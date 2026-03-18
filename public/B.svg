@@ -1,0 +1,96 @@
+<svg viewBox="-20 -20 240 240" xmlns="http://www.w3.org/2000/svg">
+  <style>
+    /* אנימציית נצנוץ וצל יוקרתי לאות B - הואט ל-6 שניות */
+    @keyframes premiumGlow {
+      0% { filter: drop-shadow(0 4px 6px rgba(0,0,0,0.5)); }
+      50% { filter: drop-shadow(0 0 18px rgba(212,175,55,0.7)) brightness(1.15); }
+      100% { filter: drop-shadow(0 4px 6px rgba(0,0,0,0.5)); }
+    }
+    .b-shape {
+      animation: premiumGlow 6s infinite ease-in-out;
+    }
+
+    /* אנימציית ציור החץ - הואט ל-4 שניות לזרימה חלקה ומרשימה */
+    .arrow-line-path {
+      stroke-dasharray: 400; 
+      stroke-dashoffset: 400;
+      animation: drawAction 4s forwards ease-in-out;
+    }
+    @keyframes drawAction {
+      to { stroke-dashoffset: 0; }
+    }
+
+    /* אנימציית ראש החץ - מופיע בדיוק רגע לפני סיום הקו (ב-3.8 שניות) */
+    .arrow-head-group {
+      opacity: 0;
+      animation: popHead 0.4s 3.8s forwards cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+    @keyframes popHead {
+      from { opacity: 0; transform: scale(0.5); }
+      to { opacity: 1; transform: scale(1); }
+    }
+  </style>
+
+  <defs>
+    <!-- גרדיאנט זהב יוקרתי לאות B משופר וחי יותר -->
+    <linearGradient id="premiumGold" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#9A7628" />
+      <stop offset="25%" stop-color="#E8C557" />
+      <stop offset="50%" stop-color="#FFFACD" />
+      <stop offset="75%" stop-color="#D4AF37" />
+      <stop offset="100%" stop-color="#8A6628" />
+    </linearGradient>
+
+    <!-- גרדיאנט החץ שעולה (מזהב, לאדום, לירוק בוהק) -->
+    <linearGradient id="rainbowFlow" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#FFD700" /> 
+      <stop offset="45%" stop-color="#FF3B3B" /> 
+      <stop offset="100%" stop-color="#00E676" /> 
+    </linearGradient>
+
+    <!-- מסיכת המנהרה שעושה את אפקט התלת-ממד -->
+    <mask id="tunnelMask">
+      <rect x="-100" y="-100" width="400" height="400" fill="white" />
+      <!-- המלבן השחור יסתיר את מרכז החץ וייתן תחושה שהוא עובר "מאחורי" האות B -->
+      <rect x="30" y="55" width="140" height="58" fill="black" />
+    </mask>
+  </defs>
+
+  <!-- עטפנו את כל הלוגו בקבוצה עם זווית קדמית (Skew) למראה של מהירות וספורטיביות! -->
+  <g transform="translate(18, 0) skewX(-10)">
+    
+    <!-- צורת האות B -->
+    <path d="M 45 20 L 45 180 L 115 180 C 150 180, 175 165, 175 140 C 175 120, 160 105, 140 100 C 155 95, 165 85, 165 65 C 165 40, 145 20, 105 20 Z M 80 55 L 105 55 C 120 55, 125 60, 125 70 C 125 80, 120 85, 105 85 L 80 85 Z M 80 115 L 110 115 C 130 115, 135 125, 135 135 C 135 145, 130 150, 110 150 L 80 150 Z" 
+          fill="url(#premiumGold)" 
+          class="b-shape" />
+
+    <!-- קו החץ (עובר דרך המסיכה) -->
+    <path d="M20 180 L110 115 L70 85 L110 55 L185 5" 
+          class="arrow-line-path"
+          fill="none" 
+          stroke="url(#rainbowFlow)" 
+          stroke-width="15" 
+          stroke-linecap="round" 
+          stroke-linejoin="round"
+          mask="url(#tunnelMask)" />
+
+    <!-- ראש החץ והנצנוץ -->
+    <g class="arrow-head-group" style="transform-origin: 185px 5px;">
+      <!-- איגדנו את הראש והנצנוץ כדי לסובב אותם יחד לזווית המושלמת של הקו -->
+      <g transform="rotate(-33.7, 185, 5)">
+        
+        <!-- ראש חץ משופר: ארוך יותר, חד יותר (כמו חץ של מטוס קרב) עם זוהר משלו -->
+        <polygon points="135,-25 195,5 135,35 155,5" 
+              fill="#00E676" 
+              style="filter: drop-shadow(0 0 6px rgba(0, 230, 118, 0.8));" />
+        
+        <!-- נצנוץ לבן בקצה החץ (מוקם בדיוק בקצה החדש) -->
+        <circle cx="192" cy="5" r="3" fill="white" style="filter: drop-shadow(0 0 4px white);">
+          <animate attributeName="opacity" values="0;1;0" dur="2.5s" repeatCount="indefinite" begin="4s" />
+        </circle>
+        
+      </g>
+    </g>
+  </g>
+
+</svg>

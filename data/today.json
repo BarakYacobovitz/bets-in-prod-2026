@@ -1,0 +1,12 @@
+[
+  {
+    "id": "test_today_match",
+    "homeTeam": "אוסטרליה",
+    "awayTeam": "ארגנטינה",
+    "matchDate": "11/03/2026 21:00",
+    "group": "A",
+    "matchday": 1,
+    "stage": "GROUPS",
+    "isFinished": false
+  }
+]

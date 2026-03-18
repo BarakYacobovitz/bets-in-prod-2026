@@ -1,0 +1,29 @@
+[
+  { "id": "m01", "group": "A", "homeTeam": "מקסיקו", "awayTeam": "ניגריה", "matchDate": "08/03/2026 10:00", "matchday": 1, "stage": "GROUP" },
+  { "id": "m02", "group": "A", "homeTeam": "גרמניה", "awayTeam": "יפן", "matchDate": "08/03/2026 14:00", "matchday": 1, "stage": "GROUP" },
+  { "id": "m03", "group": "A", "homeTeam": "מקסיקו", "awayTeam": "גרמניה", "matchDate": "16/06/2026 18:00", "matchday": 2, "stage": "GROUP" },
+  { "id": "m04", "group": "A", "homeTeam": "ניגריה", "awayTeam": "יפן", "matchDate": "16/06/2026 21:00", "matchday": 2, "stage": "GROUP" },
+  { "id": "m05", "group": "A", "homeTeam": "יפן", "awayTeam": "מקסיקו", "matchDate": "21/06/2026 17:00", "matchday": 3, "stage": "GROUP" },
+  { "id": "m06", "group": "A", "homeTeam": "ניגריה", "awayTeam": "גרמניה", "matchDate": "21/06/2026 17:00", "matchday": 3, "stage": "GROUP" },
+
+  { "id": "m07", "group": "B", "homeTeam": "קנדה", "awayTeam": "קולומביה", "matchDate": "08/03/2026 13:00", "matchday": 1, "stage": "GROUP" },
+  { "id": "m08", "group": "B", "homeTeam": "אנגליה", "awayTeam": "סנגל", "matchDate": "08/03/2026 17:00", "matchday": 1, "stage": "GROUP" },
+  { "id": "m09", "group": "B", "homeTeam": "קנדה", "awayTeam": "אנגליה", "matchDate": "17/06/2026 18:00", "matchday": 2, "stage": "GROUP" },
+  { "id": "m10", "group": "B", "homeTeam": "קולומביה", "awayTeam": "סנגל", "matchDate": "17/06/2026 21:00", "matchday": 2, "stage": "GROUP" },
+  { "id": "m11", "group": "B", "homeTeam": "סנגל", "awayTeam": "קנדה", "matchDate": "22/06/2026 17:00", "matchday": 3, "stage": "GROUP" },
+  { "id": "m12", "group": "B", "homeTeam": "קולומביה", "awayTeam": "אנגליה", "matchDate": "22/06/2026 17:00", "matchday": 3, "stage": "GROUP" },
+
+  { "id": "m13", "group": "C", "homeTeam": "ארגנטינה", "awayTeam": "אוסטרליה", "matchDate": "13/06/2026 16:00", "matchday": 1, "stage": "GROUP" },
+  { "id": "m14", "group": "C", "homeTeam": "ספרד", "awayTeam": "מרוקו", "matchDate": "13/06/2026 20:00", "matchday": 1, "stage": "GROUP" },
+  { "id": "m15", "group": "C", "homeTeam": "ארגנטינה", "awayTeam": "ספרד", "matchDate": "18/06/2026 18:00", "matchday": 2, "stage": "GROUP" },
+  { "id": "m16", "group": "C", "homeTeam": "אוסטרליה", "awayTeam": "מרוקו", "matchDate": "18/06/2026 21:00", "matchday": 2, "stage": "GROUP" },
+  { "id": "m17", "group": "C", "homeTeam": "מרוקו", "awayTeam": "ארגנטינה", "matchDate": "23/06/2026 17:00", "matchday": 3, "stage": "GROUP" },
+  { "id": "m18", "group": "C", "homeTeam": "אוסטרליה", "awayTeam": "ספרד", "matchDate": "23/06/2026 17:00", "matchday": 3, "stage": "GROUP" },
+
+  { "id": "m19", "group": "D", "homeTeam": "ברזיל", "awayTeam": "קרואטיה", "matchDate": "14/06/2026 16:00", "matchday": 1, "stage": "GROUP" },
+  { "id": "m20", "group": "D", "homeTeam": "ארה\"ב", "awayTeam": "דרום קוריאה", "matchDate": "14/06/2026 20:00", "matchday": 1, "stage": "GROUP" },
+  { "id": "m21", "group": "D", "homeTeam": "ברזיל", "awayTeam": "ארה\"ב", "matchDate": "19/06/2026 18:00", "matchday": 2, "stage": "GROUP" },
+  { "id": "m22", "group": "D", "homeTeam": "קרואטיה", "awayTeam": "דרום קוריאה", "matchDate": "19/06/2026 21:00", "matchday": 2, "stage": "GROUP" },
+  { "id": "m23", "group": "D", "homeTeam": "דרום קוריאה", "awayTeam": "ברזיל", "matchDate": "24/06/2026 17:00", "matchday": 3, "stage": "GROUP" },
+  { "id": "m24", "group": "D", "homeTeam": "קרואטיה", "awayTeam": "ארה\"ב", "matchDate": "24/06/2026 17:00", "matchday": 3, "stage": "GROUP" }
+]

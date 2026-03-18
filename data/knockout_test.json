@@ -1,0 +1,58 @@
+[
+  {
+    "id": "k01",
+    "stage": "KNOCKOUT",
+    "roundName": "32 הגדולות",
+    "homeTeam": "מקסיקו",
+    "awayTeam": "אנגליה",
+    "matchDate": "28/06/2026 18:00"
+  },
+  {
+    "id": "k02",
+    "stage": "KNOCKOUT",
+    "roundName": "32 הגדולות",
+    "homeTeam": "ארגנטינה",
+    "awayTeam": "דרום קוריאה",
+    "matchDate": "28/06/2026 22:00"
+  },
+  {
+    "id": "k03",
+    "stage": "KNOCKOUT",
+    "roundName": "שמינית גמר",
+    "homeTeam": "ברזיל",
+    "awayTeam": "ספרד",
+    "matchDate": "04/07/2026 18:00"
+  },
+  {
+    "id": "k04",
+    "stage": "KNOCKOUT",
+    "roundName": "שמינית גמר",
+    "homeTeam": "פורטוגל",
+    "awayTeam": "הולנד",
+    "matchDate": "05/07/2026 22:00"
+  },
+  {
+    "id": "k05",
+    "stage": "KNOCKOUT",
+    "roundName": "רבע גמר",
+    "homeTeam": "צרפת",
+    "awayTeam": "גרמניה",
+    "matchDate": "09/07/2026 22:00"
+  },
+  {
+    "id": "k06",
+    "stage": "KNOCKOUT",
+    "roundName": "חצי גמר",
+    "homeTeam": "ברזיל",
+    "awayTeam": "ארגנטינה",
+    "matchDate": "14/07/2026 22:00"
+  },
+  {
+    "id": "k07",
+    "stage": "KNOCKOUT",
+    "roundName": "גמר",
+    "homeTeam": "ארגנטינה",
+    "awayTeam": "צרפת",
+    "matchDate": "19/07/2026 22:00"
+  }
+]

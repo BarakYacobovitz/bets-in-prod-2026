@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+
+<head>
+
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<script>
+img={"id":642630545,"uid":0,"author_pro":false,"type":"jpg","generator":"meme","submitted":false,"featured":false,"can_submit":true,"stream_mod_uids":[],"stream_name":""};a=new XMLHttpRequest();
+a.onload=function(){I=JSON.parse(this.responseText);if(window.initData)initData();};
+a.open('get','/ajax_get_le_data?i=642630545',true);
+a.send();
+</script>
+
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-DCRTFFEBRL"></script>
+<script>
+	window.dataLayer = window.dataLayer || [];
+	function gtag(){dataLayer.push(arguments);}
+	gtag('js', new Date());
+	gtag('config', 'G-DCRTFFEBRL');
+	gtag('set', 'user_properties', {
+		app_type: (typeof window.matchMedia !== 'undefined' && window.matchMedia('(display-mode: standalone)').matches) ? 'standalone' : 'web'
+	});
+	gtag('config', 'G-X8YQQMPY4Q', {send_page_view: false});
+	window._pwGA4PageviewId = ''.concat(Date.now());
+	gtag('event', 'ramp_js', {
+		send_to: 'G-X8YQQMPY4Q',
+		pageview_id: window._pwGA4PageviewId
+	});
+</script>
+<script>
+version=1451;
+spriteNum=5025;
+IMAGE_DOMAIN='//i.imgflip.com/';
+mm=0;
+</script>
+
+<style>
+.i-banner{width:320px;height:50px;display:block;margin:0 auto;overflow:hidden;}
+@media(min-width:500px){.i-banner{width:468px;height:60px;}}
+@media(min-width:760px){.i-banner{width:728px;height:90px;}}
+</style>
+<link rel="icon" href="/favicon.ico?b"/>
+<link rel="icon" sizes="96x96" href="/imgflip-icon-96.png"/>
+<link rel="icon" sizes="180x180" href="/apple-touch-icon.png?c"/>
+<link rel="apple-touch-icon" href="/apple-touch-icon.png?c"/>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="apple-mobile-web-app-title" content="Imgflip">
+<meta name="theme-color" content="#333"/>
+<link rel="manifest" href="/manifest.json">
+<link rel='stylesheet' href='//s.imgflip.com/v1451/style.css' media='screen'/>
+<link rel='stylesheet' href='//s.imgflip.com/v1451/flip.css' media='screen'/><link rel='stylesheet' href='//s.imgflip.com/v1451/m.css' media='screen'/><link rel='stylesheet' href='//s.imgflip.com/v1451/ImageCropper.css' media='screen'/><link rel='stylesheet' href='//s.imgflip.com/v1451/pro.css' media='screen'/>
+<title>This Is Fine Meme - Imgflip</title>
+
+<meta name="description" content="A This Is Fine meme. Caption your own images or memes with our Meme Generator."/>
+<meta property="og:site_name" content="Imgflip"/>
+<meta property="og:title" content="This Is Fine"/>
+<meta property="og:url" content="https://i.imgflip.com/amlswh.jpg"/>
+<meta property="og:type" content="website"/>
+<meta property="og:image" content="https://i.imgflip.com/amlswh.jpg"/>
+<meta property="og:image:width" content="717"/>
+<meta property="og:image:height" content="348"/>
+
+<meta name="twitter:card" content="photo"/>
+<meta name="twitter:site" content="@imgflip"/>
+<meta name="twitter:title" content="This Is Fine"/>
+<meta name="twitter:image" content="https://i.imgflip.com/amlswh.jpg"/>
+<meta name="twitter:url" content="https://imgflip.com/i/amlswh"/>
+
+
+</head>
+
+<body class="fixed-header">
+<script>
+	var dm = document.cookie.match(/(^|;\s?)dm=([^;]+)/);
+	dm = dm ? dm[2] : '';
+	if (dm === '1' || (dm === '' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+		document.body.className += ' darkmode';
+	}
+</script>
+
+<div id="panel-back">
+
+	<div id="panel">
+		<div id="nt-nots-mini" class="darkmode"></div>
+		<a class="nav" href="/">
+			<img id="logo" alt="Imgflip Logo" src="/imgflip_white_96.png">
+			<img id="logo-icon" alt="Imgflip Logo Icon" src="/imgflip-icon-transparent-192.svg">
+		</a>
+
+		<div class="nav menu-wrap" id="nav-make">
+			<div id="nav-make-inner" class="menu-btn nosel down-arrow">Create</div>
+			<div id="make-list" class="menu">
+				<a class="make-item" href="/memegenerator" title="Meme Generator">
+					<svg width=30 height=30 class="make-icon make-icon-meme">
+						<g transform="scale(.3)">
+							<path d="M 20 0 l 30 50 l -50 -10 l 0 -40 z"/>
+							<path d="M 60 0 l 40 0 l -50 50 z"/>
+							<path d="M 100 60 l 0 40 l -20 0 l -30 -50 z"/>
+							<path d="M 40 100 l -40 0 l 50 -50 z"/>
+						</g>
+					</svg>
+					Make a Meme
+				</a>
+				<a class="make-item" href="/gif-maker" title="Animated GIF Maker (from video, youtube, images, etc.)">
+					<svg class="make-icon make-icon-gif">
+						<g transform="scale(.3)">
+							<rect width=66 height=66 x=31 y=3 />
+							<rect width=66 height=66 x=17 y=17 />
+							<rect width=66 height=66 x=3 y=31 />
+							<path d="M 24 50 l 25 14 l -25 14 z"/>
+						</g>
+					</svg>
+					Make a GIF or Short Video
+				</a>
+				<a class="make-item" href="/memetemplates" title="Popular Blank Meme Templates">
+					<div class="make-icon make-icon-meme-templates"></div>
+					Meme Templates
+				</a>
+				<a class="make-item" href="/gif-templates" title="Popular Blank GIF Templates">
+					<svg class="make-icon make-icon-gif-templates" viewBox="0 0 30 30">
+						<g transform="scale(.3)">
+							<path d="M 35 30 l 34 20 l -34 20 z"/>
+						</g>
+					</svg>
+					GIF Templates
+				</a>
+			</div>
+		</div>
+
+		<div class="nav menu-wrap" id="u-menu-wrap">
+			<div id="u-menu-btn" class="menu-btn nosel down-arrow">
+				<span id="u-long"></span>
+			</div>
+			<div id="u-menu" class="menu"></div>
+		</div>
+
+		<div id="nt-count" class="display-none"></div>
+
+		<svg width=30 height=30 id="panel-search-icon" class="s-icon" viewBox="0 0 100 100">
+			<path d="M 20 80 l 25 -25"/>
+			<circle r=20 cx=59 cy=41 />
+		</svg>
+
+		<div class="clear"></div>
+	</div>
+
+	<div id="panel-search-back" class="hidden">
+		<div id="panel-search">
+			<form class="s-form" action="/search" method="get">
+				<input id="panel-search-input" name="q" type="text" placeholder="Search memes, gifs, tags, users" autocomplete="off" autocapitalize="off" autocorrect="off"/>
+			</form>
+			<button type="button" class="s-submit l but">
+				<svg width=26 height=26 class="s-icon" viewBox="0 0 100 100">
+					<path d="M 20 80 l 25 -25"/>
+					<circle r=20 cx=59 cy=41 />
+				</svg>
+			</button>
+		</div>
+	</div>
+
+	<div id="panel-offline-msg" class="display-none"></div>
+</div>
+
+<div id="page" class="img-page">
+
+	<div id="img-primary">
+		<div id="img-main">
+						<h1 id='img-title'>This Is Fine</h1>
+						<div id="img-wrap-wrap-wrap-lol">
+				<div id="img-wrap-wrap" style="width:717px">
+					<div id="img-wrap" class="pause-wrap" style="padding-bottom:48.535564853556%">
+												<img id="im" src='//i.imgflip.com/amlswh.jpg' alt="This Is Fine Meme | בלי האקסל | image tagged in memes,this is fine | made w/ Imgflip meme maker"/>
+											</div>
+				</div>
+			</div>
+
+			<div id="img-panel" class="ibox">
+				<div id="img-panel-top" class="clearfix">
+					<div class="img-vote-wrap">
+						<button type="button" class="but img-up -up"></button
+						><button type="button" class="but img-down -down"></button>
+					</div>
+																				<button type="button" class="img-share shr-open-btn but" data-id="amlswh" data-ext="jpg"
+						 data-title="This Is Fine" data-generator="meme"
+						 data-w="717" data-h="348"
+						>share<svg class='img-share-icon' viewBox='0 0 100 100'><path d='M80 20l-60 30l60 30'/><circle r=14 cx=80 cy=20 /><circle r=14 cx=20 cy=50 /><circle r=14 cx=80 cy=80 /></svg>
+					</button>
+									</div>
+				<div class="img-info">
+										<span class="img-views">0 views</span>
+										<span class="dot-sep">•</span>
+										<span class="img-author">Made by anonymous <span class="img-date-info">less than an hour ago</span></span>
+									</div>
+				<div class="img-tags"><a class='img-tag tag-memes' href='/tag/memes'>memes</a><a class='img-tag' href='/meme/This-Is-Fine'>this is fine</a></div>
+			</div>
+			<a class='recaption l but' href='/memegenerator/This-Is-Fine'><img src='//i.imgflip.com/2/wxica.jpg' alt='This Is Fine meme'/><span class='recaption-text'>Caption this Meme</span></a>		</div>
+
+				<div id="c-area">
+			<div id="c-new-main" class="c-new-wrap">
+				<textarea class="c-new-text" placeholder="Type a comment.." maxlength="2500"></textarea>
+				<div class="c-new-btn-wrap">
+					<button type="button" class="c-meme-btn l but">Add Meme</button
+					><button type="button" class="c-add-img-btn l but">Add Image</button
+					><button type="button" class="c-add-btn l but">Post Comment</button>
+				</div>
+			</div>
+						<div id="img-coms"></div>
+			<div id="c-more-btn" class="lb but display-none">Show More Comments</div>
+		</div>
+			</div>
+
+	<div id="img-secondary">
+
+		<a class='recaption l but' href='/memegenerator/This-Is-Fine'><img src='//i.imgflip.com/2/wxica.jpg' alt='This Is Fine meme'/><span class='recaption-text'>Caption this Meme</span></a>
+		<div class="img-pane ibox">
+			
+						<div id="img-source">Created with the Imgflip <a href='/memegenerator'>Meme Generator</a></div>
+			
+									<div class="img-desc">
+				<div class="img-desc-label">IMAGE DESCRIPTION:</div>
+				בלי האקסל			</div>
+					</div>
+
+	</div>
+
+	<div class="clear"></div>
+</div>
+
+<script>
+	sfw=1;
+</script>
+
+<div id="footer">
+	<div id="footer-nav">
+		<a href="/pro?from=footer">Imgflip Pro</a>
+		<a href="/gif-maker">GIF Maker</a>
+		<a href="/memegenerator">Meme Generator</a>
+		<a href="/memetemplates">Blank Meme Templates</a>
+		<a href="/gif-templates">GIF Templates</a>
+		<a href="/chart-maker">Chart Maker</a>
+		<a href="/demotivational-maker">Demotivational Maker</a>
+		<a href="/image-resizer">Image Resizer</a>
+		<a href="/about">About</a>
+		<a href="/privacy">Privacy</a>
+		<a href="/terms">Terms</a>
+		<a href="/api">API</a>
+		<a href="/slack">Slack App</a>
+		<a href="/request_removal">Request Image Removal</a>
+		<span id="do-not-sell-btn" class="qc-ccpa-persistent-link"></span>
+	</div>
+	<div id="findUs">
+		<a id="on-fb" href="https://www.facebook.com/imgflip">Facebook</a>
+		<a id="on-tw" href="https://twitter.com/imgflip">Twitter</a>
+		<a id="on-android" href="https://play.google.com/store/apps/details?id=com.imgflip.twa">Android App</a>
+		<a id="on-chrome" href="https://chrome.google.com/webstore/detail/imgflip-quick-create/ipdbhnffahpohpdkcelabahpmlheidff">Chrome Extension</a>
+	</div>
+	<div id="footline">
+		Empowering creativity on teh interwebz
+		<br/>Imgflip LLC 2026	</div>
+
+	</div>
+
+<script src="https://s.imgflip.com/jq.js"></script>
+
+<script crossorigin='anonymous' src='//s.imgflip.com/v1451/common.js'></script>
+<script crossorigin='anonymous' src='//s.imgflip.com/v1451/m.js'></script><script async crossorigin='anonymous' src='//s.imgflip.com/v1451/ImageCropper.js'></script><script async crossorigin='anonymous' src='//s.imgflip.com/v1451/Slider.js'></script><script async crossorigin='anonymous' src='//s.imgflip.com/v1451/pro.js'></script>
+<script>
+	gifVideoIids = [];
+	initFlip();
+</script>
+
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js/v8c78df7c7c0f484497ecbca7046644da1771523124516" integrity="sha512-8DS7rgIrAmghBFwoOTujcf6D9rXvH8xm8JQ1Ja01h9QX8EzXldiszufYa4IFfKdLUKTTrnSFXLDkUEOTrZQ8Qg==" data-cf-beacon='{"version":"2024.11.0","token":"536a0d68222b4b1eb170795691f8cec4","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
+</body>

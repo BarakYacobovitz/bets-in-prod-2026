@@ -4,7 +4,21 @@
   --background: #ffffff;
   --foreground: #171717;
 }
+@keyframes arrowFlow {
+  0% {
+    stroke-dashoffset: 4000;
+  }
+  100% {
+    stroke-dashoffset: 0;
+  }
+}
 
+.neon-arrow-flow {
+  stroke-dasharray: 4000;
+  animation: arrowFlow 3s linear infinite;
+  /* אפקט זוהר עדין מסביב לקו הזורם */
+  filter: drop-shadow(0 0 8px rgba(0, 225, 255, 0.6));
+}
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
