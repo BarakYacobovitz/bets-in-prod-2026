@@ -2,6 +2,7 @@
 import { useState, useEffect, useRef } from "react";
 import { doc, setDoc, collection, query, where, getDocs, onSnapshot } from "firebase/firestore";
 import { db } from "../app/firebase";
+import { getFlagUrl } from "../app/utils/flags"; // ודא שהנתיב נכון
 
 export default function MatchCard({ match, userId, tournamentState = 0 }: { match: any, userId: string, tournamentState?: number }) {
   const [homeScore, setHomeScore] = useState("");
@@ -25,7 +26,6 @@ export default function MatchCard({ match, userId, tournamentState = 0 }: { matc
     return () => clearInterval(interval);
   }, []);
 
-  // שליפת הניחוש בזמן אמת
   useEffect(() => {
     if (!userId || !match.id) return;
     const collectionName = match.stage === "KNOCKOUT" ? "predictions_knockout" : "predictions_matches";
@@ -47,7 +47,6 @@ export default function MatchCard({ match, userId, tournamentState = 0 }: { matc
     return () => unsubscribe();
   }, [userId, match.id, match.stage]);
 
-  // שמירה אוטומטית - הוצאנו מכאן את אוטומציית המעפילה כדי שלא תדרוס אותך!
   useEffect(() => {
     if (!isLoaded.current || !isUserAction.current) return;
 
@@ -82,7 +81,6 @@ export default function MatchCard({ match, userId, tournamentState = 0 }: { matc
     return () => clearTimeout(timer);
   }, [homeScore, awayScore, qualifier, userId, match]);
 
-  // לוגיקת האוטומציה של המעפילה - עכשיו רצה רק כשמשנים תוצאה
   const updateDefaultQualifier = (hScore: string, aScore: string) => {
     if (hScore === "" || aScore === "") return;
     const h = Number(hScore);
@@ -233,7 +231,6 @@ export default function MatchCard({ match, userId, tournamentState = 0 }: { matc
     <>
       <div className={`rounded-2xl p-5 sm:p-7 w-full max-w-lg mx-auto relative ${cardStyle}`} dir="rtl">
         
-        {/* הפינה השמאלית העליונה - כפתור ההגרלה */}
         <div className="absolute top-4 left-4 z-10">
           {match.isFinished ? (
             getPointsBadge(myPoints)
@@ -250,20 +247,18 @@ export default function MatchCard({ match, userId, tournamentState = 0 }: { matc
           ) : null}
         </div>
 
-        {/* תווית השלב */}
         <div className="absolute top-4 right-4 z-10"><span className={`text-[10px] uppercase font-black tracking-wider px-2.5 py-1.5 rounded-lg bg-${themeColor}-500/10 text-${themeColor}-400 border border-${themeColor}-500/20`}>{isKnockout ? match.roundName : `בית ${match.group}`}</span></div>
 
-        {/* סטטוס ותאריך */}
         <div className="flex flex-col justify-center items-center mt-3 mb-6 gap-2">
            <div className="text-xs font-bold text-slate-400 bg-slate-900/50 px-3 py-1 rounded-full border border-slate-800">🕒 {getSmartDateText()}</div>
            {statusBadge}
         </div>
 
-        {/* אזור התוצאות */}
         <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 sm:gap-4 mb-6 mt-2">
           
-          <div className="flex justify-end">
-            <span className="text-xl sm:text-2xl font-black text-slate-100 break-words leading-tight text-left">
+          <div className="flex justify-end items-center gap-2 text-right">
+            {getFlagUrl(match.homeTeam) ? <img src={getFlagUrl(match.homeTeam)!} className="w-8 h-5.5 object-cover rounded-sm shadow-sm" alt="flag" /> : <span className="text-xl sm:text-2xl drop-shadow-md">🏳️</span>}
+            <span className="text-xl sm:text-2xl font-black text-slate-100 break-words leading-tight">
               {match.homeTeam}
             </span>
           </div>
@@ -302,10 +297,11 @@ export default function MatchCard({ match, userId, tournamentState = 0 }: { matc
             </div>
           </div>
 
-          <div className="flex justify-start">
-            <span className="text-xl sm:text-2xl font-black text-slate-100 break-words leading-tight text-right">
+          <div className="flex justify-start items-center gap-2 text-left">
+            <span className="text-xl sm:text-2xl font-black text-slate-100 break-words leading-tight">
               {match.awayTeam}
             </span>
+            {getFlagUrl(match.awayTeam) ? <img src={getFlagUrl(match.awayTeam)!} className="w-8 h-5.5 object-cover rounded-sm shadow-sm" alt="flag" /> : <span className="text-xl sm:text-2xl drop-shadow-md">🏳️</span>}
           </div>
           
         </div>
@@ -317,10 +313,9 @@ export default function MatchCard({ match, userId, tournamentState = 0 }: { matc
             </div>
         )}
 
-        {/* --- בחירת עולה בשלבי נוקאאוט (כפתורים במקום SELECT!) --- */}
         {isKnockout && (
           <div className="bg-slate-900/80 p-4 rounded-xl border border-slate-700/50 mb-2 shadow-inner relative">
-            {match.isFinished && match.realQualifier && (<div className="absolute top-2 left-3 text-[10px] text-emerald-400 font-black tracking-wide bg-emerald-900/20 px-2 py-0.5 rounded">העפילה: {match.realQualifier}</div>)}
+            {match.isFinished && match.realQualifier && (<div className="absolute top-2 left-3 text-[10px] text-emerald-400 font-black tracking-wide bg-emerald-900/20 px-2 py-0.5 rounded flex items-center gap-1.5">העפילה: {getFlagUrl(match.realQualifier) ? <img src={getFlagUrl(match.realQualifier)!} className="w-4 h-3 object-cover rounded-sm" alt="flag"/> : <span>🏳️</span>} {match.realQualifier}</div>)}
             <label className="block text-slate-400 text-[11px] uppercase tracking-wider mb-3 font-black text-center">
               מי תעלה לשלב הבא?
             </label>
@@ -330,7 +325,7 @@ export default function MatchCard({ match, userId, tournamentState = 0 }: { matc
                 type="button" 
                 disabled={isLocked}
                 onClick={() => { isUserAction.current = true; setQualifier(match.homeTeam); }}
-                className={`flex-1 py-3 rounded-xl font-black text-sm transition-all border-2 flex items-center justify-center ${
+                className={`flex-1 py-3 rounded-xl font-black text-sm transition-all border-2 flex items-center justify-center gap-1.5 ${
                   isLocked ? "cursor-not-allowed opacity-70" : "cursor-pointer active:scale-95 hover:border-slate-500"
                 } ${
                   qualifier === match.homeTeam
@@ -340,14 +335,15 @@ export default function MatchCard({ match, userId, tournamentState = 0 }: { matc
                     : "bg-slate-900 text-slate-400 border-slate-700"
                 }`}
               >
-                {match.homeTeam}
+                {getFlagUrl(match.homeTeam) ? <img src={getFlagUrl(match.homeTeam)!} className="w-5 h-3.5 object-cover rounded-sm shadow-sm" alt="flag" /> : <span>🏳️</span>}
+                <span>{match.homeTeam}</span>
               </button>
 
               <button
                 type="button" 
                 disabled={isLocked}
                 onClick={() => { isUserAction.current = true; setQualifier(match.awayTeam); }}
-                className={`flex-1 py-3 rounded-xl font-black text-sm transition-all border-2 flex items-center justify-center ${
+                className={`flex-1 py-3 rounded-xl font-black text-sm transition-all border-2 flex items-center justify-center gap-1.5 ${
                   isLocked ? "cursor-not-allowed opacity-70" : "cursor-pointer active:scale-95 hover:border-slate-500"
                 } ${
                   qualifier === match.awayTeam
@@ -357,11 +353,11 @@ export default function MatchCard({ match, userId, tournamentState = 0 }: { matc
                     : "bg-slate-900 text-slate-400 border-slate-700"
                 }`}
               >
-                {match.awayTeam}
+                {getFlagUrl(match.awayTeam) ? <img src={getFlagUrl(match.awayTeam)!} className="w-5 h-3.5 object-cover rounded-sm shadow-sm" alt="flag" /> : <span>🏳️</span>}
+                <span>{match.awayTeam}</span>
               </button>
             </div>
             
-            {/* אזהרת הגידור */}
             {qualifier !== "" && homeScore !== "" && awayScore !== "" && (
                ((Number(homeScore) > Number(awayScore) && qualifier === match.awayTeam) || 
                 (Number(awayScore) > Number(homeScore) && qualifier === match.homeTeam)) && (
@@ -375,13 +371,11 @@ export default function MatchCard({ match, userId, tournamentState = 0 }: { matc
           </div>
         )}
 
-        {/* חיווי שמירה */}
-        <div className="mt-4 h-4 flex justify-center items-center text-[11px] font-black tracking-wider uppercase">
+        <div className="mt-4 h-4 flex justify-center items-center text-[11px] font-black tracking-wider uppercase transition-opacity duration-300">
           {saveStatus === "saving" && <span className="text-amber-400/80 animate-pulse">⏳ מבצע שמירה...</span>}
           {saveStatus === "saved" && <span className="text-emerald-400">✓ נשמר בהצלחה</span>}
         </div>
 
-        {/* כפתור ריגול */}
         {isLocked && (
           <div className="mt-5 border-t border-slate-700/50 pt-4">
             <button onClick={handleOpenSpyModal} className={`w-full py-3 rounded-xl font-black text-sm transition-all border-2 flex items-center justify-center gap-2 shadow-sm ${showSpyModal ? "bg-blue-900/20 text-blue-400 border-blue-500/30" : "bg-slate-900 text-slate-400 hover:text-white border-slate-700 hover:bg-slate-800 hover:border-slate-500"}`}>
@@ -391,7 +385,6 @@ export default function MatchCard({ match, userId, tournamentState = 0 }: { matc
         )}
       </div>
 
-      {/* מודל ריגול (Spy Modal) */}
       {showSpyModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-md" dir="rtl">
           <div className="bg-gradient-to-b from-slate-800 to-slate-900 border border-slate-700 p-6 rounded-3xl w-full max-w-md max-h-[85vh] flex flex-col shadow-2xl relative">
@@ -400,16 +393,28 @@ export default function MatchCard({ match, userId, tournamentState = 0 }: { matc
                 <button onClick={() => setShowSpyModal(false)} className="w-8 h-8 flex items-center justify-center rounded-full bg-slate-800 hover:bg-rose-500/20 hover:text-rose-400 text-slate-400 transition-colors font-black border border-slate-700 hover:border-rose-500/30">✕</button>
             </div>
             
-            <div className="bg-slate-900 rounded-2xl mb-5 border border-slate-700/50 overflow-hidden shadow-inner">
+            <div className="bg-slate-900 rounded-2xl mb-5 border border-slate-700/50 overflow-hidden shadow-inner shrink-0">
                <div className="bg-slate-800/80 p-2 text-center text-[10px] text-blue-400 font-black uppercase tracking-widest">{isKnockout ? match.roundName : `מחזור ${Number(match.matchday) || 1}`}</div>
-               <div className="p-4 flex justify-between items-center text-sm font-bold text-slate-300">
-                 <div className="flex flex-col items-center flex-1"><span className="text-xl font-black text-white mb-1 tracking-tight">{match.homeTeam}</span>{match.isFinished && <span className="text-emerald-400 text-[10px] uppercase font-black bg-emerald-900/30 px-2 py-0.5 rounded border border-emerald-500/20">אמת: {match.realHomeScore}</span>}</div>
-                 <span className="text-slate-600 px-2 font-black text-xl">VS</span>
-                 <div className="flex flex-col items-center flex-1"><span className="text-xl font-black text-white mb-1 tracking-tight">{match.awayTeam}</span>{match.isFinished && <span className="text-emerald-400 text-[10px] uppercase font-black bg-emerald-900/30 px-2 py-0.5 rounded border border-emerald-500/20">אמת: {match.realAwayScore}</span>}</div>
+               <div className="p-4 flex justify-between items-center text-sm font-bold text-slate-300 gap-2">
+                 <div className="flex flex-col items-center flex-1 w-2/5 text-center">
+                   <span className="text-sm sm:text-base font-black text-white mb-1 tracking-tight flex flex-wrap items-center justify-center gap-1.5 w-full leading-snug">
+                     {getFlagUrl(match.homeTeam) ? <img src={getFlagUrl(match.homeTeam)!} className="w-6 h-4 object-cover rounded-sm shadow-sm" alt="flag" /> : <span>🏳️</span>}
+                     {match.homeTeam}
+                   </span>
+                   {match.isFinished && <span className="text-emerald-400 text-[10px] uppercase font-black bg-emerald-900/30 px-2 py-0.5 rounded border border-emerald-500/20 mt-1">אמת: {match.realHomeScore}</span>}
+                 </div>
+                 <span className="text-slate-600 px-1 font-black text-lg">VS</span>
+                 <div className="flex flex-col items-center flex-1 w-2/5 text-center">
+                   <span className="text-sm sm:text-base font-black text-white mb-1 tracking-tight flex flex-wrap items-center justify-center gap-1.5 w-full leading-snug">
+                     {match.awayTeam}
+                     {getFlagUrl(match.awayTeam) ? <img src={getFlagUrl(match.awayTeam)!} className="w-6 h-4 object-cover rounded-sm shadow-sm" alt="flag" /> : <span>🏳️</span>}
+                   </span>
+                   {match.isFinished && <span className="text-emerald-400 text-[10px] uppercase font-black bg-emerald-900/30 px-2 py-0.5 rounded border border-emerald-500/20 mt-1">אמת: {match.realAwayScore}</span>}
+                 </div>
                </div>
             </div>
             
-            <div className="overflow-y-auto custom-scrollbar flex-1 pr-1">
+            <div className="overflow-y-auto custom-scrollbar flex-1 pl-6 pr-2 pb-2">
               {isLoadingSpy ? (<div className="flex justify-center py-8 text-blue-400 animate-pulse font-black tracking-wide">טוען נתונים מהשטח... ⏳</div>) : spyData.length === 0 ? (<div className="text-center text-slate-500 py-8 font-bold">דממה... אף אחד לא ניחש את המשחק הזה.</div>) : (
                 <div className="space-y-2.5">
                   {spyData.map((data, idx) => (
@@ -423,7 +428,15 @@ export default function MatchCard({ match, userId, tournamentState = 0 }: { matc
                           <div className="text-slate-600 font-black">:</div>
                           <div className="flex flex-col items-center"><span className="text-2xl font-black text-white bg-slate-950 border border-slate-700 w-12 h-12 flex items-center justify-center rounded-xl shadow-inner">{data.away}</span></div>
                       </div>
-                      {isKnockout && data.qualifier && (<div className="mt-3 text-center"><span className="text-[10px] bg-purple-500/10 text-purple-300 px-3 py-1 rounded-md border border-purple-500/20 font-bold uppercase tracking-wide">הימר שיעפילו: {data.qualifier}</span></div>)}
+                      {isKnockout && data.qualifier && (
+                        <div className="mt-3 text-center flex justify-center">
+                          <span className="text-[10px] bg-purple-500/10 text-purple-300 px-3 py-1.5 rounded-md border border-purple-500/20 font-bold uppercase tracking-wide flex items-center gap-1.5 w-fit">
+                            <span>הימר שיעפילו:</span> 
+                            {getFlagUrl(data.qualifier) ? <img src={getFlagUrl(data.qualifier)!} className="w-4 h-3 object-cover rounded-sm shadow-sm" alt="flag" /> : <span className="text-sm">🏳️</span>}
+                            <span>{data.qualifier}</span>
+                          </span>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>

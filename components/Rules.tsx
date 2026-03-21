@@ -106,29 +106,60 @@ export default function Rules() {
         {/* קובייה 4: בונוסים ונעילות (מורחב!) */}
         <div className="bg-slate-800 p-6 md:p-8 rounded-3xl border border-slate-700 shadow-lg md:col-span-2 flex flex-col lg:flex-row gap-8">
           
-          <div className="flex-1 space-y-4">
-            <h3 className="text-xl font-bold text-amber-400 mb-4 flex items-center gap-2"><span>⭐</span> שאלות בונוס</h3>
-            <p className="text-slate-300 text-sm leading-relaxed">
-              הניקוד המדויק (למשל: רגיל, דאבל או שאלת הפתעה) מופיע בצורה בולטת ממש ליד כל שאלה במסך הבונוסים. 
-              <br/><br/>
-              <strong className="text-white">כמה דברים שחשוב לדעת:</strong>
-            </p>
-            <ul className="text-slate-300 text-sm space-y-3 list-disc list-inside pr-2">
-              <li>
-                <strong className="text-amber-200">כפל מנצחים:</strong> אם יש תיקו במציאות (לדוגמה: בחרתם באמבפה למלך השערים, ובסוף הטורניר גם הוא וגם לבנדובסקי סיימו בפסגה עם אותה כמות שערים) - כל מי שבחר באחד מהם יקבל את מלוא הנקודות! המערכת יודעת לקבל מספר תשובות נכונות לאותה שאלה.
-              </li>
-              <li>
-                <strong className="text-amber-200">סוגי בחירה:</strong> בחלק מהשאלות תתבקשו לבחור נבחרת מרשימה (ולפעמים יופיעו אפשרויות מכשילות כמו "אף נבחרת" או "כל הנבחרות").
-              </li>
-              <li>
-                <strong className="text-amber-200">שאלות פתוחות:</strong> בשאלות שבהן צריך להזין שם חופשי, תוכלו להיעזר בהשלמה האוטומטית המובנית במערכת, אבל אתם חופשיים לגמרי להקליד בעצמכם כל שם שתרצו (או פשוט להשתמש ב-🎲 שימלא עבורכם).
-              </li>
-            </ul>
+          {/* --- עמודה ימנית: הבונוסים לסוגיהם --- */}
+          <div className="flex-1 flex flex-col gap-6">
+            
+            <div className="space-y-4">
+              <h3 className="text-xl font-bold text-amber-400 mb-4 flex items-center gap-2"><span>⭐</span> שאלות בונוס רגילות</h3>
+              <p className="text-slate-300 text-sm leading-relaxed">
+                הניקוד המדויק (למשל: רגיל או דאבל) מופיע בצורה בולטת ממש ליד כל שאלה במסך הבונוסים. 
+                <br/><br/>
+                <strong className="text-white">כמה דברים שחשוב לדעת:</strong>
+              </p>
+              <ul className="text-slate-300 text-sm space-y-3 list-disc list-inside pr-2">
+                <li>
+                  <strong className="text-amber-200">כפל מנצחים:</strong> אם יש תיקו במציאות (לדוגמה: שני שחקנים מסיימים עם אותה כמות שערים) - כל מי שבחר באחד מהם יקבל את מלוא הנקודות! המערכת יודעת לקבל מספר תשובות נכונות לאותה שאלה.
+                </li>
+                <li>
+                  <strong className="text-amber-200">סוגי בחירה:</strong> בחלק מהשאלות תתבקשו לבחור נבחרת מרשימה (ולפעמים יופיעו אפשרויות מכשילות כמו "אף נבחרת" או "כל הנבחרות").
+                </li>
+                <li>
+                  <strong className="text-amber-200">שאלות פתוחות:</strong> בשאלות שבהן צריך להזין שם חופשי, תהיו חופשיים לגמרי להקליד בעצמכם כל שם שתרצו.
+                </li>
+              </ul>
+            </div>
+
+            <div className="bg-slate-900/50 p-5 rounded-2xl border border-purple-500/30 relative overflow-hidden group">
+               <div className="absolute top-0 left-0 w-32 h-32 bg-purple-500/10 rounded-full blur-3xl pointer-events-none group-hover:scale-150 transition-transform"></div>
+               <h3 className="text-lg font-black text-purple-400 mb-3 flex items-center gap-2 relative z-10"><span>🎁</span> שאלות הפתעה ("Surprise Drop")</h3>
+               <p className="text-slate-300 text-sm leading-relaxed relative z-10">
+                 במהלך הטורניר יצוצו פתאום "שאלות הפתעה". שאלות אלו לא תלויות במחזורים או בשלבי הנוק-אאוט, אלא נפתחות <b>לזמן מוגבל בלבד</b> (שעתיים, חצי יום, וכו'). 
+                 אם נכנסת לאפליקציה וראית סירנה אדומה למעלה, רוץ למלא אותן לפני שהזמן נגמר! מי שפספס - הפסיד את הנקודות.
+               </p>
+            </div>
+
+            <div className="bg-slate-900/50 p-5 rounded-2xl border border-orange-500/30 relative overflow-hidden group">
+               <div className="absolute top-0 left-0 w-32 h-32 bg-orange-500/10 rounded-full blur-3xl pointer-events-none group-hover:scale-150 transition-transform"></div>
+               <h3 className="text-lg font-black text-orange-400 mb-3 flex items-center gap-2 relative z-10"><span>🤪</span> "בעל הבית השתגע" (ניקוד לפי קרבה)</h3>
+               <p className="text-slate-300 text-sm leading-relaxed relative z-10 mb-3">
+                 בניגוד לשאלות בונוס רגילות (שבהן מקבלים 0 או 100), בחלק מהשאלות המספריות המערכת תעניק ניקוד על פי הקרבה שלך למספר האמיתי.
+               </p>
+               <ul className="text-sm font-bold text-slate-400 space-y-2 relative z-10 bg-slate-950/50 p-4 rounded-xl border border-slate-700/50">
+                 <li className="flex justify-between items-center"><span className="text-emerald-400">🎯 פגיעה בול</span> <span className="bg-slate-800 px-2 py-1 rounded">50 נק'</span></li>
+                 <li className="flex justify-between items-center"><span className="text-blue-400">✔️ טעות של עד 5 (±)</span> <span className="bg-slate-800 px-2 py-1 rounded">40 נק'</span></li>
+                 <li className="flex justify-between items-center"><span className="text-amber-400">⚠️ טעות של עד 10 (±)</span> <span className="bg-slate-800 px-2 py-1 rounded">30 נק'</span></li>
+                 <li className="flex justify-between items-center"><span className="text-orange-400">📉 טעות של עד 15 (±)</span> <span className="bg-slate-800 px-2 py-1 rounded">20 נק'</span></li>
+                 <li className="flex justify-between items-center"><span className="text-rose-400">❌ טעות של עד 20 (±)</span> <span className="bg-slate-800 px-2 py-1 rounded">10 נק'</span></li>
+               </ul>
+            </div>
+            
           </div>
 
-          <div className="w-px bg-slate-700 hidden lg:block"></div>
-          <div className="h-px bg-slate-700 lg:hidden w-full"></div>
+          {/* --- קו מפריד --- */}
+          <div className="w-px bg-slate-700 hidden lg:block shrink-0"></div>
+          <div className="h-px bg-slate-700 lg:hidden w-full shrink-0"></div>
 
+          {/* --- עמודה שמאלית: נעילות וריגול --- */}
           <div className="flex-1 space-y-4">
             <h3 className="text-xl font-bold text-rose-400 mb-4 flex items-center gap-2"><span>🔒</span> זמני נעילה וריגול</h3>
             <p className="text-slate-300 text-sm leading-relaxed">

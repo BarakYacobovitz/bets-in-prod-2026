@@ -1,21 +1,36 @@
 "use client";
 import { useState, useEffect } from "react";
-import { doc, getDoc, collection, onSnapshot, getDocs, query, where } from "firebase/firestore";
+import { doc, getDoc, collection, onSnapshot, getDocs, query, where, updateDoc, addDoc, arrayUnion, arrayRemove } from "firebase/firestore";
 import { db } from "../app/firebase";
+import { getFlagUrl } from "../app/utils/flags"; 
+import toast from "react-hot-toast";
 
 export default function Dashboard({ userId, userName, setActiveTab, tournamentState }: any) {
-  const [userStats, setUserStats] = useState<any>({ points: 0, hasPaid: false, prevPoints: 0, prevRank: 0 });
+  const [userStats, setUserStats] = useState<any>({ points: 0, hasPaid: false, prevPoints: 0, prevRank: 0, nemesisId: null });
   const [leaderboardInfo, setLeaderboardInfo] = useState({ rank: 0, totalUsers: 0 });
   const [dailyMessage, setDailyMessage] = useState("");
   const [timeLeft, setTimeLeft] = useState({ d: 0, h: 0, m: 0 });
   const [isLoading, setIsLoading] = useState(true);
   const [allUsersList, setAllUsersList] = useState<any[]>([]);
   
+  // === סטייטים לזירת הקרב (נמסיס + ליגות) ===
+  const [arenaTab, setArenaTab] = useState<"NEMESIS" | "LEAGUES">("NEMESIS");
+  
+  const [nemesisData, setNemesisData] = useState<any>(null);
+  const [nemesisInput, setNemesisInput] = useState<string>("");
+  const [isSavingNemesis, setIsSavingNemesis] = useState(false);
+
+  const [myLeagues, setMyLeagues] = useState<any[]>([]);
+  const [isLeagueLoading, setIsLeagueActionLoading] = useState(false);
+  const [selectedLeague, setSelectedLeague] = useState<any | null>(null);
+
   const [pointsFeed, setPointsFeed] = useState<any[]>([]);
   const [isFeedLoading, setIsFeedLoading] = useState(true);
   const [showFullHistory, setShowFullHistory] = useState(false);
 
   const [missingBonuses, setMissingBonuses] = useState({ count: 0, points: 0, totalOpen: 0 });
+  const [activeSurpriseAlert, setActiveSurpriseAlert] = useState<any[]>([]);
+  
   const [todayTargets, setTodayTargets] = useState<any[]>([]);
   const [todayMatches, setTodayMatches] = useState<any[]>([]);
   
@@ -84,11 +99,26 @@ export default function Dashboard({ userId, userName, setActiveTab, tournamentSt
           points: myData.totalPoints || 0,
           hasPaid: myData.hasPaid || false,
           prevPoints: myData.previousTotalPoints ?? (myData.totalPoints || 0),
-          prevRank: myData.previousRankGeneral ?? myData.displayRank
+          prevRank: myData.previousRankGeneral ?? myData.displayRank,
+          nemesisId: myData.nemesisId || null
         });
         setLeaderboardInfo({ rank: myData.displayRank, totalUsers: rankedUsers.length });
+
+        if (myData.nemesisId) {
+           const nData = rankedUsers.find(u => u.id === myData.nemesisId);
+           setNemesisData(nData || null);
+        } else {
+           setNemesisData(null);
+        }
       }
       setIsLoading(false);
+    });
+
+    const qLeagues = query(collection(db, "mini_leagues"), where("members", "array-contains", userId));
+    const unsubscribeLeagues = onSnapshot(qLeagues, (snap) => {
+        const leagues: any[] = [];
+        snap.forEach(doc => leagues.push({ id: doc.id, ...doc.data() }));
+        setMyLeagues(leagues);
     });
 
     const unsubscribeDash = onSnapshot(doc(db, "settings", "dashboard"), (dashSnap) => {
@@ -99,9 +129,78 @@ export default function Dashboard({ userId, userName, setActiveTab, tournamentSt
 
     return () => {
        unsubscribeUsers();
+       unsubscribeLeagues();
        unsubscribeDash();
     };
   }, [userId]);
+
+  const handleSaveNemesis = async () => {
+    if (!nemesisInput) return toast.error("יש לבחור יריב מהרשימה!");
+    setIsSavingNemesis(true);
+    try {
+      await updateDoc(doc(db, "users", userId), { nemesisId: nemesisInput });
+      toast.success("יריב נבחר בהצלחה! שיהיה קרב הוגן ⚔️");
+    } catch (e) { toast.error("שגיאה בשמירת היריב."); } 
+    finally { setIsSavingNemesis(false); }
+  };
+
+  const handleClearNemesis = async () => {
+    if (!confirm("בטוח שאתה רוצה לבטל את היריבות?")) return;
+    try {
+      await updateDoc(doc(db, "users", userId), { nemesisId: null });
+      setNemesisInput("");
+    } catch (e) { toast.error("שגיאה בביטול יריב."); }
+  };
+
+  const handleCreateLeague = async () => {
+      const name = prompt("איך קוראים לליגה החדשה שלכם?");
+      if (!name || name.trim() === "") return;
+      setIsLeagueActionLoading(true);
+      try {
+          const pin = Math.random().toString(36).substring(2, 8).toUpperCase(); 
+          await addDoc(collection(db, "mini_leagues"), {
+              name: name.trim(),
+              pin: pin,
+              adminId: userId,
+              members: [userId],
+              createdAt: new Date()
+          });
+          toast.success(`הליגה '${name}' הוקמה! קוד הצטרפות: ${pin}`, { duration: 6000 });
+      } catch(e) { toast.error("שגיאה בהקמת הליגה."); }
+      finally { setIsLeagueActionLoading(false); }
+  };
+
+  const handleJoinLeague = async () => {
+      const pin = prompt("הכנס קוד הצטרפות (6 תווים):");
+      if (!pin || pin.trim() === "") return;
+      setIsLeagueActionLoading(true);
+      try {
+          const q = query(collection(db, "mini_leagues"), where("pin", "==", pin.trim().toUpperCase()));
+          const snap = await getDocs(q);
+          if (snap.empty) {
+              toast.error("לא נמצאה ליגה עם הקוד הזה.");
+              return;
+          }
+          const leagueDoc = snap.docs[0];
+          const leagueData = leagueDoc.data();
+          if (leagueData.members.includes(userId)) {
+              toast.error("אתה כבר חבר בליגה הזו!");
+              return;
+          }
+          await updateDoc(doc(db, "mini_leagues", leagueDoc.id), { members: arrayUnion(userId) });
+          toast.success(`הצטרפת לליגה '${leagueData.name}' בהצלחה!`);
+      } catch(e) { toast.error("שגיאה בהצטרפות לליגה."); }
+      finally { setIsLeagueActionLoading(false); }
+  };
+
+  const handleLeaveLeague = async (leagueId: string, leagueName: string) => {
+      if (!confirm(`לצאת מהליגה '${leagueName}'?`)) return;
+      try {
+          await updateDoc(doc(db, "mini_leagues", leagueId), { members: arrayRemove(userId) });
+          setSelectedLeague(null);
+          toast.success("יצאת מהליגה.");
+      } catch(e) { toast.error("שגיאה ביציאה מהליגה."); }
+  };
 
   useEffect(() => {
     if (!userId) return;
@@ -131,33 +230,48 @@ export default function Dashboard({ userId, userName, setActiveTab, tournamentSt
         const pbSnap = await getDoc(doc(db, "predictions_bonus", userId));
         const userBonusAnswers = pbSnap.exists() ? pbSnap.data().answers || {} : {};
 
-// 1. הוספנו פונקציה קטנה שבודקת אם השאלה בכלל גלויה למשתמש עכשיו
-        const isQuestionVisible = (q: any, state: number) => {
-          if (q.phase === "KNOCKOUT") {
-            if (state < 4) return false;
-            if (q.round === "ALL" || q.round === "R32") return state >= 4;
-            if (q.round === "R16") return state >= 6;
-            if (q.round === "QF") return state >= 8;
-            if (q.round === "SF") return state >= 10;
-            if (q.round === "FINAL") return state >= 12;
-          }
-          return true;
-        };
-
+        const nowMs = new Date().getTime();
+        const activeSurprises: any[] = [];
         let openCount = 0;
         let missCount = 0;
         let missPoints = 0;
-        
+
         bonusQuestions.forEach((q: any) => {
-           // 2. התיקון: סופרים רק אם השאלה גלויה (!) וגם לא נעולה
-           if (isQuestionVisible(q, tournamentState) && !isQuestionLocked(q, tournamentState)) {
-              openCount++;
-              if (!userBonusAnswers[q.id] || userBonusAnswers[q.id].toString().trim() === "") {
-                 missCount++;
-                 missPoints += (Number(q.points) || 0);
+           const hasAnswered = userBonusAnswers[q.id] && userBonusAnswers[q.id].toString().trim() !== "";
+           
+           if (q.isSurprise) {
+              if (q.openTime && q.closeTime) {
+                 const openMs = new Date(q.openTime).getTime();
+                 const closeMs = new Date(q.closeTime).getTime();
+                 if (nowMs >= openMs && nowMs <= closeMs) {
+                    if (!hasAnswered) activeSurprises.push(q); 
+                 }
+              }
+           } 
+           else {
+              let isLocked = false;
+              if (tournamentState > 0) {
+                 if (q.phase === "TOURNAMENT" || q.phase === "GROUPS") isLocked = tournamentState >= 1;
+                 else if (q.phase === "KNOCKOUT") {
+                    if (q.round === "ALL" || q.round === "R32") isLocked = tournamentState >= 5;
+                    else if (q.round === "R16") isLocked = tournamentState >= 7;
+                    else if (q.round === "QF") isLocked = tournamentState >= 9;
+                    else if (q.round === "SF") isLocked = tournamentState >= 11;
+                    else if (q.round === "FINAL") isLocked = tournamentState >= 13;
+                 }
+              }
+              const isVisible = q.phase === "KNOCKOUT" ? (tournamentState >= 4) : true;
+              if (isVisible && !isLocked) {
+                 openCount++;
+                 if (!hasAnswered) {
+                    missCount++;
+                    missPoints += (Number(q.points) || 0);
+                 }
               }
            }
         });
+        
+        setActiveSurpriseAlert(activeSurprises);
         setMissingBonuses({ count: missCount, points: missPoints, totalOpen: openCount });
 
         const pmSnap = await getDocs(query(collection(db, "predictions_matches"), where("userId", "==", userId)));
@@ -291,6 +405,8 @@ export default function Dashboard({ userId, userName, setActiveTab, tournamentSt
       } catch(e) { console.error(e); } finally { setIsFeedLoading(false); }
     };
     fetchFeedAndRadar();
+    const surpriseInterval = setInterval(fetchFeedAndRadar, 30000); 
+    return () => clearInterval(surpriseInterval);
   }, [userId, tournamentState]);
 
   const getTrashTalk = () => {
@@ -304,11 +420,11 @@ export default function Dashboard({ userId, userName, setActiveTab, tournamentSt
     if (rankDiff > 0) {
        const passedGuy = allUsersList[myIndex + 1]; 
        const ptsStr = ptsDiff > 0 ? `אספת ${ptsDiff} נק' אתמול ו` : "";
-       return `בואנה חביבי! ${ptsStr}עלית ${rankDiff} מקומות בדירוג! אתה פשוט חד. ${passedGuy ? `השארת ל-${passedGuy.name.split(' ')[0]} אבק כרגע.` : ''}`;
+       return `בואנה חביבי! ${ptsStr}עלית ${rankDiff} מקומות בדירוג! אתה פשוט חד. ${passedGuy ? `השארת ל-${passedGuy.name?.split(' ')[0]} אבק כרגע.` : ''}`;
     } 
     else if (rankDiff < 0) {
        const guyAhead = allUsersList[myIndex - 1];
-       return `מה קורה פה? הכל בסדר בבית? צללת ${Math.abs(rankDiff)} מקומות ביום אחד... ${guyAhead ? `איך נתת ל-${guyAhead.name.split(' ')[0]} לעקוף אותך ככה בלי למצמץ?` : ''}`;
+       return `מה קורה פה? הכל בסדר בבית? צללת ${Math.abs(rankDiff)} מקומות ביום אחד... ${guyAhead ? `איך נתת ל-${guyAhead.name?.split(' ')[0]} לעקוף אותך ככה בלי למצמץ?` : ''}`;
     } 
     else if (ptsDiff > 0) {
        return `יפה, שאבת ${ptsDiff} נקודות לקופה! הדירוג נשאר זהה אבל אתה מטפס למעלה. תמשיך ככה!`;
@@ -327,7 +443,6 @@ export default function Dashboard({ userId, userName, setActiveTab, tournamentSt
   
   const avgPoints = allUsersList.length > 0 ? Math.round(allUsersList.reduce((sum, u) => sum + (u.totalPoints || 0), 0) / allUsersList.length) : 0;
   
-  // השולפים של המובילים לסיידבר
   const currentLeader = allUsersList.length > 0 ? allUsersList[0].name?.split(' ')[0] : "אין";
   const currentKoLeader = allUsersList.length > 0 ? [...allUsersList].sort((a, b) => (b.knockoutPoints || 0) - (a.knockoutPoints || 0))[0]?.name?.split(' ')[0] : "אין";
 
@@ -358,7 +473,27 @@ export default function Dashboard({ userId, userName, setActiveTab, tournamentSt
   return (
     <div className="w-full space-y-8 animate-fade-in-up">
       
-      {/* 1. כרטיס חדר ההלבשה */}
+      {/* 🚨 באנר שאלת הפתעה! 🚨 */}
+      {activeSurpriseAlert.length > 0 && (
+         <div className="bg-gradient-to-r from-purple-600 via-pink-600 to-purple-600 p-6 rounded-3xl border border-purple-300 shadow-[0_0_40px_rgba(168,85,247,0.6)] relative overflow-hidden animate-pulse">
+            <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0IiBoZWlnaHQ9IjQiPgo8cmVjdCB3aWR0aD0iNCIgaGVpZ2h0PSI0IiBmaWxsPSIjZmZmIiBmaWxsLW9wYWNpdHk9IjAuMSIvPgo8L3N2Zz4=')] opacity-30"></div>
+            <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-6 text-center md:text-right">
+               <div>
+                  <h2 className="text-3xl font-black text-white mb-2 flex items-center justify-center md:justify-start gap-3 drop-shadow-md">
+                     <span className="animate-bounce">🎁</span> שאלת הפתעה באוויר!
+                  </h2>
+                  <p className="text-white/90 font-medium text-lg leading-snug">
+                     האדמין פתח עכשיו <strong>{activeSurpriseAlert.length} שאלות הפתעה</strong> לזמן מוגבל מאוד!<br/>כנס מהר לענות עליהן לפני שהשעון ייגמר.
+                  </p>
+               </div>
+               <button onClick={() => setActiveTab(4)} className="bg-white text-purple-700 hover:bg-slate-100 font-black px-8 py-4 rounded-xl text-lg shadow-xl hover:-translate-y-1 transition-transform w-full md:w-auto flex-shrink-0">
+                  לקחת אותי לבונוסים! 🏃‍♂️
+               </button>
+            </div>
+         </div>
+      )}
+
+      {/* כרטיס חדר ההלבשה */}
       <div className="rounded-3xl p-6 md:p-10 flex flex-col md:flex-row justify-between items-center gap-8 shadow-2xl relative overflow-hidden group bg-slate-900 border border-slate-700">
          <img src="tunnel.png" alt="Bets in Prod Tunnel" className="absolute inset-0 w-full h-full object-cover z-0 opacity-40 group-hover:opacity-60 group-hover:scale-105 transition-all duration-1000 pointer-events-none" />
          <div className="absolute inset-0 z-0 bg-gradient-to-l from-slate-950/80 via-slate-900/40 to-slate-950/80 pointer-events-none"></div>
@@ -389,7 +524,7 @@ export default function Dashboard({ userId, userName, setActiveTab, tournamentSt
          </div>
       </div>
 
-      {/* 🎯 באנר דינמי ומתחלף: משחקי היום + ראדאר בונוסים! */}
+      {/* 🎯 באנר דינמי ומתחלף: משחקי היום + ראדאר בונוסים! 🎯 */}
       {(todayMatches.length > 0 || todayTargets.length > 0) && (
          <div className={`relative overflow-hidden rounded-3xl shadow-2xl border transition-colors duration-700 group bg-slate-900 ${isMatchesMode ? "border-blue-500/50" : "border-rose-500/50"}`}>
            <div className={`absolute inset-0 bg-gradient-to-r transition-opacity duration-700 ${isMatchesMode ? "from-blue-600/20 via-blue-500/5 to-cyan-500/10 opacity-100" : "opacity-0"}`}></div>
@@ -437,11 +572,17 @@ export default function Dashboard({ userId, userName, setActiveTab, tournamentSt
                         <span className="bg-slate-900 px-2 py-0.5 rounded border border-slate-700">🕒 {m.time}</span>
                         <span className="bg-blue-900/30 px-2 py-0.5 rounded border border-blue-500/20">{m.stage === "KNOCKOUT" ? m.roundName : `בית ${m.group}`}</span>
                       </div>
+                      
                       <div className="flex justify-between items-center text-white font-bold text-lg mb-4 bg-slate-900 p-2.5 rounded-xl border border-slate-800">
-                        <span className="flex-1 text-center truncate">{m.homeTeam}</span>
+                        <span className="flex-1 flex justify-center items-center gap-2 truncate" title={m.homeTeam}>
+                           {getFlagUrl(m.homeTeam) ? <img src={getFlagUrl(m.homeTeam)!} className="w-5 h-3.5 object-cover rounded-sm shadow-sm" alt="flag" /> : "🏳️"} {m.homeTeam}
+                        </span>
                         <span className="text-slate-500 text-xs mx-1 font-black">VS</span>
-                        <span className="flex-1 text-center truncate">{m.awayTeam}</span>
+                        <span className="flex-1 flex justify-center items-center gap-2 truncate" title={m.awayTeam}>
+                           {m.awayTeam} {getFlagUrl(m.awayTeam) ? <img src={getFlagUrl(m.awayTeam)!} className="w-5 h-3.5 object-cover rounded-sm shadow-sm" alt="flag" /> : "🏳️"}
+                        </span>
                       </div>
+
                       <div className="mt-auto pt-2 border-t border-slate-700/50">
                         {hasPrediction ? (
                            <div className="text-sm font-black text-emerald-400 bg-emerald-900/20 px-3 py-1.5 rounded-lg border border-emerald-500/30 text-center shadow-sm">
@@ -466,7 +607,10 @@ export default function Dashboard({ userId, userName, setActiveTab, tournamentSt
                        </div>
                     ) : (
                        <div>
-                         <div className="text-white font-bold text-lg mb-2"><span className="text-rose-400">{target.team}</span> משחקת!</div>
+                         <div className="text-white font-bold text-lg mb-2 flex items-center gap-2">
+                           {getFlagUrl(target.team) ? <img src={getFlagUrl(target.team)!} className="w-5 h-3.5 object-cover rounded-sm shadow-sm" alt="flag" /> : <span className="text-rose-400">🏳️</span>}
+                           <span className="text-rose-400">{target.team}</span> משחקת!
+                         </div>
                          <p className="text-sm text-slate-300 leading-snug">אם היא תקיים את התנאי: <br/><strong className="text-white bg-slate-800 px-2 py-0.5 rounded mt-1.5 inline-block text-xs border border-slate-700">"{target.questionLabel}"</strong></p>
                        </div>
                     )}
@@ -483,11 +627,10 @@ export default function Dashboard({ userId, userName, setActiveTab, tournamentSt
          </div>
       )}
 
-      {/* 📰 המגזין! (הטור היומי המעוצב + סיידבר מבזקים שודרג ל-🏆 כדור ו-👟 נעל הזהב!) */}
+      {/* 📰 המגזין! */}
       {dailyMessage && (
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 animate-fade-in-up">
            
-           {/* הכתבה (הטור המרכזי) */}
            <div className="lg:col-span-3 bg-slate-900 rounded-3xl border border-slate-700 shadow-xl overflow-hidden flex flex-col relative group">
               <div className="absolute inset-y-0 right-0 w-2 bg-gradient-to-b from-blue-400 to-emerald-500"></div>
               
@@ -530,7 +673,6 @@ export default function Dashboard({ userId, userName, setActiveTab, tournamentSt
               </div>
            </div>
 
-           {/* סיידבר דינמי (מבזקים) - ⚽ כדור ו-👟 נעל הזהב! */}
            <div className="lg:col-span-1 bg-slate-900 rounded-3xl border border-slate-700 shadow-xl p-6 flex flex-col gap-6">
               <h3 className="text-sm font-black text-slate-400 uppercase tracking-widest border-b border-slate-800 pb-3 flex items-center gap-2">
                  <span>⚡</span> מבזקי המערכת
@@ -575,7 +717,6 @@ export default function Dashboard({ userId, userName, setActiveTab, tournamentSt
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
          
          <div className="lg:col-span-2 space-y-6">
-            {/* טראש טוק */}
             <div className="bg-gradient-to-br from-blue-900/20 to-indigo-900/10 p-6 md:p-8 rounded-3xl border border-blue-500/30 shadow-lg relative overflow-hidden group">
                <div className="absolute -top-6 -left-4 text-9xl text-blue-500/10 font-serif leading-none group-hover:scale-110 transition-transform">"</div>
                <h3 className="text-xs font-black text-blue-400 uppercase tracking-widest mb-4 flex items-center gap-2">
@@ -586,7 +727,6 @@ export default function Dashboard({ userId, userName, setActiveTab, tournamentSt
                </p>
             </div>
 
-            {/* פיד הקבלות */}
             <div className="bg-slate-800 p-6 rounded-3xl border border-slate-700 shadow-xl flex flex-col h-[420px]">
                <div className="flex justify-between items-end border-b border-slate-700 pb-4 mb-4">
                  <h3 className="text-xl font-bold text-white flex items-center gap-2">
@@ -632,50 +772,141 @@ export default function Dashboard({ userId, userName, setActiveTab, tournamentSt
             </div>
          </div>
 
-         {/* 4. העמודה הימנית הצרה */}
          <div className="space-y-6 flex flex-col h-full">
             
-            {/* טיימר הטורניר */}
-            <div className="bg-slate-800 p-6 rounded-3xl border border-slate-700 shadow-xl relative overflow-hidden flex-shrink-0">
-               <div className="absolute top-0 right-0 w-1 h-full bg-emerald-500"></div>
-               {tournamentState === 0 ? (
-                 <div className="text-center">
-                   <h3 className="text-sm font-bold text-slate-400 mb-4 uppercase tracking-widest">שריקת הפתיחה בעוד:</h3>
-                   <div className="flex justify-center gap-3 mb-6" dir="ltr">
-                     <div className="flex flex-col items-center"><span className="text-4xl font-black text-white bg-slate-950 w-16 py-2 rounded-xl shadow-inner">{timeLeft.d}</span><span className="text-[10px] text-slate-500 uppercase mt-1 font-bold">Days</span></div><span className="text-2xl font-bold text-slate-700 mt-2">:</span>
-                     <div className="flex flex-col items-center"><span className="text-4xl font-black text-white bg-slate-950 w-16 py-2 rounded-xl shadow-inner">{timeLeft.h.toString().padStart(2,'0')}</span><span className="text-[10px] text-slate-500 uppercase mt-1 font-bold">Hrs</span></div><span className="text-2xl font-bold text-slate-700 mt-2">:</span>
-                     <div className="flex flex-col items-center"><span className="text-4xl font-black text-white bg-slate-950 w-16 py-2 rounded-xl shadow-inner">{timeLeft.m.toString().padStart(2,'0')}</span><span className="text-[10px] text-slate-500 uppercase mt-1 font-bold">Mins</span></div>
-                   </div>
-                 </div>
-               ) : (
-                 <div className="text-center py-4">
-                   <span className="text-6xl block mb-4">🏆</span>
-                   <h3 className="text-lg font-bold text-white">הטורניר בעיצומו!</h3>
-                 </div>
-               )}
-               
-               <div className={`mt-auto text-center p-3 rounded-xl border font-bold text-sm shadow-sm ${userStats.hasPaid ? "bg-emerald-950/30 text-emerald-400 border-emerald-500/30" : "bg-rose-950/30 text-rose-400 border-rose-500/30 animate-pulse"}`}>
-                 {userStats.hasPaid ? "✅ דמי ההשתתפות שולמו" : "⚠️ שים לב: טרם שילמת!"}
+            {/* ==================================================== */}
+            {/* ⚔️ הווידג'ט המשודרג: זירת הקרב (נמסיס + ליגות) ⚔️ */}
+            {/* ==================================================== */}
+            <div className="bg-slate-900 rounded-3xl border border-slate-700 shadow-xl flex-shrink-0 flex flex-col h-[320px]">
+               {/* כותרת קבועה עם טאבים בתוכה */}
+               <div className="flex bg-slate-950 rounded-t-3xl border-b border-slate-700">
+                  <button 
+                    onClick={() => setArenaTab("NEMESIS")}
+                    className={`flex-1 py-3 text-sm font-bold transition-colors rounded-tr-3xl ${arenaTab === "NEMESIS" ? "bg-slate-800 text-white shadow-inner" : "text-slate-500 hover:bg-slate-900 hover:text-slate-300"}`}
+                  >
+                    🎯 1-על-1 (נמסיס)
+                  </button>
+                  <button 
+                    onClick={() => setArenaTab("LEAGUES")}
+                    className={`flex-1 py-3 text-sm font-bold transition-colors rounded-tl-3xl ${arenaTab === "LEAGUES" ? "bg-slate-800 text-white shadow-inner" : "text-slate-500 hover:bg-slate-900 hover:text-slate-300"}`}
+                  >
+                    🏟️ ליגות פרטיות
+                  </button>
+               </div>
+
+               <div className="p-5 flex-1 flex flex-col overflow-hidden bg-slate-800 rounded-b-3xl">
+                 {/* טאב ה-NEMESIS */}
+                 {arenaTab === "NEMESIS" && (
+                    <div className="h-full flex flex-col justify-center">
+                       {!nemesisData ? (
+                         <div className="text-center animate-fade-in-up">
+                            <div className="text-white font-bold mb-1 text-sm">בחר יריב מושבע</div>
+                            <p className="text-xs text-slate-400 mb-3">מעקב לייב מול קולגה במשרד.</p>
+                            <select 
+                              value={nemesisInput} onChange={(e) => setNemesisInput(e.target.value)}
+                              className="w-full bg-slate-950 text-white p-2.5 rounded-lg border border-slate-600 mb-3 outline-none focus:border-purple-500 text-sm font-bold"
+                            >
+                              <option value="">בחר משתמש...</option>
+                              {allUsersList.filter(u => u.id !== userId).map(u => (<option key={u.id} value={u.id}>{u.name}</option>))}
+                            </select>
+                            <button onClick={handleSaveNemesis} disabled={isSavingNemesis || !nemesisInput} className="w-full bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white font-bold py-2 rounded-lg shadow-md text-sm">
+                              {isSavingNemesis ? "שומר..." : "התחל קרב!"}
+                            </button>
+                         </div>
+                       ) : (
+                         <div className="bg-gradient-to-b from-slate-800 to-slate-900 p-4 rounded-xl border border-slate-700 shadow-inner h-full flex flex-col justify-center animate-fade-in-up relative">
+                            {/* התיקון: שורת כותרת מסודרת (Flex) במקום מיקום אבסולוטי שדורס הכל */}
+                            <div className="flex justify-between items-start mb-2">
+                               <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest mt-1">ראש בראש</span>
+                               <button onClick={handleClearNemesis} className="text-slate-400 hover:text-rose-400 transition-colors text-xs font-bold bg-slate-900/50 px-2 py-1 rounded border border-slate-700 hover:border-rose-500/50 flex items-center gap-1 shadow-sm shrink-0" title="בטל יריבות">
+                                 <span>✕</span> החלף יריב
+                               </button>
+                            </div>
+                            
+                            <div className="flex justify-between items-center my-auto">
+                               <div className="flex flex-col items-center flex-1">
+                                  <span className="text-[10px] bg-blue-600 text-white px-2 py-0.5 rounded font-black mb-1">אתה</span>
+                                  <span className="text-sm font-bold text-white truncate max-w-[70px]">{userName?.split(" ")[0]}</span>
+                                  <span className="text-2xl font-black text-blue-400">{userStats.points}</span>
+                               </div>
+                               <div className="flex flex-col items-center px-1"><span className="text-xl font-black text-slate-600 italic">VS</span></div>
+                               <div className="flex flex-col items-center flex-1">
+                                  <span className="text-[10px] bg-rose-600 text-white px-2 py-0.5 rounded font-black mb-1">היריב</span>
+                                  <span className="text-sm font-bold text-white truncate max-w-[70px]">{nemesisData.name?.split(" ")[0]}</span>
+                                  <span className="text-2xl font-black text-rose-400">{nemesisData.totalPoints || 0}</span>
+                               </div>
+                            </div>
+
+                            {(() => {
+                               const myPts = userStats.points; const enemyPts = nemesisData.totalPoints || 0;
+                               const total = myPts + enemyPts || 1; const myPercent = (myPts === 0 && enemyPts === 0) ? 50 : Math.round((myPts / total) * 100);
+                               const diff = myPts - enemyPts;
+                               let msg = "";
+                               if (diff > 0) msg = `אתה רומס אותו! (פער: ${diff} נק')`;
+                               else if (diff < 0) msg = `הוא בורח לך... (פיגור: ${Math.abs(diff)} נק')`;
+                               else msg = "מלחמת התשה! שוויון מוחלט.";
+
+                               return (
+                                 <div className="mt-2">
+                                    <div className="w-full h-2.5 bg-slate-950 rounded-full overflow-hidden flex border border-slate-700/50 relative">
+                                       <div className="h-full bg-blue-500 transition-all duration-1000 ease-out" style={{ width: `${myPercent}%` }}></div>
+                                       <div className="h-full bg-rose-500 transition-all duration-1000 ease-out" style={{ width: `${100 - myPercent}%` }}></div>
+                                       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-0.5 h-full bg-white/30 z-10"></div>
+                                    </div>
+                                    <div className="text-center mt-2 text-[11px] font-bold text-slate-300">{msg}</div>
+                                 </div>
+                               );
+                            })()}
+                         </div>
+                       )}
+                    </div>
+                 )}
+
+                 {/* טאב הליגות הפרטיות */}
+                 {arenaTab === "LEAGUES" && (
+                    <div className="h-full flex flex-col animate-fade-in-up">
+                       <div className="flex gap-2 mb-3 shrink-0">
+                          <button onClick={handleCreateLeague} disabled={isLeagueLoading} className="flex-1 bg-slate-700 hover:bg-slate-600 text-white text-[11px] font-bold py-2 rounded-lg border border-slate-600 transition-colors">
+                             ➕ צור ליגה חדשה
+                          </button>
+                          <button onClick={handleJoinLeague} disabled={isLeagueLoading} className="flex-1 bg-slate-700 hover:bg-slate-600 text-white text-[11px] font-bold py-2 rounded-lg border border-slate-600 transition-colors">
+                             🔗 הצטרף עם קוד
+                          </button>
+                       </div>
+                       
+                       <div className="overflow-y-auto custom-scrollbar flex-1 pr-1 space-y-2">
+                          {myLeagues.length === 0 ? (
+                             <div className="text-center text-slate-500 text-xs py-8 px-2 leading-relaxed">
+                                עדיין לא הצטרפת לשום ליגה פרטית.<br/>צור אחת ושתף את הקוד עם החברים!
+                             </div>
+                          ) : (
+                             myLeagues.map(league => {
+                                const isMyLeague = league.adminId === userId;
+                                return (
+                                   <div 
+                                      key={league.id} 
+                                      onClick={() => setSelectedLeague(league)}
+                                      className="bg-slate-900 p-3 rounded-xl border border-slate-700 cursor-pointer hover:border-blue-500 transition-colors group flex justify-between items-center"
+                                   >
+                                      <div className="flex flex-col truncate pr-2">
+                                         <span className="font-bold text-slate-200 text-sm truncate">{league.name}</span>
+                                         <div className="flex items-center gap-2 mt-0.5">
+                                            <span className="text-[10px] text-slate-500">👤 {league.members?.length || 1} חברים</span>
+                                            {isMyLeague && <span className="text-[9px] bg-slate-800 border border-slate-600 text-slate-400 px-1.5 rounded" title="קוד ההצטרפות לליגה שפתחת">קוד: {league.pin}</span>}
+                                         </div>
+                                      </div>
+                                      <div className="text-slate-600 group-hover:text-blue-400 transition-colors">▶</div>
+                                   </div>
+                                );
+                             })
+                          )}
+                       </div>
+                    </div>
+                 )}
                </div>
             </div>
+            {/* ==================================================== */}
 
-            {/* 🔥 ווידג'ט שחקן בכושר שיא (כוכב היום) 🔥 */}
-            {starsOfTheDay.length > 0 && (
-               <div className="bg-gradient-to-br from-amber-500/20 to-orange-500/10 p-6 rounded-3xl border border-amber-500/30 shadow-xl relative overflow-hidden group">
-                  <div className="absolute top-0 right-0 text-6xl opacity-10 group-hover:scale-125 transition-transform duration-500 pointer-events-none -mt-2 -mr-2">⭐</div>
-                  <h3 className="text-sm font-black text-amber-500 uppercase tracking-widest mb-3 flex items-center gap-2">
-                     <span>🌟</span> שחקן בכושר שיא
-                  </h3>
-                  <div className="text-white font-black text-xl mb-1 leading-tight">
-                     {starsOfTheDay.map(u => u.name?.split(' ')[0]).join(', ')}
-                  </div>
-                  <div className="text-sm text-slate-300 font-medium">
-                     שאב <span className="text-amber-400 font-black">+{topGainedPoints} נק'</span> מאז העדכון האחרון. מכונה!
-                  </div>
-               </div>
-            )}
-
-            {/* ניווט מהיר */}
             <div className="bg-slate-800 p-6 rounded-3xl border border-slate-700 shadow-xl flex-shrink-0">
                <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-4">ניווט מהיר</h3>
                <div className="grid grid-cols-2 gap-3">
@@ -694,7 +925,6 @@ export default function Dashboard({ userId, userName, setActiveTab, tournamentSt
                </div>
             </div>
 
-            {/* 🔥 ווידג'ט שאלות בונוס פתוחות (כסף על הרצפה) 🔥 */}
             {missingBonuses.totalOpen > 0 && (
               <div className={`p-6 rounded-3xl border shadow-xl relative overflow-hidden group transition-all flex-1 flex flex-col justify-center ${missingBonuses.count > 0 ? "bg-slate-800 border-amber-500/50 shadow-[0_0_20px_rgba(245,158,11,0.1)] hover:border-amber-400" : "bg-slate-800/80 border-slate-700"}`}>
                  {missingBonuses.count > 0 && <div className="absolute inset-0 bg-gradient-to-br from-amber-500/10 to-orange-500/5 z-0"></div>}
@@ -730,6 +960,68 @@ export default function Dashboard({ userId, userName, setActiveTab, tournamentSt
 
          </div>
       </div>
+
+      {/* ==================================================== */}
+      {/* פופ-אפ תצוגת ליגה פרטית (טבלת מובילים פנימית) */}
+      {/* ==================================================== */}
+      {selectedLeague && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4 backdrop-blur-sm animate-fade-in-up" dir="rtl">
+          <div className="bg-slate-900 border border-slate-700 p-6 rounded-3xl w-full max-w-lg max-h-[85vh] flex flex-col shadow-2xl relative">
+            
+            <div className="flex justify-between items-start mb-6 pb-4 border-b border-slate-800">
+              <div>
+                <h3 className="text-xl font-black text-white flex items-center gap-2">
+                   <span>🏟️</span> טבלת {selectedLeague.name}
+                </h3>
+                <div className="flex items-center gap-3 mt-1">
+                   <p className="text-slate-400 text-sm">קוד הצטרפות: <strong className="text-blue-400 font-mono tracking-widest">{selectedLeague.pin}</strong></p>
+                </div>
+              </div>
+              <button onClick={() => setSelectedLeague(null)} className="w-8 h-8 flex items-center justify-center rounded-full bg-slate-800 hover:bg-rose-500/20 hover:text-rose-400 text-slate-400 transition-colors font-black text-sm border border-slate-700">✕</button>
+            </div>
+
+            <div className="overflow-y-auto custom-scrollbar flex-1 pr-2 mb-4">
+               <div className="bg-slate-950 rounded-2xl border border-slate-800 overflow-hidden">
+                  <table className="w-full text-right">
+                     <thead className="bg-slate-900/80 text-slate-500 text-xs uppercase tracking-widest">
+                        <tr>
+                           <th className="p-3 font-bold text-center w-12">#</th>
+                           <th className="p-3 font-bold">שחקן</th>
+                           <th className="p-3 font-bold text-center">נקודות</th>
+                        </tr>
+                     </thead>
+                     <tbody>
+                        {allUsersList
+                           .filter(u => selectedLeague.members.includes(u.id))
+                           .map((u, index) => {
+                              const isMe = u.id === userId;
+                              return (
+                                 <tr key={u.id} className={`border-t border-slate-800/50 ${isMe ? 'bg-blue-900/20' : 'hover:bg-slate-800/50'}`}>
+                                    <td className="p-3 text-center font-black text-slate-400">{index + 1}</td>
+                                    <td className="p-3 font-bold text-slate-200">
+                                       {u.name}
+                                       {isMe && <span className="mr-2 text-[9px] bg-blue-600 text-white px-1.5 py-0.5 rounded uppercase">אתה</span>}
+                                    </td>
+                                    <td className="p-3 text-center font-black text-amber-400 text-lg">{u.totalPoints || 0}</td>
+                                 </tr>
+                              );
+                           })
+                        }
+                     </tbody>
+                  </table>
+               </div>
+            </div>
+
+            <div className="pt-4 border-t border-slate-800 text-center">
+               <button onClick={() => handleLeaveLeague(selectedLeague.id, selectedLeague.name)} className="text-xs text-rose-500 hover:text-rose-400 font-bold underline transition-colors">
+                  🚪 עזוב את הליגה
+               </button>
+            </div>
+
+          </div>
+        </div>
+      )}
+      
     </div>
   );
 }

@@ -3,10 +3,13 @@ import { useState, useEffect, useRef } from "react";
 import { doc, getDoc, setDoc, collection, getDocs } from "firebase/firestore";
 import { db } from "../app/firebase";
 import toast from "react-hot-toast";
+import { getFlagUrl } from "../app/utils/flags"; 
 
-export default function ThirdPlaceQualifiers({ groups, userId, tournamentState = 0 }) {
+export default function ThirdPlaceQualifiers({ groups, userId, tournamentState = 0 }: any) {
   const [selectedTeams, setSelectedTeams] = useState<string[]>([]);
+  const [userQualifiers, setUserQualifiers] = useState<any>({}); // סטייט חדש לשמירת עולות 1-2
   const [realThirdPlace, setRealThirdPlace] = useState<string[]>([]); 
+  
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
   const [isRandomizing, setIsRandomizing] = useState(false);
   
@@ -17,6 +20,7 @@ export default function ThirdPlaceQualifiers({ groups, userId, tournamentState =
   const isLoaded = useRef(false);
   const isUserAction = useRef(false);
 
+  // 1. שליפת הנתונים: עולות מקום 3 + עולות מקומות 1/2 (לצורך הצלבה ואזהרה)
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -24,6 +28,12 @@ export default function ThirdPlaceQualifiers({ groups, userId, tournamentState =
         if (tSnap.exists()) {
           const savedTeams = tSnap.data().teams || [];
           setSelectedTeams(savedTeams.filter((t: string) => t !== "")); 
+        }
+        
+        // משיכת ניחושי הבתים כדי שנדע אם הוא כבר העלה נבחרת מסוימת
+        const qSnap = await getDoc(doc(db, "predictions_qualifiers", userId));
+        if (qSnap.exists()) {
+          setUserQualifiers(qSnap.data().groups || {});
         }
         
         const rSnap = await getDoc(doc(db, "admin_results", "third_place"));
@@ -37,13 +47,14 @@ export default function ThirdPlaceQualifiers({ groups, userId, tournamentState =
     if (userId) fetchData();
   }, [userId]);
 
+  // 2. שמירה אוטומטית כשיש שינוי
   useEffect(() => {
     if (!isLoaded.current || !isUserAction.current) return;
     setSaveStatus("saving");
     const timer = setTimeout(async () => {
       try {
         const paddedTeams = [...selectedTeams];
-        while (paddedTeams.length < 8) paddedTeams.push("");
+        while (paddedTeams.length < 8) paddedTeams.push(""); // משלים ל-8 מקומות במסד הנתונים
         
         await setDoc(doc(db, "predictions_third_place", userId), { teams: paddedTeams, updatedAt: new Date() }, { merge: true });
         setSaveStatus("saved");
@@ -54,6 +65,15 @@ export default function ThirdPlaceQualifiers({ groups, userId, tournamentState =
     return () => clearTimeout(timer);
   }, [selectedTeams, userId]);
 
+  // 3. פונקציית עזר לבדיקה האם הנבחרת כבר הועלתה ממקום 1/2
+  const checkIsAlreadyAdvanced = (team: string) => {
+    for (const group of Object.values(userQualifiers)) {
+      const g = group as any;
+      if (g.first === team || g.second === team) return true;
+    }
+    return false;
+  };
+
   const toggleTeam = (team: string, groupName: string) => {
     if (isLocked) return;
     isUserAction.current = true;
@@ -62,10 +82,20 @@ export default function ThirdPlaceQualifiers({ groups, userId, tournamentState =
       setSelectedTeams(prev => prev.filter(t => t !== team));
     } else {
       if (selectedTeams.length >= 8) {
-        toast.error("כבר בחרת 8 נבחרות! בטל בחירה קיימת כדי לבחור אחרת.");
+        toast.error("כבר בחרת 8 נבחרות! בטל בחירה קיימת (X בסלוט) כדי לבחור אחרת.");
         return;
       }
-      const teamsInThisGroup = Array.from(groups[groupName]);
+
+      // חיווי על סתירת נתונים (Soft Validation)
+      if (checkIsAlreadyAdvanced(team)) {
+        toast('שמנו לב שכבר העלית את הנבחרת הזו ממקום 1/2. זכותך לגדר סיכונים, אבל שים לב!', { 
+          icon: '⚠️', 
+          style: { background: '#334155', color: '#fbbf24', border: '1px solid #fbbf24' } 
+        });
+      }
+
+      // חסימת כפילות מתוך אותו בית (מותרת רק נבחרת אחת מהמקום ה-3 בכל בית)
+      const teamsInThisGroup = Array.from(groups[groupName] as any[]);
       const alreadySelectedFromGroup = selectedTeams.find(t => teamsInThisGroup.includes(t));
       
       if (alreadySelectedFromGroup) {
@@ -76,9 +106,15 @@ export default function ThirdPlaceQualifiers({ groups, userId, tournamentState =
     }
   };
 
+  // מחיקת נבחרת ישירות מתוך הסלוט למעלה
+  const handleRemoveTeam = (team: string) => {
+    if (isLocked) return;
+    isUserAction.current = true;
+    setSelectedTeams(prev => prev.filter(t => t !== team));
+  };
+
   const isLocked = tournamentState >= 1;
 
-  // 🎲 פונקציית הגרלת 8 המעפילות החכמה
   const handleRandomizeThirdPlace = async () => {
     if (isLocked) return;
     if (!confirm("להגריל 8 נבחרות אקראיות מתוך הבתים השונים?")) return;
@@ -87,32 +123,30 @@ export default function ThirdPlaceQualifiers({ groups, userId, tournamentState =
     
     try {
       const allGroupNames = Object.keys(groups);
-      // מגרילים 8 בתים מתוך ה-12
       const shuffledGroups = [...allGroupNames].sort(() => 0.5 - Math.random()).slice(0, 8);
       
       const newSelectedTeams: string[] = [];
       shuffledGroups.forEach(gName => {
         const teamsInGroup = Array.from(groups[gName] as Set<string>);
-        if (teamsInGroup.length > 0) {
-          const randomTeam = teamsInGroup[Math.floor(Math.random() * teamsInGroup.length)];
-          newSelectedTeams.push(randomTeam);
+        // סינון חכם בהגרלה: נשתדל לא להגריל נבחרת שכבר נמצאת במקום 1/2
+        const availableTeams = teamsInGroup.filter(t => !checkIsAlreadyAdvanced(t));
+        
+        if (availableTeams.length > 0) {
+          newSelectedTeams.push(availableTeams[Math.floor(Math.random() * availableTeams.length)]);
+        } else if (teamsInGroup.length > 0) {
+          newSelectedTeams.push(teamsInGroup[Math.floor(Math.random() * teamsInGroup.length)]);
         }
       });
 
       setSelectedTeams(newSelectedTeams);
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setIsRandomizing(false);
-    }
+    } catch (e) { console.error(e); } 
+    finally { setIsRandomizing(false); }
   };
 
   const calculateUserPoints = (userTeams: string[]) => {
     if (realThirdPlace.length === 0) return null;
     let pts = 0;
-    userTeams.forEach(t => {
-      if (realThirdPlace.includes(t)) pts += 10;
-    });
+    userTeams.forEach(t => { if (realThirdPlace.includes(t)) pts += 10; });
     return pts;
   };
 
@@ -146,79 +180,118 @@ export default function ThirdPlaceQualifiers({ groups, userId, tournamentState =
   const myPoints = calculateUserPoints(selectedTeams);
 
   return (
-    <div className="w-full">
-      <div className="bg-slate-900/80 p-8 rounded-3xl border border-teal-500/30 mb-8 shadow-2xl relative">
-        <div className="flex flex-col md:flex-row justify-between items-start gap-6 mb-4">
+    <div className="w-full animate-fade-in-up">
+      
+      {/* --- Header & Slots Area --- */}
+      <div className="bg-slate-900/80 p-6 md:p-8 rounded-3xl border border-teal-500/30 mb-8 shadow-2xl relative">
+        <div className="flex flex-col md:flex-row justify-between items-start gap-6">
           <div className="flex-1">
             <h2 className="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-teal-400 to-emerald-400 mb-2">
               8 המעפילות מהמקום השלישי
             </h2>
-            <p className="text-slate-400 mb-2">בחר את 8 הנבחרות שלדעתך יעפילו לשלב הבא מהמקום השלישי בבית שלהן.</p>
-            <p className="text-amber-400 text-sm font-bold bg-amber-500/10 inline-block px-3 py-1 rounded border border-amber-500/20">שים לב: ניתן לבחור לכל היותר נבחרת אחת מכל בית.</p>
+            <p className="text-slate-400 mb-3">בחר את 8 הנבחרות שלדעתך יעפילו לשלב הבא מהמקום השלישי בבית שלהן.</p>
+            <div className="flex items-center gap-2 text-amber-400 text-xs font-bold bg-amber-500/10 px-3 py-1.5 rounded-lg border border-amber-500/20 w-fit">
+              <span>💡</span> מותרת רק נבחרת אחת מכל בית
+            </div>
           </div>
           
-          <div className="flex items-center gap-6">
-            {myPoints !== null && (
-              <div className={`text-center px-6 py-3 rounded-2xl border shadow-lg ${myPoints > 0 ? "bg-purple-600/20 border-purple-500/50 shadow-[0_0_20px_rgba(168,85,247,0.2)]" : "bg-slate-800 border-slate-700"}`}>
-                 <div className="text-sm text-slate-400 font-bold mb-1">ניקוד צבור</div>
-                 <div className={`text-3xl font-black ${myPoints > 0 ? "text-purple-400" : "text-slate-500"}`}>{myPoints > 0 ? `+${myPoints}` : "0"}</div>
-              </div>
-            )}
-            <div className="text-center bg-slate-800 p-4 rounded-2xl border border-slate-700">
-               <div className="text-4xl font-black text-teal-400">{selectedTeams.length}/8</div>
-               <div className="text-xs text-slate-500 mt-1 font-bold uppercase tracking-widest">נבחרו</div>
-            </div>
+          <div className="flex flex-col items-end gap-3 w-full md:w-auto">
+             {myPoints !== null && (
+               <div className={`px-5 py-2.5 rounded-2xl border shadow-lg ${myPoints > 0 ? "bg-purple-600/20 border-purple-500/50 shadow-[0_0_15px_rgba(168,85,247,0.2)] text-purple-400" : "bg-slate-800 border-slate-700 text-slate-500"}`}>
+                 <span className="font-bold text-sm ml-2">ניקוד:</span>
+                 <span className="text-2xl font-black">{myPoints > 0 ? `+${myPoints}` : "0"}</span>
+               </div>
+             )}
+             
+             {/* סטטוס נעילה והגרלה מעל הסלוטים */}
+             <div className="flex items-center gap-3 w-full justify-end">
+               {saveStatus === "saving" && <span className="text-amber-400 text-xs animate-pulse font-bold">⏳ שומר...</span>}
+               {saveStatus === "saved" && <span className="text-emerald-400 text-xs font-bold">✓ נשמר</span>}
+               
+               {!isLocked ? (
+                 <button onClick={handleRandomizeThirdPlace} disabled={isRandomizing} className="bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold px-3 py-1.5 rounded-lg border border-slate-600 transition-all">
+                   🎲 הגרל
+                 </button>
+               ) : (
+                 <span className="bg-rose-500/10 text-rose-400 text-xs font-bold px-3 py-1.5 rounded-lg border border-rose-500/30">
+                   🔒 נעול
+                 </span>
+               )}
+             </div>
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-4 mt-6">
-          {!isLocked && (
-            <button 
-              onClick={handleRandomizeThirdPlace} 
-              disabled={isRandomizing}
-              className="bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white font-bold px-5 py-2.5 rounded-xl border border-slate-600 flex items-center gap-2 transition-all shadow-sm disabled:opacity-50"
-            >
-              <span className="text-xl">🎲</span> {isRandomizing ? "מגריל..." : "הגרל 8 מעפילות"}
-            </button>
-          )}
-          {isLocked && (
-            <div className="bg-rose-500/10 text-rose-400 text-sm font-bold px-4 py-2.5 rounded-xl border border-rose-500/30">
-              🔒 שלב זה נעול לעריכה
-            </div>
-          )}
-          {isLocked && (
-            <button onClick={handleOpenSpy} className="bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold px-5 py-2.5 rounded-xl border border-slate-600 flex items-center gap-2 transition-colors shadow-sm">
+        {/* 🏆 8 הסלוטים החזותיים המשודרגים 🏆 */}
+        <div className="grid grid-cols-4 lg:grid-cols-8 gap-3 mt-6">
+          {Array.from({ length: 8 }).map((_, i) => {
+            const team = selectedTeams[i];
+            const isWarning = team ? checkIsAlreadyAdvanced(team) : false;
+
+            return (
+              <div key={i} className={`relative flex flex-col items-center justify-center p-2 rounded-2xl border-2 transition-all h-28 group ${team ? 'bg-slate-800 border-teal-500 shadow-[0_0_15px_rgba(20,184,166,0.15)] hover:-translate-y-1' : 'bg-slate-950/50 border-slate-700 border-dashed'}`}>
+                {team ? (
+                  <>
+                    {/* חיווי אזהרה אם הנבחרת כבר במקום 1/2 */}
+                    {isWarning && (
+                      <div className="absolute -top-2 -right-2 bg-slate-900 border border-amber-500 text-amber-400 rounded-full w-6 h-6 flex items-center justify-center text-[10px] font-black shadow-md z-10" title="סתירה: בחרת להעלות אותה גם ממקום 1/2">
+                        ⚠️
+                      </div>
+                    )}
+                    
+                    {/* כפתור מחיקה מתוך הסלוט */}
+                    {!isLocked && (
+                      <button onClick={() => handleRemoveTeam(team)} className="absolute -top-2 -left-2 bg-rose-500 hover:bg-rose-400 rounded-full w-6 h-6 text-white text-[10px] font-black flex items-center justify-center border border-slate-900 shadow-sm opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                        ✕
+                      </button>
+                    )}
+
+                    {getFlagUrl(team) ? <img src={getFlagUrl(team)!} className="w-10 h-7 object-cover rounded shadow-md mb-2" alt="flag" /> : <span className="text-2xl mb-1">🏳️</span>}
+                    <span className="text-xs font-black text-white text-center leading-tight w-full break-words">{team}</span>
+                  </>
+                ) : (
+                  <span className="text-slate-600 text-3xl font-black opacity-20">{i+1}</span>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        {isLocked && (
+          <div className="mt-8 border-t border-slate-700/50 pt-5">
+            <button onClick={handleOpenSpy} className="w-full py-3 rounded-xl font-bold text-sm transition-all border flex items-center justify-center gap-2 bg-slate-900 text-slate-400 hover:text-white border-slate-700 hover:bg-slate-800">
               <span>👁️</span> ריגול: מי ניחש מה?
             </button>
-          )}
-        </div>
-        
-        <div className="absolute bottom-4 left-6 h-6">
-          {saveStatus === "saving" && <span className="text-amber-400 text-sm animate-pulse font-bold">⏳ שומר...</span>}
-          {saveStatus === "saved" && <span className="text-emerald-400 text-sm font-bold">✓ נשמר</span>}
-        </div>
+          </div>
+        )}
       </div>
 
+      {/* --- תוצאות אמת --- */}
       {realThirdPlace.length > 0 && (
-         <div className="mb-8 bg-purple-900/20 border border-purple-500/30 p-6 rounded-3xl">
-           <h3 className="text-purple-400 font-bold mb-4">🏆 העפילו בפועל (תוצאות אמת):</h3>
+         <div className="mb-8 bg-purple-900/20 border border-purple-500/30 p-6 rounded-3xl shadow-inner">
+           <h3 className="text-purple-400 font-bold mb-4 flex items-center gap-2"><span>🏆</span> העפילו בפועל למקום ה-3 (תוצאות אמת):</h3>
            <div className="flex flex-wrap gap-3">
-             {realThirdPlace.map(t => (
-                <span key={t} className={`px-4 py-2 rounded-xl text-sm font-bold border ${selectedTeams.includes(t) ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/50 shadow-[0_0_10px_rgba(16,185,129,0.2)]" : "bg-slate-800 text-slate-300 border-slate-700"}`}>
-                  {t} {selectedTeams.includes(t) && "🎯 +10"}
-                </span>
-             ))}
+             {realThirdPlace.map(t => {
+               const isHit = selectedTeams.includes(t);
+               return (
+                 <span key={t} className={`px-4 py-2 rounded-xl text-sm font-bold border flex items-center gap-2 transition-all ${isHit ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/50 shadow-[0_0_10px_rgba(16,185,129,0.2)] scale-105" : "bg-slate-800 text-slate-300 border-slate-700"}`}>
+                   {getFlagUrl(t) && <img src={getFlagUrl(t)!} className="w-5 h-3.5 object-cover rounded-sm" alt="flag"/>} 
+                   {t} 
+                   {isHit && <span className="ml-1">🎯 +10</span>}
+                 </span>
+               );
+             })}
            </div>
          </div>
       )}
 
+      {/* --- רשימת הבתים והנבחרות --- */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
         {Object.keys(groups).sort().map(groupName => {
           const teams = Array.from(groups[groupName] as Set<string>);
           const selectedInGroup = selectedTeams.find(t => teams.includes(t));
           
           return (
-            <div key={groupName} className={`bg-slate-800 rounded-2xl p-5 border transition-all ${selectedInGroup ? "border-teal-500 shadow-[0_0_15px_rgba(20,184,166,0.15)] bg-teal-900/10" : "border-slate-700"} ${isLocked && myPoints === null ? "opacity-80 grayscale-[10%]" : ""}`}>
+            <div key={groupName} className={`bg-slate-800 rounded-2xl p-5 border transition-all ${selectedInGroup ? "border-teal-500/50 shadow-[0_0_20px_rgba(20,184,166,0.05)] bg-teal-900/10" : "border-slate-700"} ${isLocked && myPoints === null ? "opacity-80 grayscale-[10%]" : ""}`}>
               <h3 className="text-lg font-bold text-center text-slate-300 mb-4 pb-2 border-b border-slate-700/50">
                 בית {groupName}
               </h3>
@@ -226,6 +299,7 @@ export default function ThirdPlaceQualifiers({ groups, userId, tournamentState =
                 {teams.map(team => {
                   const isSelected = selectedTeams.includes(team);
                   const isRealWinner = realThirdPlace.includes(team);
+                  const hasWarning = checkIsAlreadyAdvanced(team);
                   
                   let btnStyle = "bg-slate-900 text-slate-400 border-slate-700 hover:bg-slate-700 hover:text-white";
                   if (isSelected) btnStyle = "bg-teal-600 text-white border-teal-500 shadow-md";
@@ -236,10 +310,18 @@ export default function ThirdPlaceQualifiers({ groups, userId, tournamentState =
                       key={team}
                       disabled={isLocked}
                       onClick={() => toggleTeam(team, groupName)}
-                      className={`py-3 px-4 rounded-xl font-bold transition-all text-sm w-full text-right flex justify-between items-center border ${btnStyle} relative overflow-hidden`}
+                      className={`py-3 px-4 rounded-xl font-bold transition-all text-sm w-full text-right flex justify-between items-center border ${btnStyle} relative overflow-hidden group`}
                     >
-                      <span className="relative z-10">{team}</span>
+                      <div className="flex items-center gap-2.5 relative z-10">
+                         {getFlagUrl(team) ? <img src={getFlagUrl(team)!} className="w-5 h-3.5 object-cover rounded-sm shadow-sm" alt="flag"/> : "🏳️"}
+                         <span>{team}</span>
+                      </div>
+                      
                       <div className="flex items-center gap-2 relative z-10">
+                        {/* התראת סתירה גם בתוך הכפתור אם המשתמש לא בחר בה עדין אבל היא במקום 1/2 */}
+                        {hasWarning && !isSelected && !isLocked && (
+                          <span className="text-[10px] text-amber-500 bg-amber-500/10 border border-amber-500/20 px-1.5 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity" title="בחרת אותה במקום 1/2">⚠️ סתירה</span>
+                        )}
                         {isRealWinner && <span className="text-[10px] bg-purple-500 text-white px-2 py-0.5 rounded-full shadow-sm">העפילה</span>}
                         {isSelected && <span>✓</span>}
                       </div>
@@ -252,7 +334,7 @@ export default function ThirdPlaceQualifiers({ groups, userId, tournamentState =
         })}
       </div>
 
-      {/* מודל ריגול */}
+      {/* --- חלון הריגול --- */}
       {showSpyModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm" dir="rtl">
           <div className="bg-slate-900 border border-slate-700 p-6 rounded-3xl w-full max-w-2xl max-h-[80vh] flex flex-col shadow-2xl relative">
@@ -281,12 +363,14 @@ export default function ThirdPlaceQualifiers({ groups, userId, tournamentState =
                            </div>
                          )}
                       </div>
-                      <div className="flex flex-wrap gap-2">
+                      <div className="flex flex-wrap gap-2 mt-2">
                          {data.teams.map((t: string, i: number) => {
                            const isHit = realThirdPlace.includes(t);
                            return (
-                             <span key={i} className={`text-xs font-bold px-3 py-1.5 rounded-lg border ${isHit ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/40" : "bg-slate-900 text-slate-300 border-slate-600"}`}>
-                               {t} {isHit && "🎯"}
+                             <span key={i} className={`text-xs font-bold px-3 py-1.5 rounded-lg border flex items-center gap-1.5 ${isHit ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/40" : "bg-slate-900 text-slate-300 border-slate-600"}`}>
+                               {getFlagUrl(t) && <img src={getFlagUrl(t)!} className="w-4 h-3 object-cover rounded-sm" alt="flag"/>} 
+                               {t} 
+                               {isHit && "🎯"}
                              </span>
                            );
                          })}

@@ -1,12 +1,15 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { collection, getDocs, doc, getDoc, query, where, onSnapshot } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth, db } from "../app/firebase";
+import { getFlagUrl } from "../app/utils/flags"; 
 
 // רכיב קונפטי עצמאי שיופעל רק עבור המקום הראשון! 🎊
 const Confetti = () => {
   const [pieces, setPieces] = useState<any[]>([]);
+  const [isVisible, setIsVisible] = useState(true);
+
   useEffect(() => {
     const arr = Array.from({ length: 70 }).map((_, i) => ({
       id: i,
@@ -16,7 +19,14 @@ const Confetti = () => {
       emoji: ['🏆', '🥇', '⚽', '🎉', '💸', '🔥'][Math.floor(Math.random() * 6)]
     }));
     setPieces(arr);
+
+    // התיקון הקטנצ'יק: עוצר את הקונפטי אחרי 12 שניות בדיוק
+    const timer = setTimeout(() => setIsVisible(false), 12000);
+    return () => clearTimeout(timer);
   }, []);
+
+  if (!isVisible) return null;
+
   return (
     <div className="fixed inset-0 pointer-events-none z-50 overflow-hidden">
       {pieces.map(p => (
@@ -40,8 +50,18 @@ export default function Leaderboard() {
   
   const [generalUsers, setGeneralUsers] = useState<any[]>([]);
   const [knockoutUsers, setKnockoutUsers] = useState<any[]>([]);
-  const [activeBoard, setActiveBoard] = useState<"GENERAL" | "KNOCKOUT">("GENERAL");
+  
+  // תמיכה בטאב החדש של ליגות פרטיות
+  const [activeBoard, setActiveBoard] = useState<"GENERAL" | "KNOCKOUT" | "LEAGUES">("GENERAL");
+  const [myLeagues, setMyLeagues] = useState<any[]>([]);
+  const [selectedLeagueId, setSelectedLeagueId] = useState<string | null>(null);
+
   const [isLoading, setIsLoading] = useState(true);
+
+  const [hoveredUser, setHoveredUser] = useState<string | null>(null);
+
+  const [isMyRowVisible, setIsMyRowVisible] = useState(true);
+  const myRowRef = useRef<HTMLTableRowElement>(null);
 
   const [spyModalUser, setSpyModalUser] = useState<any | null>(null);
   const [spyPredictions, setSpyPredictions] = useState<any[]>([]);
@@ -123,28 +143,63 @@ export default function Leaderboard() {
       if (docSnap.exists()) {
         const state = Number(docSnap.data().tournamentState) || 0;
         setTournamentState(state);
-        if (state < 4 && activeBoard === "KNOCKOUT") setActiveBoard("GENERAL");
       }
     });
     return () => unsubscribeSys();
-  }, [activeBoard]);
+  }, []);
+
+  // שאיבת הליגות הפרטיות של המשתמש
+  useEffect(() => {
+    if (!currentUserId) return;
+    const qLeagues = query(collection(db, "mini_leagues"), where("members", "array-contains", currentUserId));
+    const unsubscribeLeagues = onSnapshot(qLeagues, (snap) => {
+        const leagues: any[] = [];
+        snap.forEach(doc => leagues.push({ id: doc.id, ...doc.data() }));
+        setMyLeagues(leagues);
+        if (leagues.length > 0 && !selectedLeagueId) {
+            setSelectedLeagueId(leagues[0].id);
+        }
+    });
+    return () => unsubscribeLeagues();
+  }, [currentUserId]);
+
+  // יצירת הרשימה הנוכחית להצגה (כללי / נוקאאוט / ליגה פרטית מסוננת)
+  let currentUsers: any[] = [];
+  if (activeBoard === "GENERAL") {
+     currentUsers = generalUsers;
+  } else if (activeBoard === "KNOCKOUT") {
+     currentUsers = knockoutUsers;
+  } else if (activeBoard === "LEAGUES") {
+     const activeLeague = myLeagues.find(l => l.id === selectedLeagueId);
+     if (activeLeague) {
+        const filtered = generalUsers.filter(u => activeLeague.members.includes(u.id));
+        // מדרגים מחדש רק את המשתתפים בליגה!
+        currentUsers = rankUsers(filtered, "totalPoints");
+     }
+  }
 
   useEffect(() => {
-    if (!currentUserId || generalUsers.length === 0) return;
+    if (!currentUserId || currentUsers.length === 0) return;
     
-    const currentList = activeBoard === "GENERAL" ? generalUsers : knockoutUsers;
+    if (activeBoard === "LEAGUES") {
+       const l = myLeagues.find(l => l.id === selectedLeagueId);
+       if (l) setTeaser(`ברוך הבא לזירה של "${l.name}"! פה זה המגרש של הגדולים, שחק אותה.`);
+       const me = currentUsers.find(u => u.id === currentUserId);
+       setIsFirstPlace(me ? me.displayRank === 1 : false);
+       return;
+    }
+
     const scoreField = activeBoard === "GENERAL" ? "totalPoints" : "knockoutPoints";
     const prevScoreField = activeBoard === "GENERAL" ? "previousTotalPoints" : "previousKnockoutPoints";
     const prevRankField = activeBoard === "GENERAL" ? "previousRankGeneral" : "previousRankKnockout";
     
-    const myIndex = currentList.findIndex(u => u.id === currentUserId);
-    
+    const myIndex = currentUsers.findIndex(u => u.id === currentUserId);
     if (myIndex === -1) { setTeaser("עוד לא הופעת בטבלה. איפה הניחושים שלך?"); return; }
     
-    const me = currentList[myIndex];
+    const me = currentUsers[myIndex];
     setIsFirstPlace(me.displayRank === 1);
 
-    if (currentList.length <= 1) { setTeaser("אתה לבד פה! זה הזמן להזמין חברים לטבלה."); return; }
+    if (currentUsers.length <= 1) { setTeaser("אתה לבד פה! זה הזמן להזמין חברים לטבלה."); return; }
 
     const myScore = me[scoreField] || 0;
     const myPrevScore = me[prevScoreField] || myScore;
@@ -158,37 +213,56 @@ export default function Leaderboard() {
     let newTeaser = "";
 
     if (rankDiff > 0) {
-       const passedGuy = currentList[myIndex + 1]; 
+       const passedGuy = currentUsers[myIndex + 1]; 
        const ptsStr = ptsDiff > 0 ? `אספת ${ptsDiff} נק' אתמול ו` : "";
        newTeaser = `בואנה חביבי! ${ptsStr}עלית ${rankDiff} מקומות בדירוג! אתה פשוט חד. ${passedGuy ? `אפילו עקפת את ${passedGuy.name.split(' ')[0]} שהייתה כוכבת רצינית עד עכשיו.` : ''}`;
     } else if (rankDiff < 0) {
-       const guyAhead = currentList[myIndex - 1]; 
+       const guyAhead = currentUsers[myIndex - 1]; 
        newTeaser = `מה נסגר? הכל בסדר בבית? נפלת ${Math.abs(rankDiff)} מקומות ביום אחד... ${guyAhead ? `איך נתת ל-${guyAhead.name.split(' ')[0]} לעקוף אותך ככה בלי לראות אותך ממטר?` : ''}`;
     } else {
        if (me.displayRank === 1) {
-         const nextGuy = currentList[myIndex + 1];
+         const nextGuy = currentUsers[myIndex + 1];
          if (nextGuy && nextGuy[scoreField] === myScore) newTeaser = getRandom([`אתה בפסגה, אבל צמוד ל-${nextGuy.name.split(' ')[0]} בדיוק באותו הניקוד! צריך פה שובר שוויון.`, `קרב צמוד! ${nextGuy.name.split(' ')[0]} יושב איתך על אותו כיסא בפסגה. מי ימצמץ ראשון?`]);
          else if (nextGuy) {
            const diff = myScore - (nextGuy[scoreField] || 0);
            newTeaser = getRandom([`מלך הטבלה! 👑 אבל ${nextGuy.name.split(' ')[0]} מחכה למעידה שלך במרחק של ${diff} נק' בלבד.`, `האוויר פסגות עושה לך טוב. רק אל תסתכל אחורה, ${nextGuy.name.split(' ')[0]} בפיגור ${diff} נק' ומכין קאמבק.`]);
          }
        } else if (me.displayRank === 2) {
-         const king = currentList[myIndex - 1];
+         const king = currentUsers[myIndex - 1];
          const diff = (king[scoreField] || 0) - myScore;
          if (diff === 0) newTeaser = `שוויון עם הפסגה! אתה ו-${king.name.split(' ')[0]} נועלים קרניים. ניחוש בול אחד ואתה לוקח את זה.`;
          else newTeaser = getRandom([`הכתר במרחק נגיעה! רק ${diff} נקודות מפרידות בינך לבין ${king.name.split(' ')[0]} שבפסגה.`, `סגנות זה נחמד לצרפתים, אבל אנחנו באנו לקחת גביע. תן איזה הפתעה ותעקוף את ${king.name.split(' ')[0]}! (${diff} נק' פער)`]);
-       } else if (myIndex === currentList.length - 1 && currentList.length > 3) {
-         const guyAbove = currentList[myIndex - 1];
+       } else if (myIndex === currentUsers.length - 1 && currentUsers.length > 3) {
+         const guyAbove = currentUsers[myIndex - 1];
          const diff = (guyAbove[scoreField] || 0) - myScore;
          newTeaser = getRandom([`נועל הטבלה חביבי... 📉 אפילו בוט רנדומלי עושה יותר מזה. לפחות תעקוף את ${guyAbove.name.split(' ')[0]} (פער ${diff} נק').`, `ראית פעם משחק כדורגל מלא? 😂 אתה צריך ${diff} נקודות רק כדי לא להיות אחרון.`]);
        } else {
-         const prevGuy = currentList[myIndex - 1];
+         const prevGuy = currentUsers[myIndex - 1];
          const diff = (prevGuy[scoreField] || 0) - myScore;
          newTeaser = getRandom([`אתה מרחק יריקה מ-${prevGuy.name.split(' ')[0]} שמקדימה אותך ב-${diff} נקודות. תפסיק לשחק בטוח!`, `מגמה חיובית! עוד ${diff} נקודות ואתה שולח את ${prevGuy.name.split(' ')[0]} למטה. כיוון נכון אחד ויש לך את זה.`]);
        }
     }
     setTeaser(newTeaser);
-  }, [generalUsers, knockoutUsers, activeBoard, currentUserId]);
+  }, [currentUsers, activeBoard, currentUserId]);
+
+  useEffect(() => {
+    let observer: IntersectionObserver;
+    const timer = setTimeout(() => {
+      if (!myRowRef.current) return;
+      observer = new IntersectionObserver(
+        ([entry]) => {
+          setIsMyRowVisible(entry.isIntersecting);
+        },
+        { threshold: 0 } 
+      );
+      observer.observe(myRowRef.current);
+    }, 100);
+
+    return () => {
+      clearTimeout(timer);
+      if (observer) observer.disconnect();
+    };
+  }, [currentUsers, activeBoard, isLoading]);
 
   const isMatchLocked = (match: any, state: number) => {
     if (!match) return false;
@@ -383,8 +457,6 @@ export default function Leaderboard() {
 
   if (isLoading) return <div className="text-center text-blue-400 animate-pulse font-bold mt-12 text-xl">טוען את טבלת המובילים... ⚽</div>;
 
-  const currentUsers = activeBoard === "GENERAL" ? generalUsers : knockoutUsers;
-  
   const goldBallWinner = generalUsers.length > 0 ? generalUsers[0] : null;
   const goldenBootWinner = knockoutUsers.length > 0 ? knockoutUsers[0] : null;
 
@@ -392,13 +464,27 @@ export default function Leaderboard() {
   const podiumSecond = currentUsers[1];
   const podiumThird = currentUsers[2];
 
+  // חישוב נתונים לבר הצף והנמסיס!
+  const me = currentUsers.find(u => u.id === currentUserId);
+  const myNemesisId = generalUsers.find(u => u.id === currentUserId)?.nemesisId || null;
+  const nemesisUser = myNemesisId ? currentUsers.find(u => u.id === myNemesisId) : null;
+  
+  const topUser = currentUsers[0];
+  const scoreField = activeBoard === "KNOCKOUT" ? "knockoutPoints" : "totalPoints";
+
+  const myScore = me ? me[scoreField] : 0;
+  const topScore = topUser ? topUser[scoreField] : 0;
+  const pointsGap = topScore - myScore;
+
+  // פער מהנמסיס
+  const nemesisScore = nemesisUser ? nemesisUser[scoreField] : null;
+  const nemesisGap = nemesisScore !== null ? myScore - nemesisScore : null;
+
   return (
     <div className="w-full max-w-4xl mx-auto pb-12" dir="rtl">
       
-      {/* מפעיל את הקונפטי רק אם אתה מקום ראשון! */}
       {isFirstPlace && <Confetti />}
 
-      {/* Teaser אישי ליוזר (משולב למעלה כדי לחסוך מקום בטבלה) */}
       {teaser && (
         <div className="mb-6 bg-slate-900/80 p-5 rounded-2xl border-l-4 border-blue-500 shadow-md flex items-start gap-4">
           <div className="text-3xl mt-1">🎙️</div>
@@ -409,187 +495,311 @@ export default function Leaderboard() {
         </div>
       )}
 
-      {/* פודיום עולם הכדורגל - 🏆 כדור ו-👟 נעל הזהב! */}
-      <div className={`grid grid-cols-1 ${tournamentState >= 4 ? 'md:grid-cols-2' : 'max-w-xl mx-auto'} gap-6 mb-8`}>
-         
-         {/* כדור הזהב (כללי) */}
-         <div className="bg-slate-900 rounded-3xl p-6 md:p-8 border border-amber-500/30 shadow-[0_0_30px_rgba(245,158,11,0.15)] relative overflow-hidden group">
-            <div className="absolute top-0 left-0 w-32 h-32 bg-amber-500/20 rounded-full blur-3xl pointer-events-none transition-transform group-hover:scale-150 duration-700"></div>
-            <div className="flex justify-between items-start relative z-10">
-               <div>
-                  <h2 className="text-amber-400 font-black text-sm uppercase tracking-widest mb-1 flex items-center gap-2">
-                    <span className="text-xl">⚽</span> כדור הזהב
-                  </h2>
-                  <p className="text-slate-400 text-xs mb-4">מוביל הדירוג הכללי</p>
-                  {goldBallWinner && goldBallWinner.totalPoints > 0 ? (
-                     <>
-                        <div className="text-3xl md:text-4xl font-black text-white mb-2 truncate max-w-[200px]" title={goldBallWinner.name}>
-                           {goldBallWinner.name?.split(' ')[0]} {goldBallWinner.name?.split(' ')[1]?.charAt(0)}.
-                        </div>
-                        <div className="inline-block bg-amber-500/20 border border-amber-500/30 text-amber-400 px-3 py-1.5 rounded-lg text-sm font-black shadow-inner">
-                           {goldBallWinner.totalPoints} נק'
-                        </div>
-                     </>
-                  ) : (
-                     <div className="text-slate-500 italic mt-4">התחרות טרם החלה...</div>
-                  )}
-               </div>
-               <div className="text-6xl drop-shadow-2xl group-hover:rotate-12 group-hover:scale-110 transition-transform duration-500">🏆</div>
-            </div>
-         </div>
-
-         {/* נעל הזהב (נוק-אאוט) - מוסתר בשלב הבתים! */}
-         {tournamentState >= 4 && (
-             <div className="bg-slate-900 rounded-3xl p-6 md:p-8 border border-emerald-500/30 shadow-[0_0_30px_rgba(16,185,129,0.15)] relative overflow-hidden group">
-                <div className="absolute top-0 left-0 w-32 h-32 bg-emerald-500/20 rounded-full blur-3xl pointer-events-none transition-transform group-hover:scale-150 duration-700"></div>
+      {/* אזור כרטיסי המובילים */}
+      {activeBoard === "GENERAL" && (
+          <div className={`grid grid-cols-1 ${tournamentState >= 4 ? 'md:grid-cols-2' : 'max-w-xl mx-auto'} gap-6 mb-8`}>
+             <div className="bg-slate-900 rounded-3xl p-6 md:p-8 border border-amber-500/30 shadow-[0_0_30px_rgba(245,158,11,0.15)] relative overflow-hidden group">
+                <div className="absolute top-0 left-0 w-32 h-32 bg-amber-500/20 rounded-full blur-3xl pointer-events-none transition-transform group-hover:scale-150 duration-700"></div>
                 <div className="flex justify-between items-start relative z-10">
                    <div>
-                      <h2 className="text-emerald-400 font-black text-sm uppercase tracking-widest mb-1 flex items-center gap-2">
-                        <span className="text-xl">👟</span> נעל הזהב
+                      <h2 className="text-amber-400 font-black text-sm uppercase tracking-widest mb-1 flex items-center gap-2">
+                        <span className="text-xl">⚽</span> כדור הזהב
                       </h2>
-                      <p className="text-slate-400 text-xs mb-4">מלך הנוק-אאוט</p>
-                      {goldenBootWinner && goldenBootWinner.knockoutPoints > 0 ? (
+                      <p className="text-slate-400 text-xs mb-4">מוביל הדירוג הכללי</p>
+                      {goldBallWinner && goldBallWinner.totalPoints > 0 ? (
                          <>
-                            <div className="text-3xl md:text-4xl font-black text-white mb-2 truncate max-w-[200px]" title={goldenBootWinner.name}>
-                               {goldenBootWinner.name?.split(' ')[0]} {goldenBootWinner.name?.split(' ')[1]?.charAt(0)}.
+                            <div className="text-3xl md:text-4xl font-black text-white mb-2 truncate max-w-[200px]" title={goldBallWinner.name}>
+                               {goldBallWinner.name?.split(' ')[0]} {goldBallWinner.name?.split(' ')[1]?.charAt(0)}.
                             </div>
-                            <div className="inline-block bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 px-3 py-1.5 rounded-lg text-sm font-black shadow-inner">
-                               {goldenBootWinner.knockoutPoints} נק'
+                            <div className="inline-block bg-amber-500/20 border border-amber-500/30 text-amber-400 px-3 py-1.5 rounded-lg text-sm font-black shadow-inner">
+                               {goldBallWinner.totalPoints} נק'
                             </div>
                          </>
                       ) : (
-                         <div className="text-slate-500 italic mt-4">הנוק-אאוט טרם החל...</div>
+                         <div className="text-slate-500 italic mt-4">התחרות טרם החלה...</div>
                       )}
                    </div>
-                   <div className="text-6xl drop-shadow-2xl group-hover:scale-110 transition-transform duration-500">🔥</div>
+                   <div className="text-6xl drop-shadow-2xl group-hover:rotate-12 group-hover:scale-110 transition-transform duration-500">🏆</div>
                 </div>
              </div>
-         )}
+
+             {tournamentState >= 4 && (
+                 <div className="bg-slate-900 rounded-3xl p-6 md:p-8 border border-emerald-500/30 shadow-[0_0_30px_rgba(16,185,129,0.15)] relative overflow-hidden group">
+                    <div className="absolute top-0 left-0 w-32 h-32 bg-emerald-500/20 rounded-full blur-3xl pointer-events-none transition-transform group-hover:scale-150 duration-700"></div>
+                    <div className="flex justify-between items-start relative z-10">
+                       <div>
+                          <h2 className="text-emerald-400 font-black text-sm uppercase tracking-widest mb-1 flex items-center gap-2">
+                            <span className="text-xl">👟</span> נעל הזהב
+                          </h2>
+                          <p className="text-slate-400 text-xs mb-4">מלך הנוק-אאוט</p>
+                          {goldenBootWinner && goldenBootWinner.knockoutPoints > 0 ? (
+                             <>
+                                <div className="text-3xl md:text-4xl font-black text-white mb-2 truncate max-w-[200px]" title={goldenBootWinner.name}>
+                                   {goldenBootWinner.name?.split(' ')[0]} {goldenBootWinner.name?.split(' ')[1]?.charAt(0)}.
+                                </div>
+                                <div className="inline-block bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 px-3 py-1.5 rounded-lg text-sm font-black shadow-inner">
+                                   {goldenBootWinner.knockoutPoints} נק'
+                                </div>
+                             </>
+                          ) : (
+                             <div className="text-slate-500 italic mt-4">הנוק-אאוט טרם החל...</div>
+                          )}
+                       </div>
+                       <div className="text-6xl drop-shadow-2xl group-hover:scale-110 transition-transform duration-500">🔥</div>
+                    </div>
+                 </div>
+             )}
+          </div>
+      )}
+
+      {/* טאבים ראשיים של הטבלה */}
+      <div className="flex flex-wrap gap-2 mb-6 bg-slate-900/50 p-2 rounded-2xl border border-slate-800">
+        <button onClick={() => setActiveBoard("GENERAL")} className={`flex-1 min-w-[120px] py-3 rounded-xl font-black transition-all ${activeBoard === "GENERAL" ? "bg-amber-600 text-slate-900 shadow-lg shadow-amber-500/20" : "text-slate-500 hover:bg-slate-800 hover:text-slate-300"}`}>🏆 דירוג כללי</button>
+        
+        {tournamentState >= 4 && (
+          <button onClick={() => setActiveBoard("KNOCKOUT")} className={`flex-1 min-w-[120px] py-3 rounded-xl font-black transition-all ${activeBoard === "KNOCKOUT" ? "bg-emerald-600 text-white shadow-lg shadow-emerald-500/20" : "text-slate-500 hover:bg-slate-800 hover:text-slate-300"}`}>🔥 נוק-אאוט</button>
+        )}
+
+        <button onClick={() => setActiveBoard("LEAGUES")} className={`flex-1 min-w-[120px] py-3 rounded-xl font-black transition-all ${activeBoard === "LEAGUES" ? "bg-blue-600 text-white shadow-lg shadow-blue-500/20" : "text-slate-500 hover:bg-slate-800 hover:text-slate-300"}`}>🏟️ ליגות פרטיות</button>
       </div>
 
-      {/* טאבים של דירוגים (יופיעו רק כששלב הנוקאאוט נפתח) */}
-      {tournamentState >= 4 && (
-        <div className="flex gap-2 mb-6 bg-slate-900/50 p-2 rounded-2xl border border-slate-800">
-          <button onClick={() => setActiveBoard("GENERAL")} className={`flex-1 py-3 rounded-xl font-black transition-all ${activeBoard === "GENERAL" ? "bg-amber-600 text-slate-900 shadow-lg shadow-amber-500/20" : "text-slate-500 hover:bg-slate-800 hover:text-slate-300"}`}>🏆 דירוג כללי (הכל)</button>
-          <button onClick={() => setActiveBoard("KNOCKOUT")} className={`flex-1 py-3 rounded-xl font-black transition-all ${activeBoard === "KNOCKOUT" ? "bg-emerald-600 text-white shadow-lg shadow-emerald-500/20" : "text-slate-500 hover:bg-slate-800 hover:text-slate-300"}`}>🔥 מלכי הנוק-אאוט</button>
+      {/* תתי-טאבים לבחירת הליגה (אם נמצאים בטאב ליגות פרטיות) */}
+      {activeBoard === "LEAGUES" && myLeagues.length > 0 && (
+         <div className="flex gap-2 overflow-x-auto mb-6 custom-scrollbar pb-2 bg-slate-900/30 p-2 rounded-xl border border-slate-800/50">
+            <span className="text-slate-500 text-xs font-bold py-2 px-1 flex items-center shrink-0">בחר ליגה:</span>
+            {myLeagues.map(l => (
+               <button 
+                  key={l.id} 
+                  onClick={() => setSelectedLeagueId(l.id)} 
+                  className={`px-5 py-2 rounded-lg font-bold whitespace-nowrap transition-all text-sm border shrink-0 ${selectedLeagueId === l.id ? 'bg-blue-600 text-white border-blue-500 shadow-md' : 'bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-white border-slate-700'}`}
+               >
+                  {l.name}
+               </button>
+            ))}
+         </div>
+      )}
+
+      {/* מצב שאין למשתמש אף ליגה */}
+      {activeBoard === "LEAGUES" && myLeagues.length === 0 ? (
+         <div className="bg-slate-800 border border-slate-700 rounded-3xl p-8 text-center mb-8 shadow-xl">
+           <div className="text-6xl mb-4 opacity-80">🏟️</div>
+           <h3 className="text-xl font-bold text-white mb-2">אין לך ליגות פרטיות</h3>
+           <p className="text-slate-400 text-sm max-w-sm mx-auto">
+             כנס ל<span className="text-blue-400 font-bold">דאשבורד</span> כדי ליצור ליגה חדשה או להצטרף לליגה קיימת עם קוד, ובוא להתחרות מול החברים מהמשרד!
+           </p>
+         </div>
+      ) : (
+         <div className="bg-slate-800 pt-10 rounded-3xl border border-slate-700 shadow-2xl relative overflow-hidden flex flex-col">
+           <div className={`absolute top-0 right-0 w-64 h-64 rounded-full blur-3xl pointer-events-none -mr-20 -mt-20 ${activeBoard === "GENERAL" ? "bg-amber-500/10" : activeBoard === "LEAGUES" ? "bg-blue-500/10" : "bg-emerald-500/10"}`}></div>
+           
+           <h2 className="text-3xl font-extrabold text-white mb-8 px-6 md:px-10 relative z-10 flex items-center gap-3">
+             <span>{activeBoard === "GENERAL" ? "🏆" : activeBoard === "LEAGUES" ? "🏟️" : "🔥"}</span>
+             {activeBoard === "GENERAL" ? "טבלת הדירוג הכללי" : activeBoard === "KNOCKOUT" ? "טבלת שלב הנוק-אאוט" : `ליגה: ${myLeagues.find(l => l.id === selectedLeagueId)?.name || "פרטית"}`}
+           </h2>
+           
+           {currentUsers.length > 0 && (
+             <div className="flex justify-center items-end gap-2 md:gap-6 mb-12 relative z-10 px-2 pt-8">
+               {podiumSecond && (
+                 <div className="flex flex-col items-center w-28 md:w-32">
+                   <div className="text-slate-300 font-bold mb-6 text-center truncate w-full px-1 text-sm md:text-base">
+                     {podiumSecond.name?.split(' ')[0]} {podiumSecond.id === myNemesisId && "🎯"}
+                   </div>
+                   <div className={`w-full bg-gradient-to-t from-slate-400 to-slate-300 h-28 md:h-32 rounded-t-lg shadow-lg relative flex flex-col justify-end pb-3 border-t-2 ${podiumSecond.id === myNemesisId ? 'border-rose-500 shadow-[0_0_15px_rgba(225,29,72,0.5)]' : 'border-slate-200'}`}>
+                     <span className="text-4xl absolute -top-6 left-1/2 -translate-x-1/2 drop-shadow-md">🥈</span>
+                     <span className="text-slate-800 font-black text-2xl text-center">{podiumSecond[scoreField]}</span>
+                     <span className="text-slate-700 font-bold text-xs text-center mt-1">מקום {podiumSecond.displayRank}</span>
+                   </div>
+                 </div>
+               )}
+               {podiumFirst && (
+                 <div className="flex flex-col items-center w-32 md:w-40 z-10">
+                   <div className="text-amber-400 font-black mb-8 text-center truncate w-full px-1 text-base md:text-lg">
+                     {podiumFirst.name?.split(' ')[0]} {podiumFirst.id === myNemesisId && "🎯"}
+                   </div>
+                   <div className={`w-full bg-gradient-to-t from-amber-600 to-amber-400 h-36 md:h-44 rounded-t-lg shadow-[0_0_30px_rgba(251,191,36,0.4)] relative flex flex-col justify-end pb-3 border-t-2 ${podiumFirst.id === myNemesisId ? 'border-rose-500 shadow-[0_0_20px_rgba(225,29,72,0.8)]' : 'border-amber-200'}`}>
+                     <span className="text-5xl absolute -top-8 left-1/2 -translate-x-1/2 drop-shadow-lg">🥇</span>
+                     <span className="text-amber-950 font-black text-3xl text-center">{podiumFirst[scoreField]}</span>
+                     <span className="text-amber-900 font-bold text-xs text-center mt-1">מקום {podiumFirst.displayRank}</span>
+                   </div>
+                 </div>
+               )}
+               {podiumThird && (
+                 <div className="flex flex-col items-center w-28 md:w-32">
+                   <div className="text-orange-300 font-bold mb-5 text-center truncate w-full px-1 text-sm md:text-base">
+                     {podiumThird.name?.split(' ')[0]} {podiumThird.id === myNemesisId && "🎯"}
+                   </div>
+                   <div className={`w-full bg-gradient-to-t from-orange-800 to-orange-600 h-20 md:h-24 rounded-t-lg shadow-lg relative flex flex-col justify-end pb-3 border-t-2 ${podiumThird.id === myNemesisId ? 'border-rose-500 shadow-[0_0_15px_rgba(225,29,72,0.5)]' : 'border-orange-400'}`}>
+                     <span className="text-3xl absolute -top-5 left-1/2 -translate-x-1/2 drop-shadow-md">🥉</span>
+                     <span className="text-orange-100 font-black text-xl text-center">{podiumThird[scoreField]}</span>
+                     <span className="text-orange-200 font-bold text-xs text-center mt-1">מקום {podiumThird.displayRank}</span>
+                   </div>
+                 </div>
+               )}
+             </div>
+           )}
+
+           <div className="overflow-x-auto relative z-10 bg-slate-900/50 rounded-t-2xl border-t border-slate-700/50 pb-48">
+             <table className="w-full text-right table-fixed">
+               <thead>
+                 <tr className="text-slate-400 border-b border-slate-700/50 bg-slate-800/80 text-sm md:text-base">
+                   <th className="p-3 md:p-4 font-medium w-16 md:w-20 text-center">מיקום</th>
+                   <th className="p-3 md:p-4 font-medium">שחקן</th>
+                   <th className={`p-3 md:p-4 font-medium text-center w-28 md:w-32 ${activeBoard === "GENERAL" || activeBoard === "LEAGUES" ? "text-amber-400" : "text-emerald-400"}`}>נק'</th>
+                   <th className="p-3 md:p-4 font-medium text-center w-14 md:w-16">פירוט</th>
+                 </tr>
+               </thead>
+               <tbody>
+                 {currentUsers.map((u) => {
+                   const isTop3 = u.displayRank <= 3;
+                   const isMe = u.id === currentUserId;
+                   const isNemesis = u.id === myNemesisId;
+                   
+                   // הבלטת שורת הנמסיס! 🎯
+                   const rowBg = isMe ? "bg-blue-900/20 border-blue-500/50 shadow-inner" : 
+                                 isNemesis ? "bg-rose-900/10 border-rose-500/40 shadow-[inset_0_0_15px_rgba(225,29,72,0.1)] relative z-10" :
+                                 u.displayRank === 1 ? "bg-amber-500/10 border-amber-500/30" : 
+                                 u.displayRank === 2 ? "bg-slate-300/10 border-slate-300/30" : 
+                                 u.displayRank === 3 ? "bg-orange-700/10 border-orange-700/30" : "hover:bg-slate-700/30";
+                   
+                   const scoreToShow = u[scoreField];
+                   
+                   const prevR = activeBoard === "GENERAL" ? u.previousRankGeneral : (activeBoard === "KNOCKOUT" ? u.previousRankKnockout : null);
+                   const trend = prevR ? (prevR - u.displayRank) : 0;
+                   
+                   return (
+                     <tr 
+                       key={u.id} 
+                       ref={isMe ? myRowRef : null} 
+                       className={`border-b border-slate-700/50 transition-colors ${rowBg}`}
+                     >
+                       <td className="p-3 md:p-4 text-center">
+                         <div className="flex justify-center items-center gap-1.5 md:gap-2">
+                            <div className="flex flex-col items-center">
+                              <span className={`text-xl md:text-2xl font-black ${
+                                u.displayRank === 1 ? "text-amber-400" : 
+                                u.displayRank === 2 ? "text-slate-300" : 
+                                u.displayRank === 3 ? "text-orange-400" : 
+                                "text-slate-400"
+                              }`}>
+                                {u.displayRank}
+                              </span>
+                              {trend > 0 && <span className="text-emerald-400 text-[11px] font-black tracking-tighter mt-[-2px] flex items-center" title={`עלה ${trend} מקומות`}>▲ {trend}</span>}
+                              {trend < 0 && <span className="text-rose-400 text-[11px] font-black tracking-tighter mt-[-2px] flex items-center" title={`ירד ${Math.abs(trend)} מקומות`}>▼ {Math.abs(trend)}</span>}
+                              {trend === 0 && prevR && <span className="text-slate-600 text-[11px] font-black mt-[-2px] block">-</span>}
+                            </div>
+                            {u.displayRank === 1 && <span className="text-lg md:text-xl drop-shadow-md">🥇</span>}
+                            {u.displayRank === 2 && <span className="text-lg md:text-xl drop-shadow-md">🥈</span>}
+                            {u.displayRank === 3 && <span className="text-lg md:text-xl drop-shadow-md">🥉</span>}
+                         </div>
+                       </td>
+                       <td className="p-3 md:p-4">
+                          <div className="font-bold text-white text-sm md:text-base truncate flex items-center gap-2">
+                            {u.name || "שחקן לא ידוע"}
+                            {isMe && <span className="bg-blue-600 text-white text-[9px] px-1.5 py-0.5 rounded uppercase tracking-wider shrink-0">אתה</span>}
+                            {isNemesis && <span className="bg-rose-600/20 border border-rose-500/50 text-rose-400 text-[9px] px-1.5 py-0.5 rounded tracking-wider shrink-0 flex items-center gap-1 shadow-sm" title="היריב המושבע שלך!"><span>🎯</span> יריב</span>}
+                          </div>
+                          {!u.hasPaid && <div className="text-[10px] text-rose-400 mt-0.5">טרם שולם</div>}
+                       </td>
+                       <td className={`p-3 md:p-4 text-center font-black text-lg md:text-xl ${isTop3 ? (activeBoard === "GENERAL" || activeBoard === "LEAGUES" ? "text-amber-400" : "text-emerald-400") : "text-slate-200"}`}>
+                         
+                         <div 
+                           className="inline-flex items-center justify-center gap-1.5 cursor-help relative group"
+                           onMouseEnter={() => setHoveredUser(u.id)}
+                           onMouseLeave={() => setHoveredUser(null)}
+                           onClick={() => setHoveredUser(hoveredUser === u.id ? null : u.id)}
+                         >
+                           <span>{scoreToShow || 0}</span>
+                           <span className="text-[10px] text-slate-500 group-hover:text-blue-400 transition-colors hidden sm:inline-block">ℹ️</span>
+                           
+                           <div className={`absolute top-full left-[-30px] sm:left-1/2 sm:-translate-x-1/2 mt-3 w-56 bg-slate-900/95 backdrop-blur-md border border-slate-600/80 p-4 rounded-2xl shadow-2xl z-50 pointer-events-none transition-all duration-200 origin-top-left sm:origin-top ${hoveredUser === u.id ? "opacity-100 scale-100" : "opacity-0 scale-95"}`}>
+                              <div className="absolute bottom-full left-[40px] sm:left-1/2 sm:-translate-x-1/2 -mb-[1px] border-[6px] border-transparent border-b-slate-600/80"></div>
+                              <div className="absolute bottom-full left-[40px] sm:left-1/2 sm:-translate-x-1/2 -mb-[2px] border-[5px] border-transparent border-b-slate-900/95"></div>
+                              
+                              <div className="text-xs font-black text-slate-300 border-b border-slate-700/50 pb-2 mb-3 text-center tracking-wide">
+                                פילוח נקודות
+                              </div>
+                              
+                              {u.breakdown ? (
+                                <div className="space-y-2.5 text-[11px] font-medium">
+                                  <div className="flex justify-between items-center"><span className="text-slate-400">⚽ משחקים:</span><span className="font-black text-white bg-slate-800 px-2 py-0.5 rounded">{u.breakdown.matches || 0}</span></div>
+                                  <div className="flex justify-between items-center"><span className="text-slate-400">🎁 בונוסים:</span><span className="font-black text-white bg-slate-800 px-2 py-0.5 rounded">{u.breakdown.bonuses || 0}</span></div>
+                                  <div className="flex justify-between items-center"><span className="text-slate-400">🥇 עולות מבתים:</span><span className="font-black text-white bg-slate-800 px-2 py-0.5 rounded">{u.breakdown.groups || 0}</span></div>
+                                  <div className="flex justify-between items-center"><span className="text-slate-400">🥉 8 המעפילות:</span><span className="font-black text-white bg-slate-800 px-2 py-0.5 rounded">{u.breakdown.thirdPlace || 0}</span></div>
+                                  <div className="flex justify-between items-center"><span className="text-slate-400">🔥 נוק-אאוט:</span><span className="font-black text-white bg-slate-800 px-2 py-0.5 rounded">{u.breakdown.knockout || 0}</span></div>
+                                </div>
+                              ) : (
+                                <div className="text-[10px] text-slate-400 text-center py-2 leading-relaxed">
+                                   הפילוח המלא יוצג לאחר חישוב הנקודות הבא באדמין ⏳
+                                </div>
+                              )}
+                           </div>
+                         </div>
+                         
+                       </td>
+                       <td className="p-3 md:p-4 text-center">
+                         <button onClick={() => handleOpenSpy(u)} className="w-8 h-8 md:w-10 md:h-10 mx-auto rounded-full bg-slate-800 border border-slate-600 flex items-center justify-center hover:bg-blue-600/20 hover:border-blue-400 hover:text-blue-400 transition-all text-slate-300 shadow-sm" title="הרכב ניקוד">
+                           👁️
+                         </button>
+                       </td>
+                     </tr>
+                   );
+                 })}
+                 {currentUsers.length === 0 && (<tr><td colSpan={4} className="text-center p-8 text-slate-500">עדיין אין נתונים בטבלה.</td></tr>)}
+               </tbody>
+             </table>
+           </div>
+         </div>
+      )}
+
+      {/* --- בר הסטטוס המרחף המשודרג --- */}
+      {!isMyRowVisible && me && !spyModalUser && (
+        <div className="fixed bottom-0 left-0 right-0 z-40 bg-slate-900/95 backdrop-blur-md border-t-2 border-blue-500 shadow-[0_-10px_30px_rgba(0,0,0,0.8)] pb-4 pt-3 md:py-4 animate-fade-in-up">
+          <div className="max-w-4xl mx-auto flex justify-between items-center px-4 md:px-8">
+             <div className="flex items-center gap-3 md:gap-4">
+                <div className="flex flex-col items-center justify-center bg-slate-800 w-11 h-11 md:w-14 md:h-14 rounded-xl border border-slate-600 shadow-inner">
+                   <span className="font-black text-slate-300 text-xl md:text-2xl">{me.displayRank}</span>
+                </div>
+                <div className="flex flex-col">
+                   <div className="font-bold text-white text-base md:text-lg flex items-center gap-2">
+                     <span>{me.name?.split(" ")[0]}</span>
+                     <span className="bg-blue-600 text-white text-[9px] md:text-[10px] px-1.5 py-0.5 rounded uppercase tracking-wider">אתה</span>
+                   </div>
+                   
+                   {/* 🎯 הוספת מעקב אחרי הפסגה ואחרי הנמסיס מהבר הצף! */}
+                   <div className="flex items-center gap-3">
+                       {pointsGap === 0 ? (
+                          <div className="text-[10px] md:text-[11px] text-amber-400 font-bold mt-0.5">👑 הפסגה כולה שלך!</div>
+                       ) : (
+                          <div className="text-[10px] md:text-[11px] text-blue-400 font-bold mt-0.5">פער לפסגה: <span className="font-black" dir="ltr">-{pointsGap}</span></div>
+                       )}
+                       
+                       {/* אם אנחנו לא בליגה פרטית, מציגים את הנמסיס הכללי. אם אנחנו בליגה פרטית והנמסיס לא חלק ממנה, אנחנו לא נציג אותו */}
+                       {nemesisUser && nemesisGap !== null && (
+                          <>
+                             <span className="text-slate-600 text-[10px] hidden md:inline-block">|</span>
+                             <div className={`text-[10px] md:text-[11px] font-bold mt-0.5 ${nemesisGap >= 0 ? 'text-emerald-400' : 'text-rose-400'} hidden md:block`}>
+                                🎯 מול {nemesisUser.name?.split(" ")[0]}: <span className="font-black" dir="ltr">{nemesisGap > 0 ? `+${nemesisGap}` : nemesisGap}</span>
+                             </div>
+                          </>
+                       )}
+                   </div>
+
+                </div>
+             </div>
+             
+             <div className="flex items-center gap-4 md:gap-6">
+                <div className={`font-black text-2xl md:text-3xl ${activeBoard === "GENERAL" || activeBoard === "LEAGUES" ? "text-amber-400" : "text-emerald-400"} drop-shadow-md`}>
+                  {myScore}
+                </div>
+                <button onClick={() => handleOpenSpy(me)} className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-slate-800 border border-slate-600 flex items-center justify-center hover:bg-blue-600/20 hover:border-blue-400 transition-all text-slate-300 shadow-sm" title="הניחושים שלי">
+                  👁️
+                </button>
+             </div>
+          </div>
         </div>
       )}
 
-      {/* אזור הטבלה */}
-      <div className="bg-slate-800 pt-10 rounded-3xl border border-slate-700 shadow-2xl relative overflow-hidden flex flex-col">
-        <div className={`absolute top-0 right-0 w-64 h-64 rounded-full blur-3xl pointer-events-none -mr-20 -mt-20 ${activeBoard === "GENERAL" ? "bg-amber-500/10" : "bg-emerald-500/10"}`}></div>
-        
-        <h2 className="text-3xl font-extrabold text-white mb-8 px-6 md:px-10 relative z-10 flex items-center gap-3">
-          <span>{activeBoard === "GENERAL" ? "🏆" : "🔥"}</span>
-          {activeBoard === "GENERAL" ? "טבלת הדירוג הכללי" : "טבלת שלב הנוק-אאוט"}
-        </h2>
-        
-        {/* פודיום 1-2-3 - התיקון לגובה נמצא כאן: pt-8 במקום h-48 */}
-        {currentUsers.length > 0 && (
-          <div className="flex justify-center items-end gap-2 md:gap-6 mb-12 relative z-10 px-2 pt-8">
-            {podiumSecond && (
-              <div className="flex flex-col items-center w-28 md:w-32">
-                <div className="text-slate-300 font-bold mb-6 text-center truncate w-full px-1 text-sm md:text-base">{podiumSecond.name?.split(' ')[0]}</div>
-                <div className="w-full bg-gradient-to-t from-slate-400 to-slate-300 h-28 md:h-32 rounded-t-lg shadow-lg relative flex flex-col justify-end pb-3 border-t-2 border-slate-200">
-                  <span className="text-4xl absolute -top-6 left-1/2 -translate-x-1/2 drop-shadow-md">🥈</span>
-                  <span className="text-slate-800 font-black text-2xl text-center">{activeBoard === "GENERAL" ? podiumSecond.totalPoints : podiumSecond.knockoutPoints}</span>
-                  <span className="text-slate-700 font-bold text-xs text-center mt-1">מקום {podiumSecond.displayRank}</span>
-                </div>
-              </div>
-            )}
-            {podiumFirst && (
-              <div className="flex flex-col items-center w-32 md:w-40 z-10">
-                <div className="text-amber-400 font-black mb-8 text-center truncate w-full px-1 text-base md:text-lg">{podiumFirst.name?.split(' ')[0]}</div>
-                <div className="w-full bg-gradient-to-t from-amber-600 to-amber-400 h-36 md:h-44 rounded-t-lg shadow-[0_0_30px_rgba(251,191,36,0.4)] relative flex flex-col justify-end pb-3 border-t-2 border-amber-200">
-                  <span className="text-5xl absolute -top-8 left-1/2 -translate-x-1/2 drop-shadow-lg">🥇</span>
-                  <span className="text-amber-950 font-black text-3xl text-center">{activeBoard === "GENERAL" ? podiumFirst.totalPoints : podiumFirst.knockoutPoints}</span>
-                  <span className="text-amber-900 font-bold text-xs text-center mt-1">מקום {podiumFirst.displayRank}</span>
-                </div>
-              </div>
-            )}
-            {podiumThird && (
-              <div className="flex flex-col items-center w-28 md:w-32">
-                <div className="text-orange-300 font-bold mb-5 text-center truncate w-full px-1 text-sm md:text-base">{podiumThird.name?.split(' ')[0]}</div>
-                <div className="w-full bg-gradient-to-t from-orange-800 to-orange-600 h-20 md:h-24 rounded-t-lg shadow-lg relative flex flex-col justify-end pb-3 border-t-2 border-orange-400">
-                  <span className="text-3xl absolute -top-5 left-1/2 -translate-x-1/2 drop-shadow-md">🥉</span>
-                  <span className="text-orange-100 font-black text-xl text-center">{activeBoard === "GENERAL" ? podiumThird.totalPoints : podiumThird.knockoutPoints}</span>
-                  <span className="text-orange-200 font-bold text-xs text-center mt-1">מקום {podiumThird.displayRank}</span>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-
-        <div className="overflow-x-auto relative z-10 bg-slate-900/50 rounded-t-2xl border-t border-slate-700/50">
-          <table className="w-full text-right table-fixed">
-            <thead>
-              <tr className="text-slate-400 border-b border-slate-700/50 bg-slate-800/80 text-sm md:text-base">
-                <th className="p-3 md:p-4 font-medium w-16 md:w-20 text-center">מיקום</th>
-                <th className="p-3 md:p-4 font-medium">שחקן</th>
-                <th className={`p-3 md:p-4 font-medium text-center w-20 md:w-28 ${activeBoard === "GENERAL" ? "text-amber-400" : "text-emerald-400"}`}>נק'</th>
-                <th className="p-3 md:p-4 font-medium text-center w-14 md:w-16">פירוט</th>
-              </tr>
-            </thead>
-            <tbody>
-              {currentUsers.map((u) => {
-                const isTop3 = u.displayRank <= 3;
-                const rowBg = u.id === currentUserId ? "bg-blue-900/20 border-blue-500/50 shadow-inner" : 
-                              u.displayRank === 1 ? "bg-amber-500/10 border-amber-500/30" : 
-                              u.displayRank === 2 ? "bg-slate-300/10 border-slate-300/30" : 
-                              u.displayRank === 3 ? "bg-orange-700/10 border-orange-700/30" : "hover:bg-slate-700/30";
-                
-                const scoreToShow = activeBoard === "GENERAL" ? u.totalPoints : u.knockoutPoints;
-                
-                const prevR = activeBoard === "GENERAL" ? u.previousRankGeneral : u.previousRankKnockout;
-                const trend = prevR ? (prevR - u.displayRank) : 0;
-                
-                return (
-                  <tr key={u.id} className={`border-b border-slate-700/50 transition-colors ${rowBg}`}>
-                    <td className="p-3 md:p-4 text-center">
-                      <div className="flex justify-center items-center gap-1.5 md:gap-2">
-                         <div className="flex flex-col items-center">
-                           <span className={`text-xl md:text-2xl font-black ${
-                             u.displayRank === 1 ? "text-amber-400" : 
-                             u.displayRank === 2 ? "text-slate-300" : 
-                             u.displayRank === 3 ? "text-orange-400" : 
-                             "text-slate-400"
-                           }`}>
-                             {u.displayRank}
-                           </span>
-                           {trend > 0 && <span className="text-emerald-400 text-[11px] font-black tracking-tighter mt-[-2px] flex items-center" title={`עלה ${trend} מקומות`}>▲ {trend}</span>}
-                           {trend < 0 && <span className="text-rose-400 text-[11px] font-black tracking-tighter mt-[-2px] flex items-center" title={`ירד ${Math.abs(trend)} מקומות`}>▼ {Math.abs(trend)}</span>}
-                           {trend === 0 && prevR && <span className="text-slate-600 text-[11px] font-black mt-[-2px] block">-</span>}
-                         </div>
-                         {u.displayRank === 1 && <span className="text-lg md:text-xl drop-shadow-md">🥇</span>}
-                         {u.displayRank === 2 && <span className="text-lg md:text-xl drop-shadow-md">🥈</span>}
-                         {u.displayRank === 3 && <span className="text-lg md:text-xl drop-shadow-md">🥉</span>}
-                      </div>
-                    </td>
-                    <td className="p-3 md:p-4">
-                       <div className="font-bold text-white text-sm md:text-base truncate flex items-center gap-2">
-                         {u.name || "שחקן לא ידוע"}
-                         {u.id === currentUserId && <span className="bg-blue-600 text-white text-[9px] px-1.5 py-0.5 rounded uppercase tracking-wider shrink-0">אתה</span>}
-                       </div>
-                       {!u.hasPaid && <div className="text-[10px] text-rose-400 mt-0.5">טרם שולם</div>}
-                    </td>
-                    <td className={`p-3 md:p-4 text-center font-black text-lg md:text-xl ${isTop3 ? (activeBoard === "GENERAL" ? "text-amber-400" : "text-emerald-400") : "text-slate-200"}`}>
-                      {scoreToShow || 0}
-                    </td>
-                    <td className="p-3 md:p-4 text-center">
-                      <button onClick={() => handleOpenSpy(u)} className="w-8 h-8 md:w-10 md:h-10 mx-auto rounded-full bg-slate-800 border border-slate-600 flex items-center justify-center hover:bg-blue-600/20 hover:border-blue-400 hover:text-blue-400 transition-all text-slate-300 shadow-sm" title="הרכב ניקוד">
-                        👁️
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })}
-              {currentUsers.length === 0 && (<tr><td colSpan={4} className="text-center p-8 text-slate-500">עדיין אין נתונים בטבלה.</td></tr>)}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* --- חלון הריגול (לא נגעתי בכלום) --- */}
+      {/* --- חלון הריגול --- */}
       {spyModalUser && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-2 md:p-4 backdrop-blur-sm" dir="rtl">
           <div className="bg-slate-900 border border-slate-700 p-4 md:p-6 rounded-3xl w-full max-w-xl max-h-[90vh] flex flex-col shadow-2xl relative">
@@ -735,21 +945,29 @@ export default function Leaderboard() {
                               </div>
                               <div className="flex justify-between items-center text-center">
                                  <div className="flex flex-col items-center w-2/5">
-                                    <span className="font-bold text-slate-200 mb-2 text-base leading-tight break-words">{match.homeTeam}</span>
+                                    <span className="font-bold text-slate-200 mb-2 text-base leading-tight break-words flex items-center justify-center gap-1.5 w-full">
+                                      {getFlagUrl(match.homeTeam) ? <img src={getFlagUrl(match.homeTeam)!} className="w-5 h-3.5 object-cover rounded-sm shadow-sm" alt="flag" /> : "🏳️"}
+                                      {match.homeTeam}
+                                    </span>
                                     <span className="text-3xl font-black text-white bg-slate-900 border border-slate-600 w-14 h-12 flex items-center justify-center rounded-xl shadow-inner">{pred.predictedHomeScore}</span>
                                     {match.isFinished && <span className="text-xs text-emerald-400 font-bold mt-3 bg-emerald-900/20 px-3 py-1 rounded-md border border-emerald-500/30 whitespace-nowrap">אמת: {match.realHomeScore}</span>}
                                  </div>
                                  <div className="flex flex-col items-center w-1/5 pt-6"><span className="text-slate-500 font-black text-2xl">:</span></div>
                                  <div className="flex flex-col items-center w-2/5">
-                                    <span className="font-bold text-slate-200 mb-2 text-base leading-tight break-words">{match.awayTeam}</span>
+                                    <span className="font-bold text-slate-200 mb-2 text-base leading-tight break-words flex items-center justify-center gap-1.5 w-full">
+                                      {match.awayTeam}
+                                      {getFlagUrl(match.awayTeam) ? <img src={getFlagUrl(match.awayTeam)!} className="w-5 h-3.5 object-cover rounded-sm shadow-sm" alt="flag" /> : "🏳️"}
+                                    </span>
                                     <span className="text-3xl font-black text-white bg-slate-900 border border-slate-600 w-14 h-12 flex items-center justify-center rounded-xl shadow-inner">{pred.predictedAwayScore}</span>
                                     {match.isFinished && <span className="text-xs text-emerald-400 font-bold mt-3 bg-emerald-900/20 px-3 py-1 rounded-md border border-emerald-500/30 whitespace-nowrap">אמת: {match.realAwayScore}</span>}
                                  </div>
                               </div>
                               {isKnockout && pred.qualifier && (
                                 <div className="mt-4 pt-3 border-t border-slate-700/50 text-center">
-                                  <span className="text-[11px] font-bold text-purple-300 bg-purple-900/20 px-3 py-1.5 rounded-lg border border-purple-500/30">
-                                    הימר שיעפילו: {pred.qualifier}
+                                  <span className="text-[11px] font-bold text-purple-300 bg-purple-900/20 px-3 py-1.5 rounded-lg border border-purple-500/30 flex items-center justify-center gap-1.5 w-fit mx-auto">
+                                    הימר שיעפילו: 
+                                    {getFlagUrl(pred.qualifier) ? <img src={getFlagUrl(pred.qualifier)!} className="w-4 h-3 object-cover rounded-sm shadow-sm" alt="flag" /> : "🏳️"}
+                                    {pred.qualifier}
                                   </span>
                                 </div>
                               )}
@@ -774,6 +992,7 @@ export default function Leaderboard() {
                              const pts = getThirdPlacePoints(t);
                              return (
                                <div key={i} className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border text-sm font-bold ${pts === 10 ? "bg-emerald-900/20 text-emerald-400 border-emerald-500/30" : pts === 0 ? "bg-rose-900/20 text-rose-400 border-rose-500/30" : "bg-slate-900 text-slate-300 border-slate-600"}`}>
+                                 {getFlagUrl(t) && <img src={getFlagUrl(t)!} className="w-4 h-3 object-cover rounded-sm" alt="flag"/>}
                                  {t} {pts === 10 && "✓"} {pts === 0 && "✕"}
                                </div>
                              );
@@ -796,6 +1015,7 @@ export default function Leaderboard() {
                                <div className="flex justify-between items-center bg-slate-900 p-2.5 rounded-lg border border-slate-700/50">
                                  <span className="text-slate-400 text-sm">מקום 1:</span>
                                  <div className="flex items-center gap-2">
+                                   {getFlagUrl(preds.first) && <img src={getFlagUrl(preds.first)!} className="w-4 h-3 object-cover rounded-sm" alt="flag"/>}
                                    <span className="font-bold text-slate-200">{preds.first || "-"}</span>
                                    {getPointsBadge(p1Pts)}
                                  </div>
@@ -803,6 +1023,7 @@ export default function Leaderboard() {
                                <div className="flex justify-between items-center bg-slate-900 p-2.5 rounded-lg border border-slate-700/50">
                                  <span className="text-slate-400 text-sm">מקום 2:</span>
                                  <div className="flex items-center gap-2">
+                                   {getFlagUrl(preds.second) && <img src={getFlagUrl(preds.second)!} className="w-4 h-3 object-cover rounded-sm" alt="flag"/>}
                                    <span className="font-bold text-slate-200">{preds.second || "-"}</span>
                                    {getPointsBadge(p2Pts)}
                                  </div>
@@ -823,7 +1044,7 @@ export default function Leaderboard() {
                       {[
                         { id: "TOURNAMENT", label: "🏆 טורניר" },
                         { id: "GROUPS", label: "⚽ שלב הבתים" },
-                        { id: "KNOCKOUT", label: "🔥 נוק-אאוט" }
+                        ...(tournamentState >= 4 ? [{ id: "KNOCKOUT", label: "🔥 נוק-אאוט" }] : [])
                       ].map(tab => (
                         <button
                           key={tab.id}
@@ -891,15 +1112,30 @@ export default function Leaderboard() {
                              </div>
                              <div className="mt-4">
                                <div className="text-xs text-slate-400 mb-2">הניחוש שלו:</div>
-                               <div className="inline-block px-5 py-2.5 bg-slate-900 text-slate-200 font-bold text-lg rounded-xl border border-slate-600 shadow-inner">
+                               <div className="inline-block px-5 py-2.5 bg-slate-900 text-slate-200 font-bold text-lg rounded-xl border border-slate-600 shadow-inner flex items-center gap-2 w-fit">
+                                 {getFlagUrl(bPred.answer) && <img src={getFlagUrl(bPred.answer)!} className="w-6 h-4 object-cover rounded-sm shadow-sm" alt="flag" />}
                                  {bPred.answer}
                                </div>
                              </div>
                              {realBonusAnswers[bPred.qId] && (
                                <div className="mt-4 bg-emerald-900/10 p-3 rounded-lg border border-emerald-500/20 flex items-center gap-2">
                                  <span className="text-emerald-400">✅</span>
-                                 <span className="text-sm text-emerald-400 font-bold">
-                                   תשובה אמת: {Array.isArray(realBonusAnswers[bPred.qId]) ? realBonusAnswers[bPred.qId].join(" / ") : realBonusAnswers[bPred.qId]}
+                                 <span className="text-sm text-emerald-400 font-bold flex items-center gap-2 flex-wrap">
+                                   תשובה אמת: 
+                                   {Array.isArray(realBonusAnswers[bPred.qId]) 
+                                      ? realBonusAnswers[bPred.qId].map((ans: string, i: number, arr: any[]) => (
+                                          <span key={i} className="flex items-center gap-1">
+                                            {getFlagUrl(ans) && <img src={getFlagUrl(ans)!} className="w-4 h-3 object-cover rounded-sm" alt="flag" />}
+                                            {ans}{i < arr.length - 1 ? " / " : ""}
+                                          </span>
+                                        ))
+                                      : (
+                                        <span className="flex items-center gap-1">
+                                          {getFlagUrl(realBonusAnswers[bPred.qId]) && <img src={getFlagUrl(realBonusAnswers[bPred.qId])!} className="w-4 h-3 object-cover rounded-sm" alt="flag" />}
+                                          {realBonusAnswers[bPred.qId]}
+                                        </span>
+                                      )
+                                   }
                                  </span>
                                </div>
                              )}

@@ -1,10 +1,11 @@
 "use client";
-import { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { collection, getDocs, doc, updateDoc, setDoc, getDoc, deleteDoc, query, where } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth, db } from "../firebase";
 import Link from "next/link";
 import toast from "react-hot-toast";
+import { getFlagUrl } from "../utils/flags";
 
 const ADMIN_EMAIL = "bawak.y10@gmail.com"; 
 
@@ -20,6 +21,9 @@ export default function AdminPanel() {
   const [selectedStatGroup, setSelectedStatGroup] = useState<string>("A");
   const [statSpyModal, setStatSpyModal] = useState<{title: string, list: any[], type: "MATCH_DIRECTION" | "NAMES_ONLY"} | null>(null);
   const [adminMatchGroup, setAdminMatchGroup] = useState<string>("A");
+  
+  const [adminKnockoutViewMode, setAdminKnockoutViewMode] = useState<"LIST" | "BRACKET">("LIST");
+  const [adminBracketModalMatch, setAdminBracketModalMatch] = useState<any | null>(null);
   
   const [adminBonusCategory, setAdminBonusCategory] = useState<string>("TOURNAMENT");
   const [adminKnockoutRound, setAdminKnockoutRound] = useState<string>("ALL");
@@ -41,7 +45,8 @@ export default function AdminPanel() {
   const [editingId, setEditingId] = useState<string | null>(null); 
   
   const [newQuestion, setNewQuestion] = useState({ 
-    label: "", phase: "TOURNAMENT", round: "ALL", weight: "REGULAR", answerType: "ALL_TEAMS", points: 15, customOptions: [] as string[], liveStatus: "" 
+    label: "", phase: "TOURNAMENT", round: "ALL", weight: "REGULAR", answerType: "ALL_TEAMS", points: 15, customOptions: [] as string[], liveStatus: "",
+    isSurprise: false, openTime: "", closeTime: "", isProximity: false
   });
   const [tempOption, setTempOption] = useState(""); 
   
@@ -89,7 +94,14 @@ export default function AdminPanel() {
       if (qualSnap.exists()) setRealQualifiers(qualSnap.data().results || {});
 
       const thirdSnap = await getDoc(doc(db, "admin_results", "third_place"));
-      if (thirdSnap.exists()) setRealThirdPlace(thirdSnap.data().teams || Array(8).fill(""));
+      if (thirdSnap.exists()) {
+         const tData = thirdSnap.data().teams || [];
+         const filledArr = Array(8).fill("");
+         for(let i=0; i<8; i++) if (tData[i]) filledArr[i] = tData[i];
+         setRealThirdPlace(filledArr);
+      } else {
+         setRealThirdPlace(Array(8).fill(""));
+      }
 
       const bonusSnap = await getDoc(doc(db, "admin_results", "bonus"));
       if (bonusSnap.exists()) setRealBonus(bonusSnap.data().answers || {});
@@ -243,18 +255,25 @@ export default function AdminPanel() {
 
   const handleSaveQuestion = async () => { 
     if (!newQuestion.label) return toast.error("חובה להזין את תוכן השאלה"); 
+    if (newQuestion.isSurprise && (!newQuestion.openTime || !newQuestion.closeTime)) return toast.error("יש להזין זמן פתיחה וסגירה לשאלת הפתעה.");
     if ((newQuestion.answerType === "MULTIPLE_CHOICE" || newQuestion.answerType === "TEAM_SUBSET") && newQuestion.customOptions.length < 2) return toast.error("חייבים לפחות 2 אפשרויות בחירה."); 
+    
+    let finalPoints = newQuestion.points;
+    if (newQuestion.isProximity && finalPoints === 15) finalPoints = 50;
+
+    const questionToSave = { ...newQuestion, points: finalPoints };
+
     let updatedQuestions; 
     if (editingId) { 
-       updatedQuestions = bonusQuestions.map(q => q.id === editingId ? { ...q, ...newQuestion } : q); 
+       updatedQuestions = bonusQuestions.map(q => q.id === editingId ? { ...q, ...questionToSave } : q); 
     } else { 
        const qId = `q_${Date.now()}`; 
-       updatedQuestions = [...bonusQuestions, { id: qId, ...newQuestion }]; 
+       updatedQuestions = [...bonusQuestions, { id: qId, ...questionToSave }]; 
     } 
     try { 
        await setDoc(doc(db, "settings", "bonus_questions"), { questions: updatedQuestions }); 
        setBonusQuestions(updatedQuestions); 
-       setNewQuestion({ label: "", phase: "TOURNAMENT", round: "ALL", weight: "REGULAR", answerType: "ALL_TEAMS", points: 15, customOptions: [], liveStatus: "" }); 
+       setNewQuestion({ label: "", phase: "TOURNAMENT", round: "ALL", weight: "REGULAR", answerType: "ALL_TEAMS", points: 15, customOptions: [], liveStatus: "", isSurprise: false, openTime: "", closeTime: "", isProximity: false }); 
        setEditingId(null); 
        toast.success("השאלה נשמרה בהצלחה!");
     } catch (error) { 
@@ -264,13 +283,17 @@ export default function AdminPanel() {
   
   const handleEditClick = (q: any) => { 
     if (realBonus[q.id] && realBonus[q.id].length > 0) toast.error("שים לב: לשאלה זו כבר הוזנו תוצאות אמת.", { icon: '⚠️' }); 
-    setNewQuestion({ label: q.label, phase: q.phase, round: q.round, weight: q.weight, answerType: q.answerType, points: q.points, customOptions: q.customOptions || [], liveStatus: q.liveStatus || "" }); 
+    setNewQuestion({ 
+      label: q.label, phase: q.phase, round: q.round, weight: q.weight, answerType: q.answerType, points: q.points, 
+      customOptions: q.customOptions || [], liveStatus: q.liveStatus || "",
+      isSurprise: q.isSurprise || false, openTime: q.openTime || "", closeTime: q.closeTime || "", isProximity: q.isProximity || false
+    }); 
     setEditingId(q.id); 
     window.scrollTo({ top: 0, behavior: 'smooth' }); 
   };
   
   const handleCancelEdit = () => { 
-    setNewQuestion({ label: "", phase: "TOURNAMENT", round: "ALL", weight: "REGULAR", answerType: "ALL_TEAMS", points: 15, customOptions: [], liveStatus: "" }); 
+    setNewQuestion({ label: "", phase: "TOURNAMENT", round: "ALL", weight: "REGULAR", answerType: "ALL_TEAMS", points: 15, customOptions: [], liveStatus: "", isSurprise: false, openTime: "", closeTime: "", isProximity: false }); 
     setEditingId(null); 
   };
   
@@ -379,11 +402,12 @@ export default function AdminPanel() {
     } 
   };
 
+  // --- שדרוג: שמירת תוצאות עולות (עם לוגיקה חכמה של Slots) ---
   const handleSaveQualifiers = async () => { 
     setSavingId("qualifiers"); 
     try { 
       await setDoc(doc(db, "admin_results", "qualifiers"), { results: realQualifiers, updated_at: new Date() }); 
-      setTimeout(() => { setSavingId(null); toast.success("עולות מהבתים נשמרו!"); }, 500); 
+      setTimeout(() => { setSavingId(null); toast.success("עולות מהבתים נשמרו בהצלחה!"); }, 500); 
     } catch (error) { 
       setSavingId(null);
       toast.error("שגיאה בשמירת עולות");
@@ -403,11 +427,12 @@ export default function AdminPanel() {
     } 
   };
 
+  // --- שדרוג: שמירת 8 המעפילות ---
   const handleSaveThirdPlace = async () => { 
     setSavingId("thirdPlace"); 
     try { 
       await setDoc(doc(db, "admin_results", "third_place"), { teams: realThirdPlace, updated_at: new Date() }); 
-      setTimeout(() => { setSavingId(null); toast.success("8 המעפילות נשמרו!"); }, 500); 
+      setTimeout(() => { setSavingId(null); toast.success("8 המעפילות נשמרו בהצלחה!"); }, 500); 
     } catch (error) { 
       setSavingId(null);
       toast.error("שגיאה בשמירת המעפילות");
@@ -427,111 +452,310 @@ export default function AdminPanel() {
     } 
   };
 
-  const handleInjectMockUsers = async () => {
-    if (!confirm("זה ייצר 5 משתמשים פיקטיביים עם ניחושים לכל המשחקים, העולות והבונוסים. להמשיך?")) return;
+  const handleCalculateScores = async (silentParam: any = false) => {
+    const isSilent = silentParam === true;
+    if (!isSilent && !confirm("האם לחשב נקודות לכל המשתמשים? מנוע הקרבה החדש (בעל הבית השתגע) פעיל!")) return;
     setIsCalculating(true);
     try {
-      const botNames = ["דני (בוט)", "רוני (בוט)", "יעל (בוט)", "אלכס (בוט)", "מיכל (בוט)"];
-      for (const name of botNames) {
-        const botId = `bot_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
-        await setDoc(doc(db, "users", botId), { name, email: `${botId}@test.com`, totalPoints: 0, knockoutPoints: 0, hasPaid: true });
-        for (const match of matches) {
-          const coll = match.stage === "KNOCKOUT" ? "predictions_knockout" : "predictions_matches";
-          const pHome = Math.floor(Math.random() * 4); const pAway = Math.floor(Math.random() * 4);
-          let payload: any = { userId: botId, matchId: match.id || "unknown", predictedHomeScore: pHome.toString(), predictedAwayScore: pAway.toString(), updatedAt: new Date() };
-          if (match.stage === "KNOCKOUT") { payload.roundName = match.roundName || "נוקאאוט"; payload.qualifier = (pHome > pAway ? match.homeTeam : (pAway > pHome ? match.awayTeam : (Math.random() > 0.5 ? match.homeTeam : match.awayTeam))) || ""; } 
-          else { payload.groupId = match.group || "A"; }
-          await setDoc(doc(db, coll, `${botId}_${match.id}`), payload);
-        }
-        const groupsPreds: any = {};
-        for (const groupName of Object.keys(groupTeams)) {
-          const teamsInGroup = Array.from(groupTeams[groupName]);
-          if (teamsInGroup.length >= 2) {
-            const shuffled = [...teamsInGroup].sort(() => 0.5 - Math.random());
-            groupsPreds[groupName] = { first: shuffled[0] || "", second: shuffled[1] || "" };
+      const matchesSnap = await getDocs(collection(db, "matches")); const realMatches = matchesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      const qualSnap = await getDoc(doc(db, "admin_results", "qualifiers")); const realQuals = qualSnap.exists() ? (qualSnap.data().results || {}) : {};
+      const thirdSnap = await getDoc(doc(db, "admin_results", "third_place")); const realThird = thirdSnap.exists() ? (thirdSnap.data().teams || []) : [];
+      const bonusSnap = await getDoc(doc(db, "admin_results", "bonus")); const realBonusAns = bonusSnap.exists() ? (bonusSnap.data().answers || {}) : {};
+
+      const questionsSnap = await getDoc(doc(db, "settings", "bonus_questions"));
+      const currentBonusQuestions = questionsSnap.exists() ? (questionsSnap.data().questions || []) : [];
+
+      const usersSnap = await getDocs(collection(db, "users")); const allUsers = usersSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      
+      const allUserMatchesSnap = await getDocs(collection(db, "predictions_matches")); const allUserMatches = allUserMatchesSnap.docs.map(doc => doc.data());
+      const allUserKnockoutSnap = await getDocs(collection(db, "predictions_knockout")); const allUserKnockouts = allUserKnockoutSnap.docs.map(doc => doc.data());
+      
+      const allUserQualsSnap = await getDocs(collection(db, "predictions_qualifiers")); 
+      const allUserQuals = allUserQualsSnap.docs.map(doc => ({ userId: doc.id, groups: doc.data().groups || {} }));
+      
+      const allUserBonusSnap = await getDocs(collection(db, "predictions_bonus")); 
+      const allUserBonuses = allUserBonusSnap.docs.map(doc => ({ userId: doc.id, answers: doc.data().answers || {} }));
+      
+      const allUserThirdSnap = await getDocs(collection(db, "predictions_third_place")); 
+      const allUserThirds = allUserThirdSnap.docs.map(doc => ({ userId: doc.id, teams: doc.data().teams || [] }));
+
+      const qualifierPointsMap: any = { "32 הגדולות": 5, "שמינית גמר": 10, "רבע גמר": 15, "חצי גמר": 20, "גמר": 25 };
+
+      for (const currentUser of allUsers) {
+        let basePoints = 0; 
+        let knockoutPoints = 0; 
+        let matchesPoints = 0;
+        let groupPoints = 0;
+        let thirdPlacePoints = 0;
+        let bonusPoints = 0;
+        const uid = currentUser.id;
+
+        const userGroupMatches = allUserMatches.filter(m => m.userId === uid);
+        userGroupMatches.forEach(userMatch => {
+          const realMatch = realMatches.find(m => m.id === userMatch.matchId);
+          if (realMatch && realMatch.isFinished && realMatch.stage !== "KNOCKOUT") {
+            const predH = Number(userMatch.predictedHomeScore); const predA = Number(userMatch.predictedAwayScore);
+            const realH = Number(realMatch.realHomeScore); const realA = Number(realMatch.realAwayScore);
+            if (!isNaN(predH) && !isNaN(predA) && !isNaN(realH) && !isNaN(realA)) {
+              if (Math.sign(predH - predA) === Math.sign(realH - realA)) { 
+                basePoints += 5; 
+                matchesPoints += 5;
+                if (predH === realH && predA === realA) {
+                   basePoints += 10; 
+                   matchesPoints += 10;
+                }
+              }
+            }
+          }
+        });
+
+        const userQualData = allUserQuals.find(q => q.userId === uid);
+        if (userQualData && userQualData.groups) {
+          for (const [groupName, preds] of Object.entries<any>(userQualData.groups)) {
+            const realGroup = realQuals[groupName];
+            if (realGroup) {
+              if (preds.first === realGroup.first && preds.first !== "") { basePoints += 15; groupPoints += 15; }
+              else if (preds.first === realGroup.second && preds.first !== "") { basePoints += 7; groupPoints += 7; }
+              
+              if (preds.second === realGroup.second && preds.second !== "") { basePoints += 15; groupPoints += 15; }
+              else if (preds.second === realGroup.first && preds.second !== "") { basePoints += 7; groupPoints += 7; }
+            }
           }
         }
-        await setDoc(doc(db, "predictions_qualifiers", botId), { groups: groupsPreds, updatedAt: new Date() });
-        const shuffledTeamsForThird = [...allTeams].sort(() => 0.5 - Math.random()).slice(0, 8);
-        while (shuffledTeamsForThird.length < 8) shuffledTeamsForThird.push("");
-        await setDoc(doc(db, "predictions_third_place", botId), { teams: shuffledTeamsForThird, updatedAt: new Date() });
-        const bonusAnswers: any = {};
-        for (const q of bonusQuestions) {
-           let ans = "";
-           if (q.answerType === "ALL_TEAMS") { const opts = [...allTeams, ...(q.customOptions||[])]; if (opts.length > 0) ans = opts[Math.floor(Math.random() * opts.length)]; }
-           else if (q.answerType === "TEAM_SUBSET" || q.answerType === "MULTIPLE_CHOICE") { const opts = q.customOptions || []; if (opts.length > 0) ans = opts[Math.floor(Math.random() * opts.length)]; }
-           else if (q.answerType === "OPEN_TEXT" || q.answerType === "PLAYER") { const opts = Array.isArray(q.customOptions) ? q.customOptions : []; if (opts.length > 0) ans = opts[Math.floor(Math.random() * opts.length)]; else ans = "בוט שחקן " + Math.floor(Math.random() * 100); }
-           else if (q.answerType === "NUMERIC") { ans = Math.floor(Math.random() * 20).toString(); }
-           else { ans = "תשובת בוט " + Math.floor(Math.random() * 100); }
-           bonusAnswers[q.id] = ans || ""; 
+
+        const userThirdData = allUserThirds.find(t => t.userId === uid);
+        if (userThirdData) {
+          userThirdData.teams.forEach((team: string) => { 
+              if (realThird.includes(team) && team !== "") {
+                  basePoints += 10; 
+                  thirdPlacePoints += 10;
+              }
+          });
         }
-        await setDoc(doc(db, "predictions_bonus", botId), { answers: bonusAnswers, updatedAt: new Date() });
+
+        const userKnockoutMatches = allUserKnockouts.filter(m => m.userId === uid);
+        userKnockoutMatches.forEach(koMatch => {
+          const realMatch = realMatches.find(m => m.id === koMatch.matchId);
+          if (realMatch && realMatch.isFinished && realMatch.stage === "KNOCKOUT") {
+            const predH = Number(koMatch.predictedHomeScore); const predA = Number(koMatch.predictedAwayScore);
+            const realH = Number(realMatch.realHomeScore); const realA = Number(realMatch.realAwayScore);
+            if (!isNaN(predH) && !isNaN(predA) && !isNaN(realH) && !isNaN(realA)) {
+              if (Math.sign(predH - predA) === Math.sign(realH - realA)) { 
+                knockoutPoints += 5; 
+                if (predH === realH && predA === realA) knockoutPoints += 10; 
+              }
+            }
+            const pointsForQualifying = qualifierPointsMap[koMatch.roundName] || 0;
+            if (koMatch.qualifier === realMatch.realQualifier && koMatch.qualifier !== "") knockoutPoints += pointsForQualifying;
+          }
+        });
+
+        const userBonusData = allUserBonuses.find(b => b.userId === uid);
+        if (userBonusData) {
+          const userBonus = userBonusData.answers;
+          currentBonusQuestions.forEach((q: any) => {
+            const truth = realBonusAns[q.id]; const userAnswer = userBonus[q.id];
+            if (truth && userAnswer) {
+              const truthArray = Array.isArray(truth) ? truth : [truth]; 
+              
+              if (q.isProximity && q.answerType === "NUMERIC") {
+                 const truthNum = Number(truthArray[0]); 
+                 const ansNum = Number(userAnswer);
+                 if (!isNaN(truthNum) && !isNaN(ansNum)) {
+                    const diff = Math.abs(truthNum - ansNum);
+                    let proxPts = 0;
+                    if (diff === 0) proxPts = q.points; 
+                    else if (diff <= 5) proxPts = q.points - 10; 
+                    else if (diff <= 10) proxPts = q.points - 20; 
+                    else if (diff <= 15) proxPts = q.points - 30; 
+                    else if (diff <= 20) proxPts = q.points - 40; 
+
+                    if (proxPts > 0) {
+                       basePoints += proxPts;
+                       bonusPoints += proxPts;
+                    }
+                 }
+              } 
+              else {
+                 const isCorrect = truthArray.some((t: any) => t.toString().trim().toLowerCase() === userAnswer.toString().trim().toLowerCase());
+                 if (isCorrect) {
+                     basePoints += (Number(q.points) || 0); 
+                     bonusPoints += (Number(q.points) || 0);
+                 }
+              }
+            }
+          });
+        }
+
+        const finalTotal = basePoints + knockoutPoints;
+        
+        await updateDoc(doc(db, "users", uid), { 
+            totalPoints: finalTotal, 
+            knockoutPoints: knockoutPoints,
+            breakdown: {
+                matches: matchesPoints,
+                groups: groupPoints,
+                thirdPlace: thirdPlacePoints,
+                bonuses: bonusPoints,
+                knockout: knockoutPoints
+            }
+        });
       }
-      toast.success("🤖 5 בוטים הוזרקו למערכת קומפלט!");
-      fetchAdminData();
+      
+      const updatedUsersSnap = await getDocs(collection(db, "users"));
+      const updatedUsersArray: any[] = [];
+      updatedUsersSnap.forEach(doc => updatedUsersArray.push({ id: doc.id, ...doc.data() }));
+      updatedUsersArray.sort((a, b) => (b.totalPoints || 0) - (a.totalPoints || 0));
+      setUsersList(updatedUsersArray);
+      
+      if (!isSilent) toast.success("הניקוד חושב בהצלחה כולל פילוח לבועות ומנוע 'בעל הבית השתגע'! 🏆");
     } catch (error) { 
       console.error(error); 
-      toast.error("שגיאה בהזרקת בוטים."); 
+      if (!isSilent) toast.error("אירעה שגיאה בחישוב הניקוד."); 
+    } finally { 
+      setIsCalculating(false); 
+    }
+  };
+
+  const handleGenerateStats = async () => {
+    setIsCalculating(true);
+    try {
+      const usersSnap = await getDocs(collection(db, "users"));
+      const usersMap: any = {};
+      usersSnap.forEach(doc => { usersMap[doc.id] = doc.data().name; });
+
+      const matchStatsMap: any = {};
+      const bonusStatsMap: any = {};
+      const qualStatsMap: any = {};
+      const thirdStatsMap: any = {};
+
+      const gSnap = await getDocs(collection(db, "predictions_matches"));
+      const kSnap = await getDocs(collection(db, "predictions_knockout"));
+      const allMatches = [...gSnap.docs.map(d=>d.data()), ...kSnap.docs.map(d=>d.data())];
+
+      allMatches.forEach(pred => {
+        if (!pred.predictedHomeScore || !pred.predictedAwayScore) return;
+        const userName = usersMap[pred.userId];
+        if (!userName) return; 
+
+        const timeStr = formatAuditTime(pred.updatedAt);
+        const mId = pred.matchId;
+        if (!matchStatsMap[mId]) matchStatsMap[mId] = { total: 0, homeWins: [], awayWins: [], draws: [], exactScores: {} };
+        matchStatsMap[mId].total++;
+        
+        const h = Number(pred.predictedHomeScore); const a = Number(pred.predictedAwayScore);
+        const userObj = { name: userName, home: h, away: a, time: timeStr }; 
+
+        if (h > a) matchStatsMap[mId].homeWins.push(userObj);
+        else if (a > h) matchStatsMap[mId].awayWins.push(userObj);
+        else matchStatsMap[mId].draws.push(userObj);
+
+        const exact = `${h}-${a}`;
+        if (!matchStatsMap[mId].exactScores[exact]) matchStatsMap[mId].exactScores[exact] = { count: 0, users: [] };
+        matchStatsMap[mId].exactScores[exact].count++;
+        matchStatsMap[mId].exactScores[exact].users.push({ name: userName, time: timeStr }); 
+      });
+
+      const bSnap = await getDocs(collection(db, "predictions_bonus"));
+      bSnap.forEach(doc => {
+        const userName = usersMap[doc.id];
+        if (!userName) return; 
+        const timeStr = formatAuditTime(doc.data().updatedAt);
+        const answers = doc.data().answers || {};
+        for (const [qId, ans] of Object.entries(answers)) {
+          if (!ans) continue;
+          if (!bonusStatsMap[qId]) bonusStatsMap[qId] = { total: 0, answers: {} };
+          bonusStatsMap[qId].total++;
+          const answerStr = String(ans).trim();
+          if (!bonusStatsMap[qId].answers[answerStr]) bonusStatsMap[qId].answers[answerStr] = { count: 0, users: [] };
+          bonusStatsMap[qId].answers[answerStr].count++;
+          bonusStatsMap[qId].answers[answerStr].users.push({ name: userName, time: timeStr });
+        }
+      });
+
+      const qSnap = await getDocs(collection(db, "predictions_qualifiers"));
+      qSnap.forEach(doc => {
+        const userName = usersMap[doc.id];
+        if (!userName) return;
+        const timeStr = formatAuditTime(doc.data().updatedAt);
+        const data = doc.data().groups || {};
+        for (const [group, preds] of Object.entries<any>(data)) {
+          if (!qualStatsMap[group]) qualStatsMap[group] = { first: {}, second: {}, total: 0 };
+          qualStatsMap[group].total++;
+          if (preds.first) {
+            if (!qualStatsMap[group].first[preds.first]) qualStatsMap[group].first[preds.first] = { count: 0, users: [] };
+            qualStatsMap[group].first[preds.first].count++;
+            qualStatsMap[group].first[preds.first].users.push({ name: userName, time: timeStr });
+          }
+          if (preds.second) {
+            if (!qualStatsMap[group].second[preds.second]) qualStatsMap[group].second[preds.second] = { count: 0, users: [] };
+            qualStatsMap[group].second[preds.second].count++;
+            qualStatsMap[group].second[preds.second].users.push({ name: userName, time: timeStr });
+          }
+        }
+      });
+
+      const tSnap = await getDocs(collection(db, "predictions_third_place"));
+      let totalThirdPlaceUsers = 0;
+      tSnap.forEach(doc => {
+        const userName = usersMap[doc.id];
+        if (!userName) return;
+        const timeStr = formatAuditTime(doc.data().updatedAt);
+        const teams = doc.data().teams || [];
+        let hasVoted = false;
+        teams.forEach((team: string) => {
+          if (!team) return;
+          hasVoted = true;
+          if (!thirdStatsMap[team]) thirdStatsMap[team] = { count: 0, users: [] };
+          thirdStatsMap[team].count++;
+          thirdStatsMap[team].users.push({ name: userName, time: timeStr });
+        });
+        if (hasVoted) totalThirdPlaceUsers++;
+      });
+
+      setStatsData({ matches: matchStatsMap, bonuses: bonusStatsMap, qualifiers: qualStatsMap, thirdPlace: { teams: thirdStatsMap, totalUsers: totalThirdPlaceUsers } });
+      if (matches.length > 0) setSelectedStatMatch(matches[0].id);
+      if (bonusQuestions.length > 0) setSelectedStatBonus(bonusQuestions[0].id);
+      
+      toast.success("סריקת הנתונים הסתיימה!");
+
+    } catch(e) { 
+      console.error(e); 
+      toast.error("שגיאה ביצירת תובנות הקהל"); 
     }
     finally { setIsCalculating(false); }
   };
 
-  const handleDeleteUser = async (userId: string, userName: string) => {
-    if (!confirm(`האם אתה בטוח שברצונך למחוק את המשתמש "${userName}" ואת כל הניחושים שלו לצמיתות?`)) return;
+  const handleFactoryReset = async () => {
+    const confirm1 = confirm("⚠️ אזהרה חמורה: פעולה זו תמחק את *כל* המשתמשים ואת *כל* הניחושים במערכת. האם אתה בטוח?");
+    if (!confirm1) return;
+    const confirm2 = prompt("כדי לאשר את מחיקת כל הנתונים, הקלד את המילה: RESET");
+    if (confirm2 !== "RESET") { toast.error("הפעולה בוטלה."); return; }
+    toast.loading("מנקה את המערכת לחלוטין...", { duration: 4000 });
     setIsCalculating(true);
     try {
-      await deleteDoc(doc(db, "users", userId));
-      await deleteDoc(doc(db, "predictions_qualifiers", userId));
-      await deleteDoc(doc(db, "predictions_third_place", userId));
-      await deleteDoc(doc(db, "predictions_bonus", userId));
-      
-      const matchesQuery = query(collection(db, "predictions_matches"), where("userId", "==", userId));
-      const matchesSnap = await getDocs(matchesQuery);
-      for (const d of matchesSnap.docs) {
-         await deleteDoc(doc(db, "predictions_matches", d.id));
+      const collectionsToNuke = ["users", "predictions_matches", "predictions_knockout", "predictions_qualifiers", "predictions_third_place", "predictions_bonus"];
+      for (const collName of collectionsToNuke) {
+        const snap = await getDocs(collection(db, collName));
+        for (const d of snap.docs) await deleteDoc(doc(db, collName, d.id));
       }
-      
-      const koQuery = query(collection(db, "predictions_knockout"), where("userId", "==", userId));
-      const koSnap = await getDocs(koQuery);
-      for (const d of koSnap.docs) {
-         await deleteDoc(doc(db, "predictions_knockout", d.id));
+      await setDoc(doc(db, "admin_results", "bonus"), { answers: {} });
+      await setDoc(doc(db, "admin_results", "qualifiers"), { results: {} });
+      await setDoc(doc(db, "admin_results", "third_place"), { teams: Array(8).fill("") });
+      const matchesSnap = await getDocs(collection(db, "matches"));
+      for (const m of matchesSnap.docs) {
+        await updateDoc(doc(db, "matches", m.id), { realHomeScore: null, realAwayScore: null, realQualifier: "", isFinished: false });
       }
+      await setDoc(doc(db, "settings", "system"), { tournamentState: 0, deadlines: { md1: "", md2: "", md3: "" } }, { merge: true });
+      await setDoc(doc(db, "settings", "dashboard"), { dailyMessage: "" }, { merge: true });
       
-      setUsersList(usersList.filter(u => u.id !== userId));
-      toast.success("✅ המשתמש וכל הניחושים שלו נמחקו בהצלחה וללא שאריות!");
+      toast.success("🧹 איזה ניקיון! המערכת אופסה לחלוטין למצב 'ונילה'.", { duration: 5000 });
+      setTimeout(() => window.location.reload(), 2000);
     } catch (error) { 
-      console.error(error); 
-      toast.error("שגיאה במחיקת המשתמש."); 
-    } 
-    finally { setIsCalculating(false); }
-  };
-
-  const handleDeleteAllMatches = async () => {
-    if (!confirm("⚠️ אזהרה חמורה: פעולה זו תמחק את *כל* המשחקים ממסד הנתונים וגם את *כל ניחושי המשתמשים* למשחקים אלו! האם להמשיך?")) return;
-    setIsCalculating(true);
-    try { 
-      for (const match of matches) { 
-         await deleteDoc(doc(db, "matches", match.id)); 
-      } 
-      
-      const pmSnap = await getDocs(collection(db, "predictions_matches"));
-      for (const d of pmSnap.docs) {
-         await deleteDoc(doc(db, "predictions_matches", d.id));
-      }
-
-      const pkSnap = await getDocs(collection(db, "predictions_knockout"));
-      for (const d of pkSnap.docs) {
-         await deleteDoc(doc(db, "predictions_knockout", d.id));
-      }
-
-      setMatches([]); 
-      toast.success("✅ כל המשחקים וניחושי השחקנים נמחקו לחלוטין."); 
-    } 
-    catch (error) { 
-      console.error(error); 
-      toast.error("שגיאה במחיקת המשחקים."); 
-    } 
-    finally { setIsCalculating(false); }
+      toast.error("שגיאה בתהליך האיפוס."); 
+    } finally { 
+      setIsCalculating(false); 
+    }
   };
 
   const handleSimulateFullTournament = async () => {
@@ -727,7 +951,7 @@ export default function AdminPanel() {
   const handleExportBackup = async () => {
     setIsCalculating(true);
     try {
-      const collectionsToBackup = ['users', 'matches', 'predictions_matches', 'predictions_knockout', 'predictions_qualifiers', 'predictions_third_place', 'predictions_bonus', 'settings', 'admin_results'];
+      const collectionsToBackup = ['users', 'matches', 'predictions_matches', 'predictions_knockout', 'predictions_qualifiers', 'predictions_third_place', 'predictions_bonus', 'settings', 'admin_results', 'mini_leagues'];
       const backupData: any = {};
       
       for (const collName of collectionsToBackup) {
@@ -826,261 +1050,62 @@ export default function AdminPanel() {
     } catch { return ""; }
   };
 
-  const handleCalculateScores = async (silentParam: any = false) => {
-    const isSilent = silentParam === true;
-    if (!isSilent && !confirm("האם לחשב נקודות לכל המשתמשים?")) return;
+  const handleDeleteUser = async (userId: string, userName: string) => {
+    if (!confirm(`האם אתה בטוח שברצונך למחוק את המשתמש "${userName}" ואת כל הניחושים שלו לצמיתות?`)) return;
     setIsCalculating(true);
     try {
-      const matchesSnap = await getDocs(collection(db, "matches")); const realMatches = matchesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      const qualSnap = await getDoc(doc(db, "admin_results", "qualifiers")); const realQuals = qualSnap.exists() ? (qualSnap.data().results || {}) : {};
-      const thirdSnap = await getDoc(doc(db, "admin_results", "third_place")); const realThird = thirdSnap.exists() ? (thirdSnap.data().teams || []) : [];
-      const bonusSnap = await getDoc(doc(db, "admin_results", "bonus")); const realBonusAns = bonusSnap.exists() ? (bonusSnap.data().answers || {}) : {};
-
-      const questionsSnap = await getDoc(doc(db, "settings", "bonus_questions"));
-      const currentBonusQuestions = questionsSnap.exists() ? (questionsSnap.data().questions || []) : [];
-
-      const usersSnap = await getDocs(collection(db, "users")); const allUsers = usersSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      await deleteDoc(doc(db, "users", userId));
+      await deleteDoc(doc(db, "predictions_qualifiers", userId));
+      await deleteDoc(doc(db, "predictions_third_place", userId));
+      await deleteDoc(doc(db, "predictions_bonus", userId));
       
-      const allUserMatchesSnap = await getDocs(collection(db, "predictions_matches")); const allUserMatches = allUserMatchesSnap.docs.map(doc => doc.data());
-      const allUserKnockoutSnap = await getDocs(collection(db, "predictions_knockout")); const allUserKnockouts = allUserKnockoutSnap.docs.map(doc => doc.data());
-      
-      const allUserQualsSnap = await getDocs(collection(db, "predictions_qualifiers")); 
-      const allUserQuals = allUserQualsSnap.docs.map(doc => ({ userId: doc.id, groups: doc.data().groups || {} }));
-      
-      const allUserBonusSnap = await getDocs(collection(db, "predictions_bonus")); 
-      const allUserBonuses = allUserBonusSnap.docs.map(doc => ({ userId: doc.id, answers: doc.data().answers || {} }));
-      
-      const allUserThirdSnap = await getDocs(collection(db, "predictions_third_place")); 
-      const allUserThirds = allUserThirdSnap.docs.map(doc => ({ userId: doc.id, teams: doc.data().teams || [] }));
-
-      const qualifierPointsMap: any = { "32 הגדולות": 5, "שמינית גמר": 10, "רבע גמר": 15, "חצי גמר": 20, "גמר": 25 };
-
-      for (const currentUser of allUsers) {
-        let basePoints = 0; let knockoutPoints = 0; const uid = currentUser.id;
-
-        const userGroupMatches = allUserMatches.filter(m => m.userId === uid);
-        userGroupMatches.forEach(userMatch => {
-          const realMatch = realMatches.find(m => m.id === userMatch.matchId);
-          if (realMatch && realMatch.isFinished && realMatch.stage !== "KNOCKOUT") {
-            const predH = Number(userMatch.predictedHomeScore); const predA = Number(userMatch.predictedAwayScore);
-            const realH = Number(realMatch.realHomeScore); const realA = Number(realMatch.realAwayScore);
-            if (!isNaN(predH) && !isNaN(predA) && !isNaN(realH) && !isNaN(realA)) {
-              if (Math.sign(predH - predA) === Math.sign(realH - realA)) { 
-                basePoints += 5; 
-                if (predH === realH && predA === realA) basePoints += 10; 
-              }
-            }
-          }
-        });
-
-        const userQualData = allUserQuals.find(q => q.userId === uid);
-        if (userQualData && userQualData.groups) {
-          for (const [groupName, preds] of Object.entries<any>(userQualData.groups)) {
-            const realGroup = realQuals[groupName];
-            if (realGroup) {
-              if (preds.first === realGroup.first && preds.first !== "") basePoints += 15; 
-              else if (preds.first === realGroup.second && preds.first !== "") basePoints += 7;
-              
-              if (preds.second === realGroup.second && preds.second !== "") basePoints += 15; 
-              else if (preds.second === realGroup.first && preds.second !== "") basePoints += 7;
-            }
-          }
-        }
-
-        const userThirdData = allUserThirds.find(t => t.userId === uid);
-        if (userThirdData) {
-          userThirdData.teams.forEach((team: string) => { if (realThird.includes(team) && team !== "") basePoints += 10; });
-        }
-
-        const userKnockoutMatches = allUserKnockouts.filter(m => m.userId === uid);
-        userKnockoutMatches.forEach(koMatch => {
-          const realMatch = realMatches.find(m => m.id === koMatch.matchId);
-          if (realMatch && realMatch.isFinished && realMatch.stage === "KNOCKOUT") {
-            const predH = Number(koMatch.predictedHomeScore); const predA = Number(koMatch.predictedAwayScore);
-            const realH = Number(realMatch.realHomeScore); const realA = Number(realMatch.realAwayScore);
-            if (!isNaN(predH) && !isNaN(predA) && !isNaN(realH) && !isNaN(realA)) {
-              if (Math.sign(predH - predA) === Math.sign(realH - realA)) { 
-                knockoutPoints += 5; 
-                if (predH === realH && predA === realA) knockoutPoints += 10; 
-              }
-            }
-            const pointsForQualifying = qualifierPointsMap[koMatch.roundName] || 0;
-            if (koMatch.qualifier === realMatch.realQualifier && koMatch.qualifier !== "") knockoutPoints += pointsForQualifying;
-          }
-        });
-
-        const userBonusData = allUserBonuses.find(b => b.userId === uid);
-        if (userBonusData) {
-          const userBonus = userBonusData.answers;
-          currentBonusQuestions.forEach((q: any) => {
-            const truth = realBonusAns[q.id]; const userAnswer = userBonus[q.id];
-            if (truth && userAnswer) {
-              const truthArray = Array.isArray(truth) ? truth : [truth]; 
-              const isCorrect = truthArray.some((t: any) => t.toString().trim().toLowerCase() === userAnswer.toString().trim().toLowerCase());
-              if (isCorrect) basePoints += (Number(q.points) || 0); 
-            }
-          });
-        }
-
-        const finalTotal = basePoints + knockoutPoints;
-        await updateDoc(doc(db, "users", uid), { totalPoints: finalTotal, knockoutPoints: knockoutPoints });
+      const matchesQuery = query(collection(db, "predictions_matches"), where("userId", "==", userId));
+      const matchesSnap = await getDocs(matchesQuery);
+      for (const d of matchesSnap.docs) {
+         await deleteDoc(doc(db, "predictions_matches", d.id));
       }
       
-      const updatedUsersSnap = await getDocs(collection(db, "users"));
-      const updatedUsersArray: any[] = [];
-      updatedUsersSnap.forEach(doc => updatedUsersArray.push({ id: doc.id, ...doc.data() }));
-      updatedUsersArray.sort((a, b) => (b.totalPoints || 0) - (a.totalPoints || 0));
-      setUsersList(updatedUsersArray);
+      const koQuery = query(collection(db, "predictions_knockout"), where("userId", "==", userId));
+      const koSnap = await getDocs(koQuery);
+      for (const d of koSnap.docs) {
+         await deleteDoc(doc(db, "predictions_knockout", d.id));
+      }
       
-      if (!isSilent) toast.success("הניקוד חושב בהצלחה! 🏆");
+      setUsersList(usersList.filter(u => u.id !== userId));
+      toast.success("✅ המשתמש וכל הניחושים שלו נמחקו בהצלחה וללא שאריות!");
     } catch (error) { 
       console.error(error); 
-      if (!isSilent) toast.error("אירעה שגיאה בחישוב הניקוד."); 
-    } finally { 
-      setIsCalculating(false); 
-    }
-  };
-
-  const handleGenerateStats = async () => {
-    setIsCalculating(true);
-    try {
-      const usersSnap = await getDocs(collection(db, "users"));
-      const usersMap: any = {};
-      usersSnap.forEach(doc => { usersMap[doc.id] = doc.data().name; });
-
-      const matchStatsMap: any = {};
-      const bonusStatsMap: any = {};
-      const qualStatsMap: any = {};
-      const thirdStatsMap: any = {};
-
-      const gSnap = await getDocs(collection(db, "predictions_matches"));
-      const kSnap = await getDocs(collection(db, "predictions_knockout"));
-      const allMatches = [...gSnap.docs.map(d=>d.data()), ...kSnap.docs.map(d=>d.data())];
-
-      allMatches.forEach(pred => {
-        if (!pred.predictedHomeScore || !pred.predictedAwayScore) return;
-        const userName = usersMap[pred.userId];
-        if (!userName) return; 
-
-        const timeStr = formatAuditTime(pred.updatedAt);
-        const mId = pred.matchId;
-        if (!matchStatsMap[mId]) matchStatsMap[mId] = { total: 0, homeWins: [], awayWins: [], draws: [], exactScores: {} };
-        matchStatsMap[mId].total++;
-        
-        const h = Number(pred.predictedHomeScore); const a = Number(pred.predictedAwayScore);
-        const userObj = { name: userName, home: h, away: a, time: timeStr }; 
-
-        if (h > a) matchStatsMap[mId].homeWins.push(userObj);
-        else if (a > h) matchStatsMap[mId].awayWins.push(userObj);
-        else matchStatsMap[mId].draws.push(userObj);
-
-        const exact = `${h}-${a}`;
-        if (!matchStatsMap[mId].exactScores[exact]) matchStatsMap[mId].exactScores[exact] = { count: 0, users: [] };
-        matchStatsMap[mId].exactScores[exact].count++;
-        matchStatsMap[mId].exactScores[exact].users.push({ name: userName, time: timeStr }); 
-      });
-
-      const bSnap = await getDocs(collection(db, "predictions_bonus"));
-      bSnap.forEach(doc => {
-        const userName = usersMap[doc.id];
-        if (!userName) return; 
-        const timeStr = formatAuditTime(doc.data().updatedAt);
-        const answers = doc.data().answers || {};
-        for (const [qId, ans] of Object.entries(answers)) {
-          if (!ans) continue;
-          if (!bonusStatsMap[qId]) bonusStatsMap[qId] = { total: 0, answers: {} };
-          bonusStatsMap[qId].total++;
-          const answerStr = String(ans).trim();
-          if (!bonusStatsMap[qId].answers[answerStr]) bonusStatsMap[qId].answers[answerStr] = { count: 0, users: [] };
-          bonusStatsMap[qId].answers[answerStr].count++;
-          bonusStatsMap[qId].answers[answerStr].users.push({ name: userName, time: timeStr });
-        }
-      });
-
-      const qSnap = await getDocs(collection(db, "predictions_qualifiers"));
-      qSnap.forEach(doc => {
-        const userName = usersMap[doc.id];
-        if (!userName) return;
-        const timeStr = formatAuditTime(doc.data().updatedAt);
-        const data = doc.data().groups || {};
-        for (const [group, preds] of Object.entries<any>(data)) {
-          if (!qualStatsMap[group]) qualStatsMap[group] = { first: {}, second: {}, total: 0 };
-          qualStatsMap[group].total++;
-          if (preds.first) {
-            if (!qualStatsMap[group].first[preds.first]) qualStatsMap[group].first[preds.first] = { count: 0, users: [] };
-            qualStatsMap[group].first[preds.first].count++;
-            qualStatsMap[group].first[preds.first].users.push({ name: userName, time: timeStr });
-          }
-          if (preds.second) {
-            if (!qualStatsMap[group].second[preds.second]) qualStatsMap[group].second[preds.second] = { count: 0, users: [] };
-            qualStatsMap[group].second[preds.second].count++;
-            qualStatsMap[group].second[preds.second].users.push({ name: userName, time: timeStr });
-          }
-        }
-      });
-
-      const tSnap = await getDocs(collection(db, "predictions_third_place"));
-      let totalThirdPlaceUsers = 0;
-      tSnap.forEach(doc => {
-        const userName = usersMap[doc.id];
-        if (!userName) return;
-        const timeStr = formatAuditTime(doc.data().updatedAt);
-        const teams = doc.data().teams || [];
-        let hasVoted = false;
-        teams.forEach((team: string) => {
-          if (!team) return;
-          hasVoted = true;
-          if (!thirdStatsMap[team]) thirdStatsMap[team] = { count: 0, users: [] };
-          thirdStatsMap[team].count++;
-          thirdStatsMap[team].users.push({ name: userName, time: timeStr });
-        });
-        if (hasVoted) totalThirdPlaceUsers++;
-      });
-
-      setStatsData({ matches: matchStatsMap, bonuses: bonusStatsMap, qualifiers: qualStatsMap, thirdPlace: { teams: thirdStatsMap, totalUsers: totalThirdPlaceUsers } });
-      if (matches.length > 0) setSelectedStatMatch(matches[0].id);
-      if (bonusQuestions.length > 0) setSelectedStatBonus(bonusQuestions[0].id);
-      
-      toast.success("סריקת הנתונים הסתיימה!");
-
-    } catch(e) { 
-      console.error(e); 
-      toast.error("שגיאה ביצירת תובנות הקהל"); 
-    }
+      toast.error("שגיאה במחיקת המשתמש."); 
+    } 
     finally { setIsCalculating(false); }
   };
 
-  const handleFactoryReset = async () => {
-    const confirm1 = confirm("⚠️ אזהרה חמורה: פעולה זו תמחק את *כל* המשתמשים ואת *כל* הניחושים במערכת. האם אתה בטוח?");
-    if (!confirm1) return;
-    const confirm2 = prompt("כדי לאשר את מחיקת כל הנתונים, הקלד את המילה: RESET");
-    if (confirm2 !== "RESET") { toast.error("הפעולה בוטלה."); return; }
-AdminMatchCard
-    toast.loading("מנקה את המערכת לחלוטין...", { duration: 4000 });
+  const handleDeleteAllMatches = async () => {
+    if (!confirm("⚠️ אזהרה חמורה: פעולה זו תמחק את *כל* המשחקים ממסד הנתונים וגם את *כל ניחושי המשתמשים* למשחקים אלו! האם להמשיך?")) return;
     setIsCalculating(true);
-    try {
-      const collectionsToNuke = ["users", "predictions_matches", "predictions_knockout", "predictions_qualifiers", "predictions_third_place", "predictions_bonus"];
-      for (const collName of collectionsToNuke) {
-        const snap = await getDocs(collection(db, collName));
-        for (const d of snap.docs) await deleteDoc(doc(db, collName, d.id));
-      }
-      await setDoc(doc(db, "admin_results", "bonus"), { answers: {} });
-      await setDoc(doc(db, "admin_results", "qualifiers"), { results: {} });
-      await setDoc(doc(db, "admin_results", "third_place"), { teams: Array(8).fill("") });
-      const matchesSnap = await getDocs(collection(db, "matches"));
-      for (const m of matchesSnap.docs) {
-        await updateDoc(doc(db, "matches", m.id), { realHomeScore: null, realAwayScore: null, realQualifier: "", isFinished: false });
-      }
-      await setDoc(doc(db, "settings", "system"), { tournamentState: 0, deadlines: { md1: "", md2: "", md3: "" } }, { merge: true });
-      await setDoc(doc(db, "settings", "dashboard"), { dailyMessage: "" }, { merge: true });
+    try { 
+      for (const match of matches) { 
+         await deleteDoc(doc(db, "matches", match.id)); 
+      } 
       
-      toast.success("🧹 איזה ניקיון! המערכת אופסה לחלוטין למצב 'ונילה'.", { duration: 5000 });
-      setTimeout(() => window.location.reload(), 2000);
-    } catch (error) { 
-      toast.error("שגיאה בתהליך האיפוס."); 
-    } finally { 
-      setIsCalculating(false); 
-    }
+      const pmSnap = await getDocs(collection(db, "predictions_matches"));
+      for (const d of pmSnap.docs) {
+         await deleteDoc(doc(db, "predictions_matches", d.id));
+      }
+
+      const pkSnap = await getDocs(collection(db, "predictions_knockout"));
+      for (const d of pkSnap.docs) {
+         await deleteDoc(doc(db, "predictions_knockout", d.id));
+      }
+
+      setMatches([]); 
+      toast.success("✅ כל המשחקים וניחושי השחקנים נמחקו לחלוטין."); 
+    } 
+    catch (error) { 
+      console.error(error); 
+      toast.error("שגיאה במחיקת המשחקים."); 
+    } 
+    finally { setIsCalculating(false); }
   };
 
   const renderProgressBar = (label: string, count: number, total: number, colorClass: string, onClickAction: () => void) => {
@@ -1088,7 +1113,11 @@ AdminMatchCard
     return (
       <div className="mb-4 cursor-pointer group" onClick={onClickAction}>
         <div className="flex justify-between text-sm font-bold text-slate-400 mb-1 group-hover:text-white transition-colors">
-          <span className="flex items-center gap-2">{label}{count > 0 && <span className="opacity-0 group-hover:opacity-100 text-xs bg-slate-700 text-slate-300 px-2 py-0.5 rounded transition-all">👁️ מי הצביע?</span>}</span>
+          <span className="flex items-center gap-2">
+             {getFlagUrl(label) && <img src={getFlagUrl(label)!} className="w-4 h-3 object-cover rounded-sm" alt="flag" />}
+             {label}
+             {count > 0 && <span className="opacity-0 group-hover:opacity-100 text-xs bg-slate-700 text-slate-300 px-2 py-0.5 rounded transition-all">👁️ מי הצביע?</span>}
+          </span>
           <span>{percent}% ({count})</span>
         </div>
         <div className="w-full bg-slate-900 rounded-full h-3 border border-slate-700 overflow-hidden shadow-inner">
@@ -1195,13 +1224,13 @@ AdminMatchCard
             </div>
           )}
 
-          {/* 📊 ראדאר סטטיסטיקות מורחב */}
+          {/* 📊 ראדאר סטטיסטיקות */}
           {activeTab === "STATS" && (
             <div className="space-y-8 relative">
                <div className="flex justify-between items-center bg-indigo-900/30 p-6 rounded-3xl border border-indigo-500/30 shadow-lg">
                  <div>
                    <h2 className="text-2xl font-extrabold text-indigo-400 flex items-center gap-2"><span>📡</span> ראדאר תובנות קהל (עם Audit Log)</h2>
-                   <p className="text-slate-400 text-sm mt-1">לחץ על הברים כדי לראות מי הצביע מתי. מעולה לאיתור זיופים של הרגע האחרון!</p>
+                   <p className="text-slate-400 text-sm mt-1">לחץ על הברים כדי לראות מי הצביע מתי.</p>
                  </div>
                  <button onClick={handleGenerateStats} disabled={isCalculating} className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-3 px-8 rounded-xl transition-all shadow-lg shadow-indigo-500/25">
                    {isCalculating ? "סורק נתונים... ⏳" : "🔍 סרוק מסד נתונים עכשיו"}
@@ -1320,7 +1349,7 @@ AdminMatchCard
             </div>
           )}
           
-          {/* --- משתמשים וכתבות (עם עורך טקסט עשיר) --- */}
+          {/* --- משתמשים וכתבות --- */}
           {activeTab === "USERS" && (
             <div className="space-y-8 max-w-4xl mx-auto">
               
@@ -1417,43 +1446,7 @@ AdminMatchCard
                 </div>
               </div>
 
-              <div className="bg-gradient-to-r from-purple-900/50 to-slate-800 p-8 rounded-3xl border border-purple-500/30 shadow-xl">
-                <h2 className="text-2xl font-bold text-white mb-2 flex items-center gap-2"><span>🧪</span> הזרקת שחקנים פיקטיביים</h2>
-                <button onClick={handleInjectMockUsers} disabled={isCalculating} className="mt-4 bg-purple-600 hover:bg-purple-500 text-white font-bold py-3 px-6 rounded-xl transition-all shadow-lg">{isCalculating ? "מזריק נתונים... ⏳" : "🤖 הזרק 5 בוטים עכשיו"}</button>
-              </div>
-
-              {/* 🚀 סימולטור "מכונת הזמן" */}
-              <div className="bg-gradient-to-r from-orange-900/50 to-slate-800 p-8 rounded-3xl border border-orange-500/30 shadow-xl mt-8 relative overflow-hidden">
-                <div className="absolute top-0 right-0 w-32 h-32 bg-orange-500/20 rounded-full blur-3xl pointer-events-none"></div>
-                <h2 className="text-2xl font-bold text-white mb-2 flex items-center gap-2 relative z-10"><span>🌪️</span> מכונת הזמן (סימולטור שלבים)</h2>
-                <p className="text-slate-400 mb-6 text-sm relative z-10">
-                  מנוע חכם שרץ על הטורניר שלב אחרי שלב! בוחרים מחזור, והמערכת ממציאה תוצאות, מחשבת נקודות ומקפיצה את שעון הטורניר קדימה. אידיאלי כדי לבדוק איך הדאשבורד מגיב לאורך זמן. <br/> 
-                  <strong className="text-orange-300">טיפ:</strong> לחץ קודם כמה פעמים על "הזרק 5 בוטים" כדי שיהיה למערכת למי לחשב נקודות.
-                </p>
-                
-                <div className="flex flex-col md:flex-row gap-4 relative z-10">
-                   <select value={simStage} onChange={(e) => setSimStage(e.target.value)} className="bg-slate-900 text-white font-bold p-4 rounded-xl border border-orange-500/50 outline-none w-full md:w-64 cursor-pointer focus:border-orange-400">
-                      <option value="MD1">מחזור 1 (בתים)</option>
-                      <option value="MD2">מחזור 2 (בתים)</option>
-                      <option value="MD3">מחזור 3 + עולות מבתים</option>
-                      <option value="R32">32 הגדולות (נוק-אאוט)</option>
-                      <option value="R16">שמינית גמר</option>
-                      <option value="QF">רבע גמר</option>
-                      <option value="SF">חצי גמר</option>
-                      <option value="FINAL">גמר + שאלות בונוס</option>
-                      <option value="ALL">כל הטורניר במכה אחת + 30 בוטים!</option>
-                   </select>
-                   <button 
-                     onClick={handleSmartSimulation}
-                     disabled={isCalculating}
-                     className="bg-orange-600 hover:bg-orange-500 text-white font-black py-4 px-8 rounded-xl transition-all shadow-[0_0_20px_rgba(234,88,12,0.3)] flex-1"
-                   >
-                     {isCalculating ? "מסמלץ... ⏳" : `🚀 הרץ סימולציה: ${simStage === 'ALL' ? 'לכל הטורניר' : 'רק לשלב הנבחר'}`}
-                   </button>
-                </div>
-              </div>
-              
-              <div className="bg-slate-800 p-8 rounded-3xl border border-blue-500/30 shadow-xl">
+              <div className="bg-slate-800 p-8 rounded-3xl border border-blue-500/30 shadow-xl mt-8">
                 <h2 className="text-2xl font-bold text-white mb-2 flex items-center gap-2"><span>👥</span> ניהול משתמשים ותשלומים</h2>
                 <div className="overflow-x-auto mt-6">
                   <table className="w-full text-right text-slate-300">
@@ -1474,87 +1467,40 @@ AdminMatchCard
               </div>
             </div>
           )}
-          
-          {/* --- משחקים --- */}
-          {activeTab === "MATCHES" && (
-            <div className="space-y-8">
-              <div className="bg-slate-800 p-6 rounded-3xl border border-blue-500/30 shadow-lg flex justify-between items-center">
-                <div><h3 className="text-lg font-bold text-white flex items-center gap-2"><span>📄</span> ניהול משחקים (טעינה ומחיקה)</h3></div>
-                <div className="flex gap-4"> 
-                   <button onClick={handleDeleteAllMatches} disabled={isCalculating || matches.length === 0} className="bg-rose-600 hover:bg-rose-500 text-white font-bold py-3 px-6 rounded-xl transition-all shadow-lg disabled:opacity-50">{isCalculating ? "מוחק... ⏳" : "🗑️ מחק את כל המשחקים"}</button>
-                   <input type="file" accept=".json" ref={fileInputRef} onChange={handleFileUpload} className="hidden" id="json-upload" />
-                   <label htmlFor="json-upload" className="cursor-pointer bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 px-6 rounded-xl transition-all shadow-lg">{isCalculating ? "טוען... ⏳" : "📤 העלה קובץ JSON"}</label>
-                </div>
-              </div>
-
-              <div className="flex flex-col md:flex-row gap-8 w-full border-t border-slate-800 pt-8">
-                <div className="w-full md:w-48 shrink-0">
-                  <div className="bg-slate-800 rounded-3xl p-4 border border-slate-700 md:sticky md:top-24 shadow-xl">
-                    <h3 className="text-lg font-bold text-white mb-4 px-2 border-b border-slate-700 pb-2">בחר קטגוריה</h3>
-                    <div className="flex flex-row md:flex-col gap-2 overflow-x-auto custom-scrollbar pb-2 md:pb-0">
-                      <button onClick={() => setAdminMatchGroup("KNOCKOUT")} className={`p-3 rounded-xl font-bold transition-all text-right min-w-[120px] md:min-w-0 ${adminMatchGroup === "KNOCKOUT" ? "bg-purple-600 text-white shadow-lg" : "bg-slate-900 text-slate-400 hover:bg-slate-700 hover:text-white"}`}>🔥 נוק-אאוט</button>
-                      {groupsList.map(g => (<button key={g} onClick={() => setAdminMatchGroup(g)} className={`p-3 rounded-xl font-bold transition-all text-right min-w-[80px] md:min-w-0 ${adminMatchGroup === g ? "bg-blue-600 text-white shadow-lg" : "bg-slate-900 text-slate-400 hover:bg-slate-700 hover:text-white"}`}>בית {g}</button>))}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex-1 space-y-8">
-                  <h2 className="text-3xl font-bold text-white border-b border-slate-800 pb-4">{adminMatchGroup === "KNOCKOUT" ? "🔥 משחקי נוק-אאוט" : `⚽ משחקי בית ${adminMatchGroup}`}</h2>
-                  {adminMatchGroup === "KNOCKOUT" ? (
-                    <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-                      {matches.filter(m => m.stage === "KNOCKOUT").map(match => <AdminMatchCard key={match.id} match={match} onSave={handleSaveMatch} onClear={handleClearMatch} onUpdateMatchday={handleUpdateMatchday} isSaving={savingId === match.id} />)}
-                      {matches.filter(m => m.stage === "KNOCKOUT").length === 0 && <div className="text-slate-500">אין משחקי נוק-אאוט במערכת.</div>}
-                    </div>
-                  ) : (
-                    <>
-                      {[1, 2, 3].map(day => {
-                        const dayMatches = matches.filter(m => m.group === adminMatchGroup && (Number(m.matchday) || 1) === day);
-                        if (dayMatches.length === 0) return null;
-                        return (
-                          <div key={day} className="space-y-4 mb-8">
-                            <h3 className="text-xl font-bold text-slate-400 bg-slate-800/50 p-2 rounded-lg border border-slate-700/50">מחזור {day}</h3>
-                            <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-                              {dayMatches.map(match => <AdminMatchCard key={match.id} match={match} onSave={handleSaveMatch} onClear={handleClearMatch} onUpdateMatchday={handleUpdateMatchday} isSaving={savingId === match.id} />)}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* --- עולות מבתים --- */}
-          {activeTab === "QUALIFIERS" && (
-            <div>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">{groupsList.map(group => { const teams = Array.from(groupTeams[group] || []); return (<div key={group} className="bg-slate-800 p-4 rounded-xl border border-slate-700"><h3 className="font-bold text-red-400 mb-3">בית {group}</h3><div className="flex flex-col gap-2"><select value={realQualifiers[group]?.first || ""} onChange={(e) => setRealQualifiers({...realQualifiers, [group]: { ...realQualifiers[group], first: e.target.value }})} className="bg-slate-900 text-white p-2 rounded border border-slate-600"><option value="">-- מקום 1 --</option>{teams.map((t: any) => <option key={t} value={t}>{t}</option>)}</select><select value={realQualifiers[group]?.second || ""} onChange={(e) => setRealQualifiers({...realQualifiers, [group]: { ...realQualifiers[group], second: e.target.value }})} className="bg-slate-900 text-white p-2 rounded border border-slate-600"><option value="">-- מקום 2 --</option>{teams.map((t: any) => <option key={t} value={t}>{t}</option>)}</select></div></div>);})}</div>
-              <div className="flex gap-4"><button onClick={handleSaveQualifiers} className="flex-1 py-4 bg-red-600 text-white font-bold rounded-xl text-xl">שמור עולות</button><button onClick={handleClearQualifiers} className="px-6 py-4 bg-rose-600/20 text-rose-400 border border-rose-500/30 rounded-xl">אפס הכל</button></div>
-            </div>
-          )}
-
-          {/* --- 8 מעפילות --- */}
-          {activeTab === "THIRD_PLACE" && (
-            <div>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">{realThirdPlace.map((val, idx) => (<div key={idx} className="bg-slate-800 p-4 rounded-xl border border-slate-700"><label className="text-slate-400 text-sm mb-2 block">עולה #{idx + 1}</label><select value={val} onChange={(e) => { const newArr = [...realThirdPlace]; newArr[idx] = e.target.value; setRealThirdPlace(newArr); }} className="w-full bg-slate-900 text-white p-2 rounded border border-slate-600"><option value="">-- בחר --</option>{allTeams.map((t: any) => <option key={t} value={t}>{t}</option>)}</select></div>))}</div>
-              <div className="flex gap-4"><button onClick={handleSaveThirdPlace} className="flex-1 py-4 bg-red-600 text-white font-bold rounded-xl text-xl">שמור 8 מעפילות</button><button onClick={handleClearThirdPlace} className="px-6 py-4 bg-rose-600/20 text-rose-400 border border-rose-500/30 rounded-xl">אפס הכל</button></div>
-            </div>
-          )}
 
           {/* --- טאב שאלות בונוס --- */}
           {activeTab === "BONUS" && (
             <div className="space-y-12">
               
-              {/* --- אזור בונה השאלות --- */}
               <div className="bg-slate-800 p-6 rounded-3xl border border-amber-500/30 shadow-lg transition-all relative">
                 <h2 className="text-2xl font-bold text-amber-400 mb-6 flex items-center gap-2"><span>{editingId ? "✏️" : "⚙️"}</span> {editingId ? "עריכת שאלת בונוס" : "בונה שאלות הבונוס (מפעל)"}</h2>
                 <div className={`bg-slate-900/50 p-6 rounded-xl border transition-colors ${editingId ? "border-amber-500 shadow-[0_0_15px_rgba(245,158,11,0.2)]" : "border-slate-700"}`}>
                   <div className="flex flex-col md:flex-row gap-4 mb-4">
                     <div className="flex-grow"><label className="text-slate-400 text-sm mb-1 block">תוכן השאלה</label><input type="text" value={newQuestion.label} onChange={e => setNewQuestion({...newQuestion, label: e.target.value})} className="w-full bg-slate-950 text-white p-3 rounded-lg border border-slate-600 focus:border-amber-500 outline-none" /></div>
-                    <div className="w-full md:w-32"><label className="text-slate-400 text-sm mb-1 block">ניקוד</label><input type="number" min="0" value={newQuestion.points} onChange={e => setNewQuestion({...newQuestion, points: Number(e.target.value)})} className="w-full bg-slate-950 text-white p-3 rounded-lg text-center text-amber-500 font-bold outline-none" /></div>
+                    <div className="w-full md:w-32"><label className="text-slate-400 text-sm mb-1 block">ניקוד בסיס</label><input type="number" min="0" value={newQuestion.points} onChange={e => setNewQuestion({...newQuestion, points: Number(e.target.value)})} className="w-full bg-slate-950 text-white p-3 rounded-lg text-center text-amber-500 font-bold outline-none" /></div>
                   </div>
                   
+                  {/* השדרוגים לשאלות ההפתעה וקרבה */}
+                  <div className="flex flex-wrap gap-6 mb-6 p-4 bg-slate-950 rounded-xl border border-slate-700">
+                    <label className="flex items-center gap-2 text-purple-400 font-bold cursor-pointer hover:text-purple-300">
+                       <input type="checkbox" checked={newQuestion.isSurprise} onChange={e => setNewQuestion({...newQuestion, isSurprise: e.target.checked})} className="w-5 h-5 accent-purple-500 cursor-pointer" />
+                       🎁 שאלת הפתעה מתוזמנת
+                    </label>
+                    {newQuestion.answerType === "NUMERIC" && (
+                       <label className="flex items-center gap-2 text-orange-400 font-bold cursor-pointer hover:text-orange-300">
+                          <input type="checkbox" checked={newQuestion.isProximity} onChange={e => setNewQuestion({...newQuestion, isProximity: e.target.checked})} className="w-5 h-5 accent-orange-500 cursor-pointer" />
+                          🤪 "בעל הבית השתגע" (ניקוד לפי קרבה)
+                       </label>
+                    )}
+                  </div>
+
+                  {newQuestion.isSurprise && (
+                     <div className="flex flex-col md:flex-row gap-4 mb-6 p-4 bg-purple-900/20 border border-purple-500/30 rounded-lg animate-fade-in-up">
+                         <div className="flex-1"><label className="text-purple-300 text-xs font-bold mb-1 block">מתי השאלה תופיע למשתמשים?</label><input type="datetime-local" value={newQuestion.openTime} onChange={e => setNewQuestion({...newQuestion, openTime: e.target.value})} className="w-full bg-slate-900 text-white p-3 rounded-lg border border-purple-500/50 outline-none" /></div>
+                         <div className="flex-1"><label className="text-purple-300 text-xs font-bold mb-1 block">מתי השאלה תינעל לעריכה?</label><input type="datetime-local" value={newQuestion.closeTime} onChange={e => setNewQuestion({...newQuestion, closeTime: e.target.value})} className="w-full bg-slate-900 text-white p-3 rounded-lg border border-purple-500/50 outline-none" /></div>
+                     </div>
+                  )}
+
                   <div className="mb-4">
                     <label className="text-slate-400 text-sm mb-1 block">סטטוס חי (אופציונלי - מופיע כעדכון לייב למשתמשים)</label>
                     <input type="text" value={newQuestion.liveStatus || ""} onChange={e => setNewQuestion({...newQuestion, liveStatus: e.target.value})} className="w-full bg-slate-950 text-white p-3 rounded-lg border border-slate-600 focus:border-amber-500 outline-none" placeholder="לדוגמה: מסי (2), אמבפה (1)..." />
@@ -1575,10 +1521,6 @@ AdminMatchCard
                       <div className="flex flex-wrap gap-2 mb-4 mt-2 items-center">
                         <input type="text" value={tempOption} onChange={e => setTempOption(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleAddCustomOption()} placeholder="הוסף אפשרות ידנית..." className="flex-grow bg-slate-900 text-white p-2 rounded-lg border border-slate-600 outline-none" />
                         <button onClick={handleAddCustomOption} className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg font-bold">הוסף</button>
-                        <span className="text-slate-500 text-sm mx-2">או</span>
-                        <label className="cursor-pointer bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-lg font-bold flex items-center gap-2 transition-colors">
-                          <span>📂 העלה רשימה (JSON)</span><input type="file" accept=".json" onChange={handleUploadCustomOptionsJson} className="hidden" />
-                        </label>
                       </div>
                       <div className="flex flex-wrap gap-2 items-center">
                         {newQuestion.customOptions.map((opt, i) => <div key={i} className="flex items-center gap-2 bg-slate-800 border border-slate-600 px-3 py-1 rounded-full text-sm text-white"><span>{opt}</span><button onClick={() => handleRemoveCustomOption(opt)} className="text-rose-400 font-bold hover:text-rose-300">×</button></div>)}
@@ -1595,7 +1537,6 @@ AdminMatchCard
 
               <div className="w-full h-px bg-slate-700 my-8"></div>
 
-              {/* --- אזור ניהול השאלות ותוצאות האמת --- */}
               <div className="bg-slate-800 p-8 rounded-3xl border border-slate-700 shadow-xl">
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
                   <h2 className="text-2xl font-bold text-white">🎯 ניהול שאלות והזנת תוצאות אמת</h2>
@@ -1657,9 +1598,9 @@ AdminMatchCard
                     return true;
                   });
 
-                  const adminRegularQs = filteredAdminQuestions.filter(q => q.weight === "REGULAR");
-                  const adminDoubleQs = filteredAdminQuestions.filter(q => q.weight === "DOUBLE");
-                  const adminSurpriseQs = filteredAdminQuestions.filter(q => q.weight === "SURPRISE");
+                  const adminRegularQs = filteredAdminQuestions.filter(q => q.weight === "REGULAR" && !q.isSurprise);
+                  const adminDoubleQs = filteredAdminQuestions.filter(q => q.weight === "DOUBLE" && !q.isSurprise);
+                  const adminSurpriseQs = filteredAdminQuestions.filter(q => q.isSurprise);
 
                   const renderAdminTruthCard = (q: any) => {
                     const currentAnswers = Array.isArray(realBonus[q.id]) ? realBonus[q.id] : (realBonus[q.id] ? [realBonus[q.id]] : []);
@@ -1686,6 +1627,7 @@ AdminMatchCard
                           <div className="flex flex-wrap gap-2 mb-4">
                             {currentAnswers.map((ans: string, idx: number) => (
                               <div key={idx} className="bg-emerald-600/20 border border-emerald-500/30 text-emerald-400 px-3 py-1 rounded-full text-sm font-bold flex items-center gap-2 shadow-sm">
+                                {getFlagUrl(ans) && <img src={getFlagUrl(ans)!} className="w-4 h-3 object-cover rounded-sm" alt="flag" />}
                                 <span>{ans}</span>
                                 <button onClick={() => handleRemoveTruth(q.id, ans)} className="hover:text-emerald-300 font-black">×</button>
                               </div>
@@ -1738,6 +1680,375 @@ AdminMatchCard
             </div>
           )}
 
+          {/* --- עולות מבתים (עם ה-UI החדש והשווה) --- */}
+          {activeTab === "QUALIFIERS" && (
+            <div>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+                {groupsList.map(group => {
+                  const teams = Array.from(groupTeams[group] || []);
+                  const first = realQualifiers[group]?.first || "";
+                  const second = realQualifiers[group]?.second || "";
+
+                  const handleTeamClick = (team: string) => {
+                    if (first === team) {
+                      setRealQualifiers({...realQualifiers, [group]: { ...realQualifiers[group], first: "" }});
+                    } else if (second === team) {
+                      setRealQualifiers({...realQualifiers, [group]: { ...realQualifiers[group], second: "" }});
+                    } else if (!first) {
+                      setRealQualifiers({...realQualifiers, [group]: { ...realQualifiers[group], first: team }});
+                    } else if (!second) {
+                      setRealQualifiers({...realQualifiers, [group]: { ...realQualifiers[group], second: team }});
+                    }
+                  };
+
+                  return (
+                    <div key={group} className="bg-slate-800 p-5 rounded-2xl border border-slate-700 shadow-lg relative overflow-hidden group">
+                      <div className="absolute top-0 left-0 w-2 h-full bg-blue-500 group-hover:w-3 transition-all"></div>
+                      <h3 className="font-black text-xl text-blue-400 mb-4 border-b border-slate-700/50 pb-2">בית {group}</h3>
+                      
+                      <div className="flex gap-3 mb-4">
+                        <div onClick={() => first && handleTeamClick(first)} className={`flex-1 h-12 rounded-xl flex items-center justify-center font-bold text-sm cursor-pointer transition-colors border-2 ${first ? 'bg-blue-600/20 border-blue-500 text-blue-300' : 'bg-slate-900 border-slate-700 text-slate-600 border-dashed'}`}>
+                          {first ? <><img src={getFlagUrl(first)!} className="w-5 h-3.5 mr-2 rounded-sm" alt="" />{first}</> : "1️⃣ מקום 1"}
+                        </div>
+                        <div onClick={() => second && handleTeamClick(second)} className={`flex-1 h-12 rounded-xl flex items-center justify-center font-bold text-sm cursor-pointer transition-colors border-2 ${second ? 'bg-emerald-600/20 border-emerald-500 text-emerald-300' : 'bg-slate-900 border-slate-700 text-slate-600 border-dashed'}`}>
+                          {second ? <><img src={getFlagUrl(second)!} className="w-5 h-3.5 mr-2 rounded-sm" alt="" />{second}</> : "2️⃣ מקום 2"}
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2">
+                        {teams.map((t: any) => {
+                          const isSelected = first === t || second === t;
+                          return (
+                            <button key={t} onClick={() => handleTeamClick(t)} className={`py-2 px-3 rounded-lg text-sm font-bold flex items-center justify-center gap-2 transition-all ${isSelected ? 'opacity-30 cursor-not-allowed bg-slate-900 border border-slate-800' : 'bg-slate-700 hover:bg-slate-600 text-white border border-slate-600 shadow-sm'}`}>
+                               {getFlagUrl(t) && <img src={getFlagUrl(t)!} className="w-4 h-3 rounded-sm" alt="" />} {t}
+                            </button>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="flex gap-4">
+                <button onClick={handleSaveQualifiers} className="flex-1 py-4 bg-blue-600 hover:bg-blue-500 text-white font-black rounded-xl text-xl shadow-lg transition-all">💾 שמור עולות לכל הבתים</button>
+                <button onClick={handleClearQualifiers} className="px-6 py-4 bg-slate-800 text-rose-400 border border-slate-700 hover:border-rose-500 hover:bg-rose-900/20 font-bold rounded-xl transition-all">אפס הכל</button>
+              </div>
+            </div>
+          )}
+
+          {/* --- 8 מעפילות (עם ה-UI החדש והשווה) --- */}
+          {activeTab === "THIRD_PLACE" && (
+            <div className="space-y-8">
+              <div className="bg-slate-800 p-6 md:p-8 rounded-3xl border border-rose-500/30 shadow-xl relative overflow-hidden group">
+                 <div className="absolute top-0 left-0 w-2 h-full bg-rose-500 group-hover:w-3 transition-all"></div>
+                 <h2 className="text-2xl font-black text-rose-400 mb-6 flex items-center gap-2"><span>🥉</span> בחר את 8 המעפילות מהמקום ה-3</h2>
+                 
+                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+                   {Array.from({length: 8}).map((_, idx) => {
+                     const team = realThirdPlace[idx];
+                     return (
+                       <div key={idx} 
+                            onClick={() => {
+                              if(team) {
+                                const newArr = [...realThirdPlace];
+                                newArr[idx] = "";
+                                setRealThirdPlace(newArr);
+                              }
+                            }}
+                            className={`h-16 rounded-xl flex items-center justify-center font-bold text-sm cursor-pointer transition-all border-2 ${team ? 'bg-rose-600/20 border-rose-500 text-rose-300 shadow-[0_0_15px_rgba(225,29,72,0.2)]' : 'bg-slate-900 border-slate-700 text-slate-600 border-dashed'}`}>
+                         {team ? <div className="flex items-center gap-2">{getFlagUrl(team) && <img src={getFlagUrl(team)!} className="w-6 h-4 rounded-sm" alt="" />} <span className="text-lg">{team}</span></div> : `עולה #${idx + 1}`}
+                       </div>
+                     );
+                   })}
+                 </div>
+
+                 <div className="bg-slate-900/50 p-4 rounded-2xl border border-slate-700">
+                   <h3 className="text-slate-400 font-bold mb-4 text-sm">מאגר הנבחרות (לחץ כדי להוסיף לעמדה פנויה):</h3>
+                   <div className="flex flex-wrap gap-2">
+                     {allTeams.map((t: any) => {
+                       const isSelected = realThirdPlace.includes(t);
+                       return (
+                         <button key={t} 
+                                 disabled={isSelected || realThirdPlace.filter(x=>x).length >= 8}
+                                 onClick={() => {
+                                   const emptyIdx = realThirdPlace.findIndex(x => !x);
+                                   if (emptyIdx !== -1) {
+                                     const newArr = [...realThirdPlace];
+                                     newArr[emptyIdx] = t;
+                                     setRealThirdPlace(newArr);
+                                   }
+                                 }}
+                                 className={`py-2 px-3 rounded-lg text-sm font-bold flex items-center justify-center gap-2 transition-all ${isSelected ? 'opacity-20 cursor-not-allowed bg-slate-900' : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-600 hover:border-rose-400'}`}>
+                            {getFlagUrl(t) && <img src={getFlagUrl(t)!} className="w-4 h-3 rounded-sm" alt="" />} {t}
+                         </button>
+                       )
+                     })}
+                   </div>
+                 </div>
+              </div>
+
+              <div className="flex gap-4">
+                <button onClick={handleSaveThirdPlace} className="flex-1 py-4 bg-rose-600 hover:bg-rose-500 text-white font-black rounded-xl text-xl shadow-lg transition-all">💾 שמור 8 מעפילות</button>
+                <button onClick={handleClearThirdPlace} className="px-6 py-4 bg-slate-800 text-rose-400 border border-slate-700 hover:border-rose-500 hover:bg-rose-900/20 font-bold rounded-xl transition-all">אפס הכל</button>
+              </div>
+            </div>
+          )}
+
+          {/* --- משחקים --- */}
+          {activeTab === "MATCHES" && (
+            <div className="space-y-8">
+              <div className="bg-slate-800 p-6 rounded-3xl border border-blue-500/30 shadow-lg flex justify-between items-center">
+                <div><h3 className="text-lg font-bold text-white flex items-center gap-2"><span>📄</span> ניהול משחקים (טעינה ומחיקה)</h3></div>
+                <div className="flex gap-4"> 
+                   <button onClick={handleDeleteAllMatches} disabled={isCalculating || matches.length === 0} className="bg-rose-600 hover:bg-rose-500 text-white font-bold py-3 px-6 rounded-xl transition-all shadow-lg disabled:opacity-50">{isCalculating ? "מוחק... ⏳" : "🗑️ מחק את כל המשחקים"}</button>
+                   <input type="file" accept=".json" ref={fileInputRef} onChange={handleFileUpload} className="hidden" id="json-upload" />
+                   <label htmlFor="json-upload" className="cursor-pointer bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 px-6 rounded-xl transition-all shadow-lg">{isCalculating ? "טוען... ⏳" : "📤 העלה קובץ JSON"}</label>
+                </div>
+              </div>
+
+              <div className="flex flex-col md:flex-row gap-8 w-full border-t border-slate-800 pt-8">
+                <div className="w-full md:w-48 shrink-0">
+                  <div className="bg-slate-800 rounded-3xl p-4 border border-slate-700 md:sticky md:top-24 shadow-xl">
+                    <h3 className="text-lg font-bold text-white mb-4 px-2 border-b border-slate-700 pb-2">בחר קטגוריה</h3>
+                    <div className="flex flex-row md:flex-col gap-2 overflow-x-auto custom-scrollbar pb-2 md:pb-0">
+                      <button onClick={() => {setAdminMatchGroup("KNOCKOUT"); setAdminKnockoutViewMode("LIST");}} className={`p-3 rounded-xl font-bold transition-all text-right min-w-[120px] md:min-w-0 ${adminMatchGroup === "KNOCKOUT" ? "bg-purple-600 text-white shadow-lg" : "bg-slate-900 text-slate-400 hover:bg-slate-700 hover:text-white"}`}>🔥 נוק-אאוט</button>
+                      {groupsList.map(g => (<button key={g} onClick={() => setAdminMatchGroup(g)} className={`p-3 rounded-xl font-bold transition-all text-right min-w-[80px] md:min-w-0 ${adminMatchGroup === g ? "bg-blue-600 text-white shadow-lg" : "bg-slate-900 text-slate-400 hover:bg-slate-700 hover:text-white"}`}>בית {g}</button>))}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex-1 space-y-8">
+                  <h2 className="text-3xl font-bold text-white border-b border-slate-800 pb-4">{adminMatchGroup === "KNOCKOUT" ? "🔥 משחקי נוק-אאוט" : `⚽ משחקי בית ${adminMatchGroup}`}</h2>
+                  {adminMatchGroup === "KNOCKOUT" ? (
+                    <>
+                      <div className="flex bg-slate-950 p-1.5 rounded-xl border border-slate-800 w-full md:w-auto mb-6">
+                          <button 
+                            onClick={() => setAdminKnockoutViewMode("LIST")} 
+                            className={`flex-1 md:w-32 py-2 rounded-lg font-bold text-sm transition-all flex items-center justify-center gap-2 ${adminKnockoutViewMode === "LIST" ? "bg-purple-600 text-white shadow-md" : "text-slate-400 hover:text-white"}`}
+                          >
+                            <span>📄</span> רשימה
+                          </button>
+                          <button 
+                            onClick={() => setAdminKnockoutViewMode("BRACKET")} 
+                            className={`flex-1 md:w-32 py-2 rounded-lg font-bold text-sm transition-all flex items-center justify-center gap-2 ${adminKnockoutViewMode === "BRACKET" ? "bg-purple-600 text-white shadow-md" : "text-slate-400 hover:text-white"}`}
+                          >
+                            <span>🌳</span> עץ טורניר
+                          </button>
+                      </div>
+
+                      {adminKnockoutViewMode === "LIST" ? (
+                          <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+                            {matches.filter(m => m.stage === "KNOCKOUT").map(match => <AdminMatchCard key={match.id} match={match} onSave={handleSaveMatch} onClear={handleClearMatch} onUpdateMatchday={handleUpdateMatchday} isSaving={savingId === match.id} />)}
+                            {matches.filter(m => m.stage === "KNOCKOUT").length === 0 && <div className="text-slate-500">אין משחקי נוק-אאוט במערכת.</div>}
+                          </div>
+                      ) : (
+                          (() => {
+                              const rounds = ["32 הגדולות", "שמינית גמר", "רבע גמר", "חצי גמר", "גמר"];
+                              const expectedCounts: Record<string, number> = { "32 הגדולות": 16, "שמינית גמר": 8, "רבע גמר": 4, "חצי גמר": 2, "גמר": 1 };
+                              const firstRealRoundIdx = rounds.findIndex(r => matches.some(m => m.roundName === r));
+                              const roundsToRender = firstRealRoundIdx !== -1 ? rounds.slice(firstRealRoundIdx) : [];
+
+                              const treeMatchesByRound: Record<string, any[]> = {};
+                              let previousRoundMatches: any[] = [];
+
+                              roundsToRender.forEach(round => {
+                                  const realMatches = matches.filter(m => m.roundName === round).sort((a,b) => a.id.localeCompare(b.id));
+                                  const count = expectedCounts[round] || 0;
+                                  const nodes = [];
+
+                                  for (let i = 0; i < count; i++) {
+                                       const realMatch = realMatches[i];
+                                       let pHome = realMatch ? realMatch.homeTeam : "";
+                                       let pAway = realMatch ? realMatch.awayTeam : "";
+
+                                       if (previousRoundMatches.length > 0) {
+                                           const prev1 = previousRoundMatches[i * 2];
+                                           const prev2 = previousRoundMatches[i * 2 + 1];
+                                           
+                                           if (prev1 && prev1.isFinished && prev1.realQualifier) pHome = prev1.realQualifier; 
+                                           if (prev2 && prev2.isFinished && prev2.realQualifier) pAway = prev2.realQualifier; 
+                                       }
+
+                                       nodes.push({
+                                           id: realMatch ? realMatch.id : `dummy_${round}_${i}`,
+                                           isDummy: !realMatch,
+                                           roundName: round,
+                                           projectedHome: pHome,
+                                           projectedAway: pAway,
+                                           isFinished: realMatch ? realMatch.isFinished : false,
+                                           realHomeScore: realMatch ? realMatch.realHomeScore : undefined,
+                                           realAwayScore: realMatch ? realMatch.realAwayScore : undefined,
+                                           realQualifier: realMatch ? realMatch.realQualifier : undefined,
+                                           originalMatch: realMatch 
+                                       });
+                                  }
+                                  treeMatchesByRound[round] = nodes;
+                                  previousRoundMatches = nodes;
+                              });
+
+                              const renderAdminBracketNode = (node: any, isFinal: boolean = false) => {
+                                if (!node) return null;
+                                
+                                const isDummy = node.isDummy;
+                                const hScore = node.realHomeScore;
+                                const aScore = node.realAwayScore;
+                                const qual = node.realQualifier;
+
+                                const isHomeQual = qual === node.projectedHome && node.projectedHome !== "";
+                                const isAwayQual = qual === node.projectedAway && node.projectedAway !== "";
+
+                                return (
+                                  <div 
+                                    onClick={() => {
+                                        if (isDummy) {
+                                            toast('🔮 זהו משחק עתידי (טרם הוזן באדמין).', { icon: '🔮', style: { background: '#334155', color: '#cbd5e1', border: '1px solid #475569', fontSize: '14px' } });
+                                        } else {
+                                            setAdminBracketModalMatch(node.originalMatch);
+                                        }
+                                    }}
+                                    className={`w-36 sm:w-44 border-2 rounded-xl p-1.5 flex flex-col gap-0.5 shadow-lg relative z-10 transition-all h-fit max-w-[11rem] ${
+                                        isDummy 
+                                          ? "bg-slate-800/40 border-slate-700/50 border-dashed cursor-not-allowed opacity-80 hover:opacity-100" 
+                                          : "bg-slate-800 border-slate-700 hover:border-purple-500 cursor-pointer hover:-translate-y-1 hover:shadow-[0_0_15px_rgba(168,85,247,0.3)] group"
+                                    }`}
+                                  >
+                                      {isFinal && <div className="absolute -top-5 left-1/2 -translate-x-1/2 text-2xl drop-shadow-xl z-10">🏆</div>}
+                                      
+                                      {!isDummy && node.isFinished && <div className="absolute -top-2 -right-2 text-[10px] bg-emerald-600 border border-emerald-500 text-white px-1.5 py-0.5 rounded-md z-10 shadow-sm">סויים</div>}
+                                      {!isDummy && !node.isFinished && <div className="absolute -top-2 -right-2 text-[10px] bg-purple-600 border border-purple-500 text-white px-1.5 py-0.5 rounded-md z-10 opacity-0 group-hover:opacity-100 transition-opacity shadow-sm">ערוך</div>}
+                                      {isDummy && <div className="absolute -top-2 -right-2 text-[9px] bg-slate-800 border border-slate-600 text-slate-400 px-1.5 py-0.5 rounded-md z-10 tracking-widest uppercase">עתידי</div>}
+                                      
+                                      <div className={`flex justify-between items-center text-xs sm:text-sm font-bold px-1.5 py-1 rounded transition-colors ${isHomeQual ? "bg-emerald-500/20 text-emerald-400" : "text-slate-200"}`}>
+                                         <div className="flex items-center gap-1.5 truncate">
+                                           {getFlagUrl(node.projectedHome) ? <img src={getFlagUrl(node.projectedHome)!} className="w-4 h-3 object-cover rounded-sm" alt="flag" /> : <span className="text-[10px]">🏳️</span>}
+                                           <span className="truncate">{node.projectedHome || "TBD"}</span>
+                                         </div>
+                                         {hScore !== undefined && !isDummy && <span className="font-black ml-1 text-slate-400">{hScore}</span>}
+                                      </div>
+                                      
+                                      <div className="w-full h-px bg-slate-700/50 my-0.5"></div>
+                                      
+                                      <div className={`flex justify-between items-center text-xs sm:text-sm font-bold px-1.5 py-1 rounded transition-colors ${isAwayQual ? "bg-emerald-500/20 text-emerald-400" : "text-slate-200"}`}>
+                                         <div className="flex items-center gap-1.5 truncate">
+                                           {getFlagUrl(node.projectedAway) ? <img src={getFlagUrl(node.projectedAway)!} className="w-4 h-3 object-cover rounded-sm" alt="flag" /> : <span className="text-[10px]">🏳️</span>}
+                                           <span className="truncate">{node.projectedAway || "TBD"}</span>
+                                         </div>
+                                         {aScore !== undefined && !isDummy && <span className="font-black ml-1 text-slate-400">{aScore}</span>}
+                                      </div>
+                                  </div>
+                                );
+                              };
+
+                              const renderAdminColumn = (roundName: string, isFirst: boolean, isFinal: boolean) => {
+                                  const nodes = treeMatchesByRound[roundName];
+                                  if (!nodes || nodes.length === 0) return null;
+                                  const count = expectedCounts[roundName];
+
+                                  return (
+                                     <div className="relative h-full w-40 sm:w-48 shrink-0 py-8">
+                                         <div className={`absolute top-0 w-full text-center font-black uppercase tracking-widest ${isFinal ? 'text-amber-500 text-lg drop-shadow-md' : 'text-slate-500 text-xs'}`}>{roundName}</div>
+                                         
+                                         <div className="grid h-full w-full" style={{ gridTemplateRows: `repeat(${count}, minmax(0, 1fr))` }}>
+                                             {nodes.map((node) => (
+                                                 <div key={node.id} className="flex items-center justify-center relative px-2 sm:px-4 w-full h-full">
+                                                     {!isFirst && <div className="absolute right-0 w-2 sm:w-4 border-t-2 border-slate-600 top-1/2 -z-10"></div>}
+                                                     {renderAdminBracketNode(node, isFinal)}
+                                                     {!isFinal && <div className="absolute left-0 w-2 sm:w-4 border-t-2 border-slate-600 top-1/2 -z-10"></div>}
+                                                 </div>
+                                             ))}
+                                         </div>
+                                     </div>
+                                  );
+                              };
+
+                              const renderAdminConnectorCol = (count: number) => {
+                                  return (
+                                     <div className="relative h-full w-4 sm:w-6 shrink-0 py-8">
+                                         <div className="grid h-full w-full" style={{ gridTemplateRows: `repeat(${count}, minmax(0, 1fr))` }}>
+                                             {Array.from({length: count}).map((_, i) => (
+                                                 <div key={i} className="flex items-center justify-center w-full h-full relative">
+                                                     <div className="absolute w-full h-1/2 border-l-2 border-y-2 border-slate-600 rounded-l-lg -ml-[1px] z-0"></div>
+                                                 </div>
+                                             ))}
+                                         </div>
+                                     </div>
+                                  );
+                              };
+
+                              const dynamicHeight = roundsToRender.includes("32 הגדולות") ? "h-[1600px] md:h-[1800px]" : "h-[800px] md:h-[900px]";
+
+                              return (
+                                  <div className="bg-slate-900 rounded-3xl border border-purple-500/30 shadow-2xl p-6 relative overflow-hidden">
+                                      <div className="absolute top-0 right-0 w-full h-full bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-purple-900/20 via-slate-900 to-slate-900 pointer-events-none z-0"></div>
+                                      
+                                      <div className="mb-6 flex items-center gap-2 text-purple-300 text-sm font-bold bg-purple-900/20 w-fit px-4 py-2 rounded-lg border border-purple-500/30 relative z-10 shadow-sm">
+                                         <span>💡</span> לחץ על משחק כדי לעדכן תוצאות אמת. המעפילות מתמגנטות אוטומטית לשלבים הבאים!
+                                      </div>
+
+                                      <div className="overflow-x-auto custom-scrollbar pb-6 relative z-10" dir="rtl">
+                                         <div className={`flex min-w-max pt-6 ${dynamicHeight} items-stretch`}>
+                                            
+                                            {roundsToRender.map((round, idx) => {
+                                                const isFirst = idx === 0;
+                                                const isFinal = idx === roundsToRender.length - 1;
+                                                const count = expectedCounts[round];
+
+                                                return (
+                                                    <React.Fragment key={round}>
+                                                        {renderAdminColumn(round, isFirst, isFinal)}
+                                                        {!isFinal && renderAdminConnectorCol(count / 2)}
+                                                    </React.Fragment>
+                                                );
+                                            })}
+
+                                         </div>
+                                      </div>
+
+                                      {adminBracketModalMatch && (
+                                        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm animate-fade-in-up" dir="rtl">
+                                          <div className="relative w-full max-w-lg">
+                                             <button 
+                                               onClick={() => setAdminBracketModalMatch(null)} 
+                                               className="absolute -top-4 -right-4 md:-right-10 md:-top-4 w-10 h-10 flex items-center justify-center rounded-full bg-slate-800 hover:bg-rose-500/20 hover:text-rose-400 border border-slate-600 text-slate-300 transition-colors font-bold text-xl z-50 shadow-xl"
+                                             >
+                                               ✕
+                                             </button>
+                                             <AdminMatchCard 
+                                               match={adminBracketModalMatch} 
+                                               onSave={(id, h, a, q) => { handleSaveMatch(id, h, a, q); setAdminBracketModalMatch(null); }} 
+                                               onClear={(id) => { handleClearMatch(id); setAdminBracketModalMatch(null); }} 
+                                               onUpdateMatchday={handleUpdateMatchday} 
+                                               isSaving={savingId === adminBracketModalMatch.id} 
+                                             />
+                                          </div>
+                                        </div>
+                                      )}
+                                  </div>
+                              );
+                          })()
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      {[1, 2, 3].map(day => {
+                        const dayMatches = matches.filter(m => m.group === adminMatchGroup && (Number(m.matchday) || 1) === day);
+                        if (dayMatches.length === 0) return null;
+                        return (
+                          <div key={day} className="space-y-4 mb-8">
+                            <h3 className="text-xl font-bold text-slate-400 bg-slate-800/50 p-2 rounded-lg border border-slate-700/50">מחזור {day}</h3>
+                            <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+                              {dayMatches.map(match => <AdminMatchCard key={match.id} match={match} onSave={handleSaveMatch} onClear={handleClearMatch} onUpdateMatchday={handleUpdateMatchday} isSaving={savingId === match.id} />)}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
         </div>
       </div>
     </div>
@@ -1749,7 +2060,6 @@ function AdminMatchCard({ match, onSave, onClear, onUpdateMatchday, isSaving }) 
   const [awayInput, setAwayInput] = useState(match.realAwayScore !== undefined && match.realAwayScore !== null ? String(match.realAwayScore) : "");
   const [qualifierInput, setQualifierInput] = useState(match.realQualifier || "");
 
-  // איפוס אוטומטי אם המשחק בוטל מהאדמין
   useEffect(() => { 
     if (!match.isFinished) { 
       setHomeInput(""); 
@@ -1765,7 +2075,6 @@ function AdminMatchCard({ match, onSave, onClear, onUpdateMatchday, isSaving }) 
   const isKnockout = match.stage === "KNOCKOUT";
   const themeColor = isKnockout ? "purple" : "blue";
 
-  // לוגיקת בחירה אוטומטית (כמו אצל המשתמשים) כדי לחסוך לאדמין קליקים
   const updateDefaultQualifier = (hScore: string, aScore: string) => {
     if (hScore === "" || aScore === "") return;
     const h = Number(hScore); const a = Number(aScore);
@@ -1782,7 +2091,6 @@ function AdminMatchCard({ match, onSave, onClear, onUpdateMatchday, isSaving }) 
   return (
     <div className={`bg-gradient-to-br from-slate-800 to-slate-900 rounded-2xl p-5 sm:p-7 shadow-xl border-t-4 border border-t-${themeColor}-500 border-slate-700 w-full max-w-lg mx-auto mb-4 transform transition-all relative ${match.isFinished ? "bg-emerald-900/10 border-emerald-500/30 grayscale-[15%]" : "hover:shadow-2xl"}`} dir="rtl">
       
-      {/* תגיות עליונות */}
       <div className="absolute top-4 right-4 flex items-center gap-2">
         <span className={`text-[10px] uppercase font-black tracking-wider px-2.5 py-1.5 rounded-lg bg-${themeColor}-500/10 text-${themeColor}-400 border border-${themeColor}-500/20`}>
           {isKnockout ? match.roundName : `בית ${match.group}`}
@@ -1795,14 +2103,12 @@ function AdminMatchCard({ match, onSave, onClear, onUpdateMatchday, isSaving }) 
         {match.isFinished && <span className="text-emerald-400 text-sm drop-shadow-md" title="המשחק הסתיים ונקודות חושבו">✅</span>}
       </div>
 
-      {/* תאריך */}
       <div className="flex flex-col justify-center items-center mt-3 mb-6 gap-2">
          <div className="text-xs font-bold text-slate-400 bg-slate-900/50 px-3 py-1 rounded-full border border-slate-800">
            🕒 {match.matchDate} {isKnockout && "• תוצאה ב-120 דק'"}
          </div>
       </div>
 
-      {/* 🏆 GRID תוצאות - בדיוק כמו אצל המשתמשים 🏆 */}
       <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 sm:gap-4 mb-6 mt-2">
         <div className="flex justify-end">
           <span className="text-xl sm:text-2xl font-black text-slate-100 break-words leading-tight text-left">
@@ -1831,7 +2137,6 @@ function AdminMatchCard({ match, onSave, onClear, onUpdateMatchday, isSaving }) 
         </div>
       </div>
 
-      {/* --- אזור בחירת המעפילה האמיתית (נוקאאוט) --- */}
       {isKnockout && (
         <div className="bg-slate-900/80 p-4 rounded-xl border border-slate-700/50 mb-6 shadow-inner relative">
           <label className="block text-slate-400 text-[11px] uppercase tracking-wider mb-3 font-black text-center">מי המעפילה האמיתית?</label>
@@ -1846,7 +2151,6 @@ function AdminMatchCard({ match, onSave, onClear, onUpdateMatchday, isSaving }) 
         </div>
       )}
 
-      {/* כפתורי פעולה למנהל */}
       <div className="flex gap-3">
         <button 
           onClick={() => onSave(match.id, parseInt(homeInput), parseInt(awayInput), qualifierInput)} 

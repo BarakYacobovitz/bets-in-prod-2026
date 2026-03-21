@@ -2,6 +2,7 @@
 import { useState, useEffect, useRef } from "react";
 import { doc, getDoc, setDoc, collection, getDocs } from "firebase/firestore";
 import { db } from "../app/firebase";
+import { getFlagUrl } from "../app/utils/flags"; // 🎌 ייבוא פונקציית הדגלים!
 
 export default function BonusQuestions({ userId, tournamentState: propTournamentState, groups }: any) {
   const allTeams = groups ? Object.values(groups).flat().sort() : [];
@@ -79,7 +80,6 @@ export default function BonusQuestions({ userId, tournamentState: propTournament
     return false;
   };
 
-  // 🚀 הפונקציה החדשה שבודקת אם השאלה בכלל רלוונטית כרגע להצגה וספירה!
   const isQuestionVisible = (q: any) => {
     const state = tournamentState;
     if (q.phase === "KNOCKOUT") {
@@ -201,7 +201,6 @@ export default function BonusQuestions({ userId, tournamentState: propTournament
 
   if (isLoading) return <div className="text-center text-blue-400 animate-pulse mt-12 font-bold text-xl">טוען שאלות בונוס... ⚽</div>;
   
-  // 🚀 התיקון לפס ההתקדמות: סופר רק שאלות שגלויות ופתוחות
   const totalOpenQuestions = questions.filter(q => isQuestionVisible(q) && !isQuestionLocked(q));
   const openCount = totalOpenQuestions.length;
   const answeredCount = totalOpenQuestions.filter(q => answers[q.id] && answers[q.id].toString().trim() !== "").length;
@@ -248,7 +247,7 @@ export default function BonusQuestions({ userId, tournamentState: propTournament
     const weightLabel = q.weight === "DOUBLE" ? "🔥 דאבל" : q.weight === "SURPRISE" ? "🎁 הפתעה" : "🎯 רגיל";
     const weightClass = q.weight === "DOUBLE" ? "bg-rose-500/10 text-rose-400 border-rose-500/30" : q.weight === "SURPRISE" ? "bg-purple-500/10 text-purple-400 border-purple-500/30" : "bg-blue-500/10 text-blue-400 border-blue-500/30";
 
-    const inputBaseStyle = "w-full p-3 rounded-xl border outline-none text-center font-bold transition-colors shadow-inner";
+    const inputBaseStyle = "w-full p-3 rounded-xl border outline-none text-center font-bold transition-colors shadow-inner flex-1";
     const inputStateStyle = locked 
       ? "bg-slate-900/50 text-slate-400 border-slate-700 cursor-not-allowed" 
       : isMissing 
@@ -290,37 +289,62 @@ export default function BonusQuestions({ userId, tournamentState: propTournament
           </div>
         )}
 
-        <div className="mb-4 mt-2">
-          {q.answerType === "ALL_TEAMS" && (
-            <select value={answers[q.id] || ""} disabled={locked} onChange={e => handleChange(q.id, e.target.value)} className={combinedInputStyle}>
-              <option value="">-- בחר נבחרת --</option>{allTeams.map((t: string) => <option key={t} value={t}>{t}</option>)}{(q.customOptions || []).map((opt: string) => <option key={opt} value={opt}>{opt}</option>)}
-            </select>
-          )}
-          {(q.answerType === "MULTIPLE_CHOICE" || q.answerType === "TEAM_SUBSET") && (
-            <select value={answers[q.id] || ""} disabled={locked} onChange={e => handleChange(q.id, e.target.value)} className={combinedInputStyle}>
-              <option value="">-- בחר תשובה --</option>{(q.customOptions || []).map((opt: string) => <option key={opt} value={opt}>{opt}</option>)}
-            </select>
-          )}
-          {(q.answerType === "OPEN_TEXT" || q.answerType === "PLAYER") && (
-            <div className="relative w-full">
-              <input type="text" list={`list-${q.id}`} value={answers[q.id] || ""} disabled={locked} onChange={e => handleChange(q.id, e.target.value)} placeholder={locked ? "" : "התחל להקליד לחיפוש..."} className={combinedInputStyle} />
-              {q.customOptions && (
-                <datalist id={`list-${q.id}`}>
-                  {(answers[q.id] || "").length > 0 && ((Array.isArray(q.customOptions) ? q.customOptions : (typeof q.customOptions === 'string' ? q.customOptions.split(',') : [])).map((opt: string, i: number) => <option key={i} value={opt.trim()} />))}
-                </datalist>
-              )}
+        {/* --- אזור התשובה + דגל דינמי --- */}
+        <div className="mb-4 mt-4 flex items-center gap-3">
+          {getFlagUrl(answers[q.id]) && (
+            <div className="shrink-0 bg-slate-900 border border-slate-600 p-2.5 rounded-xl shadow-inner flex items-center justify-center h-[50px] w-[60px]">
+              <img src={getFlagUrl(answers[q.id])!} className="w-8 h-5.5 object-cover rounded-sm shadow-sm" alt="flag" />
             </div>
           )}
-          {q.answerType === "NUMERIC" && (
-             <input type="number" value={answers[q.id] || ""} disabled={locked} onChange={e => handleChange(q.id, e.target.value)} placeholder={locked ? "" : "הכנס מספר..."} className={combinedInputStyle} />
-          )}
+          <div className="flex-1 w-full">
+            {q.answerType === "ALL_TEAMS" && (
+              <select value={answers[q.id] || ""} disabled={locked} onChange={e => handleChange(q.id, e.target.value)} className={`h-[50px] ${combinedInputStyle}`}>
+                <option value="">-- בחר נבחרת --</option>{allTeams.map((t: string) => <option key={t} value={t}>{t}</option>)}{(q.customOptions || []).map((opt: string) => <option key={opt} value={opt}>{opt}</option>)}
+              </select>
+            )}
+            {(q.answerType === "MULTIPLE_CHOICE" || q.answerType === "TEAM_SUBSET") && (
+              <select value={answers[q.id] || ""} disabled={locked} onChange={e => handleChange(q.id, e.target.value)} className={`h-[50px] ${combinedInputStyle}`}>
+                <option value="">-- בחר תשובה --</option>{(q.customOptions || []).map((opt: string) => <option key={opt} value={opt}>{opt}</option>)}
+              </select>
+            )}
+            {(q.answerType === "OPEN_TEXT" || q.answerType === "PLAYER") && (
+              <div className="relative w-full h-[50px]">
+                <input type="text" list={`list-${q.id}`} value={answers[q.id] || ""} disabled={locked} onChange={e => handleChange(q.id, e.target.value)} placeholder={locked ? "" : "התחל להקליד לחיפוש..."} className={`h-full ${combinedInputStyle}`} />
+                {q.customOptions && (
+                  <datalist id={`list-${q.id}`}>
+                    {(answers[q.id] || "").length > 0 && ((Array.isArray(q.customOptions) ? q.customOptions : (typeof q.customOptions === 'string' ? q.customOptions.split(',') : [])).map((opt: string, i: number) => <option key={i} value={opt.trim()} />))}
+                  </datalist>
+                )}
+              </div>
+            )}
+            {q.answerType === "NUMERIC" && (
+               <input type="number" value={answers[q.id] || ""} disabled={locked} onChange={e => handleChange(q.id, e.target.value)} placeholder={locked ? "" : "הכנס מספר..."} className={`h-[50px] ${combinedInputStyle}`} />
+            )}
+          </div>
         </div>
+        
         {hasTruth && (
-          <div className="bg-slate-900/80 p-3 rounded-xl border border-slate-700 mt-4 text-center shadow-inner">
-            <span className="text-xs text-slate-500 block mb-1">התשובה הנכונה בפועל:</span>
-            <span className="text-emerald-400 font-bold">{Array.isArray(truth) ? truth.join(" / ") : truth}</span>
+          <div className="bg-slate-900/80 p-3 rounded-xl border border-slate-700 mt-4 text-center shadow-inner flex flex-col items-center">
+            <span className="text-xs text-slate-500 block mb-2">התשובה הנכונה בפועל:</span>
+            <div className="text-emerald-400 font-bold flex flex-wrap justify-center gap-2">
+              {Array.isArray(truth) 
+                ? truth.map((ans, i) => (
+                    <span key={i} className="flex items-center gap-1.5 bg-emerald-900/20 px-2 py-1 rounded-md border border-emerald-500/20">
+                      {getFlagUrl(ans) && <img src={getFlagUrl(ans)!} className="w-4 h-3 object-cover rounded-sm" alt="flag" />}
+                      {ans}{i < truth.length - 1 ? "" : ""}
+                    </span>
+                  ))
+                : (
+                    <span className="flex items-center gap-1.5 bg-emerald-900/20 px-3 py-1 rounded-md border border-emerald-500/20 text-lg">
+                      {getFlagUrl(truth) && <img src={getFlagUrl(truth)!} className="w-5 h-3.5 object-cover rounded-sm" alt="flag" />}
+                      {truth}
+                    </span>
+                  )
+              }
+            </div>
           </div>
         )}
+        
         {locked && (
           <button onClick={() => handleOpenSpy(q)} className="w-full mt-4 py-3 rounded-xl font-bold text-sm transition-all border flex items-center justify-center gap-2 bg-slate-900 text-slate-400 hover:text-white border-slate-700 hover:bg-slate-800 shadow-sm">
             <span>👁️</span> מי ניחש מה? (ריגול)
@@ -474,6 +498,7 @@ export default function BonusQuestions({ userId, tournamentState: propTournament
         </div>
       )}
 
+      {/* מודל ריגול של בונוסים */}
       {spyModalQuestion && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm" dir="rtl">
           <div className="bg-slate-900 border border-slate-700 p-6 rounded-3xl w-full max-w-md max-h-[80vh] flex flex-col shadow-2xl relative">
@@ -483,10 +508,26 @@ export default function BonusQuestions({ userId, tournamentState: propTournament
             </div>
 
             <div className="bg-slate-800/80 p-4 rounded-xl mb-6 border border-slate-700/50 text-center shadow-inner">
-              <h4 className="text-blue-300 font-bold mb-2">{spyModalQuestion.label}</h4>
+              <h4 className="text-blue-300 font-bold mb-3">{spyModalQuestion.label}</h4>
               {realBonusAnswers[spyModalQuestion.id] && (
-                 <div className="text-sm bg-emerald-900/20 text-emerald-400 px-4 py-1.5 rounded-lg border border-emerald-500/30 inline-block font-bold">
-                   תשובה נכונה: {Array.isArray(realBonusAnswers[spyModalQuestion.id]) ? realBonusAnswers[spyModalQuestion.id].join(" / ") : realBonusAnswers[spyModalQuestion.id]}
+                 <div className="text-sm bg-emerald-900/20 text-emerald-400 px-4 py-2 rounded-lg border border-emerald-500/30 inline-block font-bold">
+                   תשובה נכונה: 
+                   <div className="flex flex-wrap justify-center gap-1.5 mt-1">
+                     {Array.isArray(realBonusAnswers[spyModalQuestion.id]) 
+                        ? realBonusAnswers[spyModalQuestion.id].map((ans: string, i: number, arr: any[]) => (
+                            <span key={i} className="flex items-center gap-1">
+                              {getFlagUrl(ans) && <img src={getFlagUrl(ans)!} className="w-4 h-3 object-cover rounded-sm" alt="flag" />}
+                              {ans}{i < arr.length - 1 ? " / " : ""}
+                            </span>
+                          ))
+                        : (
+                          <span className="flex items-center gap-1.5">
+                            {getFlagUrl(realBonusAnswers[spyModalQuestion.id]) && <img src={getFlagUrl(realBonusAnswers[spyModalQuestion.id])!} className="w-4 h-3 object-cover rounded-sm" alt="flag" />}
+                            {realBonusAnswers[spyModalQuestion.id]}
+                          </span>
+                        )
+                     }
+                   </div>
                  </div>
               )}
             </div>
@@ -505,7 +546,8 @@ export default function BonusQuestions({ userId, tournamentState: propTournament
                         {data.userId === userId && <span className="text-[10px] bg-blue-600 text-white px-1.5 py-0.5 rounded uppercase">אתה</span>}
                       </div>
                       <div className="flex items-center gap-3">
-                         <div className={`font-bold text-sm px-3 py-1.5 rounded-lg border shadow-sm ${data.points > 0 ? "bg-emerald-900/20 text-emerald-400 border-emerald-500/30 shadow-[0_0_10px_rgba(16,185,129,0.1)]" : "bg-slate-900 text-slate-300 border-slate-600"}`}>
+                         <div className={`font-bold text-sm px-3 py-1.5 rounded-lg border shadow-sm flex items-center gap-1.5 ${data.points > 0 ? "bg-emerald-900/20 text-emerald-400 border-emerald-500/30 shadow-[0_0_10px_rgba(16,185,129,0.1)]" : "bg-slate-900 text-slate-300 border-slate-600"}`}>
+                           {getFlagUrl(data.answer) && <img src={getFlagUrl(data.answer)!} className="w-4 h-3 object-cover rounded-sm" alt="flag" />}
                            {data.answer}
                          </div>
                          {data.points !== null && (

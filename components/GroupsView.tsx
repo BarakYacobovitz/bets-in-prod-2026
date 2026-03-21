@@ -3,6 +3,7 @@ import { useState, useEffect, useRef } from "react";
 import MatchCard from "./MatchCard";
 import { doc, getDoc, setDoc, collection, query, where, onSnapshot, getDocs } from "firebase/firestore";
 import { db } from "../app/firebase";
+import { getFlagUrl } from "../app/utils/flags"; // ייבוא פונקציית הדגלים!
 
 const CountdownTimer = ({ targetDateStr }: { targetDateStr: string | undefined }) => {
   const [timeLeft, setTimeLeft] = useState("מחשב...");
@@ -45,7 +46,7 @@ const CountdownTimer = ({ targetDateStr }: { targetDateStr: string | undefined }
   return <span className="font-mono text-amber-400 tracking-widest">{timeLeft}</span>;
 };
 
-export default function GroupsView({ matches, groups, userId, tournamentState }) {
+export default function GroupsView({ matches, groups, userId, tournamentState }: any) {
   const groupNames = Object.keys(groups).sort();
   const [activeGroup, setActiveGroup] = useState(groupNames[0] || "A");
   const [deadlines, setDeadlines] = useState<any>({});
@@ -114,7 +115,7 @@ export default function GroupsView({ matches, groups, userId, tournamentState })
 
   const handleQualifierSelect = (groupName: string, selectedTeam: string, place: 'first' | 'second') => {
     isUserAction.current = true;
-    setQualifiers(prev => {
+    setQualifiers((prev: any) => {
       const currentGroup = prev[groupName] || { first: "", second: "" };
       const newGroup = { ...currentGroup };
       if (place === 'first') {
@@ -129,9 +130,9 @@ export default function GroupsView({ matches, groups, userId, tournamentState })
   };
 
   const getGroupProgress = (gName: string) => {
-    const gMatches = matches.filter(m => m.group === gName);
+    const gMatches = matches.filter((m: any) => m.group === gName);
     if (gMatches.length === 0) return 0;
-    const predictedMatches = gMatches.filter(m => userMatchPredictions[m.id]).length;
+    const predictedMatches = gMatches.filter((m: any) => userMatchPredictions[m.id]).length;
     const hasFirst = qualifiers[gName]?.first ? 1 : 0;
     const hasSecond = qualifiers[gName]?.second ? 1 : 0;
     const totalTasks = gMatches.length + 2; 
@@ -139,7 +140,7 @@ export default function GroupsView({ matches, groups, userId, tournamentState })
     return Math.round((completedTasks / totalTasks) * 100);
   };
 
-  const activeMatches = matches.filter(m => m.group === activeGroup);
+  const activeMatches = matches.filter((m: any) => m.group === activeGroup);
   const activeTeams = groups[activeGroup] ? Array.from(groups[activeGroup]) : [];
   const isQualifiersLocked = tournamentState >= 1;
 
@@ -187,13 +188,11 @@ export default function GroupsView({ matches, groups, userId, tournamentState })
     finally { setIsLoadingSpy(false); }
   };
 
-  // 🎲 פונקציית הגרלת בית שלם
   const handleRandomizeGroup = async () => {
     if (!confirm(`להגריל תוצאות אקראיות לכל משחקי בית ${activeGroup} (שעדיין פתוחים)?`)) return;
     setIsRandomizing(true);
     try {
-       // הגרלת משחקים פתוחים
-       const batchPromises = activeMatches.map(async (m) => {
+       const batchPromises = activeMatches.map(async (m: any) => {
           const md = Number(m.matchday) || 1;
           let locked = false;
           if (md === 1 && tournamentState >= 1) locked = true;
@@ -209,7 +208,6 @@ export default function GroupsView({ matches, groups, userId, tournamentState })
        });
        await Promise.all(batchPromises);
 
-       // הגרלת עולות מהבית
        if (!isQualifiersLocked && activeTeams.length >= 2) {
           const shuffled = [...activeTeams].sort(() => 0.5 - Math.random());
           const newQuals = { ...qualifiers, [activeGroup]: { first: shuffled[0], second: shuffled[1] } };
@@ -288,7 +286,6 @@ export default function GroupsView({ matches, groups, userId, tournamentState })
           <h2 className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-cyan-400">משחקי בית {activeGroup}</h2>
           
           <div className="flex items-center gap-4">
-            {/* כפתור הגרלת הבית */}
             {tournamentState < 3 && (
                <button 
                   onClick={handleRandomizeGroup} 
@@ -305,9 +302,9 @@ export default function GroupsView({ matches, groups, userId, tournamentState })
           </div>
         </div>
 
-        {renderMatchday("מחזור 1", activeMatches.filter(m => (m.matchday || 1) === 1), tournamentState >= 1, 1)}
-        {renderMatchday("מחזור 2", activeMatches.filter(m => m.matchday === 2), tournamentState >= 2, 2)}
-        {renderMatchday("מחזור 3", activeMatches.filter(m => m.matchday === 3), tournamentState >= 3, 3)}
+        {renderMatchday("מחזור 1", activeMatches.filter((m: any) => (m.matchday || 1) === 1), tournamentState >= 1, 1)}
+        {renderMatchday("מחזור 2", activeMatches.filter((m: any) => m.matchday === 2), tournamentState >= 2, 2)}
+        {renderMatchday("מחזור 3", activeMatches.filter((m: any) => m.matchday === 3), tournamentState >= 3, 3)}
 
         <div className={`mt-12 bg-slate-800 p-4 md:p-6 rounded-3xl border-t-4 border-t-emerald-500 border-l border-r border-b border-slate-700 shadow-xl relative overflow-hidden transition-all ${isQualifiersLocked && myQualPoints === null ? "opacity-80 grayscale-[10%]" : ""}`}>
           <div className="flex justify-between items-start mb-2">
@@ -327,7 +324,7 @@ export default function GroupsView({ matches, groups, userId, tournamentState })
           </div>
           
           <div className="space-y-3">
-            {activeTeams.map(team => {
+            {activeTeams.map((team: any) => {
               const isFirst = qualifiers[activeGroup]?.first === team;
               const isSecond = qualifiers[activeGroup]?.second === team;
               
@@ -345,7 +342,10 @@ export default function GroupsView({ matches, groups, userId, tournamentState })
               
               return (
                 <div key={team} className={`flex flex-col md:flex-row justify-between items-start md:items-center gap-3 p-3 md:p-4 rounded-xl border transition-all ${isFirst ? 'bg-amber-500/10 border-amber-500/50 shadow-[0_0_15px_rgba(245,158,11,0.1)]' : isSecond ? 'bg-slate-300/10 border-slate-300/50 shadow-sm' : 'bg-slate-900/50 border-slate-700'}`}>
+                  
+                  {/* דגלים בכפתורי העולות מבתים! */}
                   <div className="flex items-center gap-3">
+                    {getFlagUrl(team) ? <img src={getFlagUrl(team)!} className="w-6 h-4 object-cover rounded-sm shadow-sm" alt="flag" /> : <span>🏳️</span>}
                     <span className={`font-bold text-lg md:text-xl ${isFirst ? 'text-amber-400' : isSecond ? 'text-slate-300' : 'text-white'}`}>{team}</span>
                     {teamFeedback}
                   </div>
@@ -381,7 +381,11 @@ export default function GroupsView({ matches, groups, userId, tournamentState })
             {realQualifiers[activeGroup] && (realQualifiers[activeGroup].first || realQualifiers[activeGroup].second) && (
                <div className="bg-emerald-900/20 border border-emerald-500/30 p-3 rounded-xl mb-4 text-center">
                  <div className="text-xs text-emerald-400 mb-1 font-bold">תוצאות אמת:</div>
-                 <div className="text-sm text-white">🥇 {realQualifiers[activeGroup].first || "-"} | 🥈 {realQualifiers[activeGroup].second || "-"}</div>
+                 <div className="text-sm text-white flex justify-center items-center gap-4 mt-2">
+                   <span className="flex items-center gap-1.5">🥇 {getFlagUrl(realQualifiers[activeGroup].first) ? <img src={getFlagUrl(realQualifiers[activeGroup].first)!} className="w-4 h-3 object-cover rounded-sm" alt="flag"/> : ""} {realQualifiers[activeGroup].first || "-"}</span>
+                   <span className="text-slate-600">|</span>
+                   <span className="flex items-center gap-1.5">🥈 {getFlagUrl(realQualifiers[activeGroup].second) ? <img src={getFlagUrl(realQualifiers[activeGroup].second)!} className="w-4 h-3 object-cover rounded-sm" alt="flag"/> : ""} {realQualifiers[activeGroup].second || "-"}</span>
+                 </div>
                </div>
             )}
 
@@ -405,9 +409,13 @@ export default function GroupsView({ matches, groups, userId, tournamentState })
                            </div>
                          )}
                       </div>
-                      <div className="flex gap-2 text-sm">
-                         <span className="bg-amber-500/10 text-amber-400 border border-amber-500/20 px-2 py-1 rounded flex-1 text-center">🥇 {data.first}</span>
-                         <span className="bg-slate-300/10 text-slate-300 border border-slate-400/20 px-2 py-1 rounded flex-1 text-center">🥈 {data.second}</span>
+                      <div className="flex gap-2 text-sm mt-1">
+                         <span className="bg-amber-500/10 text-amber-400 border border-amber-500/20 px-2 py-1.5 rounded flex-1 flex items-center justify-center gap-1.5">
+                           🥇 {getFlagUrl(data.first) ? <img src={getFlagUrl(data.first)!} className="w-4 h-3 object-cover rounded-sm" alt="flag"/> : ""} {data.first}
+                         </span>
+                         <span className="bg-slate-300/10 text-slate-300 border border-slate-400/20 px-2 py-1.5 rounded flex-1 flex items-center justify-center gap-1.5">
+                           🥈 {getFlagUrl(data.second) ? <img src={getFlagUrl(data.second)!} className="w-4 h-3 object-cover rounded-sm" alt="flag"/> : ""} {data.second}
+                         </span>
                       </div>
                     </div>
                   ))}
