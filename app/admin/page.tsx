@@ -1002,30 +1002,31 @@ export default function AdminPanel() {
     reader.readAsText(file);
   };
 
-  const handleTakeSnapshot = async () => {
+const handleTakeSnapshot = async () => {
     if (!confirm("לשמור תמונת מצב יומית? \nפעולה זו תקבע את נקודת הייחוס לחישוב 'מגמות' (חצים ירוקים/אדומים) עבור המשתמשים מחר. מומלץ לבצע פעם ביום בלילה.")) return;
     setIsCalculating(true);
     try {
       const usersSnap = await getDocs(collection(db, "users"));
-      const usersArray = usersSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      // התיקון של Vercel: הוספת : any[]
+      const usersArray: any[] = usersSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
-      const sortedGeneral = [...usersArray].sort((a, b) => (b.totalPoints || 0) - (a.totalPoints || 0));
+      const sortedGeneral = [...usersArray].sort((a: any, b: any) => (b.totalPoints || 0) - (a.totalPoints || 0));
       let currentRank = 1;
-      const genRanks = sortedGeneral.map((u, i) => {
+      const genRanks = sortedGeneral.map((u: any, i: number) => {
         if (i > 0 && (u.totalPoints || 0) < (sortedGeneral[i - 1].totalPoints || 0)) currentRank = i + 1;
         return { id: u.id, rank: currentRank };
       });
 
-      const sortedKnockout = [...usersArray].sort((a, b) => (b.knockoutPoints || 0) - (a.knockoutPoints || 0));
+      const sortedKnockout = [...usersArray].sort((a: any, b: any) => (b.knockoutPoints || 0) - (a.knockoutPoints || 0));
       let currentKoRank = 1;
-      const koRanks = sortedKnockout.map((u, i) => {
+      const koRanks = sortedKnockout.map((u: any, i: number) => {
         if (i > 0 && (u.knockoutPoints || 0) < (sortedKnockout[i - 1].knockoutPoints || 0)) currentKoRank = i + 1;
         return { id: u.id, rank: currentKoRank };
       });
 
       for (const u of usersArray) {
-        const genRank = genRanks.find(r => r.id === u.id)?.rank || 1;
-        const koRank = koRanks.find(r => r.id === u.id)?.rank || 1;
+        const genRank = genRanks.find((r: any) => r.id === u.id)?.rank || 1;
+        const koRank = koRanks.find((r: any) => r.id === u.id)?.rank || 1;
         await updateDoc(doc(db, "users", u.id), {
           previousTotalPoints: u.totalPoints || 0,
           previousKnockoutPoints: u.knockoutPoints || 0,
