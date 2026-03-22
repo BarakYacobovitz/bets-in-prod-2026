@@ -494,6 +494,7 @@ export default function AdminPanel() {
         const userGroupMatches = allUserMatches.filter(m => m.userId === uid);
         userGroupMatches.forEach(userMatch => {
           const realMatch = realMatches.find(m => m.id === userMatch.matchId);
+          // @ts-ignore
           if (realMatch && realMatch.isFinished && realMatch.stage !== "KNOCKOUT") {
             const predH = Number(userMatch.predictedHomeScore); const predA = Number(userMatch.predictedAwayScore);
             const realH = Number(realMatch.realHomeScore); const realA = Number(realMatch.realAwayScore);
