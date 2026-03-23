@@ -32,7 +32,7 @@ export default function AdminPanel() {
   const [matches, setMatches] = useState<any[]>([]);
   const [savingId, setSavingId] = useState<string | null>(null);
   const [isCalculating, setIsCalculating] = useState(false);
-
+  const [autoInsights, setAutoInsights] = useState<string[]>([]);
   const [realQualifiers, setRealQualifiers] = useState<any>({});
   const [realThirdPlace, setRealThirdPlace] = useState<string[]>(Array(8).fill(""));
   const [realBonus, setRealBonus] = useState<any>({});
@@ -727,7 +727,55 @@ export default function AdminPanel() {
     }
     finally { setIsCalculating(false); }
   };
+  const handleCreateAutoInsights = () => {
+    if (!statsData) {
+      toast.error("אנא עבור קודם לטאב 'תובנות' (STATS) ולחץ על 'סרוק מסד נתונים'.", { icon: "⚠️" });
+      return;
+    }
+    
+    const insights: string[] = [];
 
+    // סריקת משחקים (קונצנזוס, זאבים בודדים ותוצאות פסיכיות)
+    for (const [mId, data] of Object.entries(statsData.matches)) {
+      const match = matches.find(m => m.id === mId);
+      if (!match) continue;
+      
+      const total = (data as any).total;
+      if (total < 4) continue; // לא מייצרים תובנות על פחות מ-4 אנשים
+
+      const homeCount = (data as any).homeWins.length;
+      const awayCount = (data as any).awayWins.length;
+      const drawCount = (data as any).draws.length;
+
+      // קונצנזוס (מעל 80%)
+      if (homeCount / total >= 0.8) insights.push(`🔥 קונצנזוס: ${Math.round((homeCount/total)*100)}% בטוחים ש${match.homeTeam} תנצח את ${match.awayTeam}.`);
+      if (awayCount / total >= 0.8) insights.push(`🔥 קונצנזוס: ${Math.round((awayCount/total)*100)}% בטוחים ש${match.awayTeam} תנצח את ${match.homeTeam}.`);
+
+      // זאב בודד (רק בן אדם אחד)
+      if (homeCount === 1 && total >= 5) insights.push(`🐺 זאב בודד: רק ${(data as any).homeWins[0].name} מאמין בניצחון של ${match.homeTeam} על ${match.awayTeam}!`);
+      if (awayCount === 1 && total >= 5) insights.push(`🐺 זאב בודד: רק ${(data as any).awayWins[0].name} מאמין בניצחון של ${match.awayTeam} על ${match.homeTeam}!`);
+
+      // תוצאות משוגעות (5 שערים ומעלה)
+      Object.entries((data as any).exactScores).forEach(([score, sData]: any) => {
+         const [h, a] = score.split('-');
+         if (Number(h) + Number(a) >= 5) {
+            insights.push(`😱 טירוף: ${sData.users.map((u:any)=>u.name).join(', ')} חזה תוצאה פסיכית של ${score} בין ${match.homeTeam} ל-${match.awayTeam}.`);
+         }
+      });
+    }
+
+    // בחירת 4 תובנות אקראיות כדי לא להציף את המסך
+    const shuffled = insights.sort(() => 0.5 - Math.random()).slice(0, 4);
+    if (shuffled.length === 0) shuffled.push("אין מספיק דרמות כרגע במערכת, חכו לעוד ניחושים של הקהל.");
+    setAutoInsights(shuffled);
+  };
+
+  // פונקציית עזר להוספה לטור היומי
+  const addInsightToMessage = (text: string) => {
+    const htmlBullet = `<ul>\n  <li>${text}</li>\n</ul>\n`;
+    setDailyMessage(prev => prev + htmlBullet);
+    toast.success("התובנה נוספה לטור היומי!");
+  };
   const handleFactoryReset = async () => {
     const confirm1 = confirm("⚠️ אזהרה חמורה: פעולה זו תמחק את *כל* המשתמשים ואת *כל* הניחושים במערכת. האם אתה בטוח?");
     if (!confirm1) return;
@@ -1110,7 +1158,104 @@ const handleTakeSnapshot = async () => {
     } 
     finally { setIsCalculating(false); }
   };
+const handleExportPredictions = async (targetUserId: string | "ALL", targetUserName: string) => {
+    setIsCalculating(true);
+    toast.loading("מכין קובץ אקסל...", { id: "csvExport" });
+    try {
+      const usersSnap = await getDocs(collection(db, "users"));
+      const matchesSnap = await getDocs(collection(db, "matches"));
+      const bqSnap = await getDoc(doc(db, "settings", "bonus_questions"));
 
+      const users = usersSnap.docs.map(d => ({id: d.id, ...d.data()}));
+      const matchesList = matchesSnap.docs.map(d => ({id: d.id, ...d.data()}));
+      const bonusQs = bqSnap.exists() ? (bqSnap.data().questions || []) : [];
+
+      // הוספת BOM כדי שהאקסל יזהה עברית כמו שצריך
+      let csvContent = "\uFEFF"; 
+      csvContent += "User Name,Category,Item,Prediction\n";
+
+      const usersToExport = targetUserId === "ALL" ? users : users.filter(u => u.id === targetUserId);
+
+      // הבאת כל הניחושים
+      const pmSnap = await getDocs(collection(db, "predictions_matches"));
+      const pkSnap = await getDocs(collection(db, "predictions_knockout"));
+      const pqSnap = await getDocs(collection(db, "predictions_qualifiers"));
+      const ptSnap = await getDocs(collection(db, "predictions_third_place"));
+      const pbSnap = await getDocs(collection(db, "predictions_bonus"));
+
+      const pmData = pmSnap.docs.map(d => d.data());
+      const pkData = pkSnap.docs.map(d => d.data());
+      const pqData = pqSnap.docs.map(d => ({id: d.id, ...d.data()}));
+      const ptData = ptSnap.docs.map(d => ({id: d.id, ...d.data()}));
+      const pbData = pbSnap.docs.map(d => ({id: d.id, ...d.data()}));
+
+      for (const u of usersToExport) {
+         const uName = (u as any).name || "Unknown";
+         
+         // 1. משחקי בתים
+         const uMatches = pmData.filter(p => p.userId === u.id);
+         uMatches.forEach(p => {
+            const m: any = matchesList.find(x => x.id === p.matchId);
+            if (m) {
+               csvContent += `"${uName}","שלב הבתים","${m.homeTeam} - ${m.awayTeam}","${p.predictedHomeScore}-${p.predictedAwayScore}"\n`;
+            }
+         });
+         
+         // 2. נוק-אאוט
+         const uKnockout = pkData.filter(p => p.userId === u.id);
+         uKnockout.forEach(p => {
+            const m: any = matchesList.find(x => x.id === p.matchId);
+            if (m) {
+               csvContent += `"${uName}","נוק-אאוט","${m.roundName}: ${m.homeTeam} - ${m.awayTeam}","${p.predictedHomeScore}-${p.predictedAwayScore} (עולה: ${p.qualifier})"\n`;
+            }
+         });
+
+         // 3. עולות מבתים
+         const uQual: any = pqData.find(p => p.id === u.id);
+         if (uQual && uQual.groups) {
+            for (const [grp, preds] of Object.entries<any>(uQual.groups)) {
+               csvContent += `"${uName}","עולות מבתים","בית ${grp}","מקום 1: ${preds.first || "-"} | מקום 2: ${preds.second || "-"}"\n`;
+            }
+         }
+
+         // 4. מקום שלישי (8 המעפילות)
+         const uThird: any = ptData.find(p => p.id === u.id);
+         if (uThird && uThird.teams) {
+            const pred = uThird.teams.filter((x:any)=>x).join(', ');
+            if (pred) {
+               csvContent += `"${uName}","8 המעפילות","מקום 3","${pred}"\n`;
+            }
+         }
+
+         // 5. בונוסים
+         const uBonus: any = pbData.find(p => p.id === u.id);
+         if (uBonus && uBonus.answers) {
+            for (const [qId, ans] of Object.entries<any>(uBonus.answers)) {
+               const q: any = bonusQs.find((x:any) => x.id === qId);
+               if (q) {
+                  csvContent += `"${uName}","בונוס","${q.label.replace(/"/g, '""')}","${String(ans).replace(/"/g, '""')}"\n`;
+               }
+            }
+         }
+      }
+
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.setAttribute("href", url);
+      link.setAttribute("download", `predictions_${targetUserId === "ALL" ? "ALL_USERS" : targetUserName}_${new Date().toISOString().split('T')[0]}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      toast.success("קובץ הניחושים הורד בהצלחה!", { id: "csvExport" });
+    } catch (err) {
+      console.error(err);
+      toast.error("שגיאה בהורדת הניחושים.", { id: "csvExport" });
+    } finally {
+      setIsCalculating(false);
+    }
+  };
   const renderProgressBar = (label: string, count: number, total: number, colorClass: string, onClickAction: () => void) => {
     const percent = total > 0 ? Math.round((count / total) * 100) : 0;
     return (
@@ -1354,8 +1499,31 @@ const handleTakeSnapshot = async () => {
           
           {/* --- משתמשים וכתבות --- */}
           {activeTab === "USERS" && (
+            
             <div className="space-y-8 max-w-4xl mx-auto">
-              
+             <div className="bg-slate-800 p-6 rounded-3xl border border-indigo-500/30 shadow-xl mb-8">
+                <div className="flex justify-between items-center mb-4">
+                  <h2 className="text-xl font-bold text-indigo-400 flex items-center gap-2"><span>🔮</span> מחולל Wall of Fame / Shame</h2>
+                  <button onClick={handleCreateAutoInsights} className="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-lg font-bold transition-all shadow-md text-sm">
+                    {statsData ? "רענן תובנות מהראדאר 🔄" : "שלוף תובנות מהראדאר 🔍"}
+                  </button>
+                </div>
+                
+                {autoInsights.length > 0 ? (
+                  <div className="flex flex-col gap-2">
+                    {autoInsights.map((insight, idx) => (
+                      <div key={idx} className="bg-slate-900 border border-slate-700 p-3 rounded-xl flex justify-between items-center gap-4 group hover:border-indigo-500/50 transition-colors">
+                        <span className="text-slate-300 text-sm">{insight}</span>
+                        <button onClick={() => addInsightToMessage(insight)} className="bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600 hover:text-white border border-emerald-500/30 px-3 py-1 rounded-lg text-xs font-bold transition-all whitespace-nowrap opacity-0 group-hover:opacity-100">
+                          ➕ הוסף לטור
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-slate-500 text-sm">לחץ על הכפתור כדי לנתח את הסטטיסטיקות ולמצוא את הניחושים הכי מעניינים להיום.</p>
+                )}
+              </div> 
               <div className="bg-slate-800 p-8 rounded-3xl border border-emerald-500/30 shadow-xl">
                 <h2 className="text-2xl font-bold text-white mb-2 flex items-center gap-2"><span>📰</span> הטור היומי (Rich Text)</h2>
                 <p className="text-slate-400 text-sm mb-4">השתמש בכפתורים כדי להוסיף עיצוב, תמונות וגיפים! משתמשים יראו את זה בלייב בכתבת המגזין שבדאשבורד.</p>
@@ -1449,18 +1617,41 @@ const handleTakeSnapshot = async () => {
                 </div>
               </div>
 
-              <div className="bg-slate-800 p-8 rounded-3xl border border-blue-500/30 shadow-xl mt-8">
-                <h2 className="text-2xl font-bold text-white mb-2 flex items-center gap-2"><span>👥</span> ניהול משתמשים ותשלומים</h2>
+<div className="bg-slate-800 p-8 rounded-3xl border border-blue-500/30 shadow-xl mt-8">
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4 border-b border-slate-700 pb-4">
+                  <h2 className="text-2xl font-bold text-white flex items-center gap-2"><span>👥</span> ניהול משתמשים ותשלומים</h2>
+                  <button onClick={() => handleExportPredictions("ALL", "All")} disabled={isCalculating} className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2.5 px-5 rounded-xl transition-all shadow-md text-sm flex items-center gap-2">
+                    <span>⬇️</span> הורד ניחושים של כולם (CSV)
+                  </button>
+                </div>
+                
                 <div className="overflow-x-auto mt-6">
                   <table className="w-full text-right text-slate-300">
                     <thead className="text-sm bg-slate-900/50 text-slate-400"><tr><th className="p-4 rounded-tr-xl">שם משתמש</th><th className="p-4">אימייל</th><th className="p-4 text-center">נקודות בטבלה</th><th className="p-4 text-center">סטטוס תשלום</th><th className="p-4 rounded-tl-xl text-center">פעולות</th></tr></thead>
-                    <tbody>
+<tbody>
                       {usersList.length === 0 ? (<tr><td colSpan={5} className="p-8 text-center text-slate-500">אין משתמשים במערכת.</td></tr>) : (
                         usersList.map(u => (
                           <tr key={u.id} className="border-b border-slate-700/50 hover:bg-slate-700/20">
-                            <td className="p-4 font-bold text-white">{u.name || "ללא שם"}</td><td className="p-4 text-sm text-slate-400">{u.email}</td><td className="p-4 text-center font-bold text-amber-400">{u.totalPoints || 0}</td>
-                            <td className="p-4 flex justify-center"><button onClick={() => handleTogglePayment(u.id, u.hasPaid)} className={`px-4 py-2 rounded-lg font-bold text-sm w-28 ${u.hasPaid ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/50" : "bg-rose-500/20 text-rose-400 border border-rose-500/50"}`}>{u.hasPaid ? "✅ שולם" : "❌ ממתין"}</button></td>
-                            <td className="p-4 text-center"><button onClick={() => handleDeleteUser(u.id, u.name || "ללא שם")} className="bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 w-8 h-8 rounded-lg transition-colors flex items-center justify-center mx-auto" title="מחק משתמש">🗑️</button></td>
+                            <td className="p-4 font-bold text-white">{u.name || "ללא שם"}</td>
+                            <td className="p-4 text-sm text-slate-400">{u.email}</td>
+                            <td className="p-4 text-center font-bold text-amber-400">{u.totalPoints || 0}</td>
+                            
+                            {/* תיקון: ה-flex ירד מה-td ונכנס לתוך div פנימי */}
+                            <td className="p-4">
+                              <div className="flex justify-center">
+                                <button onClick={() => handleTogglePayment(u.id, u.hasPaid)} className={`px-4 py-2 rounded-lg font-bold text-sm w-28 ${u.hasPaid ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/50" : "bg-rose-500/20 text-rose-400 border border-rose-500/50"}`}>
+                                  {u.hasPaid ? "✅ שולם" : "❌ ממתין"}
+                                </button>
+                              </div>
+                            </td>
+                            
+                            {/* תיקון: ה-flex ירד מה-td ונכנס לתוך div פנימי */}
+                            <td className="p-4">
+                              <div className="flex justify-center gap-2">
+                                <button onClick={() => handleExportPredictions(u.id, u.name || "ללא שם")} className="bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border border-blue-500/30 w-8 h-8 rounded-lg transition-colors flex items-center justify-center" title="הורד ניחושים אישיים">⬇️</button>
+                                <button onClick={() => handleDeleteUser(u.id, u.name || "ללא שם")} className="bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 w-8 h-8 rounded-lg transition-colors flex items-center justify-center" title="מחק משתמש לצמיתות">🗑️</button>
+                              </div>
+                            </td>
                           </tr>
                         ))
                       )}
