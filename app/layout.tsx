@@ -1,10 +1,22 @@
 import './globals.css';
 import { Toaster } from 'react-hot-toast';
-import Navbar from '../components/Navbar'; // השאר רק את הייבוא הזה
+import Navbar from '../components/Navbar'; 
 
+// 1. הגדרת צבע הרקע של שורת הסטטוס בטלפון (השוליים העליונים באייפון/אנדרואיד)
+export const viewport = {
+  themeColor: '#0f172a',
+};
+
+// 2. הוספנו לכאן את הקישור למניפסט ואת הגדרות האפליקציה של אפל
 export const metadata = {
   title: 'Bets in Prod',
   description: 'World Cup 2026 Predictions',
+  manifest: '/manifest.json',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'black-translucent',
+    title: 'Bets in Prod',
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

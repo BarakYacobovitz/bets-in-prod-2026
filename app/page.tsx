@@ -14,7 +14,7 @@ import Rules from "../components/Rules";
 import ThirdPlaceQualifiers from "../components/ThirdPlaceQualifiers";
 import toast from "react-hot-toast";
 
-const TOURNAMENT_KICKOFF = "2026-03-11T22:00:00";
+const TOURNAMENT_KICKOFF = "2026-06-11T22:00:00";
 
 export default function Home() {
   const [user, setUser] = useState<any>(null);
