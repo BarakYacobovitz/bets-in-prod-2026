@@ -453,11 +453,32 @@ export default function AdminPanel() {
     } 
   };
 
-  const handleCalculateScores = async (silentParam: any = false) => {
+const handleCalculateScores = async (silentParam: any = false) => {
     const isSilent = silentParam === true;
     if (!isSilent && !confirm("האם לחשב נקודות לכל המשתמשים? מנוע הקרבה החדש (בעל הבית השתגע) פעיל!")) return;
     setIsCalculating(true);
+    
+    // נוסיף דגל שיזכור אם עשינו סנאפשוט בריצה הנוכחית
+    let wasSnapshotTakenNow = false;
+
     try {
+      // ===== הלוגיקה החכמה של ה-Snapshot האוטומטי =====
+      const systemSnap = await getDoc(doc(db, "settings", "system"));
+      const lastSnapshotDate = systemSnap.exists() ? systemSnap.data().lastSnapshotDate : "";
+      
+      const shiftedDate = new Date(Date.now() - 8 * 60 * 60 * 1000);
+      const todayString = shiftedDate.toISOString().split('T')[0]; 
+      
+      if (lastSnapshotDate !== todayString) {
+         console.log(`New football day detected! (Date: ${todayString}). Taking automated snapshot before calculating scores...`);
+         await handleTakeSnapshot(true); // מריץ בשקט מוחלט
+         await setDoc(doc(db, "settings", "system"), { lastSnapshotDate: todayString }, { merge: true });
+         
+         // מדליקים את הדגל!
+         wasSnapshotTakenNow = true;
+      }
+      // =========================================================================
+
       const matchesSnap = await getDocs(collection(db, "matches")); const realMatches = matchesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       const qualSnap = await getDoc(doc(db, "admin_results", "qualifiers")); const realQuals = qualSnap.exists() ? (qualSnap.data().results || {}) : {};
       const thirdSnap = await getDoc(doc(db, "admin_results", "third_place")); const realThird = thirdSnap.exists() ? (thirdSnap.data().teams || []) : [];
@@ -610,7 +631,23 @@ export default function AdminPanel() {
       updatedUsersArray.sort((a, b) => (b.totalPoints || 0) - (a.totalPoints || 0));
       setUsersList(updatedUsersArray);
       
-      if (!isSilent) toast.success("הניקוד חושב בהצלחה כולל פילוח לבועות ומנוע 'בעל הבית השתגע'! 🏆");
+      // החיווי המיוחד בסוף הריצה
+      if (!isSilent) {
+        // הודעה 1: תמיד קופצת - מאשרת שהניקוד חושב
+        toast.success("הניקוד חושב בהצלחה כולל פילוח לבועות ומנוע 'בעל הבית השתגע'! 🏆");
+        
+        // הודעה 2: קופצת בנוסף, רק אם המערכת חתכה יום חדש
+        if (wasSnapshotTakenNow) {
+          // נותנים דיליי של חצי שנייה כדי שההודעות יקפצו בסטייל אחת אחרי השנייה
+          setTimeout(() => {
+            toast.success("מודיעין: המערכת זיהתה יום חדש וביצעה ריצת סוף יום (Snapshot) ברקע! 📸", { 
+              duration: 7000,
+              icon: '🌟'
+            });
+          }, 500);
+        }
+      }
+
     } catch (error) { 
       console.error(error); 
       if (!isSilent) toast.error("אירעה שגיאה בחישוב הניקוד."); 
@@ -1052,12 +1089,13 @@ export default function AdminPanel() {
     reader.readAsText(file);
   };
 
-const handleTakeSnapshot = async () => {
-    if (!confirm("לשמור תמונת מצב יומית? \nפעולה זו תקבע את נקודת הייחוס לחישוב 'מגמות' (חצים ירוקים/אדומים) עבור המשתמשים מחר. מומלץ לבצע פעם ביום בלילה.")) return;
+const handleTakeSnapshot = async (isSilent: boolean = false) => {
+    // אם לא ביקשנו ריצה שקטה, נקפיץ את שאלת האישור הרגילה למנהל
+    if (!isSilent && !confirm("לשמור תמונת מצב יומית? \nפעולה זו תקבע את נקודת הייחוס לחישוב 'מגמות' (חצים ירוקים/אדומים) עבור המשתמשים מחר. מומלץ לבצע פעם ביום בלילה.")) return;
+    
     setIsCalculating(true);
     try {
       const usersSnap = await getDocs(collection(db, "users"));
-      // התיקון של Vercel: הוספת : any[]
       const usersArray: any[] = usersSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
       const sortedGeneral = [...usersArray].sort((a: any, b: any) => (b.totalPoints || 0) - (a.totalPoints || 0));
@@ -1084,9 +1122,11 @@ const handleTakeSnapshot = async () => {
           previousRankKnockout: koRank
         });
       }
-      toast.success("📸 תמונת מצב נשמרה בהצלחה! חיצי המגמה התאפסו.");
+      
+      // נקפיץ את ההודעה הירוקה רק אם זו לחיצה ידנית של האדמין
+      if (!isSilent) toast.success("📸 תמונת מצב נשמרה בהצלחה! חיצי המגמה התאפסו.");
     } catch (error) { 
-      toast.error("שגיאה בשמירת תמונת מצב."); 
+      if (!isSilent) toast.error("שגיאה בשמירת תמונת מצב."); 
     } finally { 
       setIsCalculating(false); 
     }
