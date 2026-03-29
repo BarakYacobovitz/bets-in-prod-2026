@@ -1242,7 +1242,7 @@ const handleExportPredictions = async (targetUserId: string | "ALL", targetUserN
       for (const u of usersToExport) {
          const uName = (u as any).name || "Unknown";
          
-         // 1. משחקי בתים
+// 1. משחקי בתים
          const uMatches = pmData.filter(p => p.userId === u.id);
          uMatches.forEach(p => {
             const m: any = matchesList.find(x => x.id === p.matchId);
@@ -1258,8 +1258,8 @@ const handleExportPredictions = async (targetUserId: string | "ALL", targetUserN
                    }
                  }
                }
-               // הוספנו רווחים במקף כדי למנוע הפיכה לתאריך באקסל
-               csvContent += `"${uName}","שלב הבתים","${m.homeTeam} נגד ${m.awayTeam}","${p.predictedHomeScore} - ${p.predictedAwayScore}","${m.isFinished ? pts : '-'}"\n`;
+               // שינוי הפורמט: ארגנטינה 2 מצרים 1
+               csvContent += `"${uName}","שלב הבתים","${m.homeTeam} נגד ${m.awayTeam}","${m.homeTeam} ${p.predictedHomeScore} - ${m.awayTeam} ${p.predictedAwayScore}","${m.isFinished ? pts : '-'}"\n`;
             }
          });
          
@@ -1282,7 +1282,8 @@ const handleExportPredictions = async (targetUserId: string | "ALL", targetUserN
                    pts += (qualifierPointsMap[m.roundName] || 0);
                  }
                }
-               csvContent += `"${uName}","נוק-אאוט","${m.roundName}: ${m.homeTeam} נגד ${m.awayTeam}","${p.predictedHomeScore} - ${p.predictedAwayScore} (עולה: ${p.qualifier})","${m.isFinished ? pts : '-'}"\n`;
+               // שינוי הפורמט כולל המעפילה
+               csvContent += `"${uName}","נוק-אאוט","${m.roundName}: ${m.homeTeam} נגד ${m.awayTeam}","${m.homeTeam} ${p.predictedHomeScore} - ${m.awayTeam} ${p.predictedAwayScore} (עולה: ${p.qualifier})","${m.isFinished ? pts : '-'}"\n`;
             }
          });
 
