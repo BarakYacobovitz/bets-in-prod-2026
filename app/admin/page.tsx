@@ -1205,6 +1205,14 @@ const handleExportPredictions = async (targetUserId: string | "ALL", targetUserN
       const usersSnap = await getDocs(collection(db, "users"));
       const matchesSnap = await getDocs(collection(db, "matches"));
       const bqSnap = await getDoc(doc(db, "settings", "bonus_questions"));
+      
+      // משיכת תוצאות האמת כדי שנוכל לחשב ניקוד לייצוא
+      const qualSnap = await getDoc(doc(db, "admin_results", "qualifiers")); 
+      const realQuals = qualSnap.exists() ? (qualSnap.data().results || {}) : {};
+      const thirdSnap = await getDoc(doc(db, "admin_results", "third_place")); 
+      const realThird = thirdSnap.exists() ? (thirdSnap.data().teams || []) : [];
+      const bonusSnap = await getDoc(doc(db, "admin_results", "bonus")); 
+      const realBonusAns = bonusSnap.exists() ? (bonusSnap.data().answers || {}) : {};
 
       const users = usersSnap.docs.map(d => ({id: d.id, ...d.data()}));
       const matchesList = matchesSnap.docs.map(d => ({id: d.id, ...d.data()}));
@@ -1212,7 +1220,7 @@ const handleExportPredictions = async (targetUserId: string | "ALL", targetUserN
 
       // הוספת BOM כדי שהאקסל יזהה עברית כמו שצריך
       let csvContent = "\uFEFF"; 
-      csvContent += "User Name,Category,Item,Prediction\n";
+      csvContent += "User Name,Category,Item,Prediction,Points Earned\n"; // הוספנו עמודת ניקוד!
 
       const usersToExport = targetUserId === "ALL" ? users : users.filter(u => u.id === targetUserId);
 
@@ -1229,6 +1237,8 @@ const handleExportPredictions = async (targetUserId: string | "ALL", targetUserN
       const ptData = ptSnap.docs.map(d => ({id: d.id, ...d.data()}));
       const pbData = pbSnap.docs.map(d => ({id: d.id, ...d.data()}));
 
+      const qualifierPointsMap: any = { "32 הגדולות": 5, "שמינית גמר": 10, "רבע גמר": 15, "חצי גמר": 20, "גמר": 25 };
+
       for (const u of usersToExport) {
          const uName = (u as any).name || "Unknown";
          
@@ -1237,7 +1247,19 @@ const handleExportPredictions = async (targetUserId: string | "ALL", targetUserN
          uMatches.forEach(p => {
             const m: any = matchesList.find(x => x.id === p.matchId);
             if (m) {
-               csvContent += `"${uName}","שלב הבתים","${m.homeTeam} - ${m.awayTeam}","${p.predictedHomeScore}-${p.predictedAwayScore}"\n`;
+               let pts = 0;
+               if (m.isFinished && m.stage !== "KNOCKOUT") {
+                 const predH = Number(p.predictedHomeScore); const predA = Number(p.predictedAwayScore);
+                 const realH = Number(m.realHomeScore); const realA = Number(m.realAwayScore);
+                 if (!isNaN(predH) && !isNaN(predA) && !isNaN(realH) && !isNaN(realA)) {
+                   if (Math.sign(predH - predA) === Math.sign(realH - realA)) { 
+                     pts += 5; 
+                     if (predH === realH && predA === realA) pts += 10;
+                   }
+                 }
+               }
+               // הוספנו רווחים במקף כדי למנוע הפיכה לתאריך באקסל
+               csvContent += `"${uName}","שלב הבתים","${m.homeTeam} נגד ${m.awayTeam}","${p.predictedHomeScore} - ${p.predictedAwayScore}","${m.isFinished ? pts : '-'}"\n`;
             }
          });
          
@@ -1246,7 +1268,21 @@ const handleExportPredictions = async (targetUserId: string | "ALL", targetUserN
          uKnockout.forEach(p => {
             const m: any = matchesList.find(x => x.id === p.matchId);
             if (m) {
-               csvContent += `"${uName}","נוק-אאוט","${m.roundName}: ${m.homeTeam} - ${m.awayTeam}","${p.predictedHomeScore}-${p.predictedAwayScore} (עולה: ${p.qualifier})"\n`;
+               let pts = 0;
+               if (m.isFinished && m.stage === "KNOCKOUT") {
+                 const predH = Number(p.predictedHomeScore); const predA = Number(p.predictedAwayScore);
+                 const realH = Number(m.realHomeScore); const realA = Number(m.realAwayScore);
+                 if (!isNaN(predH) && !isNaN(predA) && !isNaN(realH) && !isNaN(realA)) {
+                   if (Math.sign(predH - predA) === Math.sign(realH - realA)) { 
+                     pts += 5; 
+                     if (predH === realH && predA === realA) pts += 10; 
+                   }
+                 }
+                 if (p.qualifier === m.realQualifier && p.qualifier !== "") {
+                   pts += (qualifierPointsMap[m.roundName] || 0);
+                 }
+               }
+               csvContent += `"${uName}","נוק-אאוט","${m.roundName}: ${m.homeTeam} נגד ${m.awayTeam}","${p.predictedHomeScore} - ${p.predictedAwayScore} (עולה: ${p.qualifier})","${m.isFinished ? pts : '-'}"\n`;
             }
          });
 
@@ -1254,7 +1290,18 @@ const handleExportPredictions = async (targetUserId: string | "ALL", targetUserN
          const uQual: any = pqData.find(p => p.id === u.id);
          if (uQual && uQual.groups) {
             for (const [grp, preds] of Object.entries<any>(uQual.groups)) {
-               csvContent += `"${uName}","עולות מבתים","בית ${grp}","מקום 1: ${preds.first || "-"} | מקום 2: ${preds.second || "-"}"\n`;
+               let pts = 0;
+               let isGraded = false;
+               const realGroup = realQuals[grp];
+               if (realGroup && (realGroup.first || realGroup.second)) {
+                 isGraded = true;
+                 if (preds.first === realGroup.first && preds.first !== "") pts += 15;
+                 else if (preds.first === realGroup.second && preds.first !== "") pts += 7;
+                 
+                 if (preds.second === realGroup.second && preds.second !== "") pts += 15;
+                 else if (preds.second === realGroup.first && preds.second !== "") pts += 7;
+               }
+               csvContent += `"${uName}","עולות מבתים","בית ${grp}","מקום 1: ${preds.first || "-"} | מקום 2: ${preds.second || "-"}","${isGraded ? pts : '-'}"\n`;
             }
          }
 
@@ -1263,7 +1310,15 @@ const handleExportPredictions = async (targetUserId: string | "ALL", targetUserN
          if (uThird && uThird.teams) {
             const pred = uThird.teams.filter((x:any)=>x).join(', ');
             if (pred) {
-               csvContent += `"${uName}","8 המעפילות","מקום 3","${pred}"\n`;
+               let pts = 0;
+               let isGraded = false;
+               if (realThird && realThird.some((x:string) => x !== "")) {
+                 isGraded = true;
+                 uThird.teams.forEach((team: string) => { 
+                   if (realThird.includes(team) && team !== "") pts += 10;
+                 });
+               }
+               csvContent += `"${uName}","8 המעפילות","מקום 3","${pred}","${isGraded ? pts : '-'}"\n`;
             }
          }
 
@@ -1273,7 +1328,32 @@ const handleExportPredictions = async (targetUserId: string | "ALL", targetUserN
             for (const [qId, ans] of Object.entries<any>(uBonus.answers)) {
                const q: any = bonusQs.find((x:any) => x.id === qId);
                if (q) {
-                  csvContent += `"${uName}","בונוס","${q.label.replace(/"/g, '""')}","${String(ans).replace(/"/g, '""')}"\n`;
+                  let pts = 0;
+                  let isGraded = false;
+                  const truth = realBonusAns[qId];
+                  if (truth && truth.length > 0) {
+                     isGraded = true;
+                     const truthArray = Array.isArray(truth) ? truth : [truth]; 
+                     
+                     if (q.isProximity && q.answerType === "NUMERIC") {
+                        const truthNum = Number(truthArray[0]); 
+                        const ansNum = Number(ans);
+                        if (!isNaN(truthNum) && !isNaN(ansNum)) {
+                           const diff = Math.abs(truthNum - ansNum);
+                           let proxPts = 0;
+                           if (diff === 0) proxPts = q.points; 
+                           else if (diff <= 5) proxPts = q.points - 10; 
+                           else if (diff <= 10) proxPts = q.points - 20; 
+                           else if (diff <= 15) proxPts = q.points - 30; 
+                           else if (diff <= 20) proxPts = q.points - 40; 
+                           if (proxPts > 0) pts = proxPts;
+                        }
+                     } else {
+                        const isCorrect = truthArray.some((t: any) => t.toString().trim().toLowerCase() === String(ans).trim().toLowerCase());
+                        if (isCorrect) pts = (Number(q.points) || 0);
+                     }
+                  }
+                  csvContent += `"${uName}","בונוס","${q.label.replace(/"/g, '""')}","${String(ans).replace(/"/g, '""')}","${isGraded ? pts : '-'}"\n`;
                }
             }
          }

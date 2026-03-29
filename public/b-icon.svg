@@ -1,0 +1,53 @@
+<svg viewBox="-20 -20 240 240" xmlns="http://www.w3.org/2000/svg">
+  
+  <rect x="-20" y="-20" width="240" height="240" fill="#0f172a" rx="54" />
+
+  <defs>
+    <linearGradient id="premiumGold" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#9A7628" />
+      <stop offset="25%" stop-color="#E8C557" />
+      <stop offset="50%" stop-color="#FFFACD" />
+      <stop offset="75%" stop-color="#D4AF37" />
+      <stop offset="100%" stop-color="#8A6628" />
+    </linearGradient>
+
+    <linearGradient id="rainbowFlow" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#FFD700" /> 
+      <stop offset="45%" stop-color="#FF3B3B" /> 
+      <stop offset="100%" stop-color="#00E676" /> 
+    </linearGradient>
+
+    <mask id="tunnelMask">
+      <rect x="-100" y="-100" width="400" height="400" fill="white" />
+      <rect x="30" y="55" width="140" height="58" fill="black" />
+    </mask>
+  </defs>
+
+  <g transform="translate(18, 0) skewX(-10)">
+    
+    <path d="M 45 20 L 45 180 L 115 180 C 150 180, 175 165, 175 140 C 175 120, 160 105, 140 100 C 155 95, 165 85, 165 65 C 165 40, 145 20, 105 20 Z M 80 55 L 105 55 C 120 55, 125 60, 125 70 C 125 80, 120 85, 105 85 L 80 85 Z M 80 115 L 110 115 C 130 115, 135 125, 135 135 C 135 145, 130 150, 110 150 L 80 150 Z" 
+          fill="url(#premiumGold)" 
+          style="filter: drop-shadow(0 4px 6px rgba(0,0,0,0.5));" />
+
+    <path d="M20 180 L110 115 L70 85 L110 55 L185 5" 
+          fill="none" 
+          stroke="url(#rainbowFlow)" 
+          stroke-width="15" 
+          stroke-linecap="round" 
+          stroke-linejoin="round"
+          mask="url(#tunnelMask)" />
+
+    <g>
+      <g transform="rotate(-33.7, 185, 5)">
+        
+        <polygon points="135,-25 195,5 135,35 155,5" 
+              fill="#00E676" 
+              style="filter: drop-shadow(0 0 6px rgba(0, 230, 118, 0.8));" />
+        
+        <circle cx="192" cy="5" r="3" fill="white" style="filter: drop-shadow(0 0 4px white); opacity: 0.9;" />
+        
+      </g>
+    </g>
+  </g>
+
+</svg>
