@@ -483,6 +483,26 @@ export default function BonusQuestions({ userId, tournamentState: propTournament
         </div>
       ) : (
         <div className="space-y-12">
+         {filteredQuestions.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-16 px-4 bg-slate-900/50 rounded-3xl border border-dashed border-slate-700">
+          <span className="text-5xl block mb-4">🤷‍♂️</span>
+          <span className="text-slate-400 font-bold text-xl text-center">אין כרגע שאלות פתוחות בקטגוריה זו.</span>
+        </div>
+      ) : (
+        <div className="space-y-12">
+          
+          {/* התיקון: העברנו את ההפתעות להיות הבלוק הראשון! */}
+          {surpriseQuestions.length > 0 && (
+            <div className="bg-purple-900/10 p-6 rounded-3xl border border-purple-500/30 shadow-[0_0_30px_rgba(168,85,247,0.1)]">
+              <h3 className="text-2xl font-black text-purple-400 mb-6 flex items-center gap-2 border-b-2 border-purple-500/30 pb-3">
+                <span className="animate-bounce">🎁</span> שאלת הפתעה (לזמן מוגבל!)
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                {surpriseQuestions.map(renderQuestionCard)}
+              </div>
+            </div>
+          )}
+
           {regularQuestions.length > 0 && (
             <div>
               <h3 className="text-xl font-bold text-blue-400 mb-6 flex items-center gap-2 border-b border-slate-800 pb-3">
@@ -504,17 +524,9 @@ export default function BonusQuestions({ userId, tournamentState: propTournament
               </div>
             </div>
           )}
-
-          {surpriseQuestions.length > 0 && (
-            <div>
-              <h3 className="text-xl font-bold text-purple-400 mb-6 flex items-center gap-2 border-b border-slate-800 pb-3">
-                <span>🎁</span> שאלות הפתעה
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-                {surpriseQuestions.map(renderQuestionCard)}
-              </div>
-            </div>
-          )}
+          
+        </div>
+      )}
         </div>
       )}
 
