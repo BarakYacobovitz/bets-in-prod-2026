@@ -506,18 +506,6 @@ export default function BonusQuestions({ userId, tournamentState: propTournament
             </div>
           )}
 
-          {/* שאלות הפתעה שנגמרו יוצגו בשקט וברגוע */}
-          {lockedSurpriseQs.length > 0 && (
-            <div>
-              <h3 className="text-xl font-bold text-slate-400 mb-6 flex items-center gap-2 border-b border-slate-800 pb-3 opacity-80">
-                <span>🎁</span> שאלות הפתעה שהסתיימו
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-                {lockedSurpriseQs.map(renderQuestionCard)}
-              </div>
-            </div>
-          )}
-
           {regularQuestions.length > 0 && (
             <div>
               <h3 className="text-xl font-bold text-blue-400 mb-6 flex items-center gap-2 border-b border-slate-800 pb-3">
@@ -536,6 +524,17 @@ export default function BonusQuestions({ userId, tournamentState: propTournament
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
                 {doubleQuestions.map(renderQuestionCard)}
+              </div>
+            </div>
+          )}
+                    {/* שאלות הפתעה שנגמרו יוצגו בשקט וברגוע */}
+          {lockedSurpriseQs.length > 0 && (
+            <div>
+              <h3 className="text-xl font-bold text-slate-400 mb-6 flex items-center gap-2 border-b border-slate-800 pb-3 opacity-80">
+                <span>🎁</span> שאלות הפתעה שהסתיימו
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                {lockedSurpriseQs.map(renderQuestionCard)}
               </div>
             </div>
           )}
