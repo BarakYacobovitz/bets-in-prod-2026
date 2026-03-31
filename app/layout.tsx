@@ -21,7 +21,7 @@ export const metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="he" dir="rtl">
+    <html lang="he" dir="rtl" className="bg-slate-950">
       <body className="bg-slate-950 text-slate-200 min-h-screen flex flex-col">
         
         {/* זה הבר העליון היחיד שצריך להיות כאן! */}
