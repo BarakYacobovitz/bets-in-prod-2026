@@ -2,7 +2,6 @@
 html,
 body {
   background-color: #020617 !important; /* צבע ה-slate-950 */
-  overscroll-behavior-y: none; /* עוד וידוא הריגה לאפקט הגומי */
 }
 :root {
   --background: #ffffff;
