@@ -240,6 +240,8 @@ export default function BonusQuestions({ userId, tournamentState: propTournament
   const regularQuestions = sortGroup(filteredQuestions.filter(q => q.weight === "REGULAR"));
   const doubleQuestions = sortGroup(filteredQuestions.filter(q => q.weight === "DOUBLE"));
   const surpriseQuestions = sortGroup(filteredQuestions.filter(q => q.weight === "SURPRISE"));
+  const activeSurpriseQs = surpriseQuestions.filter(q => !isQuestionLocked(q));
+  const lockedSurpriseQs = surpriseQuestions.filter(q => isQuestionLocked(q));
 
   const renderQuestionCard = (q: any) => {
     const locked = isQuestionLocked(q);
@@ -492,13 +494,26 @@ export default function BonusQuestions({ userId, tournamentState: propTournament
         <div className="space-y-12">
           
           {/* התיקון: העברנו את ההפתעות להיות הבלוק הראשון! */}
-          {surpriseQuestions.length > 0 && (
+{/* התיקון: הפתעות חיות ובועטות מקבלות את הבמה המרכזית (סגול זוהר וקופץ) */}
+          {activeSurpriseQs.length > 0 && (
             <div className="bg-purple-900/10 p-6 rounded-3xl border border-purple-500/30 shadow-[0_0_30px_rgba(168,85,247,0.1)]">
               <h3 className="text-2xl font-black text-purple-400 mb-6 flex items-center gap-2 border-b-2 border-purple-500/30 pb-3">
                 <span className="animate-bounce">🎁</span> שאלת הפתעה (לזמן מוגבל!)
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-                {surpriseQuestions.map(renderQuestionCard)}
+                {activeSurpriseQs.map(renderQuestionCard)}
+              </div>
+            </div>
+          )}
+
+          {/* שאלות הפתעה שנגמרו יוצגו בשקט וברגוע */}
+          {lockedSurpriseQs.length > 0 && (
+            <div>
+              <h3 className="text-xl font-bold text-slate-400 mb-6 flex items-center gap-2 border-b border-slate-800 pb-3 opacity-80">
+                <span>🎁</span> שאלות הפתעה שהסתיימו
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                {lockedSurpriseQs.map(renderQuestionCard)}
               </div>
             </div>
           )}
