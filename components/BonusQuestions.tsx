@@ -143,6 +143,9 @@ const isQuestionLocked = (q: any) => {
   };
 
   const filteredQuestions = questions.filter(q => {
+    // התיקון הקריטי: אם השאלה אמורה להיות מוסתרת (למשל הפתעה עתידית), אל תרנדר אותה בכלל!
+    if (!isQuestionVisible(q)) return false;
+    
     if (q.phase !== bonusCategory) return false;
     if (bonusCategory === "KNOCKOUT") return q.round === knockoutRound;
     return true;
