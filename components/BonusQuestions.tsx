@@ -66,7 +66,17 @@ export default function BonusQuestions({ userId, tournamentState: propTournament
     setAnswers(prev => ({ ...prev, [qId]: val }));
   };
 
-  const isQuestionLocked = (q: any) => {
+const isQuestionLocked = (q: any) => {
+    // ---- התחלת התוספת לתיקון הבאג ----
+    if (q.isSurprise) {
+      if (!q.closeTime) return false;
+      const now = new Date();
+      const closeTime = new Date(q.closeTime);
+      if (now >= closeTime) return true; // אם השעון עבר את שעת הסגירה, נעל!
+      return false; // כל עוד לא הגענו לסגירה, השאלה פתוחה, בלי קשר לסטטוס הטורניר
+    }
+    // ---- סוף התוספת ----
+
     const state = tournamentState;
     if (state === 0) return false;
     if (q.phase === "TOURNAMENT" || q.phase === "GROUPS") return state >= 1;
@@ -81,6 +91,15 @@ export default function BonusQuestions({ userId, tournamentState: propTournament
   };
 
   const isQuestionVisible = (q: any) => {
+    // ---- התחלת התוספת לתיקון הבאג ----
+    if (q.isSurprise) {
+      if (!q.openTime) return false; // אם אין שעת פתיחה משום מה, אל תציג
+      const now = new Date();
+      const openTime = new Date(q.openTime);
+      if (now < openTime) return false; // אם עדיין לא הגיעה השעה, תסתיר!
+    }
+    // ---- סוף התוספת ----
+
     const state = tournamentState;
     if (q.phase === "KNOCKOUT") {
       if (state < 4) return false;
@@ -137,7 +156,7 @@ export default function BonusQuestions({ userId, tournamentState: propTournament
       let hasChanges = false;
       
       filteredQuestions.forEach(q => {
-        if (!isQuestionLocked(q)) {
+        if (!isQuestionLocked(q) && isQuestionVisible(q)) {
           let ans = "";
           if (q.answerType === "ALL_TEAMS") {
             const opts = [...allTeams, ...(q.customOptions || [])];

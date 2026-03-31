@@ -239,15 +239,24 @@ export default function Dashboard({ userId, userName, setActiveTab, tournamentSt
         bonusQuestions.forEach((q: any) => {
            const hasAnswered = userBonusAnswers[q.id] && userBonusAnswers[q.id].toString().trim() !== "";
            
-           if (q.isSurprise) {
+            if (q.isSurprise) {
               if (q.openTime && q.closeTime) {
                  const openMs = new Date(q.openTime).getTime();
                  const closeMs = new Date(q.closeTime).getTime();
+                 
+                 // בודק אם אנחנו בדיוק בחלון הזמן של שאלת ההפתעה
                  if (nowMs >= openMs && nowMs <= closeMs) {
                     if (!hasAnswered) activeSurprises.push(q); 
+                    
+                    // התיקון: מוסיף את שאלת ההפתעה למונים של הדאשבורד ("כסף על הרצפה")
+                    openCount++;
+                    if (!hasAnswered) {
+                       missCount++;
+                       missPoints += (Number(q.points) || 0);
+                    }
                  }
               }
-           } 
+           }
            else {
               let isLocked = false;
               if (tournamentState > 0) {
