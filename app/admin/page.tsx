@@ -923,7 +923,57 @@ const handleCalculateScores = async (silentParam: any = false) => {
       setIsCalculating(false); 
     }
   };
+  const handleSpawnBotsOnly = async () => {
+    const numUsers = parseInt(prompt("כמה בוטים להזריק למערכת? (הם ימלאו ניחושים מלאים לכל הטורניר)", "30") || "0");
+    if (isNaN(numUsers) || numUsers <= 0) return;
+    
+    toast.loading("מייצר בוטים וממלא להם טפסים... ⏳", { duration: 5000 });
+    setIsCalculating(true);
+    try {
+      const namesFirst = ["דני", "רוני", "יעל", "אלכס", "מיכל", "אורן", "נועה", "עידו", "מאיה", "גיא", "תמר", "עומר"];
+      const namesLast = ["לוי", "כהן", "ישראלי", "אברהם", "גולן", "שפירא", "ברק", "מזרחי"];
+      
+      for (let i = 0; i < numUsers; i++) {
+        const botId = `sim_${Date.now()}_${i}`;
+        const randomName = `${namesFirst[Math.floor(Math.random() * namesFirst.length)]} ${namesLast[Math.floor(Math.random() * namesLast.length)]} (בוט)`;
+        
+        await setDoc(doc(db, "users", botId), { name: randomName, email: `${botId}@test.com`, totalPoints: 0, knockoutPoints: 0, hasPaid: true });
+        
+        for (const match of matches) {
+          const coll = match.stage === "KNOCKOUT" ? "predictions_knockout" : "predictions_matches";
+          const pHome = Math.floor(Math.random() * 5); const pAway = Math.floor(Math.random() * 5);
+          let payload: any = { userId: botId, matchId: match.id, predictedHomeScore: pHome.toString(), predictedAwayScore: pAway.toString(), updatedAt: new Date() };
+          if (match.stage === "KNOCKOUT") { payload.roundName = match.roundName; payload.qualifier = pHome > pAway ? match.homeTeam : (pAway > pHome ? match.awayTeam : (Math.random() > 0.5 ? match.homeTeam : match.awayTeam)); } 
+          else { payload.groupId = match.group; }
+          await setDoc(doc(db, coll, `${botId}_${match.id}`), payload);
+        }
 
+        const groupsPreds: any = {};
+        for (const g of Object.keys(groupTeams)) {
+          const t = Array.from(groupTeams[g] as Set<string>);
+          if (t.length >= 2) { const sh = [...t].sort(()=>0.5-Math.random()); groupsPreds[g] = { first: sh[0], second: sh[1] }; }
+        }
+        await setDoc(doc(db, "predictions_qualifiers", botId), { groups: groupsPreds, updatedAt: new Date() });
+        const shuffledTeamsForThird = [...allTeams].sort(() => 0.5 - Math.random()).slice(0, 8);
+        while (shuffledTeamsForThird.length < 8) shuffledTeamsForThird.push("");
+        await setDoc(doc(db, "predictions_third_place", botId), { teams: shuffledTeamsForThird, updatedAt: new Date() });
+        
+        const bAns: any = {};
+        for (const q of bonusQuestions) {
+           bAns[q.id] = (q.customOptions && q.customOptions.length > 0) ? q.customOptions[Math.floor(Math.random() * q.customOptions.length)] : (q.answerType === "NUMERIC" ? Math.floor(Math.random()*15).toString() : "תשובת סימולטור");
+        }
+        await setDoc(doc(db, "predictions_bonus", botId), { answers: bAns, updatedAt: new Date() });
+      }
+
+      toast.success(`✅ ${numUsers} בוטים נוצרו והגישו ניחושים לכל הטורניר! כעת תוכל לסמלץ תוצאות אמת לפי שלבים.`, { duration: 6000 });
+      setTimeout(() => window.location.reload(), 2000);
+    } catch (e) { 
+      console.error(e); 
+      toast.error("שגיאה ביצירת בוטים."); 
+    } finally { 
+      setIsCalculating(false); 
+    }
+  };
   const handleSmartSimulation = async () => {
     if (simStage === "ALL") {
        await handleSimulateFullTournament(); 
@@ -1739,6 +1789,8 @@ const handleExportPredictions = async (targetUserId: string | "ALL", targetUserN
               </div>
 
 <div className="bg-slate-800 p-8 rounded-3xl border border-blue-500/30 shadow-xl mt-8">
+                
+                {/* כותרת וכפתור אקסל */}
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4 border-b border-slate-700 pb-4">
                   <h2 className="text-2xl font-bold text-white flex items-center gap-2"><span>👥</span> ניהול משתמשים ותשלומים</h2>
                   <button onClick={() => handleExportPredictions("ALL", "All")} disabled={isCalculating} className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2.5 px-5 rounded-xl transition-all shadow-md text-sm flex items-center gap-2">
@@ -1746,10 +1798,42 @@ const handleExportPredictions = async (targetUserId: string | "ALL", targetUserN
                   </button>
                 </div>
                 
+                {/* ===== מעבדת סימולציות (הזרקת בוטים) ===== */}
+                <div className="bg-purple-900/10 p-4 rounded-xl border border-purple-500/30 mb-6 flex flex-col xl:flex-row items-start xl:items-center justify-between gap-4">
+                  <div>
+                    <h3 className="text-purple-400 font-bold flex items-center gap-2 mb-1"><span>🤖</span> הזרקת בוטים (טסטים)</h3>
+                    <p className="text-slate-400 text-xs">ייצור משתמשים פיקטיביים עם ניחושים אקראיים כדי למלא את הטבלה ולבדוק את הראדאר. (בחר ALL כדי לייצר בוטים חדשים).</p>
+                  </div>
+<div className="flex gap-2 w-full xl:w-auto">
+                     <select value={simStage} onChange={(e) => setSimStage(e.target.value)} className="bg-slate-900 text-white p-2.5 rounded-lg border border-purple-500/50 outline-none font-bold text-sm flex-1 xl:flex-none">
+                        <option value="BOTS_ONLY">🤖 הזרק בוטים בלבד (ללא תוצאות)</option>
+                        <option value="MD1">סמלץ מחזור 1</option>
+                        <option value="MD2">סמלץ מחזור 2</option>
+                        <option value="MD3">סמלץ מחזור 3</option>
+                        <option value="R32">סמלץ 32 הגדולות</option>
+                        <option value="R16">סמלץ שמינית גמר</option>
+                        <option value="QF">סמלץ רבע גמר</option>
+                        <option value="SF">סמלץ חצי גמר</option>
+                        <option value="FINAL">סמלץ גמר</option>
+                        <option value="ALL">סמלץ טורניר שלם (בוטים + תוצאות)</option>
+                     </select>
+                     <button 
+                       onClick={() => {
+                         if (simStage === "BOTS_ONLY") handleSpawnBotsOnly();
+                         else handleSmartSimulation();
+                       }} 
+                       disabled={isCalculating} 
+                       className="py-2.5 px-6 bg-purple-600 hover:bg-purple-500 text-white font-bold rounded-lg transition-all shadow-md text-sm whitespace-nowrap"
+                     >
+                       {isCalculating ? "מריץ... ⏳" : "🧪 הפעל"}
+                     </button>
+                  </div>
+                </div>
+                {/* ========================================= */}
+
                 <div className="overflow-x-auto mt-6">
                   <table className="w-full text-right text-slate-300">
-                    <thead className="text-sm bg-slate-900/50 text-slate-400"><tr><th className="p-4 rounded-tr-xl">שם משתמש</th><th className="p-4">אימייל</th><th className="p-4 text-center">נקודות בטבלה</th><th className="p-4 text-center">סטטוס תשלום</th><th className="p-4 rounded-tl-xl text-center">פעולות</th></tr></thead>
-<tbody>
+                    <thead className="text-sm bg-slate-900/50 text-slate-400"><tr><th className="p-4 rounded-tr-xl">שם משתמש</th><th className="p-4">אימייל</th><th className="p-4 text-center">נקודות בטבלה</th><th className="p-4 text-center">סטטוס תשלום</th><th className="p-4 rounded-tl-xl text-center">פעולות</th></tr></thead><tbody>
                       {usersList.length === 0 ? (<tr><td colSpan={5} className="p-8 text-center text-slate-500">אין משתמשים במערכת.</td></tr>) : (
                         usersList.map(u => (
                           <tr key={u.id} className="border-b border-slate-700/50 hover:bg-slate-700/20">
