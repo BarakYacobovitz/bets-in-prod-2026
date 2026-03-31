@@ -66,16 +66,15 @@ export default function BonusQuestions({ userId, tournamentState: propTournament
     setAnswers(prev => ({ ...prev, [qId]: val }));
   };
 
-const isQuestionLocked = (q: any) => {
-    // ---- התחלת התוספת לתיקון הבאג ----
+  const isQuestionLocked = (q: any) => {
+    // ---- תיקון זמן לשאלת הפתעה (נעילה) ----
     if (q.isSurprise) {
       if (!q.closeTime) return false;
       const now = new Date();
       const closeTime = new Date(q.closeTime);
-      if (now >= closeTime) return true; // אם השעון עבר את שעת הסגירה, נעל!
-      return false; // כל עוד לא הגענו לסגירה, השאלה פתוחה, בלי קשר לסטטוס הטורניר
+      if (now >= closeTime) return true; // עברנו את שעת הסגירה
+      return false; // כל עוד לא הגענו, השאלה פתוחה
     }
-    // ---- סוף התוספת ----
 
     const state = tournamentState;
     if (state === 0) return false;
@@ -91,14 +90,13 @@ const isQuestionLocked = (q: any) => {
   };
 
   const isQuestionVisible = (q: any) => {
-    // ---- התחלת התוספת לתיקון הבאג ----
+    // ---- תיקון זמן לשאלת הפתעה (חשיפה) ----
     if (q.isSurprise) {
-      if (!q.openTime) return false; // אם אין שעת פתיחה משום מה, אל תציג
+      if (!q.openTime) return false;
       const now = new Date();
       const openTime = new Date(q.openTime);
-      if (now < openTime) return false; // אם עדיין לא הגיעה השעה, תסתיר!
+      if (now < openTime) return false; // מוקדם מדי, תסתיר
     }
-    // ---- סוף התוספת ----
 
     const state = tournamentState;
     if (q.phase === "KNOCKOUT") {
@@ -142,9 +140,9 @@ const isQuestionLocked = (q: any) => {
     if (ans) handleChange(q.id, ans);
   };
 
+  // ---- הסינון החכם שמעלים שאלות שלא אמורות להיראות ----
   const filteredQuestions = questions.filter(q => {
-    // התיקון הקריטי: אם השאלה אמורה להיות מוסתרת (למשל הפתעה עתידית), אל תרנדר אותה בכלל!
-    if (!isQuestionVisible(q)) return false;
+    if (!isQuestionVisible(q)) return false; // חותך החוצה שאלות שמוסתרות בגלל זמנים או שלב
     
     if (q.phase !== bonusCategory) return false;
     if (bonusCategory === "KNOCKOUT") return q.round === knockoutRound;
@@ -159,6 +157,7 @@ const isQuestionLocked = (q: any) => {
       let hasChanges = false;
       
       filteredQuestions.forEach(q => {
+        // התיקון: נגריל רק אם השאלה גלויה ולא נעולה
         if (!isQuestionLocked(q) && isQuestionVisible(q)) {
           let ans = "";
           if (q.answerType === "ALL_TEAMS") {
@@ -311,7 +310,6 @@ const isQuestionLocked = (q: any) => {
           </div>
         )}
 
-        {/* --- אזור התשובה + דגל דינמי --- */}
         <div className="mb-4 mt-4 flex items-center gap-3">
           {getFlagUrl(answers[q.id]) && (
             <div className="shrink-0 bg-slate-900 border border-slate-600 p-2.5 rounded-xl shadow-inner flex items-center justify-center h-[50px] w-[60px]">
@@ -520,7 +518,6 @@ const isQuestionLocked = (q: any) => {
         </div>
       )}
 
-      {/* מודל ריגול של בונוסים */}
       {spyModalQuestion && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm" dir="rtl">
           <div className="bg-slate-900 border border-slate-700 p-6 rounded-3xl w-full max-w-md max-h-[80vh] flex flex-col shadow-2xl relative">
