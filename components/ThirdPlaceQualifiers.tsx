@@ -6,8 +6,11 @@ import toast from "react-hot-toast";
 import { getFlagUrl } from "../app/utils/flags"; 
 
 export default function ThirdPlaceQualifiers({ groups, userId, tournamentState = 0 }: any) {
+  const groupNames = Object.keys(groups).sort();
+  const [activeGroup, setActiveGroup] = useState(groupNames[0] || "A");
+  
   const [selectedTeams, setSelectedTeams] = useState<string[]>([]);
-  const [userQualifiers, setUserQualifiers] = useState<any>({}); // סטייט חדש לשמירת עולות 1-2
+  const [userQualifiers, setUserQualifiers] = useState<any>({}); 
   const [realThirdPlace, setRealThirdPlace] = useState<string[]>([]); 
   
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
@@ -17,10 +20,12 @@ export default function ThirdPlaceQualifiers({ groups, userId, tournamentState =
   const [spyData, setSpyData] = useState<any[]>([]);
   const [isLoadingSpy, setIsLoadingSpy] = useState(false);
 
+  const [spySearchQuery, setSpySearchQuery] = useState("");
+  const [spyFilter, setSpyFilter] = useState<"ALL" | "WITH_POINTS" | "MISS">("ALL");
+
   const isLoaded = useRef(false);
   const isUserAction = useRef(false);
 
-  // 1. שליפת הנתונים: עולות מקום 3 + עולות מקומות 1/2 (לצורך הצלבה ואזהרה)
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -30,7 +35,6 @@ export default function ThirdPlaceQualifiers({ groups, userId, tournamentState =
           setSelectedTeams(savedTeams.filter((t: string) => t !== "")); 
         }
         
-        // משיכת ניחושי הבתים כדי שנדע אם הוא כבר העלה נבחרת מסוימת
         const qSnap = await getDoc(doc(db, "predictions_qualifiers", userId));
         if (qSnap.exists()) {
           setUserQualifiers(qSnap.data().groups || {});
@@ -47,14 +51,13 @@ export default function ThirdPlaceQualifiers({ groups, userId, tournamentState =
     if (userId) fetchData();
   }, [userId]);
 
-  // 2. שמירה אוטומטית כשיש שינוי
   useEffect(() => {
     if (!isLoaded.current || !isUserAction.current) return;
     setSaveStatus("saving");
     const timer = setTimeout(async () => {
       try {
         const paddedTeams = [...selectedTeams];
-        while (paddedTeams.length < 8) paddedTeams.push(""); // משלים ל-8 מקומות במסד הנתונים
+        while (paddedTeams.length < 8) paddedTeams.push(""); 
         
         await setDoc(doc(db, "predictions_third_place", userId), { teams: paddedTeams, updatedAt: new Date() }, { merge: true });
         setSaveStatus("saved");
@@ -65,7 +68,6 @@ export default function ThirdPlaceQualifiers({ groups, userId, tournamentState =
     return () => clearTimeout(timer);
   }, [selectedTeams, userId]);
 
-  // 3. פונקציית עזר לבדיקה האם הנבחרת כבר הועלתה ממקום 1/2
   const checkIsAlreadyAdvanced = (team: string) => {
     for (const group of Object.values(userQualifiers)) {
       const g = group as any;
@@ -81,12 +83,11 @@ export default function ThirdPlaceQualifiers({ groups, userId, tournamentState =
     if (selectedTeams.includes(team)) {
       setSelectedTeams(prev => prev.filter(t => t !== team));
     } else {
-      if (selectedTeams.length >= 8) {
-        toast.error("כבר בחרת 8 נבחרות! בטל בחירה קיימת (X בסלוט) כדי לבחור אחרת.");
+      if (selectedTeams.length >= 8 && !selectedTeams.find(t => Array.from(groups[groupName] as Set<string>).includes(t))) {
+        toast.error("כבר בחרת 8 נבחרות! בטל בחירה קיימת (X בסלוט למעלה) כדי לבחור אחרת.");
         return;
       }
 
-      // חיווי על סתירת נתונים (Soft Validation)
       if (checkIsAlreadyAdvanced(team)) {
         toast('שמנו לב שכבר העלית את הנבחרת הזו ממקום 1/2. זכותך לגדר סיכונים, אבל שים לב!', { 
           icon: '⚠️', 
@@ -94,7 +95,6 @@ export default function ThirdPlaceQualifiers({ groups, userId, tournamentState =
         });
       }
 
-      // חסימת כפילות מתוך אותו בית (מותרת רק נבחרת אחת מהמקום ה-3 בכל בית)
       const teamsInThisGroup = Array.from(groups[groupName] as any[]);
       const alreadySelectedFromGroup = selectedTeams.find(t => teamsInThisGroup.includes(t));
       
@@ -106,7 +106,6 @@ export default function ThirdPlaceQualifiers({ groups, userId, tournamentState =
     }
   };
 
-  // מחיקת נבחרת ישירות מתוך הסלוט למעלה
   const handleRemoveTeam = (team: string) => {
     if (isLocked) return;
     isUserAction.current = true;
@@ -128,7 +127,6 @@ export default function ThirdPlaceQualifiers({ groups, userId, tournamentState =
       const newSelectedTeams: string[] = [];
       shuffledGroups.forEach(gName => {
         const teamsInGroup = Array.from(groups[gName] as Set<string>);
-        // סינון חכם בהגרלה: נשתדל לא להגריל נבחרת שכבר נמצאת במקום 1/2
         const availableTeams = teamsInGroup.filter(t => !checkIsAlreadyAdvanced(t));
         
         if (availableTeams.length > 0) {
@@ -152,11 +150,27 @@ export default function ThirdPlaceQualifiers({ groups, userId, tournamentState =
 
   const handleOpenSpy = async () => {
     setShowSpyModal(true);
+    setSpySearchQuery("");
+    setSpyFilter("ALL");
     setIsLoadingSpy(true);
     try {
       const usersSnap = await getDocs(collection(db, "users"));
-      const usersMap: any = {};
-      usersSnap.forEach(doc => { usersMap[doc.id] = doc.data().name || "שחקן לא ידוע"; });
+      const allUsers: any[] = [];
+      usersSnap.forEach(doc => allUsers.push({ id: doc.id, ...doc.data() }));
+
+      allUsers.sort((a, b) => (Number(b.totalPoints) || 0) - (Number(a.totalPoints) || 0));
+      let currentRank = 1;
+      const usersMap: any = {}; 
+      allUsers.forEach((u, i) => {
+        if (i > 0 && (Number(u.totalPoints) || 0) < (Number(allUsers[i - 1].totalPoints) || 0)) {
+          currentRank = i + 1;
+        }
+        usersMap[u.id] = {
+          name: u.name || "שחקן לא ידוע",
+          totalPoints: Number(u.totalPoints) || 0,
+          rank: currentRank 
+        }; 
+      });
 
       const tSnap = await getDocs(collection(db, "predictions_third_place"));
       const gathered: any[] = [];
@@ -165,25 +179,58 @@ export default function ThirdPlaceQualifiers({ groups, userId, tournamentState =
         if (userTeams.length > 0) {
           gathered.push({
             userId: doc.id,
-            userName: usersMap[doc.id] || "משתמש",
+            userName: usersMap[doc.id]?.name || "משתמש",
+            userTotalPoints: usersMap[doc.id]?.totalPoints || 0,
+            userRank: usersMap[doc.id]?.rank || 999,
             teams: userTeams,
             points: calculateUserPoints(userTeams)
           });
         }
       });
-      gathered.sort((a, b) => a.userName.localeCompare(b.userName));
+      gathered.sort((a, b) => b.userTotalPoints - a.userTotalPoints);
       setSpyData(gathered);
     } catch (e) { console.error(e); } 
     finally { setIsLoadingSpy(false); }
   };
 
+  const currentIndex = groupNames.indexOf(activeGroup);
+  const handlePrevGroup = () => {
+    const prevIndex = currentIndex === 0 ? groupNames.length - 1 : currentIndex - 1;
+    setActiveGroup(groupNames[prevIndex]);
+  };
+  const handleNextGroup = () => {
+    const nextIndex = currentIndex === groupNames.length - 1 ? 0 : currentIndex + 1;
+    setActiveGroup(groupNames[nextIndex]);
+  };
+
   const myPoints = calculateUserPoints(selectedTeams);
+
+  const currentGroupTeams = Array.from(groups[activeGroup] as Set<string> || []);
+  const selectedFromActiveGroup = selectedTeams.find(t => currentGroupTeams.includes(t));
+
+  const hasTruth = realThirdPlace.length > 0;
+  const spyStats = { withPoints: 0, miss: 0 };
+  
+  if (hasTruth) {
+    spyData.forEach(d => {
+      if (d.points && d.points > 0) spyStats.withPoints++;
+      else spyStats.miss++;
+    });
+  }
+
+  const filteredSpyData = spyData.filter(d => {
+    if (!d.userName.toLowerCase().includes(spySearchQuery.toLowerCase())) return false;
+    if (hasTruth && spyFilter !== "ALL") {
+      if (spyFilter === "WITH_POINTS" && (!d.points || d.points === 0)) return false;
+      if (spyFilter === "MISS" && d.points && d.points > 0) return false;
+    }
+    return true;
+  });
 
   return (
     <div className="w-full animate-fade-in-up">
       
-      {/* --- Header & Slots Area --- */}
-      <div className="bg-slate-900/80 p-6 md:p-8 rounded-3xl border border-teal-500/30 mb-8 shadow-2xl relative">
+      <div className="bg-slate-900/80 p-6 md:p-8 rounded-3xl border border-teal-500/30 mb-8 shadow-2xl relative md:sticky md:top-20 z-30 backdrop-blur-md">
         <div className="flex flex-col md:flex-row justify-between items-start gap-6">
           <div className="flex-1">
             <h2 className="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-teal-400 to-emerald-400 mb-2">
@@ -203,7 +250,6 @@ export default function ThirdPlaceQualifiers({ groups, userId, tournamentState =
                </div>
              )}
              
-             {/* סטטוס נעילה והגרלה מעל הסלוטים */}
              <div className="flex items-center gap-3 w-full justify-end">
                {saveStatus === "saving" && <span className="text-amber-400 text-xs animate-pulse font-bold">⏳ שומר...</span>}
                {saveStatus === "saved" && <span className="text-emerald-400 text-xs font-bold">✓ נשמר</span>}
@@ -221,7 +267,6 @@ export default function ThirdPlaceQualifiers({ groups, userId, tournamentState =
           </div>
         </div>
 
-        {/* 🏆 8 הסלוטים החזותיים המשודרגים 🏆 */}
         <div className="grid grid-cols-4 lg:grid-cols-8 gap-3 mt-6">
           {Array.from({ length: 8 }).map((_, i) => {
             const team = selectedTeams[i];
@@ -231,16 +276,17 @@ export default function ThirdPlaceQualifiers({ groups, userId, tournamentState =
               <div key={i} className={`relative flex flex-col items-center justify-center p-2 rounded-2xl border-2 transition-all h-28 group ${team ? 'bg-slate-800 border-teal-500 shadow-[0_0_15px_rgba(20,184,166,0.15)] hover:-translate-y-1' : 'bg-slate-950/50 border-slate-700 border-dashed'}`}>
                 {team ? (
                   <>
-                    {/* חיווי אזהרה אם הנבחרת כבר במקום 1/2 */}
                     {isWarning && (
                       <div className="absolute -top-2 -right-2 bg-slate-900 border border-amber-500 text-amber-400 rounded-full w-6 h-6 flex items-center justify-center text-[10px] font-black shadow-md z-10" title="סתירה: בחרת להעלות אותה גם ממקום 1/2">
                         ⚠️
                       </div>
                     )}
                     
-                    {/* כפתור מחיקה מתוך הסלוט */}
                     {!isLocked && (
-                      <button onClick={() => handleRemoveTeam(team)} className="absolute -top-2 -left-2 bg-rose-500 hover:bg-rose-400 rounded-full w-6 h-6 text-white text-[10px] font-black flex items-center justify-center border border-slate-900 shadow-sm opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                      <button 
+                        onClick={() => handleRemoveTeam(team)} 
+                        className="absolute -top-2 -left-2 bg-rose-500 hover:bg-rose-400 rounded-full w-6 h-6 text-white text-[10px] font-black flex items-center justify-center border border-slate-900 shadow-md transition-all z-10 opacity-100 md:opacity-0 md:group-hover:opacity-100"
+                      >
                         ✕
                       </button>
                     )}
@@ -256,8 +302,14 @@ export default function ThirdPlaceQualifiers({ groups, userId, tournamentState =
           })}
         </div>
 
+        <div className="mt-4 text-center">
+           <span className="text-sm font-bold text-slate-400">
+             נבחרו <span className={selectedTeams.length === 8 ? "text-emerald-400" : "text-white"}>{selectedTeams.length}</span> מתוך 8
+           </span>
+        </div>
+
         {isLocked && (
-          <div className="mt-8 border-t border-slate-700/50 pt-5">
+          <div className="mt-4 border-t border-slate-700/50 pt-5">
             <button onClick={handleOpenSpy} className="w-full py-3 rounded-xl font-bold text-sm transition-all border flex items-center justify-center gap-2 bg-slate-900 text-slate-400 hover:text-white border-slate-700 hover:bg-slate-800">
               <span>👁️</span> ריגול: מי ניחש מה?
             </button>
@@ -265,15 +317,15 @@ export default function ThirdPlaceQualifiers({ groups, userId, tournamentState =
         )}
       </div>
 
-      {/* --- תוצאות אמת --- */}
       {realThirdPlace.length > 0 && (
-         <div className="mb-8 bg-purple-900/20 border border-purple-500/30 p-6 rounded-3xl shadow-inner">
+         <div className="mb-8 bg-purple-900/20 border border-purple-500/30 p-6 rounded-3xl shadow-inner relative z-10">
            <h3 className="text-purple-400 font-bold mb-4 flex items-center gap-2"><span>🏆</span> העפילו בפועל למקום ה-3 (תוצאות אמת):</h3>
-           <div className="flex flex-wrap gap-3">
+           {/* החלפנו משורות לשורה אופקית אחת נגללת */}
+           <div className="flex flex-nowrap overflow-x-auto custom-scrollbar pb-2 gap-2">
              {realThirdPlace.map(t => {
                const isHit = selectedTeams.includes(t);
                return (
-                 <span key={t} className={`px-4 py-2 rounded-xl text-sm font-bold border flex items-center gap-2 transition-all ${isHit ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/50 shadow-[0_0_10px_rgba(16,185,129,0.2)] scale-105" : "bg-slate-800 text-slate-300 border-slate-700"}`}>
+                 <span key={t} className={`shrink-0 whitespace-nowrap px-4 py-2 rounded-xl text-sm font-bold border flex items-center gap-2 transition-all ${isHit ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/50 shadow-[0_0_10px_rgba(16,185,129,0.2)] scale-105" : "bg-slate-800 text-slate-300 border-slate-700"}`}>
                    {getFlagUrl(t) && <img src={getFlagUrl(t)!} className="w-5 h-3.5 object-cover rounded-sm" alt="flag"/>} 
                    {t} 
                    {isHit && <span className="ml-1">🎯 +10</span>}
@@ -284,99 +336,160 @@ export default function ThirdPlaceQualifiers({ groups, userId, tournamentState =
          </div>
       )}
 
-      {/* --- רשימת הבתים והנבחרות --- */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-        {Object.keys(groups).sort().map(groupName => {
-          const teams = Array.from(groups[groupName] as Set<string>);
-          const selectedInGroup = selectedTeams.find(t => teams.includes(t));
-          
-          return (
-            <div key={groupName} className={`bg-slate-800 rounded-2xl p-5 border transition-all ${selectedInGroup ? "border-teal-500/50 shadow-[0_0_20px_rgba(20,184,166,0.05)] bg-teal-900/10" : "border-slate-700"} ${isLocked && myPoints === null ? "opacity-80 grayscale-[10%]" : ""}`}>
-              <h3 className="text-lg font-bold text-center text-slate-300 mb-4 pb-2 border-b border-slate-700/50">
-                בית {groupName}
-              </h3>
-              <div className="flex flex-col gap-2">
-                {teams.map(team => {
-                  const isSelected = selectedTeams.includes(team);
-                  const isRealWinner = realThirdPlace.includes(team);
-                  const hasWarning = checkIsAlreadyAdvanced(team);
-                  
-                  let btnStyle = "bg-slate-900 text-slate-400 border-slate-700 hover:bg-slate-700 hover:text-white";
-                  if (isSelected) btnStyle = "bg-teal-600 text-white border-teal-500 shadow-md";
-                  if (isLocked && !isSelected) btnStyle = "bg-slate-900/50 text-slate-500 border-slate-800 cursor-not-allowed";
-
-                  return (
-                    <button
-                      key={team}
-                      disabled={isLocked}
-                      onClick={() => toggleTeam(team, groupName)}
-                      className={`py-3 px-4 rounded-xl font-bold transition-all text-sm w-full text-right flex justify-between items-center border ${btnStyle} relative overflow-hidden group`}
-                    >
-                      <div className="flex items-center gap-2.5 relative z-10">
-                         {getFlagUrl(team) ? <img src={getFlagUrl(team)!} className="w-5 h-3.5 object-cover rounded-sm shadow-sm" alt="flag"/> : "🏳️"}
-                         <span>{team}</span>
-                      </div>
-                      
-                      <div className="flex items-center gap-2 relative z-10">
-                        {/* התראת סתירה גם בתוך הכפתור אם המשתמש לא בחר בה עדין אבל היא במקום 1/2 */}
-                        {hasWarning && !isSelected && !isLocked && (
-                          <span className="text-[10px] text-amber-500 bg-amber-500/10 border border-amber-500/20 px-1.5 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity" title="בחרת אותה במקום 1/2">⚠️ סתירה</span>
-                        )}
-                        {isRealWinner && <span className="text-[10px] bg-purple-500 text-white px-2 py-0.5 rounded-full shadow-sm">העפילה</span>}
-                        {isSelected && <span>✓</span>}
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
+      <div className="max-w-md mx-auto relative z-10">
+         <div className="flex items-center justify-between w-full bg-slate-900/80 p-2 rounded-2xl border border-slate-800 shadow-md backdrop-blur-md mb-6">
+            <button onClick={handlePrevGroup} className="w-12 h-12 flex items-center justify-center rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors border border-slate-700 active:scale-95">
+               <span className="text-xl leading-none">▶</span>
+            </button>
+            <div className="flex flex-col items-center justify-center flex-1">
+               <h2 className="text-2xl font-black text-white flex items-center gap-2">
+                 בית {activeGroup}
+               </h2>
+               {selectedFromActiveGroup ? (
+                  <span className="text-[10px] bg-teal-500/20 text-teal-400 px-2 py-0.5 rounded font-bold border border-teal-500/30 mt-1 flex items-center gap-1">
+                    <span>✓</span> נבחרה ({selectedFromActiveGroup})
+                  </span>
+               ) : (
+                  <span className="text-[10px] text-slate-500 font-bold mt-1">לא נבחרה נבחרת מבית זה</span>
+               )}
             </div>
-          );
-        })}
+            <button onClick={handleNextGroup} className="w-12 h-12 flex items-center justify-center rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors border border-slate-700 active:scale-95">
+               <span className="text-xl leading-none">◀</span>
+            </button>
+         </div>
+
+         <div className={`bg-slate-800 rounded-3xl p-5 border transition-all ${selectedFromActiveGroup ? "border-teal-500/50 shadow-[0_0_20px_rgba(20,184,166,0.05)] bg-teal-900/10" : "border-slate-700"} ${isLocked && myPoints === null ? "opacity-80 grayscale-[10%]" : ""}`}>
+            <div className="flex flex-col gap-3">
+              {currentGroupTeams.map(team => {
+                const isSelected = selectedTeams.includes(team);
+                const isRealWinner = realThirdPlace.includes(team);
+                const hasWarning = checkIsAlreadyAdvanced(team);
+                
+                let btnStyle = "bg-slate-900 text-slate-400 border-slate-700 hover:bg-slate-700 hover:text-white";
+                if (isSelected) btnStyle = "bg-teal-600 text-white border-teal-500 shadow-md transform scale-[1.02]";
+                if (isLocked && !isSelected) btnStyle = "bg-slate-900/50 text-slate-500 border-slate-800 cursor-not-allowed";
+
+                return (
+                  <button
+                    key={team}
+                    disabled={isLocked}
+                    onClick={() => toggleTeam(team, activeGroup)}
+                    className={`py-4 px-5 rounded-2xl font-bold transition-all text-base w-full text-right flex justify-between items-center border ${btnStyle} relative overflow-hidden group`}
+                  >
+                    <div className="flex items-center gap-3 relative z-10">
+                       {getFlagUrl(team) ? <img src={getFlagUrl(team)!} className="w-6 h-4 object-cover rounded-sm shadow-sm" alt="flag"/> : "🏳️"}
+                       <span>{team}</span>
+                    </div>
+                    
+                    <div className="flex items-center gap-2 relative z-10">
+                      {hasWarning && !isSelected && !isLocked && (
+                        <span className="text-[10px] text-amber-500 bg-amber-500/10 border border-amber-500/20 px-1.5 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity" title="בחרת אותה במקום 1/2">⚠️ סתירה</span>
+                      )}
+                      {isRealWinner && <span className="text-[10px] bg-purple-500 text-white px-2 py-0.5 rounded-full shadow-sm">העפילה</span>}
+                      
+                      {isSelected ? (
+                         <span className="w-6 h-6 flex items-center justify-center bg-white/20 rounded-full text-white text-xs">✓</span>
+                      ) : !isLocked ? (
+                         <span className="w-6 h-6 flex items-center justify-center bg-slate-800 rounded-full text-slate-500 text-lg group-hover:text-white transition-colors">+</span>
+                      ) : null}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+         </div>
       </div>
 
-      {/* --- חלון הריגול --- */}
+      {/* --- חלון הריגול המשודרג --- */}
       {showSpyModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm" dir="rtl">
-          <div className="bg-slate-900 border border-slate-700 p-6 rounded-3xl w-full max-w-2xl max-h-[80vh] flex flex-col shadow-2xl relative">
-            <div className="flex justify-between items-center mb-6 pb-4 border-b border-slate-800">
+          <div className="bg-slate-900 border border-slate-700 p-5 md:p-6 rounded-3xl w-full max-w-2xl md:max-w-[800px] md:min-w-[500px] min-h-[500px] h-[85vh] md:h-[650px] md:max-h-[90vh] flex flex-col shadow-2xl relative overflow-hidden md:resize">
+            <div className="flex justify-between items-center mb-4 pb-4 border-b border-slate-800 shrink-0">
               <h3 className="text-xl font-bold text-white flex items-center gap-2"><span>🕵️‍♂️</span> ריגול: 8 המעפילות מהמקום השלישי</h3>
-              <button onClick={() => setShowSpyModal(false)} className="w-8 h-8 flex items-center justify-center rounded-full bg-slate-800 hover:bg-rose-500/20 hover:text-rose-400 text-slate-400 transition-colors font-bold">✕</button>
+              <button onClick={() => setShowSpyModal(false)} className="w-8 h-8 flex items-center justify-center rounded-full bg-slate-800 hover:bg-rose-500/20 hover:text-rose-400 text-slate-400 transition-colors font-bold border border-slate-700">✕</button>
             </div>
 
-            <div className="overflow-y-auto custom-scrollbar flex-1 pr-2">
-              {isLoadingSpy ? (
-                <div className="flex justify-center py-8 text-blue-400 animate-pulse font-bold">טוען ניחושים... ⏳</div>
-              ) : spyData.length === 0 ? (
-                <div className="text-center text-slate-500 py-8">אף אחד לא בחר נבחרות מהמקום השלישי</div>
-              ) : (
+            <div className="mb-4 shrink-0">
+              <div className="relative">
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500">🔍</span>
+                <input 
+                  type="text" 
+                  placeholder="חפש חבר לליגה..." 
+                  value={spySearchQuery}
+                  onChange={(e) => setSpySearchQuery(e.target.value)}
+                  className="w-full bg-slate-950 text-white placeholder-slate-500 rounded-xl py-2.5 pr-10 pl-4 border border-slate-700 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none text-sm transition-all shadow-inner"
+                />
+              </div>
+            </div>
+
+            {hasTruth && (
+              <div className="flex justify-center gap-2 mb-4 shrink-0">
+                <button onClick={() => setSpyFilter("ALL")} className={`py-2 px-3 rounded-xl text-[11px] sm:text-xs font-bold transition-colors border flex justify-center items-center gap-1 ${spyFilter === "ALL" ? "bg-slate-700 text-white border-slate-500 shadow-sm" : "bg-slate-900 text-slate-400 border-slate-800 hover:bg-slate-800"}`}>
+                  הכל ({spyData.length})
+                </button>
+                <button onClick={() => setSpyFilter("WITH_POINTS")} className={`py-2 px-3 rounded-xl text-[11px] sm:text-xs font-bold transition-colors border flex justify-center items-center gap-1.5 ${spyFilter === "WITH_POINTS" ? "bg-emerald-900/40 text-emerald-400 border-emerald-500/50 shadow-[0_0_10px_rgba(16,185,129,0.15)]" : "bg-slate-900 text-slate-400 border-slate-800 hover:bg-slate-800"}`}>
+                  🎯 פגעו משהו ({spyStats.withPoints})
+                </button>
+                <button onClick={() => setSpyFilter("MISS")} className={`py-2 px-3 rounded-xl text-[11px] sm:text-xs font-bold transition-colors border flex justify-center items-center gap-1.5 ${spyFilter === "MISS" ? "bg-rose-900/40 text-rose-400 border-rose-500/50 shadow-[0_0_10px_rgba(225,29,72,0.1)]" : "bg-slate-900 text-slate-400 border-slate-800 hover:bg-slate-800"}`}>
+                  ❌ לא פגעו בכלום ({spyStats.miss})
+                </button>
+              </div>
+            )}
+
+            <div className="overflow-y-auto custom-scrollbar flex-1 pl-2 md:pl-4 pr-1 pb-2">
+              {isLoadingSpy ? (<div className="flex justify-center py-8 text-blue-400 animate-pulse font-bold">טוען ניחושים... ⏳</div>) : filteredSpyData.length === 0 ? (<div className="text-center text-slate-500 py-8 font-bold">לא נמצאו ניחושים שמתאימים לחיפוש.</div>) : (
                 <div className="space-y-4">
-                  {spyData.map((data, idx) => (
-                    <div key={idx} className={`p-4 rounded-xl border transition-all ${data.userId === userId ? "bg-blue-900/10 border-blue-500/30" : "bg-slate-800 border-slate-700"}`}>
-                      <div className="flex justify-between items-center mb-3">
-                         <div className="font-bold text-white text-lg flex items-center gap-2">
-                           {data.userName}
-                           {data.userId === userId && <span className="text-[10px] bg-blue-600 text-white px-1.5 py-0.5 rounded uppercase">אתה</span>}
-                         </div>
-                         {data.points !== null && (
-                           <div className={`text-sm font-black px-3 py-1 rounded-lg border ${data.points > 0 ? "bg-purple-500/20 text-purple-400 border-purple-500/30 shadow-[0_0_10px_rgba(168,85,247,0.2)]" : "bg-slate-900 text-slate-500 border-slate-700"}`}>
-                             {data.points > 0 ? `+${data.points} נק'` : "0 נק'"}
+                  {filteredSpyData.map((data, idx) => {
+                    let cardStyle = "p-4 rounded-xl border transition-all ";
+                    if (hasTruth) {
+                      if (data.points && data.points > 0) cardStyle += "bg-emerald-900/10 border-emerald-500/30 shadow-[0_0_15px_rgba(16,185,129,0.05)]";
+                      else cardStyle += "bg-rose-900/10 border-rose-500/20 opacity-80";
+                    } else {
+                      cardStyle += data.userId === userId ? "bg-blue-900/10 border-blue-500/30" : "bg-slate-800 border-slate-700";
+                    }
+
+                    return (
+                      <div key={idx} className={cardStyle}>
+                        <div className="flex justify-between items-center mb-3">
+                           <div className="font-bold text-white text-base md:text-lg flex items-center gap-2.5">
+                              <div className={`w-6 h-6 flex items-center justify-center rounded-full text-[10px] font-black border shrink-0 ${
+                                data.userRank === 1 ? "bg-amber-500/20 text-amber-400 border-amber-500/50 shadow-[0_0_8px_rgba(245,158,11,0.3)]" :
+                                data.userRank === 2 ? "bg-slate-400/20 text-slate-300 border-slate-400/50 shadow-[0_0_8px_rgba(148,163,184,0.2)]" :
+                                data.userRank === 3 ? "bg-orange-700/30 text-orange-400 border-orange-500/40 shadow-[0_0_8px_rgba(249,115,22,0.2)]" :
+                                "bg-slate-600 text-white border-slate-500 shadow-sm"
+                              }`}>
+                                {data.userRank || "-"}
+                              </div>
+                             <span className="truncate max-w-[120px] sm:max-w-[200px]">{data.userName}</span>
+                             {data.userId === userId && <span className="text-[10px] bg-blue-600 text-white px-1.5 py-0.5 rounded uppercase">אתה</span>}
                            </div>
-                         )}
+                           <div className="flex items-center gap-2">
+                             <div className="text-[10px] font-bold text-slate-400 bg-slate-950 px-2 py-1 rounded border border-slate-700/50 shrink-0">
+                               סה״כ: <span className="text-amber-400">{data.userTotalPoints} נק'</span>
+                             </div>
+                             {hasTruth && data.points !== null && (
+                               <div className={`whitespace-nowrap text-sm font-black px-3 py-1 rounded-lg border ${data.points > 0 ? "bg-emerald-900/40 text-emerald-400 border-emerald-500/50" : "bg-rose-950/50 text-rose-400 border-rose-500/40"}`}>
+                                 {data.points > 0 ? `+${data.points} נק'` : "0 נק'"}
+                               </div>
+                             )}
+                           </div>
+                        </div>
+                        {/* תיקון: הפכנו את הנבחרות בתוך הריגול לשורה אופקית אחת נגללת! */}
+                        <div className="flex flex-nowrap overflow-x-auto custom-scrollbar pb-2 gap-2 mt-2 bg-slate-950/50 p-2.5 rounded-lg border border-slate-700/50">
+                           {data.teams.map((t: string, i: number) => {
+                             const isHit = realThirdPlace.includes(t);
+                             return (
+                               <span key={i} className={`whitespace-nowrap shrink-0 text-[11px] sm:text-xs font-bold px-3 py-1.5 rounded-lg border flex items-center gap-1.5 ${isHit ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/40" : "bg-slate-900 text-slate-300 border-slate-600"}`}>
+                                 {getFlagUrl(t) && <img src={getFlagUrl(t)!} className="w-4 h-3 object-cover rounded-sm" alt="flag"/>} 
+                                 {t} 
+                                 {isHit && "🎯"}
+                               </span>
+                             );
+                           })}
+                        </div>
                       </div>
-                      <div className="flex flex-wrap gap-2 mt-2">
-                         {data.teams.map((t: string, i: number) => {
-                           const isHit = realThirdPlace.includes(t);
-                           return (
-                             <span key={i} className={`text-xs font-bold px-3 py-1.5 rounded-lg border flex items-center gap-1.5 ${isHit ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/40" : "bg-slate-900 text-slate-300 border-slate-600"}`}>
-                               {getFlagUrl(t) && <img src={getFlagUrl(t)!} className="w-4 h-3 object-cover rounded-sm" alt="flag"/>} 
-                               {t} 
-                               {isHit && "🎯"}
-                             </span>
-                           );
-                         })}
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>

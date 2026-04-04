@@ -155,7 +155,6 @@ export default function KnockoutView({ matches, userId, tournamentState }: { mat
                 setBracketModalMatch(node.originalMatch);
             }
         }}
-        // הוקטנו הריווחים הפנימיים ל- p-1.5 כדי שהקלף יהיה קומפקטי
         className={`w-36 sm:w-44 border-2 rounded-xl p-1.5 flex flex-col gap-0.5 shadow-lg relative z-10 transition-all h-fit max-w-[11rem] ${
             isDummy || hidden 
               ? "bg-slate-800/40 border-slate-700/50 border-dashed cursor-not-allowed opacity-80 hover:opacity-100" 
@@ -227,7 +226,6 @@ export default function KnockoutView({ matches, userId, tournamentState }: { mat
       );
   };
 
-  // 🚀 הגדלנו משמעותית את הגובה הכללי כדי לייצר מרווחים נקיים ובלי "רמיסת" הקלפים!
   const dynamicHeight = roundsToRender.includes("32 הגדולות") ? "h-[1600px] md:h-[1800px]" : "h-[800px] md:h-[900px]";
 
   if (matches.length === 0) {
@@ -241,24 +239,24 @@ export default function KnockoutView({ matches, userId, tournamentState }: { mat
   }
 
   return (
-    <div className="w-full animate-fade-in-up">
+    <div className="w-full animate-fade-in-up pb-8">
       
-      {/* Header */}
-      <div className="flex flex-col md:flex-row justify-between items-center bg-slate-900 p-4 rounded-3xl border border-slate-800 mb-8 shadow-lg gap-4">
-         <h2 className="text-2xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-400 flex items-center gap-2">
+      {/* כותרת קומפקטית עם גרדיאנט ומתגים */}
+      <div className="sticky top-[72px] md:top-[88px] z-40 bg-slate-950/85 backdrop-blur-xl p-4 md:p-5 rounded-3xl border border-slate-700 shadow-[0_10px_30px_rgba(0,0,0,0.6)] mb-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 transition-all">
+         <h2 className="text-xl md:text-2xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-400 flex items-center gap-2">
             <span>🔥</span> שלבי הנוק-אאוט
          </h2>
          
-         <div className="flex bg-slate-950 p-1.5 rounded-xl border border-slate-800 w-full md:w-auto">
+         <div className="flex bg-slate-950 p-1.5 rounded-xl border border-slate-800 w-full md:w-auto shadow-inner">
             <button 
               onClick={() => setViewMode("LIST")} 
-              className={`flex-1 md:w-32 py-2 rounded-lg font-bold text-sm transition-all flex items-center justify-center gap-2 ${viewMode === "LIST" ? "bg-purple-600 text-white shadow-md" : "text-slate-400 hover:text-white"}`}
+              className={`flex-1 md:w-32 py-2 rounded-lg font-bold text-xs md:text-sm transition-all flex items-center justify-center gap-2 ${viewMode === "LIST" ? "bg-purple-600 text-white shadow-md transform scale-[1.02]" : "text-slate-400 hover:text-white"}`}
             >
               <span>📄</span> רשימה ועריכה
             </button>
             <button 
               onClick={() => setViewMode("BRACKET")} 
-              className={`flex-1 md:w-32 py-2 rounded-lg font-bold text-sm transition-all flex items-center justify-center gap-2 ${viewMode === "BRACKET" ? "bg-purple-600 text-white shadow-md" : "text-slate-400 hover:text-white"}`}
+              className={`flex-1 md:w-32 py-2 rounded-lg font-bold text-xs md:text-sm transition-all flex items-center justify-center gap-2 ${viewMode === "BRACKET" ? "bg-pink-600 text-white shadow-md transform scale-[1.02]" : "text-slate-400 hover:text-white"}`}
             >
               <span>🌳</span> מסלול לגמר
             </button>
@@ -269,10 +267,10 @@ export default function KnockoutView({ matches, userId, tournamentState }: { mat
       {/* תצוגת עץ טורניר (Bracket) */}
       {/* ========================================= */}
       {viewMode === "BRACKET" && (
-         <div className="bg-slate-900 rounded-3xl border border-purple-500/30 shadow-2xl p-6 relative overflow-hidden">
+         <div className="bg-slate-900 rounded-3xl border border-purple-500/30 shadow-2xl p-4 md:p-6 relative overflow-hidden">
             <div className="absolute top-0 right-0 w-full h-full bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-purple-900/20 via-slate-900 to-slate-900 pointer-events-none z-0"></div>
             
-            <div className="mb-6 flex items-center gap-2 text-purple-300 text-sm font-bold bg-purple-900/20 w-fit px-4 py-2 rounded-lg border border-purple-500/30 relative z-10 shadow-sm">
+            <div className="mb-6 flex items-center gap-2 text-purple-300 text-[10px] md:text-xs font-bold bg-purple-900/20 w-fit px-3 py-1.5 md:px-4 md:py-2 rounded-lg border border-purple-500/30 relative z-10 shadow-sm">
                <span>💡</span> לחץ על משחקי השלב הנוכחי כדי להזין ניחוש. השלבים הבאים מתמפים אוטומטית על בסיס התחזית שלך!
             </div>
 
@@ -301,44 +299,38 @@ export default function KnockoutView({ matches, userId, tournamentState }: { mat
       {/* תצוגת רשימה (רגיל) - עריכה מהירה */}
       {/* ========================================= */}
       {viewMode === "LIST" && (
-        <div className="flex flex-col md:flex-row gap-8 w-full">
-          <div className="w-full md:w-64 shrink-0">
-            <div className="bg-slate-900 rounded-3xl p-4 border border-slate-800 md:sticky md:top-24 shadow-xl">
-              <h3 className="text-xl font-bold text-white mb-4 px-2 border-b border-slate-800 pb-2">שלבי הכרעה</h3>
-              <div className="flex flex-row md:flex-col gap-3 overflow-x-auto md:overflow-visible custom-scrollbar pb-2 md:pb-0">
-                {rounds.map(round => {
-                  const hidden = isRoundHidden(round);
-                  const hasMatches = matches.some(m => m.roundName === round);
-                  
-                  return (
-                    <button
-                      key={round}
-                      disabled={hidden || !hasMatches}
-                      onClick={() => setActiveRound(round)}
-                      className={`relative flex flex-col items-start p-4 rounded-xl font-bold transition-all min-w-[140px] md:min-w-0 overflow-hidden ${
-                        activeRound === round 
-                          ? "bg-purple-600 text-white shadow-lg shadow-purple-500/30" 
-                          : hidden 
-                            ? "bg-slate-900/50 text-slate-600 border border-slate-800 cursor-not-allowed" 
-                            : !hasMatches 
-                              ? "bg-slate-900/80 text-slate-500 border border-slate-800/50 cursor-not-allowed"
-                              : "bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-white"
-                      }`}
-                    >
-                      <div className="flex justify-between items-center w-full relative z-10">
-                        <span className="text-lg">{round}</span>
-                        {hidden ? <span>🔒</span> : !hasMatches ? <span className="text-xs">בקרוב</span> : null}
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
+        <div className="flex flex-col animate-fade-in-up">
+          
+          {/* סרגל ניווט שלבים אופקי ויוקרתי (החליף את הרשימה הצידית האנכית) */}
+          <div className="flex overflow-x-auto gap-2 mb-6 pb-2 custom-scrollbar bg-slate-900/50 p-2 rounded-2xl border border-slate-800/50">
+            {rounds.map(round => {
+              const hidden = isRoundHidden(round);
+              const hasMatches = matches.some(m => m.roundName === round);
+              
+              return (
+                <button
+                  key={round}
+                  disabled={hidden || !hasMatches}
+                  onClick={() => setActiveRound(round)}
+                  className={`px-4 py-2.5 rounded-xl font-bold whitespace-nowrap transition-all text-sm border ${
+                    activeRound === round 
+                      ? "bg-purple-600 text-white border-purple-500 shadow-md" 
+                      : hidden 
+                        ? "bg-slate-900/50 text-slate-600 border-slate-800 cursor-not-allowed" 
+                        : !hasMatches 
+                          ? "bg-slate-900/80 text-slate-500 border-slate-800/50 cursor-not-allowed"
+                          : "bg-slate-800 text-slate-400 border-slate-700 hover:bg-slate-700 hover:text-white"
+                  }`}
+                >
+                  {round} {hidden && "🔒"}
+                </button>
+              );
+            })}
           </div>
 
           <div className="flex-1 space-y-6">
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center border-b border-slate-800 pb-4 mb-8 gap-4">
-              <h2 className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-400">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center border-b border-slate-800 pb-4 mb-6 gap-4">
+              <h2 className="text-2xl font-bold text-white">
                 {activeRound}
               </h2>
               
@@ -346,9 +338,9 @@ export default function KnockoutView({ matches, userId, tournamentState }: { mat
                  <button 
                     onClick={handleRandomizeRound} 
                     disabled={isRandomizing}
-                    className="bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-sm font-bold py-2 px-4 rounded-xl border border-slate-600 flex items-center gap-2 transition-all shadow-sm disabled:opacity-50"
+                    className="bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs md:text-sm font-bold py-2 px-3 md:px-4 rounded-xl border border-slate-600 flex items-center gap-1.5 transition-all shadow-sm disabled:opacity-50"
                  >
-                   <span className="text-xl">🎲</span> {isRandomizing ? "מגריל..." : "הגרל שלב"}
+                   <span className="text-lg">🎲</span> {isRandomizing ? "מגריל..." : "הגרל שלב"}
                  </button>
               )}
             </div>
@@ -360,6 +352,7 @@ export default function KnockoutView({ matches, userId, tournamentState }: { mat
             ) : (
               <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
                 {roundMatches.map(match => (
+                  // ה-MatchCard כבר מכיל את הריגול החדש שעשינו!
                   <MatchCard key={match.id} match={match} userId={userId} tournamentState={tournamentState} />
                 ))}
               </div>
@@ -372,7 +365,7 @@ export default function KnockoutView({ matches, userId, tournamentState }: { mat
       {/* מודל קופץ להזנת משחק מתוך העץ */}
       {/* ========================================= */}
       {bracketModalMatch && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm animate-fade-in-up" dir="rtl">
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm animate-fade-in-up" dir="rtl">
           <div className="relative w-full max-w-lg">
              <button 
                onClick={() => setBracketModalMatch(null)} 

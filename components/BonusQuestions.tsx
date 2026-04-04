@@ -2,7 +2,70 @@
 import { useState, useEffect, useRef } from "react";
 import { doc, getDoc, setDoc, collection, getDocs } from "firebase/firestore";
 import { db } from "../app/firebase";
-import { getFlagUrl } from "../app/utils/flags"; // 🎌 ייבוא פונקציית הדגלים!
+import { getFlagUrl } from "../app/utils/flags";
+
+function CategoryCarousel({ title, icon, qs, titleColor, borderColor, bgColor, renderCard }: any) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [currentIndex, setCurrentIndex] = useState(0);
+
+  const handleScroll = () => {
+    if (!scrollRef.current) return;
+    const container = scrollRef.current;
+    const childWidth = container.children[0]?.clientWidth || 0;
+    if (childWidth === 0) return;
+    
+    const scrollAbs = Math.abs(container.scrollLeft);
+    const newIndex = Math.round(scrollAbs / childWidth);
+    
+    if (newIndex >= 0 && newIndex < qs.length && newIndex !== currentIndex) {
+      setCurrentIndex(newIndex);
+    }
+  };
+
+  const scrollTo = (index: number) => {
+    if (!scrollRef.current || !scrollRef.current.children[index]) return;
+    scrollRef.current.children[index].scrollIntoView({
+      behavior: "smooth",
+      block: "nearest",
+      inline: "center"
+    });
+    setCurrentIndex(index);
+  };
+
+  const handleNext = () => {
+    const next = currentIndex >= qs.length - 1 ? 0 : currentIndex + 1;
+    scrollTo(next);
+  };
+
+  const handlePrev = () => {
+    const prev = currentIndex <= 0 ? qs.length - 1 : currentIndex - 1;
+    scrollTo(prev);
+  };
+
+  if (qs.length === 0) return null;
+
+  return (
+    <div className={`mb-10 ${bgColor} ${bgColor ? 'p-6 md:p-8 rounded-3xl border shadow-lg ' + borderColor : ''}`}>
+      <h3 className={`text-xl md:text-2xl font-black ${titleColor} mb-6 flex items-center gap-3 ${!bgColor ? 'border-b border-slate-800 pb-3' : 'border-b-2 border-purple-500/30 pb-3'}`}>
+        <span className={bgColor ? "animate-bounce" : ""}>{icon}</span> {title}
+      </h3>
+
+      <div className="md:hidden flex items-center justify-between w-full bg-slate-950 p-2 rounded-2xl border border-slate-800 mb-6 shadow-inner">
+         <button onClick={handlePrev} className="w-10 h-10 flex items-center justify-center rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors border border-slate-700 active:scale-95 text-lg">▶</button>
+         <div className="text-sm font-bold text-slate-400">שאלה {currentIndex + 1} מתוך {qs.length}</div>
+         <button onClick={handleNext} className="w-10 h-10 flex items-center justify-center rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors border border-slate-700 active:scale-95 text-lg">◀</button>
+      </div>
+
+      <div 
+         ref={scrollRef}
+         onScroll={handleScroll}
+         className="flex md:grid overflow-x-auto md:overflow-visible snap-x snap-mandatory md:grid-cols-2 xl:grid-cols-3 gap-4 md:gap-6 custom-scrollbar pb-6 -mx-4 px-4 md:mx-0 md:px-0 items-stretch"
+      >
+        {qs.map((q: any) => renderCard(q))}
+      </div>
+    </div>
+  );
+}
 
 export default function BonusQuestions({ userId, tournamentState: propTournamentState, groups }: any) {
   const allTeams = groups ? Object.values(groups).flat().sort() : [];
@@ -22,6 +85,9 @@ export default function BonusQuestions({ userId, tournamentState: propTournament
   const [spyModalQuestion, setSpyModalQuestion] = useState<any | null>(null);
   const [spyData, setSpyData] = useState<any[]>([]);
   const [isLoadingSpy, setIsLoadingSpy] = useState(false);
+
+  const [spySearchQuery, setSpySearchQuery] = useState("");
+  const [spyFilter, setSpyFilter] = useState<"ALL" | "CORRECT" | "INCORRECT">("ALL");
 
   const isLoaded = useRef(false);
   const isUserAction = useRef(false);
@@ -63,17 +129,16 @@ export default function BonusQuestions({ userId, tournamentState: propTournament
 
   const handleChange = (qId: string, val: string) => {
     isUserAction.current = true;
-    setAnswers(prev => ({ ...prev, [qId]: val }));
+    setAnswers((prev: any) => ({ ...prev, [qId]: val }));
   };
 
   const isQuestionLocked = (q: any) => {
-    // ---- תיקון זמן לשאלת הפתעה (נעילה) ----
     if (q.isSurprise) {
       if (!q.closeTime) return false;
       const now = new Date();
       const closeTime = new Date(q.closeTime);
-      if (now >= closeTime) return true; // עברנו את שעת הסגירה
-      return false; // כל עוד לא הגענו, השאלה פתוחה
+      if (now >= closeTime) return true; 
+      return false; 
     }
 
     const state = tournamentState;
@@ -90,12 +155,11 @@ export default function BonusQuestions({ userId, tournamentState: propTournament
   };
 
   const isQuestionVisible = (q: any) => {
-    // ---- תיקון זמן לשאלת הפתעה (חשיפה) ----
     if (q.isSurprise) {
       if (!q.openTime) return false;
       const now = new Date();
       const openTime = new Date(q.openTime);
-      if (now < openTime) return false; // מוקדם מדי, תסתיר
+      if (now < openTime) return false; 
     }
 
     const state = tournamentState;
@@ -140,10 +204,8 @@ export default function BonusQuestions({ userId, tournamentState: propTournament
     if (ans) handleChange(q.id, ans);
   };
 
-  // ---- הסינון החכם שמעלים שאלות שלא אמורות להיראות ----
   const filteredQuestions = questions.filter(q => {
-    if (!isQuestionVisible(q)) return false; // חותך החוצה שאלות שמוסתרות בגלל זמנים או שלב
-    
+    if (!isQuestionVisible(q)) return false; 
     if (q.phase !== bonusCategory) return false;
     if (bonusCategory === "KNOCKOUT") return q.round === knockoutRound;
     return true;
@@ -157,7 +219,6 @@ export default function BonusQuestions({ userId, tournamentState: propTournament
       let hasChanges = false;
       
       filteredQuestions.forEach(q => {
-        // התיקון: נגריל רק אם השאלה גלויה ולא נעולה
         if (!isQuestionLocked(q) && isQuestionVisible(q)) {
           let ans = "";
           if (q.answerType === "ALL_TEAMS") {
@@ -193,11 +254,27 @@ export default function BonusQuestions({ userId, tournamentState: propTournament
 
   const handleOpenSpy = async (q: any) => {
     setSpyModalQuestion(q);
+    setSpySearchQuery("");
+    setSpyFilter("ALL");
     setIsLoadingSpy(true);
     try {
       const usersSnap = await getDocs(collection(db, "users"));
+      const allUsers: any[] = [];
+      usersSnap.forEach(doc => allUsers.push({ id: doc.id, ...doc.data() }));
+
+      allUsers.sort((a, b) => (Number(b.totalPoints) || 0) - (Number(a.totalPoints) || 0));
+      let currentRank = 1;
       const usersMap: any = {};
-      usersSnap.forEach(doc => { usersMap[doc.id] = doc.data().name || "שחקן לא ידוע"; });
+      allUsers.forEach((u, i) => {
+        if (i > 0 && (Number(u.totalPoints) || 0) < (Number(allUsers[i - 1].totalPoints) || 0)) {
+          currentRank = i + 1;
+        }
+        usersMap[u.id] = {
+          name: u.name || "שחקן לא ידוע",
+          totalPoints: Number(u.totalPoints) || 0,
+          rank: currentRank
+        }; 
+      });
 
       const allBonusSnap = await getDocs(collection(db, "predictions_bonus"));
       const gathered: any[] = [];
@@ -208,13 +285,15 @@ export default function BonusQuestions({ userId, tournamentState: propTournament
           const userIdDoc = doc.id;
           gathered.push({
             userId: userIdDoc,
-            userName: usersMap[userIdDoc] || "משתמש",
+            userName: usersMap[userIdDoc]?.name || "משתמש",
+            userTotalPoints: usersMap[userIdDoc]?.totalPoints || 0,
+            userRank: usersMap[userIdDoc]?.rank || 999,
             answer: ans,
             points: checkAnswerPoints(q, ans)
           });
         }
       });
-      gathered.sort((a, b) => a.userName.localeCompare(b.userName));
+      gathered.sort((a, b) => b.userTotalPoints - a.userTotalPoints);
       setSpyData(gathered);
     } catch (e) { console.error(e); } 
     finally { setIsLoadingSpy(false); }
@@ -250,7 +329,7 @@ export default function BonusQuestions({ userId, tournamentState: propTournament
     const myPoints = checkAnswerPoints(q, answers[q.id]);
     const isMissing = !locked && (!answers[q.id] || answers[q.id].trim() === "");
 
-    let cardStyle = "bg-slate-800 p-6 rounded-3xl border-t-4 border-l border-r border-b border-slate-700 relative transition-all duration-300 ";
+    let cardStyle = "w-[88vw] sm:w-[340px] md:w-auto shrink-0 snap-center flex flex-col bg-slate-800 p-5 md:p-6 rounded-3xl border-t-4 border-l border-r border-b border-slate-700 relative transition-all duration-300 shadow-xl ";
     let statusBadge = null;
 
     if (hasTruth) {
@@ -293,7 +372,7 @@ export default function BonusQuestions({ userId, tournamentState: propTournament
           )}
         </div>
         
-        <div className="flex justify-between items-start gap-2 mb-2">
+        <div className="flex justify-between items-start gap-2 mb-4">
            <h3 className="text-lg font-bold text-white leading-snug">{q.label}</h3>
            {!locked && (
               <button onClick={() => handleRandomizeSingleQuestion(q)} title="הגרל תשובה" className="text-xl hover:scale-125 transition-transform active:scale-90 opacity-70 hover:opacity-100 shrink-0">
@@ -312,13 +391,13 @@ export default function BonusQuestions({ userId, tournamentState: propTournament
           </div>
         )}
 
-        <div className="mb-4 mt-4 flex items-center gap-3">
+        <div className="mb-6 flex items-center gap-3">
           {getFlagUrl(answers[q.id]) && (
             <div className="shrink-0 bg-slate-900 border border-slate-600 p-2.5 rounded-xl shadow-inner flex items-center justify-center h-[50px] w-[60px]">
               <img src={getFlagUrl(answers[q.id])!} className="w-8 h-5.5 object-cover rounded-sm shadow-sm" alt="flag" />
             </div>
           )}
-          <div className="flex-1 w-full">
+          <div className="flex-1 w-full min-w-0">
             {q.answerType === "ALL_TEAMS" && (
               <select value={answers[q.id] || ""} disabled={locked} onChange={e => handleChange(q.id, e.target.value)} className={`h-[50px] ${combinedInputStyle}`}>
                 <option value="">-- בחר נבחרת --</option>{allTeams.map((t: string) => <option key={t} value={t}>{t}</option>)}{(q.customOptions || []).map((opt: string) => <option key={opt} value={opt}>{opt}</option>)}
@@ -345,54 +424,80 @@ export default function BonusQuestions({ userId, tournamentState: propTournament
           </div>
         </div>
         
-        {hasTruth && (
-          <div className="bg-slate-900/80 p-3 rounded-xl border border-slate-700 mt-4 text-center shadow-inner flex flex-col items-center">
-            <span className="text-xs text-slate-500 block mb-2">התשובה הנכונה בפועל:</span>
-            <div className="text-emerald-400 font-bold flex flex-wrap justify-center gap-2">
-              {Array.isArray(truth) 
-                ? truth.map((ans, i) => (
-                    <span key={i} className="flex items-center gap-1.5 bg-emerald-900/20 px-2 py-1 rounded-md border border-emerald-500/20">
-                      {getFlagUrl(ans) && <img src={getFlagUrl(ans)!} className="w-4 h-3 object-cover rounded-sm" alt="flag" />}
-                      {ans}{i < truth.length - 1 ? "" : ""}
-                    </span>
-                  ))
-                : (
-                    <span className="flex items-center gap-1.5 bg-emerald-900/20 px-3 py-1 rounded-md border border-emerald-500/20 text-lg">
-                      {getFlagUrl(truth) && <img src={getFlagUrl(truth)!} className="w-5 h-3.5 object-cover rounded-sm" alt="flag" />}
-                      {truth}
-                    </span>
-                  )
-              }
-            </div>
-          </div>
-        )}
+        <div className="flex-1"></div>
         
-        {locked && (
-          <button onClick={() => handleOpenSpy(q)} className="w-full mt-4 py-3 rounded-xl font-bold text-sm transition-all border flex items-center justify-center gap-2 bg-slate-900 text-slate-400 hover:text-white border-slate-700 hover:bg-slate-800 shadow-sm">
-            <span>👁️</span> מי ניחש מה? (ריגול)
-          </button>
-        )}
+        <div className="mt-auto flex flex-col gap-3">
+          {hasTruth && (
+            <div className="bg-slate-900/80 p-3 rounded-xl border border-slate-700 text-center shadow-inner flex flex-col items-center">
+              <span className="text-xs text-slate-400 block mb-2 font-bold uppercase tracking-wider">התשובה הנכונה בפועל:</span>
+              <div className="text-emerald-400 font-bold flex flex-wrap justify-center gap-2">
+                {Array.isArray(truth) 
+                  ? truth.map((ans, i) => (
+                      <span key={i} className="flex items-center gap-1.5 bg-emerald-900/20 px-2 py-1 rounded-md border border-emerald-500/20">
+                        {getFlagUrl(ans) && <img src={getFlagUrl(ans)!} className="w-4 h-3 object-cover rounded-sm" alt="flag" />}
+                        {ans}{i < truth.length - 1 ? "" : ""}
+                      </span>
+                    ))
+                  : (
+                      <span className="flex items-center gap-1.5 bg-emerald-900/20 px-3 py-1 rounded-md border border-emerald-500/20 text-lg">
+                        {getFlagUrl(truth) && <img src={getFlagUrl(truth)!} className="w-5 h-3.5 object-cover rounded-sm" alt="flag" />}
+                        {truth}
+                      </span>
+                    )
+                }
+              </div>
+            </div>
+          )}
+          
+          {locked && (
+            <button onClick={() => handleOpenSpy(q)} className="w-full py-3 rounded-xl font-bold text-sm transition-all border flex items-center justify-center gap-2 bg-slate-900 text-slate-400 hover:text-white border-slate-700 hover:bg-slate-800 shadow-sm">
+              <span>👁️</span> מי ניחש מה? (ריגול)
+            </button>
+          )}
+        </div>
       </div>
     );
   };
 
+  const hasSpyTruth = spyModalQuestion ? !!realBonusAnswers[spyModalQuestion.id] : false;
+  const spyStats = { correct: 0, incorrect: 0 };
+  
+  if (hasSpyTruth) {
+    spyData.forEach(d => {
+      if (d.points && d.points > 0) spyStats.correct++;
+      else spyStats.incorrect++;
+    });
+  }
+
+  const filteredSpyData = spyData.filter(d => {
+    if (!d.userName.toLowerCase().includes(spySearchQuery.toLowerCase())) return false;
+    if (hasSpyTruth && spyFilter !== "ALL") {
+      if (spyFilter === "CORRECT" && (!d.points || d.points === 0)) return false;
+      if (spyFilter === "INCORRECT" && d.points && d.points > 0) return false;
+    }
+    return true;
+  });
+
   return (
-    <div className="w-full">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4 border-b border-slate-800 pb-6">
-         <div>
-           <h2 className="text-2xl md:text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400">שאלות בונוס</h2>
+    <div className="w-full animate-fade-in-up pb-8">
+      
+      <div className="sticky top-[72px] md:top-[88px] z-40 bg-slate-950/85 backdrop-blur-xl p-4 md:p-5 rounded-3xl border border-slate-700 shadow-[0_10px_30px_rgba(0,0,0,0.6)] mb-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 transition-all">
+         <div className="w-full md:w-auto">
+           <h2 className="text-xl md:text-2xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400 flex items-center gap-2">
+              <span>⭐</span> משימות בונוס
+           </h2>
            {openCount > 0 ? (
-             <div className="mt-3 flex items-center gap-3">
-               <span className="text-slate-400 text-sm font-bold bg-slate-900 px-2 py-1 rounded-lg border border-slate-800">
+             <div className="mt-2 flex items-center gap-3">
+               <span className="text-slate-400 text-xs md:text-sm font-bold bg-slate-900 px-2 py-1 rounded-lg border border-slate-800">
                  הושלמו: {answeredCount}/{openCount}
                </span>
-               <div className="w-32 h-2.5 bg-slate-900 rounded-full overflow-hidden border border-slate-700 shadow-inner">
+               <div className="w-24 md:w-32 h-2 bg-slate-900 rounded-full overflow-hidden border border-slate-700 shadow-inner">
                  <div className={`h-full transition-all duration-500 ${isAllAnswered ? "bg-emerald-500" : "bg-blue-500"}`} style={{ width: `${progressPercent}%` }}></div>
                </div>
-               {isAllAnswered && <span className="text-emerald-400 text-sm font-bold">✓ מוכן</span>}
+               {isAllAnswered && <span className="text-emerald-400 text-xs md:text-sm font-bold">✓ מוכן</span>}
              </div>
            ) : (
-             <div className="mt-3 text-slate-400 text-sm font-bold bg-slate-900 px-3 py-1 rounded-lg border border-slate-800 inline-block">
+             <div className="mt-2 text-slate-400 text-xs font-bold bg-slate-900 px-3 py-1 rounded-lg border border-slate-800 inline-block">
                אין שאלות פתוחות בשלב זה
              </div>
            )}
@@ -403,14 +508,14 @@ export default function BonusQuestions({ userId, tournamentState: propTournament
                <button 
                   onClick={handleRandomizeCategory} 
                   disabled={isRandomizing}
-                  className="bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-sm font-bold py-2 px-4 rounded-xl border border-slate-600 flex items-center gap-2 transition-all shadow-sm disabled:opacity-50"
+                  className="bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs md:text-sm font-bold py-2 px-3 md:px-4 rounded-xl border border-slate-600 flex items-center gap-1.5 transition-all shadow-sm disabled:opacity-50"
                >
-                 <span className="text-xl">🎲</span> {isRandomizing ? "מגריל..." : "הגרל שאלות פתוחות"}
+                 <span className="text-lg">🎲</span> {isRandomizing ? "מגריל..." : "הגרל שאלות פתוחות"}
                </button>
             )}
-            <div className="h-6">
-               {saveStatus === "saving" && <span className="text-amber-400 text-sm animate-pulse font-bold">⏳ שומר...</span>}
-               {saveStatus === "saved" && <span className="text-emerald-400 text-sm font-bold">✓ נשמר</span>}
+            <div className="h-6 flex items-center">
+               {saveStatus === "saving" && <span className="text-amber-400 text-xs animate-pulse font-bold">⏳ שומר...</span>}
+               {saveStatus === "saved" && <span className="text-emerald-400 text-xs font-bold">✓ נשמר</span>}
             </div>
          </div>
       </div>
@@ -439,7 +544,7 @@ export default function BonusQuestions({ userId, tournamentState: propTournament
                   if (available.length > 0) setKnockoutRound(available[available.length - 1].id);
                 }
               }} 
-              className={`px-6 py-3 rounded-2xl font-bold whitespace-nowrap transition-all border ${
+              className={`px-5 md:px-6 py-2.5 md:py-3 rounded-2xl font-bold whitespace-nowrap transition-all border text-sm md:text-base ${
                 bonusCategory === tab.id 
                   ? "bg-blue-600 text-white border-blue-500 shadow-lg shadow-blue-500/25" 
                   : "bg-slate-900 text-slate-400 border-slate-800 hover:bg-slate-800 hover:text-blue-300"
@@ -464,7 +569,7 @@ export default function BonusQuestions({ userId, tournamentState: propTournament
             <button
               key={subTab.id}
               onClick={() => setKnockoutRound(subTab.id)}
-              className={`px-4 py-2.5 rounded-xl font-bold whitespace-nowrap transition-all text-sm border ${
+              className={`px-4 py-2.5 rounded-xl font-bold whitespace-nowrap transition-all text-xs md:text-sm border ${
                 knockoutRound === subTab.id
                   ? "bg-purple-600 text-white border-purple-500 shadow-md shadow-purple-500/20"
                   : "bg-slate-800 text-slate-400 border-slate-700 hover:bg-slate-700 hover:text-white"
@@ -480,79 +585,27 @@ export default function BonusQuestions({ userId, tournamentState: propTournament
 
       {filteredQuestions.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-16 px-4 bg-slate-900/50 rounded-3xl border border-dashed border-slate-700">
-          <span className="text-5xl block mb-4">🤷‍♂️</span>
+          <span className="text-5xl block mb-4 opacity-50">🤷‍♂️</span>
           <span className="text-slate-400 font-bold text-xl text-center">אין כרגע שאלות פתוחות בקטגוריה זו.</span>
         </div>
       ) : (
-        <div className="space-y-12">
-         {filteredQuestions.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-16 px-4 bg-slate-900/50 rounded-3xl border border-dashed border-slate-700">
-          <span className="text-5xl block mb-4">🤷‍♂️</span>
-          <span className="text-slate-400 font-bold text-xl text-center">אין כרגע שאלות פתוחות בקטגוריה זו.</span>
-        </div>
-      ) : (
-        <div className="space-y-12">
-          
-          {/* התיקון: העברנו את ההפתעות להיות הבלוק הראשון! */}
-{/* התיקון: הפתעות חיות ובועטות מקבלות את הבמה המרכזית (סגול זוהר וקופץ) */}
-          {activeSurpriseQs.length > 0 && (
-            <div className="bg-purple-900/10 p-6 rounded-3xl border border-purple-500/30 shadow-[0_0_30px_rgba(168,85,247,0.1)]">
-              <h3 className="text-2xl font-black text-purple-400 mb-6 flex items-center gap-2 border-b-2 border-purple-500/30 pb-3">
-                <span className="animate-bounce">🎁</span> שאלת הפתעה (לזמן מוגבל!)
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-                {activeSurpriseQs.map(renderQuestionCard)}
-              </div>
-            </div>
-          )}
-
-          {regularQuestions.length > 0 && (
-            <div>
-              <h3 className="text-xl font-bold text-blue-400 mb-6 flex items-center gap-2 border-b border-slate-800 pb-3">
-                <span>🎯</span> שאלות רגילות
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-                {regularQuestions.map(renderQuestionCard)}
-              </div>
-            </div>
-          )}
-
-          {doubleQuestions.length > 0 && (
-            <div>
-              <h3 className="text-xl font-bold text-rose-400 mb-6 flex items-center gap-2 border-b border-slate-800 pb-3">
-                <span>🔥</span> שאלות דאבל-בונוס (ניקוד כפול!)
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-                {doubleQuestions.map(renderQuestionCard)}
-              </div>
-            </div>
-          )}
-                    {/* שאלות הפתעה שנגמרו יוצגו בשקט וברגוע */}
-          {lockedSurpriseQs.length > 0 && (
-            <div>
-              <h3 className="text-xl font-bold text-slate-400 mb-6 flex items-center gap-2 border-b border-slate-800 pb-3 opacity-80">
-                <span>🎁</span> שאלות הפתעה שהסתיימו
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-                {lockedSurpriseQs.map(renderQuestionCard)}
-              </div>
-            </div>
-          )}
-          
-        </div>
-      )}
+        <div className="space-y-4">
+          <CategoryCarousel title="שאלת הפתעה (לזמן מוגבל!)" icon="🎁" qs={activeSurpriseQs} titleColor="text-purple-400" borderColor="border-purple-500/30" bgColor="bg-purple-900/10" renderCard={renderQuestionCard} />
+          <CategoryCarousel title="שאלות רגילות" icon="🎯" qs={regularQuestions} titleColor="text-blue-400" borderColor="" bgColor="" renderCard={renderQuestionCard} />
+          <CategoryCarousel title="שאלות דאבל-בונוס (ניקוד כפול!)" icon="🔥" qs={doubleQuestions} titleColor="text-rose-400" borderColor="" bgColor="" renderCard={renderQuestionCard} />
+          <CategoryCarousel title="שאלות הפתעה שהסתיימו" icon="🎁" qs={lockedSurpriseQs} titleColor="text-slate-400 opacity-80" borderColor="" bgColor="" renderCard={renderQuestionCard} />
         </div>
       )}
 
       {spyModalQuestion && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm" dir="rtl">
-          <div className="bg-slate-900 border border-slate-700 p-6 rounded-3xl w-full max-w-md max-h-[80vh] flex flex-col shadow-2xl relative">
-            <div className="flex justify-between items-center mb-6 pb-4 border-b border-slate-800">
-              <h3 className="text-xl font-bold text-white flex items-center gap-2"><span>🕵️‍♂️</span> ריגול בונוס</h3>
-              <button onClick={() => setSpyModalQuestion(null)} className="w-8 h-8 flex items-center justify-center rounded-full bg-slate-800 hover:bg-rose-500/20 hover:text-rose-400 text-slate-400 transition-colors font-bold">✕</button>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-md animate-fade-in-up" dir="rtl">
+<div className="bg-gradient-to-b from-slate-800 to-slate-900 border border-slate-700 p-5 md:p-6 rounded-3xl w-full max-w-md md:max-w-[600px] md:min-w-[400px] min-h-[500px] h-[85vh] md:h-[650px] md:max-h-[90vh] flex flex-col shadow-2xl relative overflow-hidden md:resize">            
+            <div className="flex justify-between items-center mb-4 pb-4 border-b border-slate-700/50 shrink-0">
+              <h3 className="text-xl font-black text-white flex items-center gap-2"><span>🕵️‍♂️</span> ריגול בונוס</h3>
+              <button onClick={() => setSpyModalQuestion(null)} className="w-8 h-8 flex items-center justify-center rounded-full bg-slate-800 hover:bg-rose-500/20 hover:text-rose-400 text-slate-400 transition-colors font-bold border border-slate-700">✕</button>
             </div>
 
-            <div className="bg-slate-800/80 p-4 rounded-xl mb-6 border border-slate-700/50 text-center shadow-inner">
+            <div className="bg-slate-900 rounded-2xl mb-4 border border-slate-700/50 p-4 text-center shadow-inner shrink-0">
               <h4 className="text-blue-300 font-bold mb-3">{spyModalQuestion.label}</h4>
               {realBonusAnswers[spyModalQuestion.id] && (
                  <div className="text-sm bg-emerald-900/20 text-emerald-400 px-4 py-2 rounded-lg border border-emerald-500/30 inline-block font-bold">
@@ -577,32 +630,88 @@ export default function BonusQuestions({ userId, tournamentState: propTournament
               )}
             </div>
 
-            <div className="overflow-y-auto custom-scrollbar flex-1 pr-2">
+            <div className="mb-4 shrink-0">
+              <div className="relative">
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500">🔍</span>
+                <input 
+                  type="text" 
+                  placeholder="חפש חבר לליגה..." 
+                  value={spySearchQuery}
+                  onChange={(e) => setSpySearchQuery(e.target.value)}
+                  className="w-full bg-slate-950 text-white placeholder-slate-500 rounded-xl py-2.5 pr-10 pl-4 border border-slate-700 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none text-sm transition-all shadow-inner"
+                />
+              </div>
+            </div>
+
+            {hasSpyTruth && (
+              <div className="grid grid-cols-3 gap-2 mb-4 shrink-0">
+                <button onClick={() => setSpyFilter("ALL")} className={`py-2 px-2 rounded-xl text-[11px] sm:text-xs font-bold transition-colors border flex justify-center items-center gap-1 ${spyFilter === "ALL" ? "bg-slate-700 text-white border-slate-500 shadow-sm" : "bg-slate-900 text-slate-400 border-slate-800 hover:bg-slate-800"}`}>
+                  הכל ({spyData.length})
+                </button>
+                <button onClick={() => setSpyFilter("CORRECT")} className={`py-2 px-2 rounded-xl text-[11px] sm:text-xs font-bold transition-colors border flex justify-center items-center gap-1.5 ${spyFilter === "CORRECT" ? "bg-emerald-900/40 text-emerald-400 border-emerald-500/50 shadow-[0_0_10px_rgba(16,185,129,0.15)]" : "bg-slate-900 text-slate-400 border-slate-800 hover:bg-slate-800"}`}>
+                  ✅ צדק ({spyStats.correct})
+                </button>
+                <button onClick={() => setSpyFilter("INCORRECT")} className={`py-2 px-2 rounded-xl text-[11px] sm:text-xs font-bold transition-colors border flex justify-center items-center gap-1.5 ${spyFilter === "INCORRECT" ? "bg-rose-900/40 text-rose-400 border-rose-500/50 shadow-[0_0_10px_rgba(225,29,72,0.1)]" : "bg-slate-900 text-slate-400 border-slate-800 hover:bg-slate-800"}`}>
+                  ❌ טעה ({spyStats.incorrect})
+                </button>
+              </div>
+            )}
+
+            {/* רשימת המשתמשים המכווצת (Compact List) בבונוסים! */}
+            <div className="overflow-y-auto custom-scrollbar flex-1 pl-2 md:pl-4 pr-1 pb-2">
               {isLoadingSpy ? (
-                <div className="flex justify-center py-8 text-blue-400 animate-pulse font-bold">סורק נתונים... ⏳</div>
-              ) : spyData.length === 0 ? (
-                <div className="text-center text-slate-500 py-8">אף אחד לא ענה על השאלה הזו</div>
+                <div className="flex justify-center py-8 text-blue-400 animate-pulse font-bold tracking-wide">טוען נתונים מהשטח... ⏳</div>
+              ) : filteredSpyData.length === 0 ? (
+                <div className="text-center text-slate-500 py-8 font-bold">לא נמצאו ניחושים שמתאימים לחיפוש.</div>
               ) : (
                 <div className="space-y-2">
-                  {spyData.map((data, idx) => (
-                    <div key={idx} className={`flex justify-between items-center p-3 rounded-xl border transition-all ${data.userId === userId ? "bg-blue-900/10 border-blue-500/30" : "bg-slate-800 border-slate-700 hover:bg-slate-700"}`}>
-                      <div className="font-medium text-white flex items-center gap-2">
-                        {data.userName}
-                        {data.userId === userId && <span className="text-[10px] bg-blue-600 text-white px-1.5 py-0.5 rounded uppercase">אתה</span>}
-                      </div>
-                      <div className="flex items-center gap-3">
-                         <div className={`font-bold text-sm px-3 py-1.5 rounded-lg border shadow-sm flex items-center gap-1.5 ${data.points > 0 ? "bg-emerald-900/20 text-emerald-400 border-emerald-500/30 shadow-[0_0_10px_rgba(16,185,129,0.1)]" : "bg-slate-900 text-slate-300 border-slate-600"}`}>
-                           {getFlagUrl(data.answer) && <img src={getFlagUrl(data.answer)!} className="w-4 h-3 object-cover rounded-sm" alt="flag" />}
-                           {data.answer}
-                         </div>
-                         {data.points !== null && (
-                           <div className={`text-xs font-black w-12 text-center ${data.points > 0 ? "text-emerald-400" : "text-slate-600"}`}>
-                             {data.points > 0 ? `+${data.points}` : "0"}
+                  {filteredSpyData.map((data, idx) => {
+                    
+                    let itemStyle = "px-3 py-2.5 rounded-xl border transition-all ";
+                    if (hasSpyTruth) {
+                      if (data.points && data.points > 0) itemStyle += "bg-emerald-900/10 border-emerald-500/30 shadow-[0_0_15px_rgba(16,185,129,0.05)]";
+                      else itemStyle += "bg-rose-900/10 border-rose-500/20 opacity-80";
+                    } else {
+                      itemStyle += data.userId === userId ? "bg-blue-900/10 border-blue-500/30" : "bg-slate-900/50 border-slate-800 hover:bg-slate-800";
+                    }
+
+                    return (
+                      <div key={idx} className={itemStyle}>
+                        
+                        {/* שורה עליונה: דירוג, שם, ניקוד כולל */}
+                        <div className="flex justify-between items-center mb-2">
+                            <div className="font-bold text-slate-200 flex items-center gap-2">
+                              <div className={`w-5 h-5 flex items-center justify-center rounded-full text-[10px] font-black border shrink-0 ${
+                                data.userRank === 1 ? "bg-amber-500/20 text-amber-400 border-amber-500/50 shadow-[0_0_8px_rgba(245,158,11,0.3)]" :
+                                data.userRank === 2 ? "bg-slate-400/20 text-slate-300 border-slate-400/50 shadow-[0_0_8px_rgba(148,163,184,0.2)]" :
+                                data.userRank === 3 ? "bg-orange-700/30 text-orange-400 border-orange-500/40 shadow-[0_0_8px_rgba(249,115,22,0.2)]" :
+                                "bg-slate-600 text-white border-slate-500 shadow-sm"
+                              }`}>
+                                {data.userRank || "-"}
+                              </div>
+                              <span className="text-sm truncate max-w-[120px] sm:max-w-[160px]">{data.userName}</span>
+                              {data.userId === userId && <span className="text-[8px] font-black bg-blue-600 text-white px-1.5 py-0.5 rounded uppercase">אתה</span>}
+                            </div>
+                            <div className="text-[9px] font-bold text-slate-400 bg-slate-950 px-1.5 py-0.5 rounded border border-slate-700/50 shrink-0">
+                              סה״כ: <span className="text-amber-400">{data.userTotalPoints}</span>
+                            </div>
+                        </div>
+                        
+                        {/* שורה תחתונה: התשובה שניתנה וניקוד השאלה */}
+                        <div className="flex justify-between items-center bg-slate-950/40 px-2.5 py-2 rounded-lg border border-slate-700/50 shadow-inner">
+                           <div className={`font-bold text-[11px] sm:text-xs flex items-center gap-1.5 ${data.points && data.points > 0 ? "text-emerald-400" : "text-slate-300"}`}>
+                             {getFlagUrl(data.answer) ? <img src={getFlagUrl(data.answer)!} className="w-4 h-3 object-cover rounded-sm shadow-sm" alt="flag" /> : <span className="text-sm">📝</span>}
+                             <span className="truncate max-w-[150px] sm:max-w-[200px]">{data.answer}</span>
                            </div>
-                         )}
+                           {hasSpyTruth && (
+                             <div className={`text-[10px] font-black px-1.5 py-0.5 rounded border ${data.points && data.points > 0 ? "bg-emerald-900/40 text-emerald-400 border-emerald-500/40" : "bg-rose-950/50 text-rose-400 border-rose-500/40"}`}>
+                               {data.points && data.points > 0 ? `+${data.points}` : "0"}
+                             </div>
+                           )}
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>

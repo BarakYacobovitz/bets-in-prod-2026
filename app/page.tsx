@@ -217,24 +217,61 @@ export default function Home() {
     <div className="min-h-screen bg-slate-950 font-sans pb-12" dir="rtl">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-8">
         
-        <div className="flex overflow-x-auto gap-2 mb-8 pb-2 custom-scrollbar">
+{/* === הניווט הראשי (Main Navigation) === */}
+        <div className="flex overflow-x-auto gap-2 mb-4 pb-2 custom-scrollbar border-b border-slate-800">
           {[
-            { id: -1, label: "🏠 דאשבורד" },
-            { id: 0, label: "⚽ שלב הבתים" },
-            { id: 1, label: "🥉 מעפילות (מקום 3)" },
-            { id: 2, label: "🔥 נוק-אאוט" },
-            { id: 3, label: "🏆 טבלה וריגול" },
-            { id: 4, label: "⭐ בונוסים" },
-            { id: 5, label: "ℹ️ חוקים וניקוד" }
+            { id: 'DASHBOARD', label: "🏠 דאשבורד", activeVals: [-1] },
+            { id: 'PREDICTIONS', label: "🎯 ניחושים", activeVals: [0, 1, 2, 4] },
+            { id: 'LEADERBOARD', label: "🏆 טבלה ", activeVals: [3] },
+            { id: 'RULES', label: "ℹ️ חוקים", activeVals: [5] }
           ].map(tab => {
-            if (tab.id === 2 && tournamentState < 4) return null;
+            const isActive = tab.activeVals.includes(activeTab);
             return (
-              <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`px-5 py-3 rounded-xl font-bold whitespace-nowrap transition-all ${activeTab === tab.id ? "bg-blue-600 text-white shadow-lg shadow-blue-500/25" : "bg-slate-900 text-slate-400 border border-slate-800 hover:bg-slate-800 hover:text-slate-200"}`}>
+              <button 
+                key={tab.id} 
+                // בלחיצה על "ניחושים", אנחנו מנתבים כברירת מחדל לשלב הבתים (0)
+                onClick={() => setActiveTab(tab.activeVals[0])} 
+                className={`px-5 py-3 rounded-xl font-bold whitespace-nowrap transition-all flex-1 text-center min-w-[120px] ${
+                  isActive 
+                    ? "bg-blue-600 text-white shadow-lg shadow-blue-500/25" 
+                    : "bg-slate-900 text-slate-400 border border-slate-800 hover:bg-slate-800 hover:text-slate-200"
+                }`}
+              >
                 {tab.label}
               </button>
             );
           })}
         </div>
+
+        {/* === תת-ניווט לאזור הניחושים (Sub Navigation) === */}
+        {/* מופיע רק אם הטאב הפעיל הוא אחד מטאבי הניחושים */}
+        {[0, 1, 2, 4].includes(activeTab) && (
+          <div className="flex overflow-x-auto gap-2 mb-8 pb-2 custom-scrollbar bg-slate-900/40 p-2 rounded-2xl border border-slate-800/50">
+            {[
+              { id: 0, label: "⚽ שלב הבתים" },
+              { id: 2, label: "🔥 נוק-אאוט", minState: 4 },
+              { id: 1, label: "🥉 מקום 3" },
+              { id: 4, label: "⭐ בונוסים" }
+            ].map(sub => {
+              // חוסם את הנוק-אאוט אם הטורניר לא בשלב המתאים
+              if (sub.minState && tournamentState < sub.minState) return null;
+              
+              return (
+                <button 
+                  key={sub.id} 
+                  onClick={() => setActiveTab(sub.id)} 
+                  className={`px-4 py-2 rounded-lg font-bold whitespace-nowrap transition-all text-sm flex-1 text-center ${
+                    activeTab === sub.id 
+                      ? "bg-slate-700 text-white shadow-md border border-slate-600" 
+                      : "text-slate-400 hover:bg-slate-800 hover:text-slate-200"
+                  }`}
+                >
+                  {sub.label}
+                </button>
+              );
+            })}
+          </div>
+        )}
 
         {activeTab === -1 && <Dashboard userId={user.uid} userName={user.displayName} setActiveTab={setActiveTab} tournamentState={tournamentState} />}
         {activeTab === 0 && <GroupsView matches={matches.filter(m => m.stage !== "KNOCKOUT")} groups={groups} userId={user.uid} tournamentState={tournamentState} />}

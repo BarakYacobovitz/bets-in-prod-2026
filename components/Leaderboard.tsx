@@ -20,7 +20,6 @@ const Confetti = () => {
     }));
     setPieces(arr);
 
-    // התיקון הקטנצ'יק: עוצר את הקונפטי אחרי 12 שניות בדיוק
     const timer = setTimeout(() => setIsVisible(false), 12000);
     return () => clearTimeout(timer);
   }, []);
@@ -51,7 +50,6 @@ export default function Leaderboard() {
   const [generalUsers, setGeneralUsers] = useState<any[]>([]);
   const [knockoutUsers, setKnockoutUsers] = useState<any[]>([]);
   
-  // תמיכה בטאב החדש של ליגות פרטיות
   const [activeBoard, setActiveBoard] = useState<"GENERAL" | "KNOCKOUT" | "LEAGUES">("GENERAL");
   const [myLeagues, setMyLeagues] = useState<any[]>([]);
   const [selectedLeagueId, setSelectedLeagueId] = useState<string | null>(null);
@@ -148,7 +146,6 @@ export default function Leaderboard() {
     return () => unsubscribeSys();
   }, []);
 
-  // שאיבת הליגות הפרטיות של המשתמש
   useEffect(() => {
     if (!currentUserId) return;
     const qLeagues = query(collection(db, "mini_leagues"), where("members", "array-contains", currentUserId));
@@ -163,7 +160,6 @@ export default function Leaderboard() {
     return () => unsubscribeLeagues();
   }, [currentUserId]);
 
-  // יצירת הרשימה הנוכחית להצגה (כללי / נוקאאוט / ליגה פרטית מסוננת)
   let currentUsers: any[] = [];
   if (activeBoard === "GENERAL") {
      currentUsers = generalUsers;
@@ -173,7 +169,6 @@ export default function Leaderboard() {
      const activeLeague = myLeagues.find(l => l.id === selectedLeagueId);
      if (activeLeague) {
         const filtered = generalUsers.filter(u => activeLeague.members.includes(u.id));
-        // מדרגים מחדש רק את המשתתפים בליגה!
         currentUsers = rankUsers(filtered, "totalPoints");
      }
   }
@@ -326,12 +321,14 @@ export default function Leaderboard() {
     if (realThirdPlace.includes(predTeam)) return 10; if (realThirdPlace.filter(t=>t!=="").length === 8) return 0; return null; 
   };
 
+  // --- התיקון הקריטי למניעת שבירת שורות של הניקוד! ---
+  // שימוש ב- inline-flex flex-nowrap shrink-0 מבטיח שהתגית לא תישבר לעולם לשתי שורות
   const getPointsBadge = (points: number | null) => {
     if (points === null) return null;
-    if (points === 0) return <span className="bg-slate-700/50 text-slate-400 px-2 py-1 rounded-md text-xs font-bold shadow-sm">0 נק'</span>;
-    if (points === 5 || points === 7 || points === 10) return <span className="bg-blue-500/20 text-blue-300 border border-blue-500/30 px-2 py-1 rounded-md text-xs font-bold shadow-sm">+{points} נק'</span>;
-    if (points >= 15) return <span className="bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-2 py-1 rounded-md text-xs font-bold shadow-[0_0_10px_rgba(16,185,129,0.2)]">🎯 +{points} נק'</span>;
-    return <span className="bg-purple-500/20 text-purple-300 border border-purple-500/30 px-2 py-1 rounded-md text-xs font-bold shadow-sm">+{points} נק'</span>;
+    if (points === 0) return <span className="inline-flex items-center gap-1 whitespace-nowrap shrink-0 bg-slate-700/50 text-slate-400 px-2 py-1 rounded-md text-[10px] md:text-xs font-bold shadow-sm">0 נק'</span>;
+    if (points === 5 || points === 7 || points === 10) return <span className="inline-flex items-center gap-1 whitespace-nowrap shrink-0 bg-blue-500/20 text-blue-300 border border-blue-500/30 px-2 py-1 rounded-md text-[10px] md:text-xs font-bold shadow-sm">+{points} נק'</span>;
+    if (points >= 15) return <span className="inline-flex items-center gap-1 whitespace-nowrap shrink-0 bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-2 py-1 rounded-md text-[10px] md:text-xs font-bold shadow-[0_0_10px_rgba(16,185,129,0.2)]">🎯 +{points} נק'</span>;
+    return <span className="inline-flex items-center gap-1 whitespace-nowrap shrink-0 bg-purple-500/20 text-purple-300 border border-purple-500/30 px-2 py-1 rounded-md text-[10px] md:text-xs font-bold shadow-sm">+{points} נק'</span>;
   };
 
   const handleOpenSpy = async (userToSpy: any) => {
@@ -464,7 +461,6 @@ export default function Leaderboard() {
   const podiumSecond = currentUsers[1];
   const podiumThird = currentUsers[2];
 
-  // חישוב נתונים לבר הצף והנמסיס!
   const me = currentUsers.find(u => u.id === currentUserId);
   const myNemesisId = generalUsers.find(u => u.id === currentUserId)?.nemesisId || null;
   const nemesisUser = myNemesisId ? currentUsers.find(u => u.id === myNemesisId) : null;
@@ -476,7 +472,6 @@ export default function Leaderboard() {
   const topScore = topUser ? topUser[scoreField] : 0;
   const pointsGap = topScore - myScore;
 
-  // פער מהנמסיס
   const nemesisScore = nemesisUser ? nemesisUser[scoreField] : null;
   const nemesisGap = nemesisScore !== null ? myScore - nemesisScore : null;
 
@@ -751,7 +746,7 @@ export default function Leaderboard() {
          </div>
       )}
 
-      {/* --- בר הסטטוס המרחף המשודרג --- */}
+      {/* בר הסטטוס המרחף */}
       {!isMyRowVisible && me && !spyModalUser && (
         <div className="fixed bottom-0 left-0 right-0 z-40 bg-slate-900/95 backdrop-blur-md border-t-2 border-blue-500 shadow-[0_-10px_30px_rgba(0,0,0,0.8)] pb-4 pt-3 md:py-4 animate-fade-in-up">
           <div className="max-w-4xl mx-auto flex justify-between items-center px-4 md:px-8">
@@ -765,7 +760,6 @@ export default function Leaderboard() {
                      <span className="bg-blue-600 text-white text-[9px] md:text-[10px] px-1.5 py-0.5 rounded uppercase tracking-wider">אתה</span>
                    </div>
                    
-                   {/* 🎯 הוספת מעקב אחרי הפסגה ואחרי הנמסיס מהבר הצף! */}
                    <div className="flex items-center gap-3">
                        {pointsGap === 0 ? (
                           <div className="text-[10px] md:text-[11px] text-amber-400 font-bold mt-0.5">👑 הפסגה כולה שלך!</div>
@@ -773,7 +767,6 @@ export default function Leaderboard() {
                           <div className="text-[10px] md:text-[11px] text-blue-400 font-bold mt-0.5">פער לפסגה: <span className="font-black" dir="ltr">-{pointsGap}</span></div>
                        )}
                        
-                       {/* אם אנחנו לא בליגה פרטית, מציגים את הנמסיס הכללי. אם אנחנו בליגה פרטית והנמסיס לא חלק ממנה, אנחנו לא נציג אותו */}
                        {nemesisUser && nemesisGap !== null && (
                           <>
                              <span className="text-slate-600 text-[10px] hidden md:inline-block">|</span>
@@ -799,12 +792,12 @@ export default function Leaderboard() {
         </div>
       )}
 
-      {/* --- חלון הריגול --- */}
+      {/* --- חלון הריגול/פרופיל המעודכן --- */}
       {spyModalUser && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-2 md:p-4 backdrop-blur-sm" dir="rtl">
-          <div className="bg-slate-900 border border-slate-700 p-4 md:p-6 rounded-3xl w-full max-w-xl max-h-[90vh] flex flex-col shadow-2xl relative">
+          <div className="bg-slate-900 border border-slate-700 p-4 md:p-6 rounded-3xl w-full max-w-xl md:max-w-[800px] md:min-w-[500px] min-h-[500px] h-[85vh] md:h-[650px] md:max-h-[90vh] flex flex-col shadow-2xl relative overflow-hidden md:resize">
             
-            <div className="flex justify-between items-start mb-4 pb-4 border-b border-slate-800">
+            <div className="flex justify-between items-start mb-4 pb-4 border-b border-slate-800 shrink-0">
               <div>
                 <h3 className="text-2xl font-black text-white flex items-center gap-2"><span>🕵️‍♂️</span> חקירת משתמש: <span className="text-blue-400">{spyModalUser.name}</span></h3>
                 <p className="text-slate-400 text-sm mt-1">מוצגים רק נתונים שכבר ננעלו לעריכה.</p>
@@ -812,14 +805,14 @@ export default function Leaderboard() {
               <button onClick={() => setSpyModalUser(null)} className="w-10 h-10 flex items-center justify-center rounded-full bg-slate-800 hover:bg-rose-500/20 hover:text-rose-400 text-slate-300 transition-colors font-bold shrink-0 text-lg">✕</button>
             </div>
 
-            <div className="flex flex-wrap gap-2 mb-6 bg-slate-800 p-2 rounded-xl border border-slate-700/50">
+            <div className="flex flex-wrap gap-2 mb-6 bg-slate-800 p-2 rounded-xl border border-slate-700/50 shrink-0">
                <button onClick={() => setSpyTab("STATS")} className={`flex-1 min-w-[80px] py-2 rounded-lg font-bold text-sm transition-all ${spyTab === "STATS" ? "bg-amber-500 text-slate-900 shadow-md" : "text-slate-300 hover:text-white hover:bg-slate-700"}`}>📊 נתונים</button>
                <button onClick={() => setSpyTab("MATCHES")} className={`flex-1 min-w-[80px] py-2 rounded-lg font-bold text-sm transition-all ${spyTab === "MATCHES" ? "bg-blue-600 text-white shadow-md" : "text-slate-300 hover:text-white hover:bg-slate-700"}`}>⚽ משחקים</button>
                <button onClick={() => setSpyTab("QUALIFIERS")} className={`flex-1 min-w-[80px] py-2 rounded-lg font-bold text-sm transition-all ${spyTab === "QUALIFIERS" ? "bg-purple-600 text-white shadow-md" : "text-slate-300 hover:text-white hover:bg-slate-700"}`}>🥇 עולות</button>
                <button onClick={() => setSpyTab("BONUS")} className={`flex-1 min-w-[80px] py-2 rounded-lg font-bold text-sm transition-all ${spyTab === "BONUS" ? "bg-emerald-600 text-white shadow-md" : "text-slate-300 hover:text-white hover:bg-slate-700"}`}>⭐ בונוס</button>
             </div>
 
-            <div className="overflow-y-auto custom-scrollbar flex-1 pr-2">
+            <div className="overflow-y-auto custom-scrollbar flex-1 pr-2 pb-2">
               {isLoadingSpy ? (
                 <div className="flex justify-center py-12 text-blue-400 animate-pulse font-bold text-lg">שואב נתונים מסווגים... ⏳</div>
               ) : spyTab === "STATS" ? (
@@ -927,7 +920,7 @@ export default function Leaderboard() {
                        ))}
                     </div>
 
-                    <div className="space-y-4">
+                    <div className="space-y-3">
                       {getFilteredSpyMatches().length === 0 ? (
                         <div className="text-center text-slate-500 py-8 bg-slate-800/30 rounded-xl border border-slate-700/50 font-bold">
                           לא מולאו ניחושים לסיבוב זה.
@@ -936,40 +929,40 @@ export default function Leaderboard() {
                         getFilteredSpyMatches().map((pred, idx) => {
                           const match = pred.matchInfo; const isKnockout = match.stage === "KNOCKOUT";
                           return (
-                            <div key={idx} className="bg-slate-800 p-5 rounded-2xl border border-slate-700 shadow-sm">
-                              <div className="flex justify-between items-start mb-4 border-b border-slate-700/50 pb-3">
-                                 <span className="text-xs text-blue-300 font-bold tracking-wider uppercase bg-blue-900/20 px-2 py-1 rounded">
-                                   {isKnockout ? match.roundName : `בית ${match.group} - מחזור ${Number(match.matchday) || 1}`}
-                                 </span>
-                                 {getPointsBadge(pred.points)}
+                            <div key={idx} className="px-3 py-3 rounded-xl border bg-slate-800 border-slate-700 flex flex-col md:flex-row md:items-center justify-between gap-3">
+                              <div className="flex items-center justify-between md:justify-start gap-3 w-full md:w-auto shrink-0">
+                                <span className="text-[10px] font-bold text-blue-300 bg-blue-900/20 px-2 py-1 rounded tracking-wider uppercase border border-blue-500/20">
+                                   {isKnockout ? match.roundName : `בית ${match.group}`}
+                                </span>
+                                <div className="md:hidden">{getPointsBadge(pred.points)}</div>
                               </div>
-                              <div className="flex justify-between items-center text-center">
-                                 <div className="flex flex-col items-center w-2/5">
-                                    <span className="font-bold text-slate-200 mb-2 text-base leading-tight break-words flex items-center justify-center gap-1.5 w-full">
-                                      {getFlagUrl(match.homeTeam) ? <img src={getFlagUrl(match.homeTeam)!} className="w-5 h-3.5 object-cover rounded-sm shadow-sm" alt="flag" /> : "🏳️"}
-                                      {match.homeTeam}
-                                    </span>
-                                    <span className="text-3xl font-black text-white bg-slate-900 border border-slate-600 w-14 h-12 flex items-center justify-center rounded-xl shadow-inner">{pred.predictedHomeScore}</span>
-                                    {match.isFinished && <span className="text-xs text-emerald-400 font-bold mt-3 bg-emerald-900/20 px-3 py-1 rounded-md border border-emerald-500/30 whitespace-nowrap">אמת: {match.realHomeScore}</span>}
+                              
+                              <div className="flex items-center justify-center gap-3 flex-1 px-2">
+                                 <div className="flex items-center gap-2 flex-1 justify-end">
+                                   <span className="text-sm font-bold text-slate-200 truncate max-w-[90px]">{match.homeTeam}</span>
+                                   {getFlagUrl(match.homeTeam) && <img src={getFlagUrl(match.homeTeam)!} className="w-5 h-3.5 object-cover rounded-sm shadow-sm" alt="flag" />}
+                                   <span className="text-lg font-black text-white bg-slate-950 border border-slate-700 w-9 h-9 flex items-center justify-center rounded-lg shadow-inner shrink-0">{pred.predictedHomeScore}</span>
                                  </div>
-                                 <div className="flex flex-col items-center w-1/5 pt-6"><span className="text-slate-500 font-black text-2xl">:</span></div>
-                                 <div className="flex flex-col items-center w-2/5">
-                                    <span className="font-bold text-slate-200 mb-2 text-base leading-tight break-words flex items-center justify-center gap-1.5 w-full">
-                                      {match.awayTeam}
-                                      {getFlagUrl(match.awayTeam) ? <img src={getFlagUrl(match.awayTeam)!} className="w-5 h-3.5 object-cover rounded-sm shadow-sm" alt="flag" /> : "🏳️"}
-                                    </span>
-                                    <span className="text-3xl font-black text-white bg-slate-900 border border-slate-600 w-14 h-12 flex items-center justify-center rounded-xl shadow-inner">{pred.predictedAwayScore}</span>
-                                    {match.isFinished && <span className="text-xs text-emerald-400 font-bold mt-3 bg-emerald-900/20 px-3 py-1 rounded-md border border-emerald-500/30 whitespace-nowrap">אמת: {match.realAwayScore}</span>}
+                                 <span className="text-slate-600 font-black text-sm shrink-0">:</span>
+                                 <div className="flex items-center gap-2 flex-1 justify-start">
+                                   <span className="text-lg font-black text-white bg-slate-950 border border-slate-700 w-9 h-9 flex items-center justify-center rounded-lg shadow-inner shrink-0">{pred.predictedAwayScore}</span>
+                                   {getFlagUrl(match.awayTeam) && <img src={getFlagUrl(match.awayTeam)!} className="w-5 h-3.5 object-cover rounded-sm shadow-sm" alt="flag" />}
+                                   <span className="text-sm font-bold text-slate-200 truncate max-w-[90px]">{match.awayTeam}</span>
                                  </div>
                               </div>
+                              
+                              <div className="hidden md:flex shrink-0 w-auto min-w-[80px] justify-end">
+                                {getPointsBadge(pred.points)}
+                              </div>
+                              
                               {isKnockout && pred.qualifier && (
-                                <div className="mt-4 pt-3 border-t border-slate-700/50 text-center">
-                                  <span className="text-[11px] font-bold text-purple-300 bg-purple-900/20 px-3 py-1.5 rounded-lg border border-purple-500/30 flex items-center justify-center gap-1.5 w-fit mx-auto">
-                                    הימר שיעפילו: 
-                                    {getFlagUrl(pred.qualifier) ? <img src={getFlagUrl(pred.qualifier)!} className="w-4 h-3 object-cover rounded-sm shadow-sm" alt="flag" /> : "🏳️"}
-                                    {pred.qualifier}
-                                  </span>
-                                </div>
+                                 <div className="w-full md:w-auto text-center mt-2 md:mt-0 shrink-0">
+                                    <span className="text-[10px] bg-purple-500/10 text-purple-300 px-2 py-1 rounded border border-purple-500/20 font-bold uppercase tracking-wide inline-flex items-center justify-center gap-1.5 w-full md:w-auto">
+                                      הימר שיעפילו: 
+                                      {getFlagUrl(pred.qualifier) && <img src={getFlagUrl(pred.qualifier)!} className="w-4 h-3 object-cover rounded-sm shadow-sm" alt="flag" />}
+                                      {pred.qualifier}
+                                    </span>
+                                 </div>
                               )}
                             </div>
                           );
@@ -982,16 +975,16 @@ export default function Leaderboard() {
                  tournamentState < 1 ? (
                    <div className="text-center text-slate-400 py-12 bg-slate-800/50 rounded-2xl border border-slate-700/50 text-lg">עולות טרם ננעלו (מצב 0).</div>
                  ) : (
-                   <div className="space-y-8">
-                     <div className="bg-slate-800 p-5 rounded-2xl border border-slate-700 shadow-sm">
-                       <h4 className="text-lg font-bold text-amber-400 mb-4 border-b border-slate-700/50 pb-2">🥉 8 המעפילות (מקום שלישי)</h4>
-                       {spyThirdPlace.length === 0 ? <div className="text-slate-500 text-sm mb-4">לא בחר נבחרות.</div> : (
-                         <div className="flex flex-wrap gap-2 mb-4">
+                   <div className="space-y-6 pb-4">
+                     <div className="bg-slate-800 p-4 rounded-xl border border-slate-700 shadow-sm">
+                       <h4 className="text-sm md:text-base font-bold text-amber-400 mb-3 border-b border-slate-700/50 pb-2">🥉 8 המעפילות (מקום שלישי)</h4>
+                       {spyThirdPlace.length === 0 ? <div className="text-slate-500 text-sm mb-2">לא בחר נבחרות.</div> : (
+                         <div className="flex flex-nowrap overflow-x-auto custom-scrollbar pb-2 gap-2">
                            {spyThirdPlace.map((t, i) => {
                              if (!t) return null;
                              const pts = getThirdPlacePoints(t);
                              return (
-                               <div key={i} className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border text-sm font-bold ${pts === 10 ? "bg-emerald-900/20 text-emerald-400 border-emerald-500/30" : pts === 0 ? "bg-rose-900/20 text-rose-400 border-rose-500/30" : "bg-slate-900 text-slate-300 border-slate-600"}`}>
+                               <div key={i} className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-bold ${pts === 10 ? "bg-emerald-900/20 text-emerald-400 border-emerald-500/30" : pts === 0 ? "bg-rose-900/20 text-rose-400 border-rose-500/30" : "bg-slate-900 text-slate-300 border-slate-600"}`}>
                                  {getFlagUrl(t) && <img src={getFlagUrl(t)!} className="w-4 h-3 object-cover rounded-sm" alt="flag"/>}
                                  {t} {pts === 10 && "✓"} {pts === 0 && "✕"}
                                </div>
@@ -1001,7 +994,7 @@ export default function Leaderboard() {
                        )}
                      </div>
 
-                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                        {groupsList.map(g => {
                          const preds = spyQualifiers[g];
                          if (!preds || (!preds.first && !preds.second)) return null;
@@ -1009,24 +1002,24 @@ export default function Leaderboard() {
                          const p2Pts = getGroupQualPoints(g, 'second', preds.second);
 
                          return (
-                           <div key={g} className="bg-slate-800 p-4 rounded-xl border border-slate-700">
-                             <div className="text-blue-300 font-bold mb-3 bg-blue-900/20 inline-block px-2 py-1 rounded text-xs">בית {g}</div>
-                             <div className="space-y-3">
-                               <div className="flex justify-between items-center bg-slate-900 p-2.5 rounded-lg border border-slate-700/50">
-                                 <span className="text-slate-400 text-sm">מקום 1:</span>
+                           <div key={g} className="bg-slate-800 p-3 rounded-xl border border-slate-700 flex flex-col sm:flex-row sm:items-center gap-3">
+                             <div className="text-blue-300 font-bold bg-blue-900/20 px-3 py-1.5 rounded-lg text-xs shrink-0 border border-blue-500/20 text-center sm:w-16">בית {g}</div>
+                             <div className="flex-1 flex flex-col gap-2">
+                               <div className="flex justify-between items-center bg-slate-900 p-2 rounded-lg border border-slate-700/50">
                                  <div className="flex items-center gap-2">
+                                   <span className="text-slate-500 text-[10px] font-bold">1️⃣</span>
                                    {getFlagUrl(preds.first) && <img src={getFlagUrl(preds.first)!} className="w-4 h-3 object-cover rounded-sm" alt="flag"/>}
-                                   <span className="font-bold text-slate-200">{preds.first || "-"}</span>
-                                   {getPointsBadge(p1Pts)}
+                                   <span className="font-bold text-slate-200 text-xs">{preds.first || "-"}</span>
                                  </div>
+                                 {getPointsBadge(p1Pts)}
                                </div>
-                               <div className="flex justify-between items-center bg-slate-900 p-2.5 rounded-lg border border-slate-700/50">
-                                 <span className="text-slate-400 text-sm">מקום 2:</span>
+                               <div className="flex justify-between items-center bg-slate-900 p-2 rounded-lg border border-slate-700/50">
                                  <div className="flex items-center gap-2">
+                                   <span className="text-slate-500 text-[10px] font-bold">2️⃣</span>
                                    {getFlagUrl(preds.second) && <img src={getFlagUrl(preds.second)!} className="w-4 h-3 object-cover rounded-sm" alt="flag"/>}
-                                   <span className="font-bold text-slate-200">{preds.second || "-"}</span>
-                                   {getPointsBadge(p2Pts)}
+                                   <span className="font-bold text-slate-200 text-xs">{preds.second || "-"}</span>
                                  </div>
+                                 {getPointsBadge(p2Pts)}
                                </div>
                              </div>
                            </div>
@@ -1098,47 +1091,49 @@ export default function Leaderboard() {
                       </div>
                     )}
 
-                    <div className="space-y-4">
+                    <div className="space-y-3">
                       {getFilteredSpyBonuses().length === 0 ? (
                         <div className="text-center text-slate-500 py-8 bg-slate-800/30 rounded-xl border border-slate-700/50 font-bold">
                           אין שאלות בונוס (או שלא מולאו) בקטגוריה זו.
                         </div>
                       ) : (
                         getFilteredSpyBonuses().map((bPred, idx) => (
-                          <div key={idx} className="bg-slate-800 p-6 rounded-2xl border border-slate-700 shadow-sm">
-                             <div className="flex justify-between items-start mb-4 border-b border-slate-700/50 pb-3">
-                               <span className="text-amber-400 font-bold text-base pr-4 leading-snug">{bPred.question.label}</span>
-                               <div className="shrink-0">{getPointsBadge(bPred.points)}</div>
-                             </div>
-                             <div className="mt-4">
-                               <div className="text-xs text-slate-400 mb-2">הניחוש שלו:</div>
-                               <div className="inline-block px-5 py-2.5 bg-slate-900 text-slate-200 font-bold text-lg rounded-xl border border-slate-600 shadow-inner flex items-center gap-2 w-fit">
-                                 {getFlagUrl(bPred.answer) && <img src={getFlagUrl(bPred.answer)!} className="w-6 h-4 object-cover rounded-sm shadow-sm" alt="flag" />}
-                                 {bPred.answer}
-                               </div>
-                             </div>
-                             {realBonusAnswers[bPred.qId] && (
-                               <div className="mt-4 bg-emerald-900/10 p-3 rounded-lg border border-emerald-500/20 flex items-center gap-2">
-                                 <span className="text-emerald-400">✅</span>
-                                 <span className="text-sm text-emerald-400 font-bold flex items-center gap-2 flex-wrap">
-                                   תשובה אמת: 
-                                   {Array.isArray(realBonusAnswers[bPred.qId]) 
-                                      ? realBonusAnswers[bPred.qId].map((ans: string, i: number, arr: any[]) => (
-                                          <span key={i} className="flex items-center gap-1">
-                                            {getFlagUrl(ans) && <img src={getFlagUrl(ans)!} className="w-4 h-3 object-cover rounded-sm" alt="flag" />}
-                                            {ans}{i < arr.length - 1 ? " / " : ""}
-                                          </span>
-                                        ))
-                                      : (
-                                        <span className="flex items-center gap-1">
-                                          {getFlagUrl(realBonusAnswers[bPred.qId]) && <img src={getFlagUrl(realBonusAnswers[bPred.qId])!} className="w-4 h-3 object-cover rounded-sm" alt="flag" />}
-                                          {realBonusAnswers[bPred.qId]}
-                                        </span>
-                                      )
-                                   }
+                          <div key={idx} className="bg-slate-800 px-4 py-3 rounded-xl border border-slate-700 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-3">
+                             <div className="flex-1">
+                               <div className="text-amber-400 font-bold text-xs md:text-sm leading-snug mb-1.5">{bPred.question.label}</div>
+                               <div className="flex items-center gap-2 text-xs">
+                                 <span className="text-slate-400">ניחוש:</span>
+                                 <span className="bg-slate-900 text-slate-200 font-bold px-2 py-1 rounded-md border border-slate-600 flex items-center gap-1.5">
+                                   {getFlagUrl(bPred.answer) && <img src={getFlagUrl(bPred.answer)!} className="w-4 h-3 object-cover rounded-sm" alt="flag" />}
+                                   {bPred.answer}
                                  </span>
                                </div>
-                             )}
+                             </div>
+                             
+                             <div className="flex items-center justify-between md:justify-end gap-3 w-full md:w-auto border-t border-slate-700/50 pt-2 md:border-t-0 md:pt-0">
+                               {realBonusAnswers[bPred.qId] && (
+                                 <div className="bg-emerald-900/10 px-2 py-1 rounded-md border border-emerald-500/20 flex items-center gap-1.5 text-[10px]">
+                                   <span className="text-emerald-400">אמת:</span>
+                                   <span className="text-emerald-400 font-bold flex items-center gap-1">
+                                     {Array.isArray(realBonusAnswers[bPred.qId]) 
+                                        ? realBonusAnswers[bPred.qId].map((ans: string, i: number, arr: any[]) => (
+                                            <span key={i} className="flex items-center gap-1">
+                                              {getFlagUrl(ans) && <img src={getFlagUrl(ans)!} className="w-3 h-2 object-cover rounded-sm" alt="flag" />}
+                                              {ans}{i < arr.length - 1 ? " / " : ""}
+                                            </span>
+                                          ))
+                                        : (
+                                          <span className="flex items-center gap-1">
+                                            {getFlagUrl(realBonusAnswers[bPred.qId]) && <img src={getFlagUrl(realBonusAnswers[bPred.qId])!} className="w-3 h-2 object-cover rounded-sm" alt="flag" />}
+                                            {realBonusAnswers[bPred.qId]}
+                                          </span>
+                                        )
+                                     }
+                                   </span>
+                                 </div>
+                               )}
+                               <div className="shrink-0 w-auto min-w-[80px] text-left">{getPointsBadge(bPred.points)}</div>
+                             </div>
                           </div>
                         ))
                       )}

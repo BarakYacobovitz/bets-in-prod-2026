@@ -1,9 +1,9 @@
 "use client";
-import Link from "next/link";
+// הסרנו את Link, אנחנו נשתמש בתגית a רגילה לריפרוש הסטייט
 import { useEffect, useState } from "react";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { auth, db } from "../app/firebase";
-import { doc, getDoc } from "firebase/firestore";
+import { doc, onSnapshot } from "firebase/firestore"; // שינינו מ-getDoc ל-onSnapshot!
 
 export default function Navbar() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -13,21 +13,32 @@ export default function Navbar() {
   const [photoUrl, setPhotoUrl] = useState<string>("");
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+    let unsubscribeUser: () => void;
+
+    const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
       if (user) {
         setIsLoggedIn(true);
         setUserEmail(user.email || "");
         setPhotoUrl(user.photoURL || "");
-        const userDoc = await getDoc(doc(db, "users", user.uid));
-        if (userDoc.exists()) {
-          setUserName(userDoc.data().name || "שחקן");
-          setUserPoints(userDoc.data().totalPoints || 0);
-        }
+        
+        // --- התיקון הקריטי: מאזין בזמן אמת למסמך המשתמש! ---
+        unsubscribeUser = onSnapshot(doc(db, "users", user.uid), (userDoc) => {
+          if (userDoc.exists()) {
+            setUserName(userDoc.data().name || "שחקן");
+            setUserPoints(userDoc.data().totalPoints || 0); // יתעדכן מיד כשהקופה תגדל!
+          }
+        });
+
       } else {
         setIsLoggedIn(false);
+        if (unsubscribeUser) unsubscribeUser(); // ניקוי המאזין כשהמשתמש מתנתק
       }
     });
-    return () => unsubscribe();
+
+    return () => {
+      unsubscribeAuth();
+      if (unsubscribeUser) unsubscribeUser();
+    };
   }, []);
 
   const handleLogout = () => {
@@ -42,10 +53,9 @@ export default function Navbar() {
     <nav className="w-full bg-slate-950 border-b border-slate-800 p-3 md:p-4 shadow-[0_4px_20px_rgba(0,0,0,0.5)] sticky top-0 z-50" dir="rtl">
       <div className="max-w-7xl mx-auto flex justify-between items-center">
         
-        {/* צד ימין: הלוגו B החדש והטקסט */}
-{/* צד ימין: הלוגו B החדש והטקסט */}
-  {/* צד ימין: הלוגו B והטקסט בסטייל פרימיום */}
-        <Link href="/" className="group flex items-center gap-4 transition-all duration-300 hover:opacity-90 cursor-pointer">
+        {/* צד ימין: הלוגו B והטקסט בסטייל פרימיום */}
+        {/* החלפנו ל-a רגיל כדי שלחיצה עליו תמיד תאפס את האפליקציה למסך הדאשבורד הראשי */}
+        <a href="/" className="group flex items-center gap-4 transition-all duration-300 hover:opacity-90 cursor-pointer">
           
           {/* הלוגו - נקי, עם צללית שמתגברת במעבר עכבר */}
           <div className="w-12 h-12 md:w-16 md:h-16 flex items-center justify-center shrink-0">
@@ -70,7 +80,7 @@ export default function Navbar() {
              </span>
              
           </div>
-        </Link>
+        </a>
 
         {/* צד שמאל: פרופיל משתמש + התנתקות */}
         <div className="flex items-center gap-3 md:gap-4">

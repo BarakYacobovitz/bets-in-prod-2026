@@ -6,7 +6,6 @@ import { auth, db } from "../firebase";
 import Link from "next/link";
 import toast from "react-hot-toast";
 import { getFlagUrl } from "../utils/flags";
-// trigger vercel build
 
 const ADMIN_EMAIL = "bawak.y10@gmail.com"; 
 
@@ -403,7 +402,6 @@ export default function AdminPanel() {
     } 
   };
 
-  // --- שדרוג: שמירת תוצאות עולות (עם לוגיקה חכמה של Slots) ---
   const handleSaveQualifiers = async () => { 
     setSavingId("qualifiers"); 
     try { 
@@ -428,7 +426,6 @@ export default function AdminPanel() {
     } 
   };
 
-  // --- שדרוג: שמירת 8 המעפילות ---
   const handleSaveThirdPlace = async () => { 
     setSavingId("thirdPlace"); 
     try { 
@@ -458,11 +455,9 @@ const handleCalculateScores = async (silentParam: any = false) => {
     if (!isSilent && !confirm("האם לחשב נקודות לכל המשתמשים? מנוע הקרבה החדש (בעל הבית השתגע) פעיל!")) return;
     setIsCalculating(true);
     
-    // נוסיף דגל שיזכור אם עשינו סנאפשוט בריצה הנוכחית
     let wasSnapshotTakenNow = false;
 
     try {
-      // ===== הלוגיקה החכמה של ה-Snapshot האוטומטי =====
       const systemSnap = await getDoc(doc(db, "settings", "system"));
       const lastSnapshotDate = systemSnap.exists() ? systemSnap.data().lastSnapshotDate : "";
       
@@ -471,13 +466,11 @@ const handleCalculateScores = async (silentParam: any = false) => {
       
       if (lastSnapshotDate !== todayString) {
          console.log(`New football day detected! (Date: ${todayString}). Taking automated snapshot before calculating scores...`);
-         await handleTakeSnapshot(true); // מריץ בשקט מוחלט
+         await handleTakeSnapshot(true); 
          await setDoc(doc(db, "settings", "system"), { lastSnapshotDate: todayString }, { merge: true });
          
-         // מדליקים את הדגל!
          wasSnapshotTakenNow = true;
       }
-      // =========================================================================
 
       const matchesSnap = await getDocs(collection(db, "matches")); const realMatches = matchesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       const qualSnap = await getDoc(doc(db, "admin_results", "qualifiers")); const realQuals = qualSnap.exists() ? (qualSnap.data().results || {}) : {};
@@ -631,14 +624,9 @@ const handleCalculateScores = async (silentParam: any = false) => {
       updatedUsersArray.sort((a, b) => (b.totalPoints || 0) - (a.totalPoints || 0));
       setUsersList(updatedUsersArray);
       
-      // החיווי המיוחד בסוף הריצה
       if (!isSilent) {
-        // הודעה 1: תמיד קופצת - מאשרת שהניקוד חושב
         toast.success("הניקוד חושב בהצלחה כולל פילוח לבועות ומנוע 'בעל הבית השתגע'! 🏆");
-        
-        // הודעה 2: קופצת בנוסף, רק אם המערכת חתכה יום חדש
         if (wasSnapshotTakenNow) {
-          // נותנים דיליי של חצי שנייה כדי שההודעות יקפצו בסטייל אחת אחרי השנייה
           setTimeout(() => {
             toast.success("מודיעין: המערכת זיהתה יום חדש וביצעה ריצת סוף יום (Snapshot) ברקע! 📸", { 
               duration: 7000,
@@ -764,6 +752,7 @@ const handleCalculateScores = async (silentParam: any = false) => {
     }
     finally { setIsCalculating(false); }
   };
+  
   const handleCreateAutoInsights = () => {
     if (!statsData) {
       toast.error("אנא עבור קודם לטאב 'תובנות' (STATS) ולחץ על 'סרוק מסד נתונים'.", { icon: "⚠️" });
@@ -772,27 +761,22 @@ const handleCalculateScores = async (silentParam: any = false) => {
     
     const insights: string[] = [];
 
-    // סריקת משחקים (קונצנזוס, זאבים בודדים ותוצאות פסיכיות)
     for (const [mId, data] of Object.entries(statsData.matches)) {
       const match = matches.find(m => m.id === mId);
       if (!match) continue;
       
       const total = (data as any).total;
-      if (total < 4) continue; // לא מייצרים תובנות על פחות מ-4 אנשים
+      if (total < 4) continue; 
 
       const homeCount = (data as any).homeWins.length;
       const awayCount = (data as any).awayWins.length;
-      const drawCount = (data as any).draws.length;
 
-      // קונצנזוס (מעל 80%)
       if (homeCount / total >= 0.8) insights.push(`🔥 קונצנזוס: ${Math.round((homeCount/total)*100)}% בטוחים ש${match.homeTeam} תנצח את ${match.awayTeam}.`);
       if (awayCount / total >= 0.8) insights.push(`🔥 קונצנזוס: ${Math.round((awayCount/total)*100)}% בטוחים ש${match.awayTeam} תנצח את ${match.homeTeam}.`);
 
-      // זאב בודד (רק בן אדם אחד)
       if (homeCount === 1 && total >= 5) insights.push(`🐺 זאב בודד: רק ${(data as any).homeWins[0].name} מאמין בניצחון של ${match.homeTeam} על ${match.awayTeam}!`);
       if (awayCount === 1 && total >= 5) insights.push(`🐺 זאב בודד: רק ${(data as any).awayWins[0].name} מאמין בניצחון של ${match.awayTeam} על ${match.homeTeam}!`);
 
-      // תוצאות משוגעות (5 שערים ומעלה)
       Object.entries((data as any).exactScores).forEach(([score, sData]: any) => {
          const [h, a] = score.split('-');
          if (Number(h) + Number(a) >= 5) {
@@ -801,18 +785,17 @@ const handleCalculateScores = async (silentParam: any = false) => {
       });
     }
 
-    // בחירת 4 תובנות אקראיות כדי לא להציף את המסך
     const shuffled = insights.sort(() => 0.5 - Math.random()).slice(0, 4);
     if (shuffled.length === 0) shuffled.push("אין מספיק דרמות כרגע במערכת, חכו לעוד ניחושים של הקהל.");
     setAutoInsights(shuffled);
   };
 
-  // פונקציית עזר להוספה לטור היומי
   const addInsightToMessage = (text: string) => {
     const htmlBullet = `<ul>\n  <li>${text}</li>\n</ul>\n`;
     setDailyMessage(prev => prev + htmlBullet);
     toast.success("התובנה נוספה לטור היומי!");
   };
+
   const handleFactoryReset = async () => {
     const confirm1 = confirm("⚠️ אזהרה חמורה: פעולה זו תמחק את *כל* המשתמשים ואת *כל* הניחושים במערכת. האם אתה בטוח?");
     if (!confirm1) return;
@@ -923,6 +906,7 @@ const handleCalculateScores = async (silentParam: any = false) => {
       setIsCalculating(false); 
     }
   };
+
   const handleSpawnBotsOnly = async () => {
     const numUsers = parseInt(prompt("כמה בוטים להזריק למערכת? (הם ימלאו ניחושים מלאים לכל הטורניר)", "30") || "0");
     if (isNaN(numUsers) || numUsers <= 0) return;
@@ -974,6 +958,7 @@ const handleCalculateScores = async (silentParam: any = false) => {
       setIsCalculating(false); 
     }
   };
+
   const handleSmartSimulation = async () => {
     if (simStage === "ALL") {
        await handleSimulateFullTournament(); 
@@ -1139,8 +1124,7 @@ const handleCalculateScores = async (silentParam: any = false) => {
     reader.readAsText(file);
   };
 
-const handleTakeSnapshot = async (isSilent: boolean = false) => {
-    // אם לא ביקשנו ריצה שקטה, נקפיץ את שאלת האישור הרגילה למנהל
+  const handleTakeSnapshot = async (isSilent: boolean = false) => {
     if (!isSilent && !confirm("לשמור תמונת מצב יומית? \nפעולה זו תקבע את נקודת הייחוס לחישוב 'מגמות' (חצים ירוקים/אדומים) עבור המשתמשים מחר. מומלץ לבצע פעם ביום בלילה.")) return;
     
     setIsCalculating(true);
@@ -1173,7 +1157,6 @@ const handleTakeSnapshot = async (isSilent: boolean = false) => {
         });
       }
       
-      // נקפיץ את ההודעה הירוקה רק אם זו לחיצה ידנית של האדמין
       if (!isSilent) toast.success("📸 תמונת מצב נשמרה בהצלחה! חיצי המגמה התאפסו.");
     } catch (error) { 
       if (!isSilent) toast.error("שגיאה בשמירת תמונת מצב."); 
@@ -1185,9 +1168,8 @@ const handleTakeSnapshot = async (isSilent: boolean = false) => {
   const formatAuditTime = (ts: any) => {
     if (!ts) return "";
     try {
-      if (ts.toDate) return ts.toDate().toLocaleString('he-IL', {day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit'});
-      if (ts.seconds) return new Date(ts.seconds * 1000).toLocaleString('he-IL', {day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit'});
-      return new Date(ts).toLocaleString('he-IL', {day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit'});
+      const date = ts.toDate ? ts.toDate() : (ts.seconds ? new Date(ts.seconds * 1000) : new Date(ts));
+      return date.toLocaleString('he-IL', {day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit'});
     } catch { return ""; }
   };
 
@@ -1248,7 +1230,11 @@ const handleTakeSnapshot = async (isSilent: boolean = false) => {
     } 
     finally { setIsCalculating(false); }
   };
-const handleExportPredictions = async (targetUserId: string | "ALL", targetUserName: string) => {
+
+  // =========================================================================
+  // שדרוג ייצוא האקסל - מבנה "נתונים שטוחים" (Flattened Data) כמו שביקשת!
+  // =========================================================================
+  const handleExportPredictions = async (targetUserId: string | "ALL", targetUserName: string) => {
     setIsCalculating(true);
     toast.loading("מכין קובץ אקסל...", { id: "csvExport" });
     try {
@@ -1256,7 +1242,6 @@ const handleExportPredictions = async (targetUserId: string | "ALL", targetUserN
       const matchesSnap = await getDocs(collection(db, "matches"));
       const bqSnap = await getDoc(doc(db, "settings", "bonus_questions"));
       
-      // משיכת תוצאות האמת כדי שנוכל לחשב ניקוד לייצוא
       const qualSnap = await getDoc(doc(db, "admin_results", "qualifiers")); 
       const realQuals = qualSnap.exists() ? (qualSnap.data().results || {}) : {};
       const thirdSnap = await getDoc(doc(db, "admin_results", "third_place")); 
@@ -1268,13 +1253,11 @@ const handleExportPredictions = async (targetUserId: string | "ALL", targetUserN
       const matchesList = matchesSnap.docs.map(d => ({id: d.id, ...d.data()}));
       const bonusQs = bqSnap.exists() ? (bqSnap.data().questions || []) : [];
 
-      // הוספת BOM כדי שהאקסל יזהה עברית כמו שצריך
       let csvContent = "\uFEFF"; 
-      csvContent += "User Name,Category,Item,Prediction,Points Earned\n"; // הוספנו עמודת ניקוד!
+      csvContent += "שם משתמש,סוג הניחוש,שלב המשחק,פירוט המשחק,ניחוש,תאריך הניחוש,ניקוד\n";
 
       const usersToExport = targetUserId === "ALL" ? users : users.filter(u => u.id === targetUserId);
 
-      // הבאת כל הניחושים
       const pmSnap = await getDocs(collection(db, "predictions_matches"));
       const pkSnap = await getDocs(collection(db, "predictions_knockout"));
       const pqSnap = await getDocs(collection(db, "predictions_qualifiers"));
@@ -1291,8 +1274,9 @@ const handleExportPredictions = async (targetUserId: string | "ALL", targetUserN
 
       for (const u of usersToExport) {
          const uName = (u as any).name || "Unknown";
+         const escapeCSV = (str: string) => `"${String(str).replace(/"/g, '""')}"`;
          
-// 1. משחקי בתים
+         // 1. משחקי שלב הבתים
          const uMatches = pmData.filter(p => p.userId === u.id);
          uMatches.forEach(p => {
             const m: any = matchesList.find(x => x.id === p.matchId);
@@ -1308,12 +1292,15 @@ const handleExportPredictions = async (targetUserId: string | "ALL", targetUserN
                    }
                  }
                }
-               // שינוי הפורמט: ארגנטינה 2 מצרים 1
-               csvContent += `"${uName}","שלב הבתים","${m.homeTeam} נגד ${m.awayTeam}","${m.homeTeam} ${p.predictedHomeScore} - ${m.awayTeam} ${p.predictedAwayScore}","${m.isFinished ? pts : '-'}"\n`;
+               const stageStr = `בית ${m.group}`;
+               const detailsStr = `${m.homeTeam} - ${m.awayTeam}`;
+               const predStr = `${m.homeTeam} ${p.predictedHomeScore} - ${p.predictedAwayScore} ${m.awayTeam}`;
+               const ptsStr = m.isFinished ? pts : '-';
+               csvContent += `${escapeCSV(uName)},"משחק",${escapeCSV(stageStr)},${escapeCSV(detailsStr)},${escapeCSV(predStr)},${escapeCSV(formatAuditTime(p.updatedAt))},${escapeCSV(ptsStr.toString())}\n`;
             }
          });
          
-         // 2. נוק-אאוט
+         // 2. משחקי נוק-אאוט
          const uKnockout = pkData.filter(p => p.userId === u.id);
          uKnockout.forEach(p => {
             const m: any = matchesList.find(x => x.id === p.matchId);
@@ -1332,8 +1319,11 @@ const handleExportPredictions = async (targetUserId: string | "ALL", targetUserN
                    pts += (qualifierPointsMap[m.roundName] || 0);
                  }
                }
-               // שינוי הפורמט כולל המעפילה
-               csvContent += `"${uName}","נוק-אאוט","${m.roundName}: ${m.homeTeam} נגד ${m.awayTeam}","${m.homeTeam} ${p.predictedHomeScore} - ${m.awayTeam} ${p.predictedAwayScore} (עולה: ${p.qualifier})","${m.isFinished ? pts : '-'}"\n`;
+               const stageStr = m.roundName;
+               const detailsStr = `${m.homeTeam} - ${m.awayTeam}`;
+               const predStr = `${m.homeTeam} ${p.predictedHomeScore} - ${p.predictedAwayScore} ${m.awayTeam} (עולה: ${p.qualifier})`;
+               const ptsStr = m.isFinished ? pts : '-';
+               csvContent += `${escapeCSV(uName)},"משחק",${escapeCSV(stageStr)},${escapeCSV(detailsStr)},${escapeCSV(predStr)},${escapeCSV(formatAuditTime(p.updatedAt))},${escapeCSV(ptsStr.toString())}\n`;
             }
          });
 
@@ -1341,22 +1331,30 @@ const handleExportPredictions = async (targetUserId: string | "ALL", targetUserN
          const uQual: any = pqData.find(p => p.id === u.id);
          if (uQual && uQual.groups) {
             for (const [grp, preds] of Object.entries<any>(uQual.groups)) {
-               let pts = 0;
-               let isGraded = false;
                const realGroup = realQuals[grp];
-               if (realGroup && (realGroup.first || realGroup.second)) {
-                 isGraded = true;
-                 if (preds.first === realGroup.first && preds.first !== "") pts += 15;
-                 else if (preds.first === realGroup.second && preds.first !== "") pts += 7;
-                 
-                 if (preds.second === realGroup.second && preds.second !== "") pts += 15;
-                 else if (preds.second === realGroup.first && preds.second !== "") pts += 7;
+               const isGraded = realGroup && (realGroup.first || realGroup.second);
+               
+               if (preds.first) {
+                  let pts1 = 0;
+                  if (isGraded) {
+                     if (preds.first === realGroup.first) pts1 = 15;
+                     else if (preds.first === realGroup.second) pts1 = 7;
+                  }
+                  csvContent += `${escapeCSV(uName)},"מעפילה",${escapeCSV(`בית ${grp}`)},"מקום 1",${escapeCSV(preds.first)},${escapeCSV(formatAuditTime(uQual.updatedAt))},${escapeCSV(isGraded ? pts1.toString() : '-')}\n`;
                }
-               csvContent += `"${uName}","עולות מבתים","בית ${grp}","מקום 1: ${preds.first || "-"} | מקום 2: ${preds.second || "-"}","${isGraded ? pts : '-'}"\n`;
+
+               if (preds.second) {
+                  let pts2 = 0;
+                  if (isGraded) {
+                     if (preds.second === realGroup.second) pts2 = 15;
+                     else if (preds.second === realGroup.first) pts2 = 7;
+                  }
+                  csvContent += `${escapeCSV(uName)},"מעפילה",${escapeCSV(`בית ${grp}`)},"מקום 2",${escapeCSV(preds.second)},${escapeCSV(formatAuditTime(uQual.updatedAt))},${escapeCSV(isGraded ? pts2.toString() : '-')}\n`;
+               }
             }
          }
 
-         // 4. מקום שלישי (8 המעפילות)
+         // 4. 8 המעפילות (מקום 3)
          const uThird: any = ptData.find(p => p.id === u.id);
          if (uThird && uThird.teams) {
             const pred = uThird.teams.filter((x:any)=>x).join(', ');
@@ -1369,16 +1367,16 @@ const handleExportPredictions = async (targetUserId: string | "ALL", targetUserN
                    if (realThird.includes(team) && team !== "") pts += 10;
                  });
                }
-               csvContent += `"${uName}","8 המעפילות","מקום 3","${pred}","${isGraded ? pts : '-'}"\n`;
+               csvContent += `${escapeCSV(uName)},"מקום 3","ללא שלב","מקום 3",${escapeCSV(pred)},${escapeCSV(formatAuditTime(uThird.updatedAt))},${escapeCSV(isGraded ? pts.toString() : '-')}\n`;
             }
          }
 
-         // 5. בונוסים
+         // 5. שאלות בונוס
          const uBonus: any = pbData.find(p => p.id === u.id);
          if (uBonus && uBonus.answers) {
             for (const [qId, ans] of Object.entries<any>(uBonus.answers)) {
                const q: any = bonusQs.find((x:any) => x.id === qId);
-               if (q) {
+               if (q && String(ans).trim() !== "") {
                   let pts = 0;
                   let isGraded = false;
                   const truth = realBonusAns[qId];
@@ -1404,7 +1402,12 @@ const handleExportPredictions = async (targetUserId: string | "ALL", targetUserN
                         if (isCorrect) pts = (Number(q.points) || 0);
                      }
                   }
-                  csvContent += `"${uName}","בונוס","${q.label.replace(/"/g, '""')}","${String(ans).replace(/"/g, '""')}","${isGraded ? pts : '-'}"\n`;
+                  
+                  let phaseStr = q.phase === "GROUPS" ? "בתים" : q.phase === "KNOCKOUT" ? "נוקאאוט" : "כל הטורניר";
+                  let weightStr = q.weight === "DOUBLE" ? "דאבל" : q.isSurprise ? "הפתעה" : "רגיל";
+                  let stageStr = `${phaseStr} - ${weightStr}`;
+
+                  csvContent += `${escapeCSV(uName)},"בונוס",${escapeCSV(stageStr)},${escapeCSV(q.label)},${escapeCSV(String(ans))},${escapeCSV(formatAuditTime(uBonus.updatedAt))},${escapeCSV(isGraded ? pts.toString() : '-')}\n`;
                }
             }
          }
@@ -1414,12 +1417,12 @@ const handleExportPredictions = async (targetUserId: string | "ALL", targetUserN
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.setAttribute("href", url);
-      link.setAttribute("download", `predictions_${targetUserId === "ALL" ? "ALL_USERS" : targetUserName}_${new Date().toISOString().split('T')[0]}.csv`);
+      link.setAttribute("download", `predictions_log_${targetUserId === "ALL" ? "ALL_USERS" : targetUserName}_${new Date().toISOString().split('T')[0]}.csv`);
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
 
-      toast.success("קובץ הניחושים הורד בהצלחה!", { id: "csvExport" });
+      toast.success("קובץ הניחושים נוצר בהצלחה!", { id: "csvExport" });
     } catch (err) {
       console.error(err);
       toast.error("שגיאה בהורדת הניחושים.", { id: "csvExport" });
@@ -1427,6 +1430,7 @@ const handleExportPredictions = async (targetUserId: string | "ALL", targetUserN
       setIsCalculating(false);
     }
   };
+  
   const renderProgressBar = (label: string, count: number, total: number, colorClass: string, onClickAction: () => void) => {
     const percent = total > 0 ? Math.round((count / total) * 100) : 0;
     return (
@@ -1447,97 +1451,129 @@ const handleExportPredictions = async (targetUserId: string | "ALL", targetUserN
   };
 
   if (isCheckingAuth) return <div className="min-h-screen bg-slate-900 flex items-center justify-center text-white text-2xl">בודק הרשאות...</div>;
-  if (!user || user.email !== ADMIN_EMAIL) return <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center text-white text-center"><h1 className="text-6xl mb-4">⛔</h1><h2 className="text-3xl font-bold text-red-500 mb-2">גישה נדחתה</h2><Link href="/" className="px-6 py-3 bg-blue-600 rounded-full font-bold mt-4">חזור</Link></div>;
+  if (!user || user.email !== ADMIN_EMAIL) return <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center text-white text-center"><h1 className="text-6xl mb-4">⛔</h1><h2 className="text-3xl font-bold text-rose-500 mb-2">גישה נדחתה</h2><Link href="/" className="px-6 py-3 bg-blue-600 rounded-full font-bold mt-4 shadow-lg">חזור למשחק</Link></div>;
 
   return (
-    <div className="min-h-screen bg-slate-950 p-8 font-sans" dir="rtl">
+    <div className="min-h-screen bg-slate-950 p-4 md:p-8 font-sans" dir="rtl">
       <div className="max-w-6xl mx-auto">
         
-        <div className="bg-gradient-to-r from-red-900/50 to-slate-900 p-8 rounded-3xl border border-red-500/30 shadow-2xl mb-8 flex justify-between items-center">
-          <div><h1 className="text-4xl font-extrabold text-white mb-2 flex items-center gap-3"><span className="text-red-500">🛠️</span> חדר בקרה</h1></div>
-          <Link href="/" className="px-6 py-3 bg-slate-800 border border-slate-700 rounded-xl font-bold text-white hover:bg-slate-700">חזור למשחק</Link>
+        {/* כותרת פאנל ניהול (מראה גיימרי חדש!) */}
+        <div className="bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-slate-800 via-slate-900 to-slate-950 p-6 md:p-8 rounded-3xl border border-slate-800 shadow-2xl mb-8 flex flex-col md:flex-row justify-between items-center gap-4 relative overflow-hidden">
+          <div className="absolute -top-10 -right-10 w-40 h-40 bg-blue-500/10 rounded-full blur-3xl pointer-events-none"></div>
+          <div className="absolute -bottom-10 -left-10 w-40 h-40 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none"></div>
+          
+          <div className="relative z-10 text-center md:text-right">
+            <h1 className="text-3xl md:text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400 mb-2 flex items-center justify-center md:justify-start gap-3">
+              <span className="text-white drop-shadow-md">⚙️</span> חדר הבקרה
+            </h1>
+            <p className="text-slate-400 text-sm font-medium">ברוך הבא לאדמין פאנל. מכאן מנהלים את כל המשחק.</p>
+          </div>
+          <Link href="/" className="relative z-10 px-6 py-3 bg-slate-800 hover:bg-slate-700 border border-slate-600 rounded-xl font-bold text-white transition-all shadow-lg flex items-center gap-2">
+            חזור למשחק <span>➡️</span>
+          </Link>
         </div>
 
-        <div className="mb-6 p-6 bg-emerald-900/20 border border-emerald-500/30 rounded-3xl flex flex-col md:flex-row gap-4 justify-between items-center shadow-lg">
-          <div>
-             <h2 className="text-2xl font-bold text-emerald-400 mb-1">ניהול ניקוד ומגמות (Trends)</h2>
-             <p className="text-slate-400 text-sm">לחץ על הריצת מנוע אחרי תוצאות, ושמור תמונת מצב בסוף יום כדי לחשב חצים לירידות/עליות בדירוג.</p>
+        {/* בר המשימות המהיר של הניקוד */}
+        <div className="mb-6 p-6 bg-slate-900 border border-emerald-500/30 rounded-3xl flex flex-col md:flex-row gap-4 justify-between items-center shadow-xl relative overflow-hidden group">
+          <div className="absolute inset-0 bg-emerald-500/5 group-hover:bg-emerald-500/10 transition-colors pointer-events-none"></div>
+          <div className="relative z-10 text-center md:text-right">
+             <h2 className="text-xl md:text-2xl font-bold text-emerald-400 mb-1">מנוע חישוב ניקוד 🏆</h2>
+             <p className="text-slate-400 text-sm">הזנת תוצאה באדמין? לחץ על הריצת מנוע כדי לעדכן את הטבלאות. שמור תמונת מצב בלילה כדי לייצר מגמות למחר.</p>
           </div>
-          <div className="flex gap-3 w-full md:w-auto">
-             <button onClick={handleTakeSnapshot} disabled={isCalculating} className="flex-1 md:flex-none px-6 py-3 rounded-xl font-bold border border-emerald-500/50 text-emerald-400 hover:bg-emerald-500/10 transition-all">{isCalculating ? "⏳" : "📸 שמור תמונת מצב (סוף יום)"}</button>
-             <button onClick={() => handleCalculateScores()} disabled={isCalculating} className="flex-1 md:flex-none px-8 py-3 rounded-xl font-extrabold shadow-xl bg-emerald-600 hover:bg-emerald-500 text-white transition-all">{isCalculating ? "⏳" : "🚀 הרץ מנוע ניקוד"}</button>
+          <div className="flex gap-3 w-full md:w-auto relative z-10">
+             <button onClick={handleTakeSnapshot} disabled={isCalculating} className="flex-1 md:flex-none px-6 py-3 rounded-xl font-bold border border-emerald-500/50 text-emerald-400 hover:bg-emerald-900/50 transition-all shadow-sm">
+               {isCalculating ? "⏳" : "📸 סוף יום (Snapshot)"}
+             </button>
+             <button onClick={() => handleCalculateScores()} disabled={isCalculating} className="flex-1 md:flex-none px-8 py-3 rounded-xl font-black shadow-[0_0_15px_rgba(16,185,129,0.3)] bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white transition-all transform active:scale-95">
+               {isCalculating ? "⏳" : "🚀 הרץ מנוע ניקוד!"}
+             </button>
           </div>
         </div>
 
-        <div className="flex gap-2 mb-8 bg-slate-900 p-2 rounded-2xl border border-slate-800 overflow-x-auto">
+        {/* טאבים בסגנון פרימיום */}
+        <div className="flex gap-2 mb-8 bg-slate-900/60 p-2 rounded-2xl border border-slate-800 overflow-x-auto custom-scrollbar shadow-inner">
           {[
             { id: "SYSTEM", label: "⏱️ שעון המערכת" }, 
-            { id: "USERS", label: "👥 משתמשים וכתבות" },
+            { id: "USERS", label: "👥 משתמשים" },
             { id: "MATCHES", label: "⚽ משחקים" }, 
-            { id: "QUALIFIERS", label: "🥇 עולות מבתים" }, 
-            { id: "THIRD_PLACE", label: "🥉 8 המעפילות" }, 
+            { id: "QUALIFIERS", label: "🥇 בתים" }, 
+            { id: "THIRD_PLACE", label: "🥉 8 מעפילות" }, 
             { id: "BONUS", label: "⭐ בונוסים" },
-            { id: "STATS", label: "📊 תובנות" },
-            { id: "BACKUP", label: "💾 גיבוי ושחזור" }
+            { id: "STATS", label: "📊 ראדאר" },
+            { id: "BACKUP", label: "💾 גיבוי" }
           ].map(tab => (
-            <button key={tab.id} onClick={() => setActiveTab(tab.id as any)} className={`px-6 py-3 rounded-xl font-bold whitespace-nowrap ${activeTab === tab.id ? "bg-red-600 text-white shadow-lg" : "text-slate-400 hover:text-white"}`}>{tab.label}</button>
+            <button 
+               key={tab.id} 
+               onClick={() => setActiveTab(tab.id as any)} 
+               className={`px-5 py-3 rounded-xl font-bold whitespace-nowrap transition-all flex-1 text-center text-sm md:text-base ${activeTab === tab.id ? "bg-gradient-to-r from-blue-600 to-cyan-600 text-white shadow-lg transform scale-[1.02] border border-blue-500/50" : "text-slate-400 hover:text-white hover:bg-slate-800"}`}
+            >
+              {tab.label}
+            </button>
           ))}
         </div>
 
-        <div className="bg-slate-900 p-8 rounded-3xl border border-slate-800 shadow-xl min-h-[50vh]">
+        {/* אזור התוכן המרכזי */}
+        <div className="bg-slate-900 p-4 md:p-8 rounded-3xl border border-slate-800 shadow-xl min-h-[50vh]">
 
           {/* --- טאב גיבוי ושחזור --- */}
           {activeTab === "BACKUP" && (
-            <div className="space-y-8 max-w-3xl mx-auto">
-              <div className="bg-gradient-to-r from-blue-900/50 to-slate-800 p-8 rounded-3xl border border-blue-500/30 shadow-xl">
+            <div className="space-y-8 max-w-3xl mx-auto animate-fade-in-up">
+              <div className="bg-gradient-to-br from-slate-800 to-slate-900 p-8 rounded-3xl border border-blue-500/30 shadow-xl relative overflow-hidden">
+                <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500 to-cyan-400"></div>
                 <h2 className="text-2xl font-bold text-white mb-2 flex items-center gap-2"><span>💾</span> גיבוי נתונים מלא (Export)</h2>
-                <p className="text-slate-400 mb-6 text-sm">הורד קובץ JSON המכיל את כל מסד הנתונים: משתמשים, ניחושים מכל הסוגים, משחקים, הגדרות הטורניר ותוצאות האמת של האדמין. הקובץ מהווה תמונת מצב (Snapshot) מדויקת לנקודת הזמן הנוכחית.</p>
-                <button onClick={handleExportBackup} disabled={isCalculating} className="bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 px-6 rounded-xl transition-all shadow-lg w-full md:w-auto">{isCalculating ? "מייצר קובץ גיבוי... ⏳" : "⬇️ הורד קובץ גיבוי למחשב"}</button>
+                <p className="text-slate-400 mb-6 text-sm leading-relaxed">הורד קובץ JSON המכיל את כל מסד הנתונים: משתמשים, ניחושים מכל הסוגים, משחקים, הגדרות הטורניר ותוצאות האמת של האדמין. הקובץ מהווה תמונת מצב מדויקת.</p>
+                <button onClick={handleExportBackup} disabled={isCalculating} className="bg-blue-600 hover:bg-blue-500 text-white font-bold py-3.5 px-6 rounded-xl transition-all shadow-lg w-full md:w-auto text-lg">{isCalculating ? "מייצר קובץ גיבוי... ⏳" : "⬇️ הורד קובץ גיבוי למחשב"}</button>
               </div>
 
-              <div className="bg-gradient-to-r from-rose-900/20 to-slate-800 p-8 rounded-3xl border border-rose-500/30 shadow-xl mt-8">
+              <div className="bg-gradient-to-br from-slate-800 to-slate-900 p-8 rounded-3xl border border-rose-500/30 shadow-xl mt-8 relative overflow-hidden">
+                <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-rose-500 to-red-400"></div>
                 <h2 className="text-2xl font-bold text-rose-400 mb-2 flex items-center gap-2"><span>⚠️</span> שחזור נתונים מקובץ (Import)</h2>
-                <p className="text-slate-400 mb-6 text-sm">העלה קובץ גיבוי (JSON) ששמרת בעבר באמצעות המערכת. <br/><strong className="text-rose-300">שים לב:</strong> פעולה זו תדרוס לחלוטין את הנתונים הקיימים במערכת עם הנתונים שנמצאים בקובץ!</p>
+                <p className="text-slate-400 mb-6 text-sm leading-relaxed">העלה קובץ גיבוי (JSON) ששמרת בעבר באמצעות המערכת. <br/><strong className="text-rose-300">שים לב:</strong> פעולה זו תדרוס לחלוטין את הנתונים הקיימים במערכת עם הנתונים שבקובץ!</p>
                 <input type="file" accept=".json" id="import-backup" className="hidden" onChange={handleImportBackup} />
-                <label htmlFor="import-backup" className="cursor-pointer bg-rose-600 hover:bg-rose-500 text-white font-bold py-3 px-6 rounded-xl transition-all shadow-lg inline-block w-full md:w-auto text-center">{isCalculating ? "קורא קובץ ומשחזר... ⏳" : "📤 העלה קובץ לביצוע שחזור מערכת"}</label>
+                <label htmlFor="import-backup" className="cursor-pointer bg-rose-600 hover:bg-rose-500 text-white font-bold py-3.5 px-6 rounded-xl transition-all shadow-lg inline-block w-full md:w-auto text-center text-lg">{isCalculating ? "קורא קובץ ומשחזר... ⏳" : "📤 העלה קובץ שחזור"}</label>
               </div>
             </div>
           )}
 
           {/* --- טאב שעון המערכת --- */}
           {activeTab === "SYSTEM" && (
-            <div className="space-y-8 max-w-3xl mx-auto">
-              <div className="bg-slate-800 p-8 rounded-3xl border border-blue-500/30 shadow-2xl relative overflow-hidden">
+            <div className="space-y-8 max-w-3xl mx-auto animate-fade-in-up">
+              <div className="bg-slate-800 p-6 md:p-8 rounded-3xl border border-blue-500/30 shadow-2xl relative overflow-hidden">
                 <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/10 rounded-full blur-3xl pointer-events-none"></div>
-                <h2 className="text-3xl font-extrabold text-white mb-2 flex items-center gap-3 relative z-10"><span>⏱️</span> ציר הזמן של הטורניר</h2>
-                <div className="bg-slate-900/50 p-6 rounded-2xl border border-slate-700 relative z-10">
-                  <h3 className="text-xl font-bold text-white mb-4">המצב הנוכחי:</h3>
-                  <select value={tournamentState} onChange={e => setTournamentState(Number(e.target.value))} className="w-full bg-slate-950 text-white font-bold text-lg p-4 rounded-xl border border-blue-500/50 focus:border-blue-400 outline-none cursor-pointer mb-6">
+                <h2 className="text-3xl font-black text-white mb-2 flex items-center gap-3 relative z-10"><span>⏱️</span> ציר הזמן של הטורניר</h2>
+                <p className="text-slate-400 text-sm mb-6 relative z-10">שינוי מצב כאן ינעל באופן אוטומטי כרטיסיות למשתמשים ויחשוף שלבים חדשים.</p>
+                
+                <div className="bg-slate-900/80 backdrop-blur-sm p-6 rounded-2xl border border-slate-700 relative z-10 shadow-inner">
+                  <h3 className="text-lg font-bold text-slate-300 mb-3">בחר סטטוס נוכחי:</h3>
+                  <select value={tournamentState} onChange={e => setTournamentState(Number(e.target.value))} className="w-full bg-slate-950 text-blue-400 font-bold text-lg p-4 rounded-xl border border-slate-600 focus:border-blue-500 outline-none cursor-pointer mb-6 shadow-sm">
                     {TIMELINE_STATES.map(state => <option key={state.val} value={state.val}>{state.label}</option>)}
                   </select>
-                  <div className="p-4 bg-blue-900/20 border border-blue-500/30 rounded-lg">
-                    <h4 className="text-blue-400 font-bold mb-1">מה קורה במצב הזה?</h4>
-                    <p className="text-slate-300 text-sm">{TIMELINE_STATES.find(s => s.val === tournamentState)?.desc}</p>
+                  <div className="p-4 bg-blue-900/20 border border-blue-500/30 rounded-xl">
+                    <h4 className="text-blue-400 font-bold mb-1">משמעות הסטטוס:</h4>
+                    <p className="text-slate-300 text-sm font-medium">{TIMELINE_STATES.find(s => s.val === tournamentState)?.desc}</p>
                   </div>
                 </div>
-                <button onClick={handleSaveTournamentState} className="w-full mt-8 py-4 bg-blue-600 hover:bg-blue-500 text-white font-extrabold rounded-xl text-xl transition-all shadow-lg relative z-10">
-                  {savingId === "system" ? "מעדכן... ⏳" : "שמור מצב טורניר 💾"}
+                
+                <button onClick={handleSaveTournamentState} className="w-full mt-6 py-4 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white font-black rounded-xl text-lg transition-all shadow-[0_0_15px_rgba(59,130,246,0.3)] relative z-10 active:scale-95">
+                  {savingId === "system" ? "מעדכן... ⏳" : "💾 שמור מצב טורניר"}
                 </button>
-                <div className="bg-slate-900/50 p-6 rounded-2xl border border-slate-700 relative z-10 mt-6">
-                  <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2"><span>⏳</span> מועדי נעילה (לספירה לאחור)</h3>
-                  <p className="text-slate-400 text-sm mb-6">הגדר כאן את התאריך והשעה המדויקים שבהם תרצה לנעול כל מחזור.</p>
+                
+                <div className="bg-slate-900/80 p-6 rounded-2xl border border-slate-700 relative z-10 mt-8 shadow-inner">
+                  <h3 className="text-xl font-bold text-white mb-2 flex items-center gap-2"><span>⏳</span> שעוני עצר (מועדי נעילה)</h3>
+                  <p className="text-slate-400 text-sm mb-6">הגדר כאן מתי להציג את אזהרת ההתקרבות לנעילת כל מחזור.</p>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                    <div><label className="text-slate-400 text-sm block mb-2 font-bold">מחזור 1 (+עולות)</label><input type="datetime-local" value={deadlines.md1 || ""} onChange={e => setDeadlines({...deadlines, md1: e.target.value})} className="w-full bg-slate-800 text-white p-3 rounded-lg border border-slate-600 outline-none focus:border-blue-500" /></div>
-                    <div><label className="text-slate-400 text-sm block mb-2 font-bold">מחזור 2</label><input type="datetime-local" value={deadlines.md2 || ""} onChange={e => setDeadlines({...deadlines, md2: e.target.value})} className="w-full bg-slate-800 text-white p-3 rounded-lg border border-slate-600 outline-none focus:border-blue-500" /></div>
-                    <div><label className="text-slate-400 text-sm block mb-2 font-bold">מחזור 3</label><input type="datetime-local" value={deadlines.md3 || ""} onChange={e => setDeadlines({...deadlines, md3: e.target.value})} className="w-full bg-slate-800 text-white p-3 rounded-lg border border-slate-600 outline-none focus:border-blue-500" /></div>
+                    <div><label className="text-slate-400 text-xs block mb-2 font-bold uppercase tracking-wider">מחזור 1 (+עולות)</label><input type="datetime-local" value={deadlines.md1 || ""} onChange={e => setDeadlines({...deadlines, md1: e.target.value})} className="w-full bg-slate-950 text-white p-3 rounded-xl border border-slate-600 outline-none focus:border-blue-500" /></div>
+                    <div><label className="text-slate-400 text-xs block mb-2 font-bold uppercase tracking-wider">מחזור 2</label><input type="datetime-local" value={deadlines.md2 || ""} onChange={e => setDeadlines({...deadlines, md2: e.target.value})} className="w-full bg-slate-950 text-white p-3 rounded-xl border border-slate-600 outline-none focus:border-blue-500" /></div>
+                    <div><label className="text-slate-400 text-xs block mb-2 font-bold uppercase tracking-wider">מחזור 3</label><input type="datetime-local" value={deadlines.md3 || ""} onChange={e => setDeadlines({...deadlines, md3: e.target.value})} className="w-full bg-slate-950 text-white p-3 rounded-xl border border-slate-600 outline-none focus:border-blue-500" /></div>
                   </div>
-                  <button onClick={handleSaveDeadlines} className="w-full py-3 bg-slate-700 hover:bg-slate-600 border border-slate-600 text-white font-bold rounded-xl transition-all shadow-sm">{savingId === "deadlines" ? "שומר..." : "שמור שעוני עצר 💾"}</button>
+                  <button onClick={handleSaveDeadlines} className="w-full py-3.5 bg-slate-700 hover:bg-slate-600 border border-slate-500 text-white font-bold rounded-xl transition-all shadow-sm active:scale-95">{savingId === "deadlines" ? "שומר..." : "💾 שמור שעוני עצר"}</button>
                 </div>
 
-                <div className="bg-rose-900/20 p-6 rounded-2xl border border-rose-500/50 relative z-10 mt-12">
-                  <h3 className="text-xl font-black text-rose-500 mb-2 flex items-center gap-2"><span>⚠️</span> אזור סכנה (Danger Zone)</h3>
-                  <p className="text-rose-300 text-sm mb-6">כפתור זה ימחק לחלוטין את כל המשתמשים, ינקה את כל הניחושים, יאפס את תוצאות האמת, ויחזיר את שעון הטורניר ל-0. <strong>המשחקים ושאלות הבונוס לא יימחקו</strong>.</p>
-                  <button onClick={handleFactoryReset} disabled={isCalculating} className="w-full py-4 bg-rose-600 hover:bg-rose-700 text-white font-extrabold rounded-xl transition-all shadow-[0_0_20px_rgba(225,29,72,0.4)]">{isCalculating ? "משמיד נתונים... ⏳" : "🧨 מחק הכל ואפס למצב ונילה (Factory Reset)"}</button>
+                <div className="bg-rose-900/20 p-6 rounded-2xl border border-rose-500/50 relative z-10 mt-12 overflow-hidden group">
+                  <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0IiBoZWlnaHQ9IjQiPgo8cmVjdCB3aWR0aD0iNCIgaGVpZ2h0PSI0IiBmaWxsPSIjZmZmIiBmaWxsLW9wYWNpdHk9IjAuMSIvPgo8L3N2Zz4=')] opacity-20 pointer-events-none"></div>
+                  <h3 className="text-xl font-black text-rose-500 mb-2 flex items-center gap-2 relative z-10"><span>⚠️</span> אזור סכנה (Danger Zone)</h3>
+                  <p className="text-rose-300 text-sm mb-6 relative z-10">כפתור זה ימחק לחלוטין את כל המשתמשים, ינקה את כל הניחושים, יאפס את תוצאות האמת, ויחזיר את שעון הטורניר ל-0. <strong>המשחקים ושאלות הבונוס לא יימחקו</strong>.</p>
+                  <button onClick={handleFactoryReset} disabled={isCalculating} className="w-full py-4 bg-rose-600 hover:bg-rose-700 text-white font-extrabold rounded-xl transition-all shadow-[0_0_20px_rgba(225,29,72,0.4)] relative z-10 active:scale-95">{isCalculating ? "משמיד נתונים... ⏳" : "🧨 Factory Reset (מחק נתוני משתמשים)"}</button>
                 </div>
               </div>
             </div>
@@ -1545,25 +1581,25 @@ const handleExportPredictions = async (targetUserId: string | "ALL", targetUserN
 
           {/* 📊 ראדאר סטטיסטיקות */}
           {activeTab === "STATS" && (
-            <div className="space-y-8 relative">
-               <div className="flex justify-between items-center bg-indigo-900/30 p-6 rounded-3xl border border-indigo-500/30 shadow-lg">
+            <div className="space-y-8 relative animate-fade-in-up">
+               <div className="flex flex-col md:flex-row justify-between items-start md:items-center bg-gradient-to-r from-indigo-900/50 to-slate-800 p-6 md:p-8 rounded-3xl border border-indigo-500/30 shadow-lg gap-6">
                  <div>
-                   <h2 className="text-2xl font-extrabold text-indigo-400 flex items-center gap-2"><span>📡</span> ראדאר תובנות קהל (עם Audit Log)</h2>
-                   <p className="text-slate-400 text-sm mt-1">לחץ על הברים כדי לראות מי הצביע מתי.</p>
+                   <h2 className="text-2xl md:text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-purple-400 flex items-center gap-2"><span>📡</span> ראדאר תובנות וביון</h2>
+                   <p className="text-slate-400 text-sm mt-2">סרוק את הנתונים, צפה בהתפלגויות הקהל, ולחץ על הברים כדי לראות מי בדיוק אמר מה.</p>
                  </div>
-                 <button onClick={handleGenerateStats} disabled={isCalculating} className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-3 px-8 rounded-xl transition-all shadow-lg shadow-indigo-500/25">
-                   {isCalculating ? "סורק נתונים... ⏳" : "🔍 סרוק מסד נתונים עכשיו"}
+                 <button onClick={handleGenerateStats} disabled={isCalculating} className="w-full md:w-auto bg-indigo-600 hover:bg-indigo-500 text-white font-black py-4 px-8 rounded-xl transition-all shadow-[0_0_20px_rgba(79,70,229,0.3)] active:scale-95">
+                   {isCalculating ? "סורק נתונים מסווגים... ⏳" : "🔍 התחל סריקת ראדאר"}
                  </button>
                </div>
 
                {!statsData ? (
-                 <div className="text-center text-slate-500 py-16 border border-dashed border-slate-700 rounded-3xl">לחץ על הסריקה כדי לשלוף את הסטטיסטיקות העדכניות.</div>
+                 <div className="text-center text-slate-500 py-16 border border-dashed border-slate-700 rounded-3xl font-bold text-lg">יש ללחוץ על "סריקת ראדאר" כדי להציג את הנתונים המעודכנים.</div>
                ) : (
-                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                 <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
                    
-                   <div className="bg-slate-800 p-6 rounded-3xl border border-slate-700 shadow-xl">
-                      <h3 className="text-xl font-bold text-white mb-6 border-b border-slate-700 pb-3">⚽ התפלגות ניחושי משחק</h3>
-                      <select value={selectedStatMatch} onChange={(e) => setSelectedStatMatch(e.target.value)} className="w-full bg-slate-900 text-white font-bold p-3 rounded-xl border border-slate-600 mb-6 outline-none">
+                   <div className="bg-slate-800 p-6 md:p-8 rounded-3xl border border-slate-700 shadow-xl">
+                      <h3 className="text-xl md:text-2xl font-black text-white mb-6 border-b border-slate-700 pb-3">⚽ התפלגות ניחושי משחק</h3>
+                      <select value={selectedStatMatch} onChange={(e) => setSelectedStatMatch(e.target.value)} className="w-full bg-slate-900 text-blue-300 font-bold p-3.5 rounded-xl border border-slate-600 mb-6 outline-none shadow-inner cursor-pointer">
                         {matches.map(m => (<option key={m.id} value={m.id}>{m.homeTeam} נגד {m.awayTeam}</option>))}
                       </select>
                       {statsData.matches[selectedStatMatch] ? (
@@ -1572,19 +1608,19 @@ const handleExportPredictions = async (targetUserId: string | "ALL", targetUserN
                              const match = matches.find(m => m.id === selectedStatMatch);
                              const stats = statsData.matches[selectedStatMatch];
                              return (
-                               <>
+                               <div className="bg-slate-900/50 p-4 rounded-2xl border border-slate-700/50 shadow-inner mb-6">
                                  {renderProgressBar(match?.homeTeam || "קבוצת בית", stats.homeWins.length, stats.total, "bg-blue-500", () => { if(stats.homeWins.length>0) setStatSpyModal({ title: `הימרו על ${match?.homeTeam}`, list: stats.homeWins, type: "MATCH_DIRECTION" })})}
                                  {renderProgressBar("תיקו", stats.draws.length, stats.total, "bg-slate-400", () => { if(stats.draws.length>0) setStatSpyModal({ title: `הימרו על תיקו`, list: stats.draws, type: "MATCH_DIRECTION" })})}
                                  {renderProgressBar(match?.awayTeam || "קבוצת חוץ", stats.awayWins.length, stats.total, "bg-emerald-500", () => { if(stats.awayWins.length>0) setStatSpyModal({ title: `הימרו על ${match?.awayTeam}`, list: stats.awayWins, type: "MATCH_DIRECTION" })})}
-                               </>
+                               </div>
                              )
                           })()}
-                          <div className="mt-8 bg-slate-900 p-4 rounded-xl border border-slate-700/50">
-                            <h4 className="text-sm font-bold text-amber-400 mb-3">התוצאות הכי פופולריות:</h4>
-                            <div className="flex flex-wrap gap-3">
+                          <div>
+                            <h4 className="text-sm font-black text-amber-400 mb-3 border-t border-slate-700/50 pt-4">התוצאות הכי פופולריות:</h4>
+                            <div className="flex flex-wrap gap-2">
                               {Object.entries(statsData.matches[selectedStatMatch].exactScores).sort(([,a]:any, [,b]:any) => b.count - a.count).slice(0, 6).map(([score, data]: any) => (
-                                  <button key={score} onClick={() => setStatSpyModal({ title: `הימרו על תוצאה מדויקת ${score}`, list: data.users, type: "NAMES_ONLY" })} className="bg-slate-800 px-4 py-2 rounded-lg border border-slate-600 hover:border-amber-500 hover:bg-slate-700 font-black text-white flex gap-3 transition-colors group">
-                                    <span className="tracking-widest">{score}</span><span className="text-amber-500 text-sm group-hover:text-amber-400">({data.count} אנשים)</span>
+                                  <button key={score} onClick={() => setStatSpyModal({ title: `הימרו על תוצאה מדויקת ${score}`, list: data.users, type: "NAMES_ONLY" })} className="bg-slate-900 px-4 py-2.5 rounded-xl border border-slate-600 hover:border-amber-500 hover:bg-slate-800 font-black text-white flex gap-3 transition-colors shadow-sm">
+                                    <span className="tracking-widest">{score}</span><span className="text-amber-500 text-sm">({data.count})</span>
                                   </button>
                               ))}
                             </div>
@@ -1593,13 +1629,13 @@ const handleExportPredictions = async (targetUserId: string | "ALL", targetUserN
                       ) : (<div className="text-slate-500 text-center py-8">אף אחד לא ניחש עדיין את המשחק הזה.</div>)}
                    </div>
 
-                   <div className="bg-slate-800 p-6 rounded-3xl border border-slate-700 shadow-xl">
-                      <h3 className="text-xl font-bold text-amber-400 mb-6 border-b border-slate-700 pb-3">⭐ התפלגות שאלות בונוס</h3>
-                      <select value={selectedStatBonus} onChange={(e) => setSelectedStatBonus(e.target.value)} className="w-full bg-slate-900 text-white font-bold p-3 rounded-xl border border-amber-500/50 mb-6 outline-none">
+                   <div className="bg-slate-800 p-6 md:p-8 rounded-3xl border border-slate-700 shadow-xl">
+                      <h3 className="text-xl md:text-2xl font-black text-amber-400 mb-6 border-b border-slate-700 pb-3">⭐ שאלות בונוס</h3>
+                      <select value={selectedStatBonus} onChange={(e) => setSelectedStatBonus(e.target.value)} className="w-full bg-slate-900 text-amber-300 font-bold p-3.5 rounded-xl border border-slate-600 mb-6 outline-none shadow-inner cursor-pointer">
                         {bonusQuestions.map(q => (<option key={q.id} value={q.id}>{q.label}</option>))}
                       </select>
                       {statsData.bonuses[selectedStatBonus] ? (
-                        <div className="space-y-2">
+                        <div className="bg-slate-900/50 p-4 rounded-2xl border border-slate-700/50 shadow-inner max-h-[300px] overflow-y-auto custom-scrollbar pr-2 space-y-2">
                           {Object.entries(statsData.bonuses[selectedStatBonus].answers).sort(([,a]:any, [,b]:any) => b.count - a.count).map(([answer, data]: any, idx) => {
                               return renderProgressBar(answer, data.count, statsData.bonuses[selectedStatBonus].total, idx === 0 ? "bg-amber-500" : "bg-slate-500", () => setStatSpyModal({ title: `הימרו על: ${answer}`, list: data.users, type: "NAMES_ONLY" }));
                           })}
@@ -1607,25 +1643,27 @@ const handleExportPredictions = async (targetUserId: string | "ALL", targetUserN
                       ) : (<div className="text-slate-500 text-center py-8">אף אחד לא ענה על שאלת הבונוס הזו.</div>)}
                    </div>
 
-                   <div className="bg-slate-800 p-6 rounded-3xl border border-slate-700 shadow-xl">
-                      <h3 className="text-xl font-bold text-teal-400 mb-6 border-b border-slate-700 pb-3">🥇 עולות מהבתים</h3>
-                      <select value={selectedStatGroup} onChange={(e) => setSelectedStatGroup(e.target.value)} className="w-full bg-slate-900 text-white font-bold p-3 rounded-xl border border-teal-500/50 mb-6 outline-none">
+                   <div className="bg-slate-800 p-6 md:p-8 rounded-3xl border border-slate-700 shadow-xl">
+                      <h3 className="text-xl md:text-2xl font-black text-teal-400 mb-6 border-b border-slate-700 pb-3">🥇 עולות מהבתים</h3>
+                      <select value={selectedStatGroup} onChange={(e) => setSelectedStatGroup(e.target.value)} className="w-full bg-slate-900 text-teal-300 font-bold p-3.5 rounded-xl border border-slate-600 mb-6 outline-none shadow-inner cursor-pointer">
                         {groupsList.map(g => <option key={g} value={g}>בית {g}</option>)}
                       </select>
                       {statsData.qualifiers[selectedStatGroup] ? (
                         <div className="space-y-6">
-                          <div><h4 className="text-slate-300 font-bold mb-3">מקום 1:</h4>{Object.entries(statsData.qualifiers[selectedStatGroup].first).sort(([,a]:any, [,b]:any) => b.count - a.count).map(([team, data]: any) => renderProgressBar(team, data.count, statsData.qualifiers[selectedStatGroup].total, "bg-teal-500", () => setStatSpyModal({ title: `הימרו על ${team} (מקום 1 - בית ${selectedStatGroup})`, list: data.users, type: "NAMES_ONLY" })))}</div>
-                          <div><h4 className="text-slate-300 font-bold mb-3">מקום 2:</h4>{Object.entries(statsData.qualifiers[selectedStatGroup].second).sort(([,a]:any, [,b]:any) => b.count - a.count).map(([team, data]: any) => renderProgressBar(team, data.count, statsData.qualifiers[selectedStatGroup].total, "bg-emerald-500", () => setStatSpyModal({ title: `הימרו על ${team} (מקום 2 - בית ${selectedStatGroup})`, list: data.users, type: "NAMES_ONLY" })))}</div>
+                          <div className="bg-slate-900/50 p-4 rounded-2xl border border-slate-700/50 shadow-inner"><h4 className="text-teal-400 font-bold mb-4 border-b border-slate-700/50 pb-2">מקום 1:</h4>{Object.entries(statsData.qualifiers[selectedStatGroup].first).sort(([,a]:any, [,b]:any) => b.count - a.count).map(([team, data]: any) => renderProgressBar(team, data.count, statsData.qualifiers[selectedStatGroup].total, "bg-teal-500", () => setStatSpyModal({ title: `הימרו על ${team} (מקום 1 - בית ${selectedStatGroup})`, list: data.users, type: "NAMES_ONLY" })))}</div>
+                          <div className="bg-slate-900/50 p-4 rounded-2xl border border-slate-700/50 shadow-inner"><h4 className="text-emerald-400 font-bold mb-4 border-b border-slate-700/50 pb-2">מקום 2:</h4>{Object.entries(statsData.qualifiers[selectedStatGroup].second).sort(([,a]:any, [,b]:any) => b.count - a.count).map(([team, data]: any) => renderProgressBar(team, data.count, statsData.qualifiers[selectedStatGroup].total, "bg-emerald-500", () => setStatSpyModal({ title: `הימרו על ${team} (מקום 2 - בית ${selectedStatGroup})`, list: data.users, type: "NAMES_ONLY" })))}</div>
                         </div>
                       ) : (<div className="text-slate-500 text-center py-8">אין נתונים.</div>)}
                    </div>
 
-                   <div className="bg-slate-800 p-6 rounded-3xl border border-slate-700 shadow-xl">
-                      <h3 className="text-xl font-bold text-rose-400 mb-6 border-b border-slate-700 pb-3">🥉 8 המעפילות (מקום 3)</h3>
+                   <div className="bg-slate-800 p-6 md:p-8 rounded-3xl border border-slate-700 shadow-xl">
+                      <h3 className="text-xl md:text-2xl font-black text-rose-400 mb-6 border-b border-slate-700 pb-3">🥉 8 המעפילות (מקום 3)</h3>
                       {Object.keys(statsData.thirdPlace.teams).length > 0 ? (
-                        <div className="space-y-2 max-h-[400px] overflow-y-auto custom-scrollbar pr-2">
-                          <div className="text-xs text-slate-400 mb-4">אחוזים מחושבים מתוך סך המשתתפים שניחשו מעפילות:</div>
-                          {Object.entries(statsData.thirdPlace.teams).sort(([,a]:any, [,b]:any) => b.count - a.count).map(([team, data]: any) => renderProgressBar(team, data.count, statsData.thirdPlace.totalUsers, "bg-rose-500", () => setStatSpyModal({ title: `הימרו על ${team} (מקום 3)`, list: data.users, type: "NAMES_ONLY" })))}
+                        <div className="bg-slate-900/50 p-4 rounded-2xl border border-slate-700/50 shadow-inner max-h-[500px] overflow-y-auto custom-scrollbar pr-2">
+                          <div className="text-[10px] text-slate-500 mb-4 uppercase tracking-widest font-bold">אחוזים מחושבים מתוך סך המשתתפים שהצביעו:</div>
+                          <div className="space-y-3">
+                            {Object.entries(statsData.thirdPlace.teams).sort(([,a]:any, [,b]:any) => b.count - a.count).map(([team, data]: any) => renderProgressBar(team, data.count, statsData.thirdPlace.totalUsers, "bg-rose-500", () => setStatSpyModal({ title: `הימרו על ${team} (מקום 3)`, list: data.users, type: "NAMES_ONLY" })))}
+                          </div>
                         </div>
                       ) : (<div className="text-slate-500 text-center py-8">אין נתונים.</div>)}
                    </div>
@@ -1634,28 +1672,28 @@ const handleExportPredictions = async (targetUserId: string | "ALL", targetUserN
                )}
 
                {statSpyModal && (
-                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm">
-                    <div className="bg-slate-900 border border-slate-600 p-6 rounded-3xl w-full max-w-md max-h-[80vh] flex flex-col shadow-2xl relative">
-                       <div className="flex justify-between items-center mb-6 pb-4 border-b border-slate-800">
+                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-md animate-fade-in-up">
+                    <div className="bg-slate-900 border border-slate-600 p-6 rounded-3xl w-full max-w-md max-h-[85vh] flex flex-col shadow-2xl relative overflow-hidden md:resize">
+                       <div className="flex justify-between items-center mb-6 pb-4 border-b border-slate-800 shrink-0">
                          <h3 className="text-xl font-bold text-white flex items-center gap-2"><span>👀</span> {statSpyModal.title}</h3>
-                         <button onClick={() => setStatSpyModal(null)} className="text-slate-400 hover:text-rose-400 font-bold w-8 h-8 bg-slate-800 rounded-full flex items-center justify-center">✕</button>
+                         <button onClick={() => setStatSpyModal(null)} className="text-slate-400 hover:text-rose-400 font-bold w-10 h-10 bg-slate-800 rounded-full flex items-center justify-center border border-slate-700 transition-colors">✕</button>
                        </div>
                        <div className="overflow-y-auto custom-scrollbar flex-1 pr-2 space-y-2">
                           {statSpyModal.type === "NAMES_ONLY" ? (
                              statSpyModal.list.map((uObj, i) => (
-                               <div key={i} className="bg-slate-800 p-3 rounded-xl border border-slate-700 text-white font-medium flex justify-between items-center gap-3 hover:bg-slate-700 transition-colors">
-                                 <div className="flex items-center gap-2"><span className="text-slate-500 text-sm">{i+1}.</span> {uObj.name || uObj}</div>
-                                 {uObj.time && <div className="text-[10px] font-bold text-slate-400 bg-slate-900 border border-slate-700 px-2 py-1 rounded">עדכון אחרון: {uObj.time}</div>}
+                               <div key={i} className="bg-slate-800 p-3 rounded-xl border border-slate-700 text-white font-bold flex justify-between items-center gap-3 hover:bg-slate-700 transition-colors shadow-sm">
+                                 <div className="flex items-center gap-2"><span className="text-slate-500 text-xs w-4">{i+1}.</span> {uObj.name || uObj}</div>
+                                 {uObj.time && <div className="text-[10px] font-bold text-slate-400 bg-slate-900 border border-slate-700 px-2 py-1 rounded">עדכון: {uObj.time}</div>}
                                </div>
                              ))
                           ) : (
                              statSpyModal.list.sort((a, b) => b.home - a.home).map((userObj, i) => (
-                               <div key={i} className="bg-slate-800 p-3 rounded-xl border border-slate-700 flex justify-between items-center hover:bg-slate-700 transition-colors">
-                                  <div className="text-white font-medium flex flex-col gap-1">
-                                    <div className="flex items-center gap-2"><span className="text-slate-500 text-sm">{i+1}.</span> {userObj.name}</div>
+                               <div key={i} className="bg-slate-800 p-3 rounded-xl border border-slate-700 flex justify-between items-center hover:bg-slate-700 transition-colors shadow-sm">
+                                  <div className="text-white font-bold flex flex-col gap-1">
+                                    <div className="flex items-center gap-2"><span className="text-slate-500 text-xs w-4">{i+1}.</span> {userObj.name}</div>
                                     {userObj.time && <div className="text-[10px] font-bold text-slate-400 bg-slate-900 border border-slate-700 px-2 py-1 rounded inline-block w-fit">עדכון: {userObj.time}</div>}
                                   </div>
-                                  <div className="font-black text-slate-300 tracking-widest bg-slate-900 px-3 py-1 rounded-lg border border-slate-700 shadow-inner">
+                                  <div className="font-black text-slate-200 tracking-widest bg-slate-950 px-3 py-1.5 rounded-lg border border-slate-700 shadow-inner">
                                     {userObj.home} - {userObj.away}
                                   </div>
                                </div>
@@ -1668,45 +1706,26 @@ const handleExportPredictions = async (targetUserId: string | "ALL", targetUserN
             </div>
           )}
           
-          {/* --- משתמשים וכתבות --- */}
+          {/* --- משתמשים וכתבות (עם עיצוב הטבלה החדש!) --- */}
           {activeTab === "USERS" && (
             
-            <div className="space-y-8 max-w-4xl mx-auto">
-             <div className="bg-slate-800 p-6 rounded-3xl border border-indigo-500/30 shadow-xl mb-8">
-                <div className="flex justify-between items-center mb-4">
-                  <h2 className="text-xl font-bold text-indigo-400 flex items-center gap-2"><span>🔮</span> מחולל Wall of Fame / Shame</h2>
-                  <button onClick={handleCreateAutoInsights} className="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-lg font-bold transition-all shadow-md text-sm">
-                    {statsData ? "רענן תובנות מהראדאר 🔄" : "שלוף תובנות מהראדאר 🔍"}
-                  </button>
-                </div>
+            <div className="space-y-8 max-w-4xl mx-auto animate-fade-in-up">
+              
+              {/* המהדורה המרכזית */}
+              <div className="bg-gradient-to-br from-slate-800 to-slate-900 p-8 rounded-3xl border border-emerald-500/30 shadow-xl relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-2 h-full bg-gradient-to-b from-blue-400 to-emerald-500"></div>
+                <h2 className="text-2xl font-black text-white mb-2 flex items-center gap-2"><span>📰</span> עריכת המהדורה המרכזית (Rich Text)</h2>
+                <p className="text-slate-400 text-sm mb-6 leading-relaxed">השתמש בכפתורים כדי להוסיף עיצוב, תמונות וגיפים! משתמשים יראו את זה בלייב בכתבת המגזין שבדאשבורד.</p>
                 
-                {autoInsights.length > 0 ? (
-                  <div className="flex flex-col gap-2">
-                    {autoInsights.map((insight, idx) => (
-                      <div key={idx} className="bg-slate-900 border border-slate-700 p-3 rounded-xl flex justify-between items-center gap-4 group hover:border-indigo-500/50 transition-colors">
-                        <span className="text-slate-300 text-sm">{insight}</span>
-                        <button onClick={() => addInsightToMessage(insight)} className="bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600 hover:text-white border border-emerald-500/30 px-3 py-1 rounded-lg text-xs font-bold transition-all whitespace-nowrap opacity-0 group-hover:opacity-100">
-                          ➕ הוסף לטור
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-slate-500 text-sm">לחץ על הכפתור כדי לנתח את הסטטיסטיקות ולמצוא את הניחושים הכי מעניינים להיום.</p>
-                )}
-              </div> 
-              <div className="bg-slate-800 p-8 rounded-3xl border border-emerald-500/30 shadow-xl">
-                <h2 className="text-2xl font-bold text-white mb-2 flex items-center gap-2"><span>📰</span> הטור היומי (Rich Text)</h2>
-                <p className="text-slate-400 text-sm mb-4">השתמש בכפתורים כדי להוסיף עיצוב, תמונות וגיפים! משתמשים יראו את זה בלייב בכתבת המגזין שבדאשבורד.</p>
-                
-                <div className="flex flex-wrap gap-2 mb-0 bg-slate-900 p-3 rounded-t-xl border border-b-0 border-slate-700 items-center">
-                  <button onClick={() => insertTagToDailyMessage('<b>', '</b>')} className="bg-slate-800 hover:bg-slate-700 text-white px-3 py-1.5 rounded-lg text-sm font-bold transition-colors shadow-sm"><b>B</b> מודגש</button>
-                  <button onClick={() => insertTagToDailyMessage('<i>', '</i>')} className="bg-slate-800 hover:bg-slate-700 text-white px-3 py-1.5 rounded-lg text-sm font-bold transition-colors shadow-sm"><i>I</i> נטוי</button>
-                  <button onClick={() => insertTagToDailyMessage('<u>', '</u>')} className="bg-slate-800 hover:bg-slate-700 text-white px-3 py-1.5 rounded-lg text-sm font-bold transition-colors shadow-sm"><u>U</u> קו תחתון</button>
+                {/* סרגל הכלים */}
+                <div className="flex flex-wrap gap-2 mb-0 bg-slate-950 p-3 rounded-t-xl border border-b-0 border-slate-700 items-center shadow-inner">
+                  <button onClick={() => insertTagToDailyMessage('<b>', '</b>')} className="bg-slate-800 hover:bg-slate-700 text-white px-3 py-1.5 rounded-lg text-sm font-bold transition-colors border border-slate-600"><b>B</b> מודגש</button>
+                  <button onClick={() => insertTagToDailyMessage('<i>', '</i>')} className="bg-slate-800 hover:bg-slate-700 text-white px-3 py-1.5 rounded-lg text-sm font-bold transition-colors border border-slate-600"><i>I</i> נטוי</button>
+                  <button onClick={() => insertTagToDailyMessage('<u>', '</u>')} className="bg-slate-800 hover:bg-slate-700 text-white px-3 py-1.5 rounded-lg text-sm font-bold transition-colors border border-slate-600"><u>U</u> קו תחתון</button>
                   
                   <div className="w-px h-6 bg-slate-700 mx-1 self-center"></div>
                   
-                  <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-lg border border-slate-700">
+                  <div className="flex items-center gap-1 bg-slate-900 p-1 rounded-lg border border-slate-700 shadow-inner">
                     <button onClick={() => insertTagToDailyMessage('<div style="text-align: right;">\n', '\n</div>')} className="px-2 py-1 hover:bg-slate-800 rounded text-sm transition-colors text-slate-300" title="יישור לימין">▶️</button>
                     <button onClick={() => insertTagToDailyMessage('<div style="text-align: center;">\n', '\n</div>')} className="px-2 py-1 hover:bg-slate-800 rounded text-sm transition-colors text-slate-300" title="יישור למרכז">⏸️</button>
                     <button onClick={() => insertTagToDailyMessage('<div style="text-align: left;">\n', '\n</div>')} className="px-2 py-1 hover:bg-slate-800 rounded text-sm transition-colors text-slate-300" title="יישור לשמאל">◀️</button>
@@ -1714,27 +1733,26 @@ const handleExportPredictions = async (targetUserId: string | "ALL", targetUserN
                   
                   <div className="w-px h-6 bg-slate-700 mx-1 self-center"></div>
                   
-                  <button onClick={() => insertTagToDailyMessage('<h2>', '</h2>')} className="bg-slate-800 hover:bg-slate-700 text-blue-300 px-3 py-1.5 rounded-lg text-sm font-bold transition-colors shadow-sm">📝 כותרת גדולה</button>
-                  <button onClick={() => insertTagToDailyMessage('<h3>', '</h3>')} className="bg-slate-800 hover:bg-slate-700 text-emerald-300 px-3 py-1.5 rounded-lg text-sm font-bold transition-colors shadow-sm">📝 תת-כותרת</button>
-                  <button onClick={() => insertTagToDailyMessage('<h4>', '</h4>')} className="bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-1.5 rounded-lg text-sm font-bold transition-colors shadow-sm">📝 כותרת קטנה</button>
+                  <button onClick={() => insertTagToDailyMessage('<h2>', '</h2>')} className="bg-slate-800 hover:bg-slate-700 text-blue-300 px-3 py-1.5 rounded-lg text-sm font-bold transition-colors border border-slate-600">📝 כותרת גדולה</button>
+                  <button onClick={() => insertTagToDailyMessage('<h3>', '</h3>')} className="bg-slate-800 hover:bg-slate-700 text-emerald-300 px-3 py-1.5 rounded-lg text-sm font-bold transition-colors border border-slate-600">📝 תת-כותרת</button>
                   
                   <div className="w-px h-6 bg-slate-700 mx-1 self-center"></div>
                   
-                  <button onClick={() => insertTagToDailyMessage('<blockquote>', '</blockquote>')} className="bg-slate-800 hover:bg-slate-700 text-emerald-300 px-3 py-1.5 rounded-lg text-sm font-bold transition-colors shadow-sm">❝ ציטוט</button>
+                  <button onClick={() => insertTagToDailyMessage('<blockquote>', '</blockquote>')} className="bg-slate-800 hover:bg-slate-700 text-emerald-300 px-3 py-1.5 rounded-lg text-sm font-bold transition-colors border border-slate-600">❝ ציטוט</button>
                   
                   <div className="w-px h-6 bg-slate-700 mx-1 self-center"></div>
                   
-                  <div className="flex items-center gap-1.5 bg-slate-950 p-1.5 rounded-lg border border-slate-700">
-                    <span className="text-xs text-slate-500 font-bold px-1">מרקר:</span>
-                    <button onClick={() => insertTagToDailyMessage('<mark class="yellow">', '</mark>')} className="w-5 h-5 rounded-md bg-amber-500/80 hover:bg-amber-400 border border-amber-600 transition-colors" title="צהוב"></button>
-                    <button onClick={() => insertTagToDailyMessage('<mark class="green">', '</mark>')} className="w-5 h-5 rounded-md bg-emerald-500/80 hover:bg-emerald-400 border border-emerald-600 transition-colors" title="ירוק"></button>
-                    <button onClick={() => insertTagToDailyMessage('<mark class="blue">', '</mark>')} className="w-5 h-5 rounded-md bg-blue-500/80 hover:bg-blue-400 border border-blue-600 transition-colors" title="כחול"></button>
-                    <button onClick={() => insertTagToDailyMessage('<mark class="red">', '</mark>')} className="w-5 h-5 rounded-md bg-rose-500/80 hover:bg-rose-400 border border-rose-600 transition-colors" title="אדום"></button>
+                  <div className="flex items-center gap-1.5 bg-slate-900 p-1.5 rounded-lg border border-slate-700 shadow-inner">
+                    <span className="text-[10px] text-slate-500 font-bold px-1 uppercase">מרקר:</span>
+                    <button onClick={() => insertTagToDailyMessage('<mark class="yellow">', '</mark>')} className="w-5 h-5 rounded-md bg-amber-500/80 hover:bg-amber-400 border border-amber-600 transition-colors shadow-sm" title="צהוב"></button>
+                    <button onClick={() => insertTagToDailyMessage('<mark class="green">', '</mark>')} className="w-5 h-5 rounded-md bg-emerald-500/80 hover:bg-emerald-400 border border-emerald-600 transition-colors shadow-sm" title="ירוק"></button>
+                    <button onClick={() => insertTagToDailyMessage('<mark class="blue">', '</mark>')} className="w-5 h-5 rounded-md bg-blue-500/80 hover:bg-blue-400 border border-blue-600 transition-colors shadow-sm" title="כחול"></button>
+                    <button onClick={() => insertTagToDailyMessage('<mark class="red">', '</mark>')} className="w-5 h-5 rounded-md bg-rose-500/80 hover:bg-rose-400 border border-rose-600 transition-colors shadow-sm" title="אדום"></button>
                   </div>
 
                   <div className="w-px h-6 bg-slate-700 mx-1 self-center"></div>
-                  <button onClick={() => insertTagToDailyMessage('<ul>\n  <li>', '</li>\n</ul>')} className="bg-slate-800 hover:bg-slate-700 text-white px-3 py-1.5 rounded-lg text-sm font-bold transition-colors shadow-sm">📑 רשימה</button>
-                  <button onClick={() => insertTagToDailyMessage('<hr>\n', '')} className="bg-slate-800 hover:bg-slate-700 text-white px-3 py-1.5 rounded-lg text-sm font-bold transition-colors shadow-sm">➖ קו הפרדה</button>
+                  <button onClick={() => insertTagToDailyMessage('<ul>\n  <li>', '</li>\n</ul>')} className="bg-slate-800 hover:bg-slate-700 text-white px-3 py-1.5 rounded-lg text-sm font-bold transition-colors border border-slate-600">📑 רשימה</button>
+                  <button onClick={() => insertTagToDailyMessage('<hr>\n', '')} className="bg-slate-800 hover:bg-slate-700 text-white px-3 py-1.5 rounded-lg text-sm font-bold transition-colors border border-slate-600">➖ קו הפרדה</button>
                   <div className="w-px h-6 bg-slate-700 mx-1 self-center"></div>
                   <button onClick={() => insertTagToDailyMessage('<img src="', '" />')} className="bg-emerald-600/20 hover:bg-emerald-600/40 text-emerald-400 border border-emerald-500/30 px-3 py-1.5 rounded-lg text-sm font-bold transition-colors">🖼️ תמונה/גיף</button>
                   <button onClick={() => insertTagToDailyMessage('<a href="', '" target="_blank">טקסט ללחיצה</a>')} className="bg-blue-600/20 hover:bg-blue-600/40 text-blue-400 border border-blue-500/30 px-3 py-1.5 rounded-lg text-sm font-bold transition-colors">🔗 קישור</button>
@@ -1744,16 +1762,16 @@ const handleExportPredictions = async (targetUserId: string | "ALL", targetUserN
                   ref={dailyMessageRef}
                   value={dailyMessage} 
                   onChange={e => setDailyMessage(e.target.value)} 
-                  className="w-full bg-slate-950 text-slate-300 p-4 rounded-b-xl border border-slate-700 focus:border-emerald-500 min-h-[180px] outline-none font-mono text-sm leading-relaxed" 
+                  className="w-full bg-slate-950 text-slate-300 p-5 rounded-b-xl border border-slate-700 focus:border-emerald-500 min-h-[200px] outline-none font-mono text-sm leading-relaxed shadow-inner" 
                   placeholder="כתוב את הטור היומי כאן... אפשר להיעזר בכפתורים למעלה." 
                 />
                 
-                <button onClick={handleSaveDailyMessage} className="mt-4 w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3.5 px-6 rounded-xl transition-all shadow-lg text-lg">
-                  {savingId === "dashboardMsg" ? "שומר ומשדר... ⏳" : "💾 פרסם את הטור (יוצג ככתבת מגזין)"}
+                <button onClick={handleSaveDailyMessage} className="mt-5 w-full bg-emerald-600 hover:bg-emerald-500 text-white font-black py-4 px-6 rounded-xl transition-all shadow-[0_0_15px_rgba(16,185,129,0.3)] text-lg active:scale-95">
+                  {savingId === "dashboardMsg" ? "שומר ומשדר... ⏳" : "💾 פרסם את המהדורה בלייב"}
                 </button>
 
                 <div className="mt-8 border-t border-slate-700 pt-6">
-                   <h4 className="text-slate-500 text-sm font-bold mb-3 flex items-center gap-2"><span>👀</span> איך זה ייראה למשתמשים (תצוגה מקדימה):</h4>
+                   <h4 className="text-slate-500 text-sm font-bold mb-4 flex items-center gap-2 uppercase tracking-widest"><span>👀</span> תצוגה מקדימה למשתמשים:</h4>
                    
                    <div className="bg-slate-900 rounded-3xl border border-slate-700 shadow-xl overflow-hidden flex flex-col max-w-2xl mx-auto">
                       <div className="bg-slate-950 p-4 border-b border-slate-800 flex justify-between items-center">
@@ -1782,40 +1800,73 @@ const handleExportPredictions = async (targetUserId: string | "ALL", targetUserN
                                          [&_hr]:border-slate-700 [&_hr]:my-6
                                          [&_img]:inline-block [&_img]:rounded-2xl [&_img]:shadow-lg [&_img]:my-4 [&_img]:max-h-[400px] [&_img]:w-auto [&_img]:max-w-full [&_img]:object-contain [&_img]:border [&_img]:border-slate-700
                                          [&_a]:text-cyan-400 [&_a]:underline hover:[&_a]:text-cyan-300" 
-                              dangerouslySetInnerHTML={{ __html: dailyMessage || "<span class='text-slate-600'>אין תוכן להצגה...</span>" }} />
+                              dangerouslySetInnerHTML={{ __html: dailyMessage || "<span class='text-slate-600 font-medium'>השורות שלך יופיעו כאן...</span>" }} />
                       </div>
                    </div>
                 </div>
               </div>
-
-<div className="bg-slate-800 p-8 rounded-3xl border border-blue-500/30 shadow-xl mt-8">
-                
-                {/* כותרת וכפתור אקסל */}
+              
+              {/* מחולל Wall of Fame/Shame */}
+              <div className="bg-gradient-to-br from-indigo-900/40 to-slate-800 p-8 rounded-3xl border border-indigo-500/30 shadow-xl">
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4 border-b border-slate-700 pb-4">
-                  <h2 className="text-2xl font-bold text-white flex items-center gap-2"><span>👥</span> ניהול משתמשים ותשלומים</h2>
-                  <button onClick={() => handleExportPredictions("ALL", "All")} disabled={isCalculating} className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2.5 px-5 rounded-xl transition-all shadow-md text-sm flex items-center gap-2">
-                    <span>⬇️</span> הורד ניחושים של כולם (CSV)
+                  <div>
+                    <h2 className="text-2xl font-black text-indigo-400 flex items-center gap-2"><span>🔮</span> מחולל Wall of Fame / Shame</h2>
+                    <p className="text-slate-400 text-sm mt-1">המערכת קוראת את הראדאר ובוחרת ניחושים קיצוניים או קונצנזוסים.</p>
+                  </div>
+                  <button onClick={handleCreateAutoInsights} className="bg-indigo-600 hover:bg-indigo-500 text-white px-6 py-3 rounded-xl font-bold transition-all shadow-md active:scale-95 flex items-center gap-2">
+                    {statsData ? "🔄 רענן תובנות מהראדאר" : "🔍 חלץ תובנות עכשיו"}
                   </button>
                 </div>
                 
-                {/* ===== מעבדת סימולציות (הזרקת בוטים) ===== */}
-                <div className="bg-purple-900/10 p-4 rounded-xl border border-purple-500/30 mb-6 flex flex-col xl:flex-row items-start xl:items-center justify-between gap-4">
-                  <div>
-                    <h3 className="text-purple-400 font-bold flex items-center gap-2 mb-1"><span>🤖</span> הזרקת בוטים (טסטים)</h3>
-                    <p className="text-slate-400 text-xs">ייצור משתמשים פיקטיביים עם ניחושים אקראיים כדי למלא את הטבלה ולבדוק את הראדאר. (בחר ALL כדי לייצר בוטים חדשים).</p>
+                {autoInsights.length > 0 ? (
+                  <div className="flex flex-col gap-3">
+                    {autoInsights.map((insight, idx) => (
+                      <div key={idx} className="bg-slate-900/80 border border-slate-700 p-4 rounded-2xl flex justify-between items-center gap-4 group hover:border-indigo-500/50 hover:bg-slate-800 transition-colors shadow-sm">
+                        <span className="text-slate-200 text-sm font-medium leading-relaxed">{insight}</span>
+                        <button onClick={() => addInsightToMessage(insight)} className="bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600 hover:text-white border border-emerald-500/30 px-4 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap opacity-0 group-hover:opacity-100 flex items-center gap-1">
+                          <span>➕</span> הוסף לטור
+                        </button>
+                      </div>
+                    ))}
                   </div>
-<div className="flex gap-2 w-full xl:w-auto">
-                     <select value={simStage} onChange={(e) => setSimStage(e.target.value)} className="bg-slate-900 text-white p-2.5 rounded-lg border border-purple-500/50 outline-none font-bold text-sm flex-1 xl:flex-none">
-                        <option value="BOTS_ONLY">🤖 הזרק בוטים בלבד (ללא תוצאות)</option>
-                        <option value="MD1">סמלץ מחזור 1</option>
+                ) : (
+                  <div className="text-slate-500 text-sm bg-slate-900/50 p-6 rounded-2xl border border-dashed border-slate-700 text-center">
+                     לחץ על הכפתור כדי לנתח את הסטטיסטיקות ולמצוא את הניחושים הכי מעניינים להיום.
+                  </div>
+                )}
+              </div> 
+
+              {/* טבלת המשתמשים */}
+              <div className="bg-slate-800 p-8 rounded-3xl border border-blue-500/30 shadow-xl mt-8">
+                
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4 border-b border-slate-700 pb-6">
+                  <div>
+                    <h2 className="text-2xl font-black text-white flex items-center gap-2"><span>👥</span> ניהול שחקנים (ותשלומים)</h2>
+                    <p className="text-slate-400 text-sm mt-1">רשימת כל השחקנים במערכת עם שליטה בסטטוס התשלום שלהם.</p>
+                  </div>
+                  <button onClick={() => handleExportPredictions("ALL", "All")} disabled={isCalculating} className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 px-6 rounded-xl transition-all shadow-[0_0_15px_rgba(16,185,129,0.3)] flex items-center gap-2 active:scale-95">
+                    <span>⬇️</span> הורד יומן ניחושים שטוח (CSV)
+                  </button>
+                </div>
+                
+                {/* מעבדת סימולציות */}
+                <div className="bg-purple-900/10 p-5 rounded-2xl border border-purple-500/30 mb-8 flex flex-col xl:flex-row items-start xl:items-center justify-between gap-6 shadow-inner">
+                  <div>
+                    <h3 className="text-purple-400 font-black flex items-center gap-2 mb-1 text-lg"><span>🤖</span> מעבדת סימולציות (הזרקת בוטים)</h3>
+                    <p className="text-slate-400 text-sm">הזרק משתמשים פיקטיביים עם ניחושים אקראיים כדי למלא את הטבלה ולבדוק את האפליקציה.</p>
+                  </div>
+                  <div className="flex gap-3 w-full xl:w-auto">
+                     <select value={simStage} onChange={(e) => setSimStage(e.target.value)} className="bg-slate-950 text-white p-3 rounded-xl border border-purple-500/50 outline-none font-bold text-sm flex-1 xl:flex-none shadow-sm cursor-pointer">
+                        <option value="BOTS_ONLY">🤖 בוטים בלבד (ללא תוצאות אמת)</option>
+                        <option value="MD1">סמלץ מחזור 1 (תוצאות אמת)</option>
                         <option value="MD2">סמלץ מחזור 2</option>
-                        <option value="MD3">סמלץ מחזור 3</option>
+                        <option value="MD3">סמלץ מחזור 3 + עולות</option>
                         <option value="R32">סמלץ 32 הגדולות</option>
                         <option value="R16">סמלץ שמינית גמר</option>
                         <option value="QF">סמלץ רבע גמר</option>
                         <option value="SF">סמלץ חצי גמר</option>
-                        <option value="FINAL">סמלץ גמר</option>
-                        <option value="ALL">סמלץ טורניר שלם (בוטים + תוצאות)</option>
+                        <option value="FINAL">סמלץ גמר הטורניר</option>
+                        <option value="ALL">סמלץ טורניר שלם (בוטים + הכל)</option>
                      </select>
                      <button 
                        onClick={() => {
@@ -1823,7 +1874,7 @@ const handleExportPredictions = async (targetUserId: string | "ALL", targetUserN
                          else handleSmartSimulation();
                        }} 
                        disabled={isCalculating} 
-                       className="py-2.5 px-6 bg-purple-600 hover:bg-purple-500 text-white font-bold rounded-lg transition-all shadow-md text-sm whitespace-nowrap"
+                       className="py-3 px-8 bg-purple-600 hover:bg-purple-500 text-white font-black rounded-xl transition-all shadow-lg text-sm whitespace-nowrap active:scale-95"
                      >
                        {isCalculating ? "מריץ... ⏳" : "🧪 הפעל"}
                      </button>
@@ -1831,30 +1882,41 @@ const handleExportPredictions = async (targetUserId: string | "ALL", targetUserN
                 </div>
                 {/* ========================================= */}
 
-                <div className="overflow-x-auto mt-6">
+                {/* טבלת המשתמשים המעוצבת */}
+                <div className="overflow-x-auto bg-slate-950 rounded-2xl border border-slate-700 shadow-inner">
                   <table className="w-full text-right text-slate-300">
-                    <thead className="text-sm bg-slate-900/50 text-slate-400"><tr><th className="p-4 rounded-tr-xl">שם משתמש</th><th className="p-4">אימייל</th><th className="p-4 text-center">נקודות בטבלה</th><th className="p-4 text-center">סטטוס תשלום</th><th className="p-4 rounded-tl-xl text-center">פעולות</th></tr></thead><tbody>
-                      {usersList.length === 0 ? (<tr><td colSpan={5} className="p-8 text-center text-slate-500">אין משתמשים במערכת.</td></tr>) : (
-                        usersList.map(u => (
-                          <tr key={u.id} className="border-b border-slate-700/50 hover:bg-slate-700/20">
-                            <td className="p-4 font-bold text-white">{u.name || "ללא שם"}</td>
-                            <td className="p-4 text-sm text-slate-400">{u.email}</td>
-                            <td className="p-4 text-center font-bold text-amber-400">{u.totalPoints || 0}</td>
+                    <thead className="text-xs uppercase tracking-widest bg-slate-900/80 text-slate-500 border-b border-slate-800">
+                      <tr>
+                        <th className="p-4 font-black">שם משתמש</th>
+                        <th className="p-4 font-black">אימייל</th>
+                        <th className="p-4 text-center font-black">נק'</th>
+                        <th className="p-4 text-center font-black">תשלום</th>
+                        <th className="p-4 text-center font-black">פעולות</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {usersList.length === 0 ? (<tr><td colSpan={5} className="p-12 text-center text-slate-500 font-bold">אין משתמשים במערכת.</td></tr>) : (
+                        usersList.map((u, idx) => (
+                          <tr key={u.id} className="border-b border-slate-800/50 hover:bg-slate-800/50 transition-colors">
+                            <td className="p-4 font-bold text-white flex items-center gap-3">
+                              <span className="text-slate-600 text-xs w-4">{idx + 1}.</span> 
+                              <span>{u.name || "ללא שם"}</span>
+                            </td>
+                            <td className="p-4 text-sm text-slate-400 font-mono">{u.email}</td>
+                            <td className="p-4 text-center font-black text-amber-400 text-lg">{u.totalPoints || 0}</td>
                             
-                            {/* תיקון: ה-flex ירד מה-td ונכנס לתוך div פנימי */}
                             <td className="p-4">
                               <div className="flex justify-center">
-                                <button onClick={() => handleTogglePayment(u.id, u.hasPaid)} className={`px-4 py-2 rounded-lg font-bold text-sm w-28 ${u.hasPaid ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/50" : "bg-rose-500/20 text-rose-400 border border-rose-500/50"}`}>
-                                  {u.hasPaid ? "✅ שולם" : "❌ ממתין"}
+                                <button onClick={() => handleTogglePayment(u.id, u.hasPaid)} className={`px-4 py-1.5 rounded-lg font-bold text-xs w-24 transition-colors border shadow-sm ${u.hasPaid ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20" : "bg-rose-500/10 text-rose-400 border-rose-500/30 hover:bg-rose-500/20"}`}>
+                                  {u.hasPaid ? "✅ שולם" : "❌ חוב"}
                                 </button>
                               </div>
                             </td>
                             
-                            {/* תיקון: ה-flex ירד מה-td ונכנס לתוך div פנימי */}
                             <td className="p-4">
                               <div className="flex justify-center gap-2">
-                                <button onClick={() => handleExportPredictions(u.id, u.name || "ללא שם")} className="bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border border-blue-500/30 w-8 h-8 rounded-lg transition-colors flex items-center justify-center" title="הורד ניחושים אישיים">⬇️</button>
-                                <button onClick={() => handleDeleteUser(u.id, u.name || "ללא שם")} className="bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 w-8 h-8 rounded-lg transition-colors flex items-center justify-center" title="מחק משתמש לצמיתות">🗑️</button>
+                                <button onClick={() => handleExportPredictions(u.id, u.name || "ללא שם")} className="bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border border-blue-500/30 w-9 h-9 rounded-lg transition-colors flex items-center justify-center text-sm shadow-sm" title="הורד ניחושים אישיים">⬇️</button>
+                                <button onClick={() => handleDeleteUser(u.id, u.name || "ללא שם")} className="bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 w-9 h-9 rounded-lg transition-colors flex items-center justify-center text-sm shadow-sm" title="מחק משתמש לצמיתות">🗑️</button>
                               </div>
                             </td>
                           </tr>
