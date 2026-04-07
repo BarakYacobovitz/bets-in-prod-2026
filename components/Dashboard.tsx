@@ -451,7 +451,6 @@ export default function Dashboard({ userId, userName, setActiveTab, tournamentSt
   const currentLeader = allUsersList.length > 0 ? allUsersList[0].name?.split(' ')[0] : "אין";
   const currentKoLeader = allUsersList.length > 0 ? [...allUsersList].sort((a, b) => (Number(b.knockoutPoints) || 0) - (Number(a.knockoutPoints) || 0))[0]?.name?.split(' ')[0] : "אין";
 
-  // מציאת המיקום בליגה הפרטית הראשית (תיקון: שימוש בשם הליגה)
   let myLeagueRank = null;
   let myLeagueName = "";
   if (myLeagues.length > 0) {
@@ -466,6 +465,15 @@ export default function Dashboard({ userId, userName, setActiveTab, tournamentSt
   const handleNextMatch = () => setTodayMatchIndex(i => (i === todayMatches.length - 1 ? 0 : i + 1));
   const handlePrevBonus = () => setTodayBonusIndex(i => (i === 0 ? todayTargets.length - 1 : i - 1));
   const handleNextBonus = () => setTodayBonusIndex(i => (i === todayTargets.length - 1 ? 0 : i + 1));
+
+  // פונקציית העזר לתגיוצ הניקוד (כדי שלא ישברו שורות)
+  const getPointsBadge = (points: number | null) => {
+    if (points === null) return null;
+    if (points === 0) return <span className="inline-flex items-center gap-1 whitespace-nowrap shrink-0 bg-rose-950/50 text-rose-400 border border-rose-500/40 px-2 py-1 rounded text-[10px] font-black shadow-sm">0 נק'</span>;
+    if (points > 0 && points < 15) return <span className="inline-flex items-center gap-1 whitespace-nowrap shrink-0 bg-amber-900/40 text-amber-400 border border-amber-500/50 px-2 py-1 rounded text-[10px] font-black shadow-sm">+{points} נק'</span>;
+    if (points >= 15) return <span className="inline-flex items-center gap-1 whitespace-nowrap shrink-0 bg-emerald-900/40 text-emerald-400 border border-emerald-500/50 px-2 py-1 rounded text-[10px] font-black shadow-[0_0_10px_rgba(16,185,129,0.2)]">🎯 +{points} נק'</span>;
+    return <span className="inline-flex items-center gap-1 whitespace-nowrap shrink-0 bg-blue-900/40 text-blue-400 border border-blue-500/40 px-2 py-1 rounded text-[10px] font-black shadow-sm">+{points} נק'</span>;
+  };
 
   if (isLoading) return <div className="flex justify-center items-center h-64"><div className="animate-spin text-5xl text-blue-500">⚽</div></div>;
 
@@ -576,24 +584,30 @@ export default function Dashboard({ userId, userName, setActiveTab, tournamentSt
             </div>
 
             {/* ==================================================== */}
-            {/* 🏅 שורת הטופ 3 נגללת הצידה עם שם הליגה שלך! */}
+            {/* 🏅 שורת הטופ 3 עם האפקט המהבהב לכדור הזהב/נעל הזהב! */}
             {/* ==================================================== */}
             <div className="flex gap-3 relative z-10 w-full mb-4 overflow-x-auto custom-scrollbar pb-2 snap-x snap-mandatory">
                
-               <div className="min-w-[120px] flex-1 bg-amber-500/10 p-3 rounded-xl border border-amber-500/30 backdrop-blur-sm text-center shrink-0 snap-center">
-                  <div className="text-[9px] text-amber-500/80 font-black mb-0.5 uppercase tracking-wider">🏆 כדור הזהב</div>
-                  <div className="text-sm font-black text-amber-400 truncate">{currentLeader}</div>
+               <div className="min-w-[120px] flex-1 bg-amber-500/10 p-3 rounded-xl border border-amber-500/30 backdrop-blur-sm text-center shrink-0 snap-center relative overflow-hidden group">
+                  <div className="absolute top-0 left-1/2 -translate-x-1/2 w-16 h-16 bg-amber-500/20 rounded-full blur-xl pointer-events-none"></div>
+                  {/* האייקון עכשיו כדורגל שזורח ומקפץ */}
+                  <div className="text-2xl drop-shadow-[0_0_10px_rgba(251,191,36,0.8)] animate-pulse mb-1">⚽</div>
+                  <div className="text-[9px] text-amber-500 font-black mb-1 uppercase tracking-wider relative z-10">כדור הזהב</div>
+                  <div className="text-sm font-black text-amber-400 truncate relative z-10">{currentLeader}</div>
                </div>
                
                {tournamentState >= 4 && (
-                  <div className="min-w-[120px] flex-1 bg-emerald-500/10 p-3 rounded-xl border border-emerald-500/30 backdrop-blur-sm text-center shrink-0 snap-center">
-                     <div className="text-[9px] text-emerald-500/80 font-black mb-0.5 uppercase tracking-wider">🔥 נעל הזהב</div>
-                     <div className="text-sm font-black text-emerald-400 truncate">{currentKoLeader}</div>
+                  <div className="min-w-[120px] flex-1 bg-emerald-500/10 p-3 rounded-xl border border-emerald-500/30 backdrop-blur-sm text-center shrink-0 snap-center relative overflow-hidden group">
+                     <div className="absolute top-0 left-1/2 -translate-x-1/2 w-16 h-16 bg-emerald-500/20 rounded-full blur-xl pointer-events-none"></div>
+                     {/* האייקון עכשיו נעל שזורחת ומקפצת */}
+                     <div className="text-2xl drop-shadow-[0_0_10px_rgba(16,185,129,0.8)] animate-pulse mb-1">👟</div>
+                     <div className="text-[9px] text-emerald-500 font-black mb-1 uppercase tracking-wider relative z-10">נעל הזהב</div>
+                     <div className="text-sm font-black text-emerald-400 truncate relative z-10">{currentKoLeader}</div>
                   </div>
                )}
 
                {myLeagues.length > 0 && myLeagueRank && (
-                  <div className="min-w-[120px] flex-1 bg-blue-500/10 p-3 rounded-xl border border-blue-500/30 backdrop-blur-sm text-center shrink-0 snap-center">
+                  <div className="min-w-[120px] flex-1 bg-blue-500/10 p-3 rounded-xl border border-blue-500/30 backdrop-blur-sm text-center shrink-0 snap-center flex flex-col justify-center">
                      <div className="text-[9px] text-blue-400/80 font-black mb-0.5 uppercase tracking-wider truncate px-1" title={myLeagueName}>🏟️ {myLeagueName}</div>
                      <div className="text-sm font-black text-blue-400 truncate">מקום {myLeagueRank}</div>
                   </div>

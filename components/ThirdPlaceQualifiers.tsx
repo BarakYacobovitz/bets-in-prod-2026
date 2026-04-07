@@ -230,36 +230,37 @@ export default function ThirdPlaceQualifiers({ groups, userId, tournamentState =
   return (
     <div className="w-full animate-fade-in-up">
       
-      <div className="bg-slate-900/80 p-6 md:p-8 rounded-3xl border border-teal-500/30 mb-8 shadow-2xl relative md:sticky md:top-20 z-30 backdrop-blur-md">
-        <div className="flex flex-col md:flex-row justify-between items-start gap-6">
+      {/* אזור העגלה - כווץ והודק! */}
+      <div className="bg-slate-900/80 p-4 md:p-6 rounded-3xl border border-teal-500/30 mb-6 shadow-2xl relative md:sticky md:top-20 z-30 backdrop-blur-md">
+        <div className="flex flex-col md:flex-row justify-between items-start gap-4">
           <div className="flex-1">
-            <h2 className="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-teal-400 to-emerald-400 mb-2">
+            <h2 className="text-xl md:text-2xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-teal-400 to-emerald-400 mb-1">
               8 המעפילות מהמקום השלישי
             </h2>
-            <p className="text-slate-400 mb-3">בחר את 8 הנבחרות שלדעתך יעפילו לשלב הבא מהמקום השלישי בבית שלהן.</p>
-            <div className="flex items-center gap-2 text-amber-400 text-xs font-bold bg-amber-500/10 px-3 py-1.5 rounded-lg border border-amber-500/20 w-fit">
+            <p className="text-slate-400 text-xs md:text-sm mb-2">בחר את 8 הנבחרות שלדעתך יעפילו לשלב הבא מהמקום השלישי .</p>
+            <div className="flex items-center gap-1.5 text-amber-400 text-[10px] sm:text-xs font-bold bg-amber-500/10 px-2.5 py-1 rounded-lg border border-amber-500/20 w-fit">
               <span>💡</span> מותרת רק נבחרת אחת מכל בית
             </div>
           </div>
           
-          <div className="flex flex-col items-end gap-3 w-full md:w-auto">
+          <div className="flex flex-col items-end gap-2.5 w-full md:w-auto mt-2 md:mt-0">
              {myPoints !== null && (
-               <div className={`px-5 py-2.5 rounded-2xl border shadow-lg ${myPoints > 0 ? "bg-purple-600/20 border-purple-500/50 shadow-[0_0_15px_rgba(168,85,247,0.2)] text-purple-400" : "bg-slate-800 border-slate-700 text-slate-500"}`}>
-                 <span className="font-bold text-sm ml-2">ניקוד:</span>
-                 <span className="text-2xl font-black">{myPoints > 0 ? `+${myPoints}` : "0"}</span>
+               <div className={`px-4 py-2 rounded-xl border shadow-lg ${myPoints > 0 ? "bg-purple-600/20 border-purple-500/50 shadow-[0_0_15px_rgba(168,85,247,0.2)] text-purple-400" : "bg-slate-800 border-slate-700 text-slate-500"}`}>
+                 <span className="font-bold text-xs ml-1">ניקוד:</span>
+                 <span className="text-xl font-black">{myPoints > 0 ? `+${myPoints}` : "0"}</span>
                </div>
              )}
              
              <div className="flex items-center gap-3 w-full justify-end">
-               {saveStatus === "saving" && <span className="text-amber-400 text-xs animate-pulse font-bold">⏳ שומר...</span>}
-               {saveStatus === "saved" && <span className="text-emerald-400 text-xs font-bold">✓ נשמר</span>}
+               {saveStatus === "saving" && <span className="text-amber-400 text-[10px] animate-pulse font-bold">⏳ שומר...</span>}
+               {saveStatus === "saved" && <span className="text-emerald-400 text-[10px] font-bold">✓ נשמר</span>}
                
                {!isLocked ? (
-                 <button onClick={handleRandomizeThirdPlace} disabled={isRandomizing} className="bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold px-3 py-1.5 rounded-lg border border-slate-600 transition-all">
-                   🎲 הגרל
+                 <button onClick={handleRandomizeThirdPlace} disabled={isRandomizing} className="bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] font-bold px-3 py-1.5 rounded-lg border border-slate-600 transition-all active:scale-95">
+                   🎲 הגרל הכל
                  </button>
                ) : (
-                 <span className="bg-rose-500/10 text-rose-400 text-xs font-bold px-3 py-1.5 rounded-lg border border-rose-500/30">
+                 <span className="bg-rose-500/10 text-rose-400 text-[11px] font-bold px-3 py-1.5 rounded-lg border border-rose-500/30">
                    🔒 נעול
                  </span>
                )}
@@ -267,17 +268,18 @@ export default function ThirdPlaceQualifiers({ groups, userId, tournamentState =
           </div>
         </div>
 
-        <div className="grid grid-cols-4 lg:grid-cols-8 gap-3 mt-6">
+        {/* הסלוטים של 8 הנבחרות - כווצו מעט */}
+        <div className="grid grid-cols-4 lg:grid-cols-8 gap-2.5 mt-4">
           {Array.from({ length: 8 }).map((_, i) => {
             const team = selectedTeams[i];
             const isWarning = team ? checkIsAlreadyAdvanced(team) : false;
 
             return (
-              <div key={i} className={`relative flex flex-col items-center justify-center p-2 rounded-2xl border-2 transition-all h-28 group ${team ? 'bg-slate-800 border-teal-500 shadow-[0_0_15px_rgba(20,184,166,0.15)] hover:-translate-y-1' : 'bg-slate-950/50 border-slate-700 border-dashed'}`}>
+              <div key={i} className={`relative flex flex-col items-center justify-center p-2 rounded-2xl border-2 transition-all h-24 group ${team ? 'bg-slate-800 border-teal-500 shadow-[0_0_15px_rgba(20,184,166,0.15)] hover:-translate-y-1' : 'bg-slate-950/50 border-slate-700 border-dashed'}`}>
                 {team ? (
                   <>
                     {isWarning && (
-                      <div className="absolute -top-2 -right-2 bg-slate-900 border border-amber-500 text-amber-400 rounded-full w-6 h-6 flex items-center justify-center text-[10px] font-black shadow-md z-10" title="סתירה: בחרת להעלות אותה גם ממקום 1/2">
+                      <div className="absolute -top-2 -right-2 bg-slate-900 border border-amber-500 text-amber-400 rounded-full w-5 h-5 flex items-center justify-center text-[9px] font-black shadow-md z-10" title="סתירה: בחרת להעלות אותה גם ממקום 1/2">
                         ⚠️
                       </div>
                     )}
@@ -285,32 +287,32 @@ export default function ThirdPlaceQualifiers({ groups, userId, tournamentState =
                     {!isLocked && (
                       <button 
                         onClick={() => handleRemoveTeam(team)} 
-                        className="absolute -top-2 -left-2 bg-rose-500 hover:bg-rose-400 rounded-full w-6 h-6 text-white text-[10px] font-black flex items-center justify-center border border-slate-900 shadow-md transition-all z-10 opacity-100 md:opacity-0 md:group-hover:opacity-100"
+                        className="absolute -top-2 -left-2 bg-rose-500 hover:bg-rose-400 rounded-full w-5 h-5 text-white text-[9px] font-black flex items-center justify-center border border-slate-900 shadow-md transition-all z-10 opacity-100 md:opacity-0 md:group-hover:opacity-100 active:scale-90"
                       >
                         ✕
                       </button>
                     )}
 
-                    {getFlagUrl(team) ? <img src={getFlagUrl(team)!} className="w-10 h-7 object-cover rounded shadow-md mb-2" alt="flag" /> : <span className="text-2xl mb-1">🏳️</span>}
-                    <span className="text-xs font-black text-white text-center leading-tight w-full break-words">{team}</span>
+                    {getFlagUrl(team) ? <img src={getFlagUrl(team)!} className="w-8 h-5.5 object-cover rounded shadow-sm mb-1.5" alt="flag" /> : <span className="text-xl mb-1">🏳️</span>}
+                    <span className="text-[11px] font-black text-white text-center leading-tight w-full break-words">{team}</span>
                   </>
                 ) : (
-                  <span className="text-slate-600 text-3xl font-black opacity-20">{i+1}</span>
+                  <span className="text-slate-600 text-2xl font-black opacity-20">{i+1}</span>
                 )}
               </div>
             );
           })}
         </div>
 
-        <div className="mt-4 text-center">
-           <span className="text-sm font-bold text-slate-400">
+        <div className="mt-3 text-center">
+           <span className="text-[11px] font-bold text-slate-400">
              נבחרו <span className={selectedTeams.length === 8 ? "text-emerald-400" : "text-white"}>{selectedTeams.length}</span> מתוך 8
            </span>
         </div>
 
         {isLocked && (
-          <div className="mt-4 border-t border-slate-700/50 pt-5">
-            <button onClick={handleOpenSpy} className="w-full py-3 rounded-xl font-bold text-sm transition-all border flex items-center justify-center gap-2 bg-slate-900 text-slate-400 hover:text-white border-slate-700 hover:bg-slate-800">
+          <div className="mt-4 border-t border-slate-700/50 pt-4">
+            <button onClick={handleOpenSpy} className="w-full py-2.5 rounded-xl font-bold text-[13px] transition-all border flex items-center justify-center gap-2 bg-slate-900 text-slate-400 hover:text-white border-slate-700 hover:bg-slate-800 shadow-sm active:scale-95">
               <span>👁️</span> ריגול: מי ניחש מה?
             </button>
           </div>
@@ -318,17 +320,16 @@ export default function ThirdPlaceQualifiers({ groups, userId, tournamentState =
       </div>
 
       {realThirdPlace.length > 0 && (
-         <div className="mb-8 bg-purple-900/20 border border-purple-500/30 p-6 rounded-3xl shadow-inner relative z-10">
-           <h3 className="text-purple-400 font-bold mb-4 flex items-center gap-2"><span>🏆</span> העפילו בפועל למקום ה-3 (תוצאות אמת):</h3>
-           {/* החלפנו משורות לשורה אופקית אחת נגללת */}
+         <div className="mb-8 bg-purple-900/20 border border-purple-500/30 p-5 rounded-3xl shadow-inner relative z-10">
+           <h3 className="text-purple-400 text-sm font-bold mb-3 flex items-center gap-2"><span>🏆</span> העפילו בפועל למקום ה-3 (תוצאות אמת):</h3>
            <div className="flex flex-nowrap overflow-x-auto custom-scrollbar pb-2 gap-2">
              {realThirdPlace.map(t => {
                const isHit = selectedTeams.includes(t);
                return (
-                 <span key={t} className={`shrink-0 whitespace-nowrap px-4 py-2 rounded-xl text-sm font-bold border flex items-center gap-2 transition-all ${isHit ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/50 shadow-[0_0_10px_rgba(16,185,129,0.2)] scale-105" : "bg-slate-800 text-slate-300 border-slate-700"}`}>
-                   {getFlagUrl(t) && <img src={getFlagUrl(t)!} className="w-5 h-3.5 object-cover rounded-sm" alt="flag"/>} 
+                 <span key={t} className={`shrink-0 whitespace-nowrap px-3 py-1.5 rounded-xl text-xs font-bold border flex items-center gap-1.5 transition-all ${isHit ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/50 shadow-[0_0_10px_rgba(16,185,129,0.2)] scale-105" : "bg-slate-800 text-slate-300 border-slate-700"}`}>
+                   {getFlagUrl(t) && <img src={getFlagUrl(t)!} className="w-4 h-3 object-cover rounded-sm" alt="flag"/>} 
                    {t} 
-                   {isHit && <span className="ml-1">🎯 +10</span>}
+                   {isHit && <span className="ml-1 text-[10px] bg-emerald-900/40 px-1.5 py-0.5 rounded border border-emerald-500/30">🎯 +10</span>}
                  </span>
                );
              })}
@@ -338,28 +339,28 @@ export default function ThirdPlaceQualifiers({ groups, userId, tournamentState =
 
       <div className="max-w-md mx-auto relative z-10">
          <div className="flex items-center justify-between w-full bg-slate-900/80 p-2 rounded-2xl border border-slate-800 shadow-md backdrop-blur-md mb-6">
-            <button onClick={handlePrevGroup} className="w-12 h-12 flex items-center justify-center rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors border border-slate-700 active:scale-95">
-               <span className="text-xl leading-none">▶</span>
+            <button onClick={handlePrevGroup} className="w-10 h-10 flex items-center justify-center rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors border border-slate-700 active:scale-95">
+               <span className="text-lg leading-none">▶</span>
             </button>
             <div className="flex flex-col items-center justify-center flex-1">
-               <h2 className="text-2xl font-black text-white flex items-center gap-2">
+               <h2 className="text-xl font-black text-white flex items-center gap-2">
                  בית {activeGroup}
                </h2>
                {selectedFromActiveGroup ? (
-                  <span className="text-[10px] bg-teal-500/20 text-teal-400 px-2 py-0.5 rounded font-bold border border-teal-500/30 mt-1 flex items-center gap-1">
+                  <span className="text-[9px] bg-teal-500/20 text-teal-400 px-2 py-0.5 rounded font-bold border border-teal-500/30 mt-1 flex items-center gap-1">
                     <span>✓</span> נבחרה ({selectedFromActiveGroup})
                   </span>
                ) : (
-                  <span className="text-[10px] text-slate-500 font-bold mt-1">לא נבחרה נבחרת מבית זה</span>
+                  <span className="text-[9px] text-slate-500 font-bold mt-1">לא נבחרה נבחרת</span>
                )}
             </div>
-            <button onClick={handleNextGroup} className="w-12 h-12 flex items-center justify-center rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors border border-slate-700 active:scale-95">
-               <span className="text-xl leading-none">◀</span>
+            <button onClick={handleNextGroup} className="w-10 h-10 flex items-center justify-center rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors border border-slate-700 active:scale-95">
+               <span className="text-lg leading-none">◀</span>
             </button>
          </div>
 
-         <div className={`bg-slate-800 rounded-3xl p-5 border transition-all ${selectedFromActiveGroup ? "border-teal-500/50 shadow-[0_0_20px_rgba(20,184,166,0.05)] bg-teal-900/10" : "border-slate-700"} ${isLocked && myPoints === null ? "opacity-80 grayscale-[10%]" : ""}`}>
-            <div className="flex flex-col gap-3">
+         <div className={`bg-slate-800 rounded-3xl p-4 border transition-all ${selectedFromActiveGroup ? "border-teal-500/50 shadow-[0_0_20px_rgba(20,184,166,0.05)] bg-teal-900/10" : "border-slate-700"} ${isLocked && myPoints === null ? "opacity-80 grayscale-[10%]" : ""}`}>
+            <div className="flex flex-col gap-2.5">
               {currentGroupTeams.map(team => {
                 const isSelected = selectedTeams.includes(team);
                 const isRealWinner = realThirdPlace.includes(team);
@@ -374,23 +375,23 @@ export default function ThirdPlaceQualifiers({ groups, userId, tournamentState =
                     key={team}
                     disabled={isLocked}
                     onClick={() => toggleTeam(team, activeGroup)}
-                    className={`py-4 px-5 rounded-2xl font-bold transition-all text-base w-full text-right flex justify-between items-center border ${btnStyle} relative overflow-hidden group`}
+                    className={`py-3 px-4 rounded-xl font-bold transition-all text-sm w-full text-right flex justify-between items-center border ${btnStyle} relative overflow-hidden group`}
                   >
-                    <div className="flex items-center gap-3 relative z-10">
-                       {getFlagUrl(team) ? <img src={getFlagUrl(team)!} className="w-6 h-4 object-cover rounded-sm shadow-sm" alt="flag"/> : "🏳️"}
+                    <div className="flex items-center gap-2.5 relative z-10">
+                       {getFlagUrl(team) ? <img src={getFlagUrl(team)!} className="w-5 h-3.5 object-cover rounded-sm shadow-sm" alt="flag"/> : "🏳️"}
                        <span>{team}</span>
                     </div>
                     
                     <div className="flex items-center gap-2 relative z-10">
                       {hasWarning && !isSelected && !isLocked && (
-                        <span className="text-[10px] text-amber-500 bg-amber-500/10 border border-amber-500/20 px-1.5 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity" title="בחרת אותה במקום 1/2">⚠️ סתירה</span>
+                        <span className="text-[9px] text-amber-500 bg-amber-500/10 border border-amber-500/20 px-1.5 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity" title="בחרת אותה במקום 1/2">⚠️ סתירה</span>
                       )}
-                      {isRealWinner && <span className="text-[10px] bg-purple-500 text-white px-2 py-0.5 rounded-full shadow-sm">העפילה</span>}
+                      {isRealWinner && <span className="text-[9px] bg-purple-500 text-white px-2 py-0.5 rounded-full shadow-sm">העפילה</span>}
                       
                       {isSelected ? (
-                         <span className="w-6 h-6 flex items-center justify-center bg-white/20 rounded-full text-white text-xs">✓</span>
+                         <span className="w-5 h-5 flex items-center justify-center bg-white/20 rounded-full text-white text-[10px]">✓</span>
                       ) : !isLocked ? (
-                         <span className="w-6 h-6 flex items-center justify-center bg-slate-800 rounded-full text-slate-500 text-lg group-hover:text-white transition-colors">+</span>
+                         <span className="w-5 h-5 flex items-center justify-center bg-slate-800 rounded-full text-slate-500 text-base group-hover:text-white transition-colors">+</span>
                       ) : null}
                     </div>
                   </button>
@@ -438,9 +439,9 @@ export default function ThirdPlaceQualifiers({ groups, userId, tournamentState =
 
             <div className="overflow-y-auto custom-scrollbar flex-1 pl-2 md:pl-4 pr-1 pb-2">
               {isLoadingSpy ? (<div className="flex justify-center py-8 text-blue-400 animate-pulse font-bold">טוען ניחושים... ⏳</div>) : filteredSpyData.length === 0 ? (<div className="text-center text-slate-500 py-8 font-bold">לא נמצאו ניחושים שמתאימים לחיפוש.</div>) : (
-                <div className="space-y-4">
+                <div className="space-y-3">
                   {filteredSpyData.map((data, idx) => {
-                    let cardStyle = "p-4 rounded-xl border transition-all ";
+                    let cardStyle = "p-3.5 rounded-xl border transition-all ";
                     if (hasTruth) {
                       if (data.points && data.points > 0) cardStyle += "bg-emerald-900/10 border-emerald-500/30 shadow-[0_0_15px_rgba(16,185,129,0.05)]";
                       else cardStyle += "bg-rose-900/10 border-rose-500/20 opacity-80";
@@ -450,9 +451,9 @@ export default function ThirdPlaceQualifiers({ groups, userId, tournamentState =
 
                     return (
                       <div key={idx} className={cardStyle}>
-                        <div className="flex justify-between items-center mb-3">
-                           <div className="font-bold text-white text-base md:text-lg flex items-center gap-2.5">
-                              <div className={`w-6 h-6 flex items-center justify-center rounded-full text-[10px] font-black border shrink-0 ${
+                        <div className="flex justify-between items-center mb-2.5">
+                           <div className="font-bold text-white text-sm md:text-base flex items-center gap-2">
+                              <div className={`w-5 h-5 flex items-center justify-center rounded-full text-[9px] font-black border shrink-0 ${
                                 data.userRank === 1 ? "bg-amber-500/20 text-amber-400 border-amber-500/50 shadow-[0_0_8px_rgba(245,158,11,0.3)]" :
                                 data.userRank === 2 ? "bg-slate-400/20 text-slate-300 border-slate-400/50 shadow-[0_0_8px_rgba(148,163,184,0.2)]" :
                                 data.userRank === 3 ? "bg-orange-700/30 text-orange-400 border-orange-500/40 shadow-[0_0_8px_rgba(249,115,22,0.2)]" :
@@ -461,26 +462,25 @@ export default function ThirdPlaceQualifiers({ groups, userId, tournamentState =
                                 {data.userRank || "-"}
                               </div>
                              <span className="truncate max-w-[120px] sm:max-w-[200px]">{data.userName}</span>
-                             {data.userId === userId && <span className="text-[10px] bg-blue-600 text-white px-1.5 py-0.5 rounded uppercase">אתה</span>}
+                             {data.userId === userId && <span className="text-[8px] bg-blue-600 text-white px-1.5 py-0.5 rounded uppercase">אתה</span>}
                            </div>
                            <div className="flex items-center gap-2">
-                             <div className="text-[10px] font-bold text-slate-400 bg-slate-950 px-2 py-1 rounded border border-slate-700/50 shrink-0">
-                               סה״כ: <span className="text-amber-400">{data.userTotalPoints} נק'</span>
+                             <div className="text-[9px] font-bold text-slate-400 bg-slate-950 px-2 py-0.5 rounded border border-slate-700/50 shrink-0">
+                               סה״כ: <span className="text-amber-400">{data.userTotalPoints}</span>
                              </div>
                              {hasTruth && data.points !== null && (
-                               <div className={`whitespace-nowrap text-sm font-black px-3 py-1 rounded-lg border ${data.points > 0 ? "bg-emerald-900/40 text-emerald-400 border-emerald-500/50" : "bg-rose-950/50 text-rose-400 border-rose-500/40"}`}>
-                                 {data.points > 0 ? `+${data.points} נק'` : "0 נק'"}
+                               <div className={`whitespace-nowrap text-[11px] font-black px-2 py-0.5 rounded border ${data.points > 0 ? "bg-emerald-900/40 text-emerald-400 border-emerald-500/50" : "bg-rose-950/50 text-rose-400 border-rose-500/40"}`}>
+                                 {data.points > 0 ? `+${data.points}` : "0"}
                                </div>
                              )}
                            </div>
                         </div>
-                        {/* תיקון: הפכנו את הנבחרות בתוך הריגול לשורה אופקית אחת נגללת! */}
-                        <div className="flex flex-nowrap overflow-x-auto custom-scrollbar pb-2 gap-2 mt-2 bg-slate-950/50 p-2.5 rounded-lg border border-slate-700/50">
+                        <div className="flex flex-nowrap overflow-x-auto custom-scrollbar pb-1.5 gap-2 mt-2 bg-slate-950/50 p-2 rounded-lg border border-slate-700/50 shadow-inner">
                            {data.teams.map((t: string, i: number) => {
                              const isHit = realThirdPlace.includes(t);
                              return (
-                               <span key={i} className={`whitespace-nowrap shrink-0 text-[11px] sm:text-xs font-bold px-3 py-1.5 rounded-lg border flex items-center gap-1.5 ${isHit ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/40" : "bg-slate-900 text-slate-300 border-slate-600"}`}>
-                                 {getFlagUrl(t) && <img src={getFlagUrl(t)!} className="w-4 h-3 object-cover rounded-sm" alt="flag"/>} 
+                               <span key={i} className={`whitespace-nowrap shrink-0 text-[10px] sm:text-[11px] font-bold px-2 py-1 rounded-md border flex items-center gap-1.5 ${isHit ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/40" : "bg-slate-900 text-slate-300 border-slate-600"}`}>
+                                 {getFlagUrl(t) && <img src={getFlagUrl(t)!} className="w-3.5 h-2.5 object-cover rounded-sm" alt="flag"/>} 
                                  {t} 
                                  {isHit && "🎯"}
                                </span>

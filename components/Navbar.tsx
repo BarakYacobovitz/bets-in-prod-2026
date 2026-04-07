@@ -191,7 +191,7 @@ export default function Navbar() {
       <div className="max-w-7xl mx-auto flex justify-between items-center gap-2">
         
         {/* צד ימין: הלוגו */}
-        <Link href="/" className="group flex items-center gap-2 md:gap-3 transition-all duration-300 hover:opacity-90 cursor-pointer shrink-0">
+        <a href="/" className="group flex items-center gap-2 md:gap-3 transition-all duration-300 hover:opacity-90 cursor-pointer shrink-0">
           <div className="w-10 h-10 md:w-16 md:h-16 flex items-center justify-center shrink-0">
             <img src="/B.svg" alt="Logo" className="w-full h-full object-contain drop-shadow-[0_4px_8px_rgba(0,0,0,0.6)] group-hover:drop-shadow-[0_0_15px_rgba(253,224,71,0.4)] transition-all duration-500" />
           </div>
@@ -199,8 +199,7 @@ export default function Navbar() {
              <span className="font-black text-[28px] tracking-tight leading-none bg-gradient-to-br from-amber-100 via-yellow-400 to-amber-600 bg-clip-text text-transparent drop-shadow-sm pb-1">Bets in PROD</span>
              <span className="text-emerald-400/90 font-bold text-sm tracking-[0.15em] mt-0.5">מהמרים בייצור</span>
           </div>
-        </Link>
-
+        </a>
         {/* מרכז: השעון או הודעת No More Bets */}
         <div className="flex-1 flex justify-center items-center px-1">
            {isNoMoreBets ? (

@@ -5,6 +5,10 @@ import { db } from "../app/firebase";
 import { getFlagUrl } from "../app/utils/flags";
 
 export default function MatchCard({ match, userId, tournamentState = 0 }: { match: any, userId: string, tournamentState?: number }) {
+  
+  // 1. הגנת הקריסה שלנו (מונעת את מסך השגיאה המפחיד)
+  if (!match || !match.id) return null;
+
   const [homeScore, setHomeScore] = useState("");
   const [awayScore, setAwayScore] = useState("");
   const [qualifier, setQualifier] = useState("");
@@ -241,21 +245,21 @@ export default function MatchCard({ match, userId, tournamentState = 0 }: { matc
 
   if (match.isFinished) {
     cardStyle = "bg-slate-900/90 border border-slate-700 opacity-80 grayscale-[30%] shadow-none";
-    statusBadge = <div className="px-4 py-1.5 rounded-full text-[11px] uppercase tracking-wide font-black flex items-center gap-2 bg-slate-950 text-slate-500 border border-slate-800">🏁 סיום</div>;
+    statusBadge = <div className="px-3 py-1 rounded-full text-[10px] uppercase tracking-wide font-black flex items-center gap-2 bg-slate-950 text-slate-500 border border-slate-800">🏁 סיום</div>;
   } else if (isLive) {
     cardStyle = "bg-gradient-to-br from-slate-800 to-slate-900 border border-rose-500 shadow-[0_0_25px_rgba(225,29,72,0.15)]";
-    statusBadge = <div className="px-4 py-1.5 rounded-full text-[11px] uppercase tracking-wider font-black flex items-center gap-2 bg-rose-500/10 text-rose-400 border border-rose-500/50 shadow-[0_0_10px_rgba(225,29,72,0.3)]"><span className="w-2 h-2 rounded-full bg-rose-500 animate-ping"></span> LIVE</div>;
+    statusBadge = <div className="px-3 py-1 rounded-full text-[10px] uppercase tracking-wider font-black flex items-center gap-2 bg-rose-500/10 text-rose-400 border border-rose-500/50 shadow-[0_0_10px_rgba(225,29,72,0.3)]"><span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-ping"></span> LIVE</div>;
   } else if (isWaitingForResult) {
     cardStyle = "bg-gradient-to-br from-slate-800 to-slate-900 border border-indigo-500/50 shadow-[0_0_15px_rgba(99,102,241,0.1)] opacity-95";
-    statusBadge = <div className="px-4 py-1.5 rounded-full text-[11px] uppercase tracking-wide font-black flex items-center gap-2 bg-indigo-500/10 text-indigo-400 border border-indigo-500/50"><span className="animate-pulse">⏳</span> ממתין לסיום</div>;
+    statusBadge = <div className="px-3 py-1 rounded-full text-[10px] uppercase tracking-wide font-black flex items-center gap-2 bg-indigo-500/10 text-indigo-400 border border-indigo-500/50"><span className="animate-pulse">⏳</span> ממתין</div>;
   } else if (isLocked) { 
     cardStyle = "bg-slate-900 border border-slate-700 opacity-90";
-    statusBadge = <div className="px-4 py-1.5 rounded-full text-[11px] uppercase tracking-wide font-black flex items-center gap-2 bg-slate-950 text-slate-400 border border-slate-700">🔒 נעול</div>;
+    statusBadge = <div className="px-3 py-1 rounded-full text-[10px] uppercase tracking-wide font-black flex items-center gap-2 bg-slate-950 text-slate-400 border border-slate-700">🔒 נעול</div>;
   } else if (isMissingPrediction) {
     cardStyle = "bg-gradient-to-br from-slate-800 to-slate-900 border border-amber-500/60 shadow-[0_0_20px_rgba(245,158,11,0.1)] hover:-translate-y-1 transition-all duration-300";
-    statusBadge = <div className="px-4 py-1.5 rounded-full text-[11px] uppercase tracking-wide font-black flex items-center gap-2 bg-amber-500/10 text-amber-400 border border-amber-500/50"><span className="animate-pulse">⚠️</span> חסר ניחוש</div>;
+    statusBadge = <div className="px-3 py-1 rounded-full text-[10px] uppercase tracking-wide font-black flex items-center gap-2 bg-amber-500/10 text-amber-400 border border-amber-500/50"><span className="animate-pulse">⚠️</span> חסר ניחוש</div>;
   } else {
-    statusBadge = <div className="px-4 py-1.5 rounded-full text-[11px] uppercase tracking-wide font-black flex items-center gap-2 bg-slate-800 text-slate-300 border border-slate-600">✍️ פתוח להצבעה</div>;
+    statusBadge = <div className="px-3 py-1 rounded-full text-[10px] uppercase tracking-wide font-black flex items-center gap-2 bg-slate-800 text-slate-300 border border-slate-600">✍️ פתוח</div>;
   }
 
   const numberInputClass = "[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none";
@@ -289,9 +293,10 @@ export default function MatchCard({ match, userId, tournamentState = 0 }: { matc
 
   return (
     <>
-      <div className={`rounded-2xl p-5 sm:p-7 w-full max-w-lg mx-auto relative ${cardStyle}`} dir="rtl">
+      {/* 2. עיצוב מכווץ: הפאדינג פה צומצם ל-p-4 sm:p-5 */}
+      <div className={`rounded-2xl p-4 sm:p-5 w-full max-w-lg mx-auto relative ${cardStyle}`} dir="rtl">
         
-        <div className="absolute top-4 left-4 z-10">
+        <div className="absolute top-3 left-3 z-10">
           {match.isFinished ? (
             getPointsBadge(myPoints)
           ) : !isLocked ? (
@@ -299,34 +304,35 @@ export default function MatchCard({ match, userId, tournamentState = 0 }: { matc
               type="button"
               onClick={handleRandomize} 
               title="ניחוש אקראי" 
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-800/80 border border-slate-700 hover:border-slate-500 hover:bg-slate-700/80 rounded-lg text-slate-400 hover:text-white transition-all shadow-sm group active:scale-95"
+              className="flex items-center gap-1.5 px-2 py-1 bg-slate-800/80 border border-slate-700 hover:border-slate-500 hover:bg-slate-700/80 rounded-lg text-slate-400 hover:text-white transition-all shadow-sm group active:scale-95"
             >
-              <span className="text-[10px] font-bold uppercase tracking-wider">אקראי</span>
-              <span className="text-sm group-hover:rotate-12 transition-transform">🎲</span>
+              <span className="text-[9px] font-bold uppercase tracking-wider hidden sm:inline">אקראי</span>
+              <span className="text-xs group-hover:rotate-12 transition-transform">🎲</span>
             </button>
           ) : null}
         </div>
 
-        <div className="absolute top-4 right-4 z-10"><span className={`text-[10px] uppercase font-black tracking-wider px-2.5 py-1.5 rounded-lg bg-${themeColor}-500/10 text-${themeColor}-400 border border-${themeColor}-500/20`}>{isKnockout ? match.roundName : `בית ${match.group}`}</span></div>
+        <div className="absolute top-3 right-3 z-10"><span className={`text-[9px] uppercase font-black tracking-wider px-2 py-1 rounded-lg bg-${themeColor}-500/10 text-${themeColor}-400 border border-${themeColor}-500/20`}>{isKnockout ? match.roundName : `בית ${match.group}`}</span></div>
 
-        <div className="flex flex-col justify-center items-center mt-3 mb-6 gap-2">
-           <div className="text-xs font-bold text-slate-400 bg-slate-900/50 px-3 py-1 rounded-full border border-slate-800">🕒 {getSmartDateText()}</div>
+        <div className="flex flex-col justify-center items-center mt-2 mb-4 gap-1.5">
+           <div className="text-[11px] font-bold text-slate-400 bg-slate-900/50 px-2 py-1 rounded-full border border-slate-800">🕒 {getSmartDateText()}</div>
            {statusBadge}
         </div>
 
-        <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 sm:gap-4 mb-6 mt-2">
+        <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 sm:gap-3 mb-4 mt-1">
           <div className="flex justify-end items-center gap-2 text-right">
-            {getFlagUrl(match.homeTeam) ? <img src={getFlagUrl(match.homeTeam)!} className="w-8 h-5.5 object-cover rounded-sm shadow-sm" alt="flag" /> : <span className="text-xl sm:text-2xl drop-shadow-md">🏳️</span>}
-            <span className="text-xl sm:text-2xl font-black text-slate-100 break-words leading-tight">
+            {getFlagUrl(match.homeTeam) ? <img src={getFlagUrl(match.homeTeam)!} className="w-6 h-4 sm:w-7 sm:h-5 object-cover rounded-sm shadow-sm" alt="flag" /> : <span className="text-lg sm:text-xl drop-shadow-md">🏳️</span>}
+            <span className="text-lg sm:text-xl font-black text-slate-100 break-words leading-tight">
               {match.homeTeam}
             </span>
           </div>
           
           <div className="flex items-center justify-center gap-3 sm:gap-4">
             <div className="flex flex-col items-center">
+               {/* כיווץ קופסאות קלט: w-12 h-14 טקסט 2xl במקום המפלצות שהיו קודם */}
                <input 
                  type="number" min="0" disabled={isLocked} 
-                 className={`w-14 h-16 sm:w-16 sm:h-18 text-center text-3xl sm:text-4xl font-black rounded-xl border-2 focus:outline-none transition-all ${numberInputClass} ${isLocked ? "bg-slate-900 border-slate-800 text-slate-500 cursor-not-allowed" : isMissingPrediction ? "bg-slate-900 border-amber-500/50 text-white shadow-[inset_0_2px_10px_rgba(0,0,0,0.5)]" : `bg-slate-800 border-slate-600 text-white focus:border-${themeColor}-500 shadow-[inset_0_2px_10px_rgba(0,0,0,0.5)]`} ${match.isFinished && homeScore === String(match.realHomeScore) ? "border-emerald-500/50 text-emerald-400 bg-emerald-900/20" : ""}`} 
+                 className={`w-12 h-14 sm:w-14 sm:h-16 text-center text-2xl sm:text-3xl font-black rounded-xl border-2 focus:outline-none transition-all ${numberInputClass} ${isLocked ? "bg-slate-900 border-slate-800 text-slate-500 cursor-not-allowed" : isMissingPrediction ? "bg-slate-900 border-amber-500/50 text-white shadow-[inset_0_2px_10px_rgba(0,0,0,0.5)]" : `bg-slate-800 border-slate-600 text-white focus:border-${themeColor}-500 shadow-[inset_0_2px_10px_rgba(0,0,0,0.5)]`} ${match.isFinished && homeScore === String(match.realHomeScore) ? "border-emerald-500/50 text-emerald-400 bg-emerald-900/20" : ""}`} 
                  value={homeScore} 
                  onChange={(e) => { 
                    isUserAction.current = true; 
@@ -338,13 +344,13 @@ export default function MatchCard({ match, userId, tournamentState = 0 }: { matc
             </div>
             
             <div className="flex flex-col items-center justify-center">
-               <span className="text-3xl sm:text-4xl font-black text-slate-600 leading-none pb-1">:</span>
+               <span className="text-2xl sm:text-3xl font-black text-slate-600 leading-none pb-1">:</span>
             </div>
 
             <div className="flex flex-col items-center">
                <input 
                  type="number" min="0" disabled={isLocked} 
-                 className={`w-14 h-16 sm:w-16 sm:h-18 text-center text-3xl sm:text-4xl font-black rounded-xl border-2 focus:outline-none transition-all ${numberInputClass} ${isLocked ? "bg-slate-900 border-slate-800 text-slate-500 cursor-not-allowed" : isMissingPrediction ? "bg-slate-900 border-amber-500/50 text-white shadow-[inset_0_2px_10px_rgba(0,0,0,0.5)]" : `bg-slate-800 border-slate-600 text-white focus:border-${themeColor}-500 shadow-[inset_0_2px_10px_rgba(0,0,0,0.5)]`} ${match.isFinished && awayScore === String(match.realAwayScore) ? "border-emerald-500/50 text-emerald-400 bg-emerald-900/20" : ""}`} 
+                 className={`w-12 h-14 sm:w-14 sm:h-16 text-center text-2xl sm:text-3xl font-black rounded-xl border-2 focus:outline-none transition-all ${numberInputClass} ${isLocked ? "bg-slate-900 border-slate-800 text-slate-500 cursor-not-allowed" : isMissingPrediction ? "bg-slate-900 border-amber-500/50 text-white shadow-[inset_0_2px_10px_rgba(0,0,0,0.5)]" : `bg-slate-800 border-slate-600 text-white focus:border-${themeColor}-500 shadow-[inset_0_2px_10px_rgba(0,0,0,0.5)]`} ${match.isFinished && awayScore === String(match.realAwayScore) ? "border-emerald-500/50 text-emerald-400 bg-emerald-900/20" : ""}`} 
                  value={awayScore} 
                  onChange={(e) => { 
                    isUserAction.current = true; 
@@ -357,33 +363,33 @@ export default function MatchCard({ match, userId, tournamentState = 0 }: { matc
           </div>
 
           <div className="flex justify-start items-center gap-2 text-left">
-            <span className="text-xl sm:text-2xl font-black text-slate-100 break-words leading-tight">
+            <span className="text-lg sm:text-xl font-black text-slate-100 break-words leading-tight">
               {match.awayTeam}
             </span>
-            {getFlagUrl(match.awayTeam) ? <img src={getFlagUrl(match.awayTeam)!} className="w-8 h-5.5 object-cover rounded-sm shadow-sm" alt="flag" /> : <span className="text-xl sm:text-2xl drop-shadow-md">🏳️</span>}
+            {getFlagUrl(match.awayTeam) ? <img src={getFlagUrl(match.awayTeam)!} className="w-6 h-4 sm:w-7 sm:h-5 object-cover rounded-sm shadow-sm" alt="flag" /> : <span className="text-lg sm:text-xl drop-shadow-md">🏳️</span>}
           </div>
         </div>
         
         {match.isFinished && (
-            <div className="flex justify-center gap-12 mt-1 mb-4">
-              <span className="text-[11px] font-black text-emerald-400 bg-emerald-900/30 px-2 py-0.5 rounded border border-emerald-500/20 shadow-sm">אמת: {match.realHomeScore}</span>
-              <span className="text-[11px] font-black text-emerald-400 bg-emerald-900/30 px-2 py-0.5 rounded border border-emerald-500/20 shadow-sm">אמת: {match.realAwayScore}</span>
+            <div className="flex justify-center gap-12 mt-1 mb-2">
+              <span className="text-[10px] font-black text-emerald-400 bg-emerald-900/30 px-2 py-0.5 rounded border border-emerald-500/20 shadow-sm">אמת: {match.realHomeScore}</span>
+              <span className="text-[10px] font-black text-emerald-400 bg-emerald-900/30 px-2 py-0.5 rounded border border-emerald-500/20 shadow-sm">אמת: {match.realAwayScore}</span>
             </div>
         )}
 
         {isKnockout && (
-          <div className="bg-slate-900/80 p-4 rounded-xl border border-slate-700/50 mb-2 shadow-inner relative">
-            {match.isFinished && match.realQualifier && (<div className="absolute top-2 left-3 text-[10px] text-emerald-400 font-black tracking-wide bg-emerald-900/20 px-2 py-0.5 rounded flex items-center gap-1.5">העפילה: {getFlagUrl(match.realQualifier) ? <img src={getFlagUrl(match.realQualifier)!} className="w-4 h-3 object-cover rounded-sm" alt="flag"/> : <span>🏳️</span>} {match.realQualifier}</div>)}
-            <label className="block text-slate-400 text-[11px] uppercase tracking-wider mb-3 font-black text-center">
+          <div className="bg-slate-900/80 p-3 rounded-xl border border-slate-700/50 mb-2 shadow-inner relative mt-2">
+            {match.isFinished && match.realQualifier && (<div className="absolute top-2 left-2 text-[9px] text-emerald-400 font-black tracking-wide bg-emerald-900/20 px-1.5 py-0.5 rounded flex items-center gap-1">העפילה: {getFlagUrl(match.realQualifier) ? <img src={getFlagUrl(match.realQualifier)!} className="w-3 h-2 object-cover rounded-sm" alt="flag"/> : <span>🏳️</span>} {match.realQualifier}</div>)}
+            <label className="block text-slate-400 text-[10px] uppercase tracking-wider mb-2 font-black text-center">
               מי תעלה לשלב הבא?
             </label>
             
-            <div className="flex gap-3">
+            <div className="flex gap-2">
               <button
                 type="button" 
                 disabled={isLocked}
                 onClick={() => { isUserAction.current = true; setQualifier(match.homeTeam); }}
-                className={`flex-1 py-3 rounded-xl font-black text-sm transition-all border-2 flex items-center justify-center gap-1.5 ${
+                className={`flex-1 py-2 rounded-xl font-black text-[13px] transition-all border-2 flex items-center justify-center gap-1.5 ${
                   isLocked ? "cursor-not-allowed opacity-70" : "cursor-pointer active:scale-95 hover:border-slate-500"
                 } ${
                   qualifier === match.homeTeam
@@ -393,7 +399,7 @@ export default function MatchCard({ match, userId, tournamentState = 0 }: { matc
                     : "bg-slate-900 text-slate-400 border-slate-700"
                 }`}
               >
-                {getFlagUrl(match.homeTeam) ? <img src={getFlagUrl(match.homeTeam)!} className="w-5 h-3.5 object-cover rounded-sm shadow-sm" alt="flag" /> : <span>🏳️</span>}
+                {getFlagUrl(match.homeTeam) ? <img src={getFlagUrl(match.homeTeam)!} className="w-4 h-3 object-cover rounded-sm shadow-sm" alt="flag" /> : <span>🏳️</span>}
                 <span>{match.homeTeam}</span>
               </button>
 
@@ -401,7 +407,7 @@ export default function MatchCard({ match, userId, tournamentState = 0 }: { matc
                 type="button" 
                 disabled={isLocked}
                 onClick={() => { isUserAction.current = true; setQualifier(match.awayTeam); }}
-                className={`flex-1 py-3 rounded-xl font-black text-sm transition-all border-2 flex items-center justify-center gap-1.5 ${
+                className={`flex-1 py-2 rounded-xl font-black text-[13px] transition-all border-2 flex items-center justify-center gap-1.5 ${
                   isLocked ? "cursor-not-allowed opacity-70" : "cursor-pointer active:scale-95 hover:border-slate-500"
                 } ${
                   qualifier === match.awayTeam
@@ -411,28 +417,28 @@ export default function MatchCard({ match, userId, tournamentState = 0 }: { matc
                     : "bg-slate-900 text-slate-400 border-slate-700"
                 }`}
               >
-                {getFlagUrl(match.awayTeam) ? <img src={getFlagUrl(match.awayTeam)!} className="w-5 h-3.5 object-cover rounded-sm shadow-sm" alt="flag" /> : <span>🏳️</span>}
+                {getFlagUrl(match.awayTeam) ? <img src={getFlagUrl(match.awayTeam)!} className="w-4 h-3 object-cover rounded-sm shadow-sm" alt="flag" /> : <span>🏳️</span>}
                 <span>{match.awayTeam}</span>
               </button>
             </div>
           </div>
         )}
 
-        <div className="mt-4 h-4 flex justify-center items-center text-[11px] font-black tracking-wider uppercase transition-opacity duration-300">
-          {saveStatus === "saving" && <span className="text-amber-400/80 animate-pulse">⏳ מבצע שמירה...</span>}
-          {saveStatus === "saved" && <span className="text-emerald-400">✓ נשמר בהצלחה</span>}
+        <div className="mt-3 h-3 flex justify-center items-center text-[10px] font-black tracking-wider uppercase transition-opacity duration-300">
+          {saveStatus === "saving" && <span className="text-amber-400/80 animate-pulse">⏳ שומר...</span>}
+          {saveStatus === "saved" && <span className="text-emerald-400">✓ נשמר</span>}
         </div>
 
         {isLocked && (
-          <div className="mt-5 border-t border-slate-700/50 pt-4">
-            <button onClick={handleOpenSpyModal} className={`w-full py-3.5 rounded-xl font-black text-sm transition-all border-2 flex items-center justify-center gap-2 shadow-sm ${showSpyModal ? "bg-blue-900/20 text-blue-400 border-blue-500/30" : "bg-slate-900 text-slate-400 hover:text-white border-slate-700 hover:bg-slate-800 hover:border-slate-500"}`}>
-              <span className="text-lg">🕵️‍♂️</span> הצג את ניחושי החברים
+          <div className="mt-3 border-t border-slate-700/50 pt-3">
+            <button onClick={handleOpenSpyModal} className={`w-full py-2.5 rounded-xl font-black text-[13px] transition-all border-2 flex items-center justify-center gap-2 shadow-sm ${showSpyModal ? "bg-blue-900/20 text-blue-400 border-blue-500/30" : "bg-slate-900 text-slate-400 hover:text-white border-slate-700 hover:bg-slate-800 hover:border-slate-500"}`}>
+              <span className="text-base">🕵️‍♂️</span> הצג את ניחושי החברים
             </button>
           </div>
         )}
       </div>
 
-      {/* --- חלון הריגול המצומצם והמשודרג --- */}
+      {/* חלון הריגול המצומצם */}
       {showSpyModal && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-md animate-fade-in-up" dir="rtl">
           <div className="bg-gradient-to-b from-slate-800 to-slate-900 border border-slate-700 p-5 md:p-6 rounded-3xl w-full max-w-md md:max-w-[600px] md:min-w-[400px] min-h-[500px] h-[85vh] md:h-[650px] md:max-h-[90vh] flex flex-col shadow-2xl relative overflow-hidden md:resize">
@@ -493,7 +499,6 @@ export default function MatchCard({ match, userId, tournamentState = 0 }: { matc
               </div>
             )}
             
-            {/* רשימת המשתמשים ה"מכווצת" (Compact List) החדשה */}
             <div className="overflow-y-auto custom-scrollbar flex-1 pl-2 md:pl-4 pr-1 pb-2">
               {isLoadingSpy ? (<div className="flex justify-center py-8 text-blue-400 animate-pulse font-black tracking-wide">טוען נתונים מהשטח... ⏳</div>) : filteredSpyData.length === 0 ? (<div className="text-center text-slate-500 py-8 font-bold">לא נמצאו ניחושים שמתאימים לחיפוש.</div>) : (
                 <div className="space-y-2">
@@ -512,8 +517,6 @@ export default function MatchCard({ match, userId, tournamentState = 0 }: { matc
 
                     return (
                       <div key={idx} className={cardStyle}>
-                        
-                        {/* שורה עליונה: דירוג, שם, ניקוד כולל */}
                         <div className="flex justify-between items-center mb-2">
                             <div className="font-bold text-slate-200 flex items-center gap-2">
                               <div className={`w-5 h-5 flex items-center justify-center rounded-full text-[10px] font-black border shrink-0 ${
@@ -532,9 +535,7 @@ export default function MatchCard({ match, userId, tournamentState = 0 }: { matc
                             </div>
                         </div>
                         
-                        {/* שורה תחתונה: ניחוש והעפלה/ניקוד באותה שורה! */}
                         <div className="flex justify-between items-center">
-                            
                             <div className="flex justify-center items-center gap-3 pl-2">
                                 <span className="text-lg font-black text-white bg-slate-950 border border-slate-700 w-9 h-9 flex items-center justify-center rounded-lg shadow-inner">{data.home}</span>
                                 <span className="text-slate-600 font-black text-sm">:</span>
