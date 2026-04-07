@@ -9,7 +9,6 @@ export default function Dashboard({ userId, userName, setActiveTab, tournamentSt
   const [userStats, setUserStats] = useState<any>({ points: 0, hasPaid: false, prevPoints: 0, prevRank: 0, nemesisId: null });
   const [leaderboardInfo, setLeaderboardInfo] = useState({ rank: 0, totalUsers: 0 });
   const [dailyMessage, setDailyMessage] = useState("");
-  const [timeLeft, setTimeLeft] = useState({ d: 0, h: 0, m: 0 });
   const [isLoading, setIsLoading] = useState(true);
   const [allUsersList, setAllUsersList] = useState<any[]>([]);
   
@@ -28,7 +27,7 @@ export default function Dashboard({ userId, userName, setActiveTab, tournamentSt
   const [isFeedLoading, setIsFeedLoading] = useState(true);
   const [showFullHistory, setShowFullHistory] = useState(false);
 
-  const [missingBonuses, setMissingBonuses] = useState({ count: 0, points: 0, totalOpen: 0 });
+  const [missingMatchesToday, setMissingMatchesToday] = useState(0);
   const [activeSurpriseAlert, setActiveSurpriseAlert] = useState<any[]>([]);
   
   const [todayTargets, setTodayTargets] = useState<any[]>([]);
@@ -47,23 +46,6 @@ export default function Dashboard({ userId, userName, setActiveTab, tournamentSt
 
   const [showMagazineModal, setShowMagazineModal] = useState(false);
   const [showRealStandingsModal, setShowRealStandingsModal] = useState(false);
-
-  const kickoffDate = new Date("2026-06-11T20:00:00");
-
-  useEffect(() => {
-    const timer = setInterval(() => {
-      const now = new Date();
-      const difference = kickoffDate.getTime() - now.getTime();
-      if (difference > 0) {
-        setTimeLeft({
-          d: Math.floor(difference / (1000 * 60 * 60 * 24)),
-          h: Math.floor((difference / (1000 * 60 * 60)) % 24),
-          m: Math.floor((difference / 1000 / 60) % 60)
-        });
-      }
-    }, 1000);
-    return () => clearInterval(timer);
-  }, []);
 
   const rankUsers = (usersArr: any[], field: string) => {
     const sorted = [...usersArr].sort((a, b) => (b[field] || 0) - (a[field] || 0));
@@ -238,66 +220,33 @@ export default function Dashboard({ userId, userName, setActiveTab, tournamentSt
         const pbSnap = await getDoc(doc(db, "predictions_bonus", userId));
         const userBonusAnswers = pbSnap.exists() ? pbSnap.data().answers || {} : {};
 
-        const nowMs = new Date().getTime();
-        const activeSurprises: any[] = [];
-        let openCount = 0;
-        let missCount = 0;
-        let missPoints = 0;
-
-        bonusQuestions.forEach((q: any) => {
-           const hasAnswered = userBonusAnswers[q.id] && userBonusAnswers[q.id].toString().trim() !== "";
-           
-            if (q.isSurprise) {
-              if (q.openTime && q.closeTime) {
-                 const openMs = new Date(q.openTime).getTime();
-                 const closeMs = new Date(q.closeTime).getTime();
-                 if (nowMs >= openMs && nowMs <= closeMs) {
-                    if (!hasAnswered) activeSurprises.push(q); 
-                    openCount++;
-                    if (!hasAnswered) {
-                       missCount++;
-                       missPoints += (Number(q.points) || 0);
-                    }
-                 }
-              }
-           }
-           else {
-              let isLocked = false;
-              if (tournamentState > 0) {
-                 if (q.phase === "TOURNAMENT" || q.phase === "GROUPS") isLocked = tournamentState >= 1;
-                 else if (q.phase === "KNOCKOUT") {
-                    if (q.round === "ALL" || q.round === "R32") isLocked = tournamentState >= 5;
-                    else if (q.round === "R16") isLocked = tournamentState >= 7;
-                    else if (q.round === "QF") isLocked = tournamentState >= 9;
-                    else if (q.round === "SF") isLocked = tournamentState >= 11;
-                    else if (q.round === "FINAL") isLocked = tournamentState >= 13;
-                 }
-              }
-              const isVisible = q.phase === "KNOCKOUT" ? (tournamentState >= 4) : true;
-              if (isVisible && !isLocked) {
-                 openCount++;
-                 if (!hasAnswered) {
-                    missCount++;
-                    missPoints += (Number(q.points) || 0);
-                 }
-              }
-           }
-        });
-        
-        setActiveSurpriseAlert(activeSurprises);
-        setMissingBonuses({ count: missCount, points: missPoints, totalOpen: openCount });
-
         const pmSnap = await getDocs(query(collection(db, "predictions_matches"), where("userId", "==", userId)));
         const pkSnap = await getDocs(query(collection(db, "predictions_knockout"), where("userId", "==", userId)));
-        
         const userMatchPreds: any = {};
         pmSnap.forEach(d => { userMatchPreds[d.data().matchId] = d.data(); });
         pkSnap.forEach(d => { userMatchPreds[d.data().matchId] = d.data(); });
 
+        const now = new Date();
+        const nowMs = now.getTime();
         const today = new Date();
+
+        const activeSurprises: any[] = [];
+        bonusQuestions.forEach((q: any) => {
+           if (q.isSurprise && q.openTime && q.closeTime) {
+             const openMs = new Date(q.openTime).getTime();
+             const closeMs = new Date(q.closeTime).getTime();
+             if (nowMs >= openMs && nowMs <= closeMs) {
+                const hasAnswered = userBonusAnswers[q.id] && userBonusAnswers[q.id].toString().trim() !== "";
+                if (!hasAnswered) activeSurprises.push(q); 
+             }
+           }
+        });
+        setActiveSurpriseAlert(activeSurprises);
+
         const targets: any[] = [];
         const tMatches: any[] = [];
         const todayTeams = new Set<string>();
+        let missingMatches = 0;
         
         matches.forEach(m => {
            if (!m.isFinished && m.matchDate) {
@@ -308,15 +257,15 @@ export default function Dashboard({ userId, userName, setActiveTab, tournamentSt
                     todayTeams.add(m.homeTeam);
                     todayTeams.add(m.awayTeam);
                     
-                    tMatches.push({
-                      ...m,
-                      time: t,
-                      userPrediction: userMatchPreds[m.id] || null
-                    });
+                    const pred = userMatchPreds[m.id];
+                    tMatches.push({ ...m, time: t, userPrediction: pred || null });
+
+                    if (!pred || pred.predictedHomeScore === "") missingMatches++;
                  }
               }
            }
         });
+        setMissingMatchesToday(missingMatches);
 
         const noneKeywords = ["אף נבחרת", "אף אחת", "אין", "none"];
         
@@ -479,6 +428,8 @@ export default function Dashboard({ userId, userName, setActiveTab, tournamentSt
     finally { setIsLoadingSpy(false); }
   };
 
+  const avgPoints = allUsersList.length > 0 ? Math.round(allUsersList.reduce((sum, u) => sum + (Number(u.totalPoints) || 0), 0) / allUsersList.length) : 0;
+  
   const getRecentFeedItems = () => {
     const ptsDiff = userStats.points - userStats.prevPoints;
     if (ptsDiff <= 0) return [];
@@ -493,13 +444,23 @@ export default function Dashboard({ userId, userName, setActiveTab, tournamentSt
     return recent;
   };
 
-  const avgPoints = allUsersList.length > 0 ? Math.round(allUsersList.reduce((sum, u) => sum + (Number(u.totalPoints) || 0), 0) / allUsersList.length) : 0;
   const displayFeed = showFullHistory ? pointsFeed : getRecentFeedItems();
   const ptsDiff = userStats.points - userStats.prevPoints;
   const rankDiff = userStats.prevRank > 0 ? userStats.prevRank - leaderboardInfo.rank : 0;
   
   const currentLeader = allUsersList.length > 0 ? allUsersList[0].name?.split(' ')[0] : "אין";
   const currentKoLeader = allUsersList.length > 0 ? [...allUsersList].sort((a, b) => (Number(b.knockoutPoints) || 0) - (Number(a.knockoutPoints) || 0))[0]?.name?.split(' ')[0] : "אין";
+
+  // מציאת המיקום בליגה הפרטית הראשית (תיקון: שימוש בשם הליגה)
+  let myLeagueRank = null;
+  let myLeagueName = "";
+  if (myLeagues.length > 0) {
+     const primaryLeague = myLeagues[0];
+     myLeagueName = primaryLeague.name;
+     const leagueUsers = allUsersList.filter(u => primaryLeague.members.includes(u.id));
+     const myIndex = leagueUsers.findIndex(u => u.id === userId);
+     if (myIndex !== -1) myLeagueRank = myIndex + 1;
+  }
 
   const handlePrevMatch = () => setTodayMatchIndex(i => (i === 0 ? todayMatches.length - 1 : i - 1));
   const handleNextMatch = () => setTodayMatchIndex(i => (i === todayMatches.length - 1 ? 0 : i + 1));
@@ -525,13 +486,11 @@ export default function Dashboard({ userId, userName, setActiveTab, tournamentSt
 
   const filteredSpyData = spyData.filter(d => {
     if (!d.userName.toLowerCase().includes(spySearchQuery.toLowerCase())) return false;
-    
     if (spyModalMatch && spyModalMatch.isFinished && spyFilter !== "ALL") {
       const pH = Number(d.predictedHomeScore); const pA = Number(d.predictedAwayScore);
       const rH = Number(spyModalMatch.realHomeScore); const rA = Number(spyModalMatch.realAwayScore);
       const isExact = (pH === rH && pA === rA);
       const isDirection = (!isExact && Math.sign(pH - pA) === Math.sign(rH - rA));
-      
       if (spyFilter === "EXACT" && !isExact) return false;
       if (spyFilter === "DIRECTION" && !isDirection) return false;
       if (spyFilter === "MISS" && (isExact || isDirection)) return false;
@@ -540,8 +499,31 @@ export default function Dashboard({ userId, userName, setActiveTab, tournamentSt
   });
 
   return (
-    <div className="w-full space-y-8 animate-fade-in-up">
+    <div className="w-full space-y-8 animate-fade-in-up pb-8">
       
+      {/* ==================================================== */}
+      {/* 🚨 באנר אזהרה חסרים ניחושים להיום! */}
+      {/* ==================================================== */}
+      {missingMatchesToday > 0 && (
+         <div className="bg-gradient-to-r from-amber-600 via-orange-600 to-amber-600 p-6 rounded-3xl border border-amber-300 shadow-[0_0_40px_rgba(245,158,11,0.6)] relative overflow-hidden">
+            <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0IiBoZWlnaHQ9IjQiPgo8cmVjdCB3aWR0aD0iNCIgaGVpZ2h0PSI0IiBmaWxsPSIjZmZmIiBmaWxsLW9wYWNpdHk9IjAuMSIvPgo8L3N2Zz4=')] opacity-30"></div>
+            <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-6 text-center md:text-right">
+               <div>
+                  <h2 className="text-2xl md:text-3xl font-black text-white mb-2 flex items-center justify-center md:justify-start gap-3 drop-shadow-md">
+                     <span className="animate-pulse text-amber-950">⚠️</span> משחקים להיום מחכים לך!
+                  </h2>
+                  <p className="text-white/90 font-medium text-base md:text-lg leading-snug">
+                     ישנם <strong>{missingMatchesToday} משחקים</strong> שמתקיימים היום וטרם הזנת להם ניחוש. אל תאבד נקודות סתם.
+                  </p>
+               </div>
+               <button onClick={() => { setActiveTab(0); window.scrollTo({top:0, behavior:'smooth'}); }} className="bg-white text-amber-700 hover:bg-slate-100 font-black px-8 py-4 rounded-xl text-lg shadow-xl hover:-translate-y-1 transition-transform w-full md:w-auto flex-shrink-0">
+                  קח אותי למשחקים 🏃‍♂️
+               </button>
+            </div>
+         </div>
+      )}
+
+      {/* 🎁 באנר שאלת הפתעה! */}
       {activeSurpriseAlert.length > 0 && (
          <div className="bg-gradient-to-r from-purple-600 via-pink-600 to-purple-600 p-6 rounded-3xl border border-purple-300 shadow-[0_0_40px_rgba(168,85,247,0.6)] relative overflow-hidden animate-pulse">
             <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0IiBoZWlnaHQ9IjQiPgo8cmVjdCB3aWR0aD0iNCIgaGVpZ2h0PSI0IiBmaWxsPSIjZmZmIiBmaWxsLW9wYWNpdHk9IjAuMSIvPgo8L3N2Zz4=')] opacity-30"></div>
@@ -561,7 +543,6 @@ export default function Dashboard({ userId, userName, setActiveTab, tournamentSt
          </div>
       )}
 
-      {/* 1. אהלן ברק (הוסר הכפתור הגדול) */}
       <div className="flex md:grid md:grid-cols-2 overflow-x-auto snap-x snap-mandatory md:overflow-visible gap-4 md:gap-8 pb-4 md:pb-0 custom-scrollbar -mx-4 px-4 md:mx-0 md:px-0">
          
          <div className="w-[90%] md:w-auto shrink-0 snap-center rounded-3xl p-6 shadow-2xl relative overflow-hidden bg-slate-900 border border-slate-700 group flex flex-col justify-center">
@@ -594,17 +575,42 @@ export default function Dashboard({ userId, userName, setActiveTab, tournamentSt
                </div>
             </div>
 
-            <div className="flex gap-3 relative z-10 w-full mt-auto">
-               <div className="flex-1 bg-amber-500/10 p-3 rounded-xl border border-amber-500/30 backdrop-blur-sm text-center">
+            {/* ==================================================== */}
+            {/* 🏅 שורת הטופ 3 נגללת הצידה עם שם הליגה שלך! */}
+            {/* ==================================================== */}
+            <div className="flex gap-3 relative z-10 w-full mb-4 overflow-x-auto custom-scrollbar pb-2 snap-x snap-mandatory">
+               
+               <div className="min-w-[120px] flex-1 bg-amber-500/10 p-3 rounded-xl border border-amber-500/30 backdrop-blur-sm text-center shrink-0 snap-center">
                   <div className="text-[9px] text-amber-500/80 font-black mb-0.5 uppercase tracking-wider">🏆 כדור הזהב</div>
                   <div className="text-sm font-black text-amber-400 truncate">{currentLeader}</div>
                </div>
+               
                {tournamentState >= 4 && (
-                  <div className="flex-1 bg-emerald-500/10 p-3 rounded-xl border border-emerald-500/30 backdrop-blur-sm text-center">
+                  <div className="min-w-[120px] flex-1 bg-emerald-500/10 p-3 rounded-xl border border-emerald-500/30 backdrop-blur-sm text-center shrink-0 snap-center">
                      <div className="text-[9px] text-emerald-500/80 font-black mb-0.5 uppercase tracking-wider">🔥 נעל הזהב</div>
                      <div className="text-sm font-black text-emerald-400 truncate">{currentKoLeader}</div>
                   </div>
                )}
+
+               {myLeagues.length > 0 && myLeagueRank && (
+                  <div className="min-w-[120px] flex-1 bg-blue-500/10 p-3 rounded-xl border border-blue-500/30 backdrop-blur-sm text-center shrink-0 snap-center">
+                     <div className="text-[9px] text-blue-400/80 font-black mb-0.5 uppercase tracking-wider truncate px-1" title={myLeagueName}>🏟️ {myLeagueName}</div>
+                     <div className="text-sm font-black text-blue-400 truncate">מקום {myLeagueRank}</div>
+                  </div>
+               )}
+
+            </div>
+
+            <div className="flex justify-between items-center gap-2 mt-auto pt-4 border-t border-slate-700/50 relative z-10 text-center">
+               <div className="flex-1">
+                  <div className="text-[10px] text-slate-400 uppercase tracking-widest font-bold">משתתפים באפליקציה</div>
+                  <div className="text-base font-black text-slate-200 mt-0.5">{leaderboardInfo.totalUsers}</div>
+               </div>
+               <div className="w-px h-8 bg-slate-700/50"></div>
+               <div className="flex-1">
+                  <div className="text-[10px] text-slate-400 uppercase tracking-widest font-bold">ממוצע נקודות קהל</div>
+                  <div className="text-base font-black text-slate-200 mt-0.5">{avgPoints}</div>
+               </div>
             </div>
          </div>
 
@@ -637,7 +643,7 @@ export default function Dashboard({ userId, userName, setActiveTab, tournamentSt
          )}
       </div>
 
-      {/* 2. ציר הזמן (והכפתור החדש בתוכו) */}
+      {/* 2. ציר הזמן */}
       <div className="bg-slate-900 rounded-3xl border border-slate-700 shadow-xl flex flex-col lg:h-[600px] overflow-hidden">
          <div className="flex lg:hidden bg-slate-950 rounded-t-3xl border-b border-slate-700 shrink-0">
             <button 
@@ -657,7 +663,6 @@ export default function Dashboard({ userId, userName, setActiveTab, tournamentSt
          <div className="flex-1 flex flex-col lg:flex-row overflow-hidden bg-slate-800 rounded-b-3xl lg:rounded-3xl">
             <div className={`${timelineTab === "YESTERDAY" ? "flex" : "hidden"} lg:flex flex-col w-full lg:w-1/2 h-full bg-slate-800/50 lg:border-l border-slate-700`}>
                
-               {/* כותרת דסקטופ (עם הכפתור החדש "תמונת מצב בתים") */}
                <div className="hidden lg:flex bg-slate-900/80 px-6 h-20 border-b border-slate-700 justify-between items-center z-10 shadow-sm shrink-0">
                  <h2 className="text-xl font-black text-white flex items-center gap-2"><span>🧾</span> מה היה לנו אתמול?</h2>
                  <div className="flex gap-2">
@@ -670,7 +675,6 @@ export default function Dashboard({ userId, userName, setActiveTab, tournamentSt
                  </div>
                </div>
                
-               {/* כותרת מובייל (עם הכפתור החדש "תמונת מצב בתים") */}
                <div className="flex lg:hidden bg-slate-800 px-4 sm:px-6 py-4 border-b border-slate-700 justify-between items-center z-10 shadow-sm shrink-0 gap-2">
                   <div className="text-sm font-bold text-slate-300">נקודות שנכנסו:</div>
                   <div className="flex gap-2 shrink-0">
@@ -981,39 +985,6 @@ export default function Dashboard({ userId, userName, setActiveTab, tournamentSt
                  </div>
               </div>
            )}
-         </div>
-      </div>
-
-      {/* 4. נתונים יבשים */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-4 border-t border-slate-800">
-         <div className="md:col-span-2 grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <button onClick={() => setActiveTab(0)} className="bg-slate-800 hover:bg-blue-600 hover:text-white text-slate-300 p-3 rounded-2xl border border-slate-700 flex flex-col items-center justify-center gap-1.5 transition-all group shadow-sm">
-              <span className="text-2xl group-hover:scale-110 transition-transform">⚽</span>
-              <span className="font-bold text-[11px]">משחקים</span>
-            </button>
-            <button onClick={() => setActiveTab(1)} className="bg-slate-800 hover:bg-teal-500 hover:text-slate-900 text-slate-300 p-3 rounded-2xl border border-slate-700 flex flex-col items-center justify-center gap-1.5 transition-all group shadow-sm">
-              <span className="text-2xl group-hover:scale-110 transition-transform">🥉</span>
-              <span className="font-bold text-[11px]">מקום 3</span>
-            </button>
-            <button onClick={() => setActiveTab(4)} className="bg-slate-800 hover:bg-amber-500 hover:text-slate-900 text-slate-300 p-3 rounded-2xl border border-slate-700 flex flex-col items-center justify-center gap-1.5 transition-all group shadow-sm">
-              <span className="text-2xl group-hover:scale-110 transition-transform">⭐</span>
-              <span className="font-bold text-[11px]">בונוסים</span>
-            </button>
-            <button onClick={() => setActiveTab(3)} className="bg-slate-800 hover:bg-emerald-500 hover:text-slate-900 text-slate-300 p-3 rounded-2xl border border-slate-700 flex flex-col items-center justify-center gap-1.5 transition-all group shadow-sm">
-              <span className="text-2xl group-hover:scale-110 transition-transform">🏆</span>
-              <span className="font-bold text-[11px]">טבלה</span>
-            </button>
-         </div>
-
-         <div className="md:col-span-1 grid grid-cols-2 gap-3">
-            <div className="bg-slate-800/50 p-4 rounded-2xl border border-blue-500/20 flex flex-col items-center justify-center text-center shadow-inner">
-               <div className="text-[10px] text-slate-500 font-bold mb-1 uppercase tracking-wider">משתתפים בטורניר</div>
-               <div className="text-2xl font-black text-blue-400">{leaderboardInfo.totalUsers}</div>
-            </div>
-            <div className="bg-slate-800/50 p-4 rounded-2xl border border-emerald-500/20 flex flex-col items-center justify-center text-center shadow-inner">
-               <div className="text-[10px] text-slate-500 font-bold mb-1 uppercase tracking-wider">ממוצע ניקוד למשתמש</div>
-               <div className="text-2xl font-black text-emerald-400">{avgPoints}</div>
-            </div>
          </div>
       </div>
 

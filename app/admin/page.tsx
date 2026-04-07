@@ -37,7 +37,7 @@ export default function AdminPanel() {
   const [realBonus, setRealBonus] = useState<any>({});
 
   const [tournamentState, setTournamentState] = useState<number>(0);
-  const [deadlines, setDeadlines] = useState<any>({ md1: "", md2: "", md3: "" });
+  const [deadlines, setDeadlines] = useState<any>({});
   const [usersList, setUsersList] = useState<any[]>([]);
   const [dailyMessage, setDailyMessage] = useState("");
 
@@ -112,7 +112,7 @@ export default function AdminPanel() {
       const settingsSnap = await getDoc(doc(db, "settings", "system"));
       if (settingsSnap.exists()) {
         setTournamentState(settingsSnap.data().tournamentState || 0);
-        setDeadlines(settingsSnap.data().deadlines || { md1: "", md2: "", md3: "" });
+        setDeadlines(settingsSnap.data().deadlines || {});
       }
 
       const dashSnap = await getDoc(doc(db, "settings", "dashboard"));
@@ -229,28 +229,6 @@ export default function AdminPanel() {
 
   const handleRemoveCustomOption = (optionToRemove: string) => { 
     setNewQuestion(prev => ({ ...prev, customOptions: prev.customOptions.filter(opt => opt !== optionToRemove) })); 
-  };
-  
-  const handleUploadCustomOptionsJson = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      try {
-        const json = JSON.parse(event.target?.result as string);
-        if (!Array.isArray(json)) return toast.error("שגיאה: הקובץ חייב להיות מערך פשוט של טקסטים.");
-        const stringArray = json.map(item => String(item));
-        setNewQuestion(prev => ({
-          ...prev,
-          customOptions: [...prev.customOptions, ...stringArray].filter((val, idx, arr) => arr.indexOf(val) === idx)
-        }));
-        toast.success(`נטענו ${stringArray.length} אפשרויות בהצלחה!`);
-      } catch (error) { 
-        toast.error("שגיאה בפורמט הקובץ."); 
-      }
-      e.target.value = ""; 
-    };
-    reader.readAsText(file);
   };
 
   const handleSaveQuestion = async () => { 
@@ -816,7 +794,7 @@ const handleCalculateScores = async (silentParam: any = false) => {
       for (const m of matchesSnap.docs) {
         await updateDoc(doc(db, "matches", m.id), { realHomeScore: null, realAwayScore: null, realQualifier: "", isFinished: false });
       }
-      await setDoc(doc(db, "settings", "system"), { tournamentState: 0, deadlines: { md1: "", md2: "", md3: "" } }, { merge: true });
+      await setDoc(doc(db, "settings", "system"), { tournamentState: 0, deadlines: {} }, { merge: true });
       await setDoc(doc(db, "settings", "dashboard"), { dailyMessage: "" }, { merge: true });
       
       toast.success("🧹 איזה ניקיון! המערכת אופסה לחלוטין למצב 'ונילה'.", { duration: 5000 });
@@ -1231,9 +1209,6 @@ const handleCalculateScores = async (silentParam: any = false) => {
     finally { setIsCalculating(false); }
   };
 
-  // =========================================================================
-  // שדרוג ייצוא האקסל - מבנה "נתונים שטוחים" (Flattened Data) כמו שביקשת!
-  // =========================================================================
   const handleExportPredictions = async (targetUserId: string | "ALL", targetUserName: string) => {
     setIsCalculating(true);
     toast.loading("מכין קובץ אקסל...", { id: "csvExport" });
@@ -1276,7 +1251,6 @@ const handleCalculateScores = async (silentParam: any = false) => {
          const uName = (u as any).name || "Unknown";
          const escapeCSV = (str: string) => `"${String(str).replace(/"/g, '""')}"`;
          
-         // 1. משחקי שלב הבתים
          const uMatches = pmData.filter(p => p.userId === u.id);
          uMatches.forEach(p => {
             const m: any = matchesList.find(x => x.id === p.matchId);
@@ -1300,7 +1274,6 @@ const handleCalculateScores = async (silentParam: any = false) => {
             }
          });
          
-         // 2. משחקי נוק-אאוט
          const uKnockout = pkData.filter(p => p.userId === u.id);
          uKnockout.forEach(p => {
             const m: any = matchesList.find(x => x.id === p.matchId);
@@ -1327,7 +1300,6 @@ const handleCalculateScores = async (silentParam: any = false) => {
             }
          });
 
-         // 3. עולות מבתים
          const uQual: any = pqData.find(p => p.id === u.id);
          if (uQual && uQual.groups) {
             for (const [grp, preds] of Object.entries<any>(uQual.groups)) {
@@ -1354,7 +1326,6 @@ const handleCalculateScores = async (silentParam: any = false) => {
             }
          }
 
-         // 4. 8 המעפילות (מקום 3)
          const uThird: any = ptData.find(p => p.id === u.id);
          if (uThird && uThird.teams) {
             const pred = uThird.teams.filter((x:any)=>x).join(', ');
@@ -1371,7 +1342,6 @@ const handleCalculateScores = async (silentParam: any = false) => {
             }
          }
 
-         // 5. שאלות בונוס
          const uBonus: any = pbData.find(p => p.id === u.id);
          if (uBonus && uBonus.answers) {
             for (const [qId, ans] of Object.entries<any>(uBonus.answers)) {
@@ -1457,7 +1427,6 @@ const handleCalculateScores = async (silentParam: any = false) => {
     <div className="min-h-screen bg-slate-950 p-4 md:p-8 font-sans" dir="rtl">
       <div className="max-w-6xl mx-auto">
         
-        {/* כותרת פאנל ניהול (מראה גיימרי חדש!) */}
         <div className="bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-slate-800 via-slate-900 to-slate-950 p-6 md:p-8 rounded-3xl border border-slate-800 shadow-2xl mb-8 flex flex-col md:flex-row justify-between items-center gap-4 relative overflow-hidden">
           <div className="absolute -top-10 -right-10 w-40 h-40 bg-blue-500/10 rounded-full blur-3xl pointer-events-none"></div>
           <div className="absolute -bottom-10 -left-10 w-40 h-40 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none"></div>
@@ -1473,7 +1442,6 @@ const handleCalculateScores = async (silentParam: any = false) => {
           </Link>
         </div>
 
-        {/* בר המשימות המהיר של הניקוד */}
         <div className="mb-6 p-6 bg-slate-900 border border-emerald-500/30 rounded-3xl flex flex-col md:flex-row gap-4 justify-between items-center shadow-xl relative overflow-hidden group">
           <div className="absolute inset-0 bg-emerald-500/5 group-hover:bg-emerald-500/10 transition-colors pointer-events-none"></div>
           <div className="relative z-10 text-center md:text-right">
@@ -1490,7 +1458,6 @@ const handleCalculateScores = async (silentParam: any = false) => {
           </div>
         </div>
 
-        {/* טאבים בסגנון פרימיום */}
         <div className="flex gap-2 mb-8 bg-slate-900/60 p-2 rounded-2xl border border-slate-800 overflow-x-auto custom-scrollbar shadow-inner">
           {[
             { id: "SYSTEM", label: "⏱️ שעון המערכת" }, 
@@ -1512,10 +1479,8 @@ const handleCalculateScores = async (silentParam: any = false) => {
           ))}
         </div>
 
-        {/* אזור התוכן המרכזי */}
         <div className="bg-slate-900 p-4 md:p-8 rounded-3xl border border-slate-800 shadow-xl min-h-[50vh]">
 
-          {/* --- טאב גיבוי ושחזור --- */}
           {activeTab === "BACKUP" && (
             <div className="space-y-8 max-w-3xl mx-auto animate-fade-in-up">
               <div className="bg-gradient-to-br from-slate-800 to-slate-900 p-8 rounded-3xl border border-blue-500/30 shadow-xl relative overflow-hidden">
@@ -1535,7 +1500,6 @@ const handleCalculateScores = async (silentParam: any = false) => {
             </div>
           )}
 
-          {/* --- טאב שעון המערכת --- */}
           {activeTab === "SYSTEM" && (
             <div className="space-y-8 max-w-3xl mx-auto animate-fade-in-up">
               <div className="bg-slate-800 p-6 md:p-8 rounded-3xl border border-blue-500/30 shadow-2xl relative overflow-hidden">
@@ -1560,12 +1524,26 @@ const handleCalculateScores = async (silentParam: any = false) => {
                 
                 <div className="bg-slate-900/80 p-6 rounded-2xl border border-slate-700 relative z-10 mt-8 shadow-inner">
                   <h3 className="text-xl font-bold text-white mb-2 flex items-center gap-2"><span>⏳</span> שעוני עצר (מועדי נעילה)</h3>
-                  <p className="text-slate-400 text-sm mb-6">הגדר כאן מתי להציג את אזהרת ההתקרבות לנעילת כל מחזור.</p>
+                  <p className="text-slate-400 text-sm mb-4">הגדר כאן מתי יינעלו הניחושים לכל שלב. השעון יציג למשתמשים את השלב הקרוב ביותר אוטומטית.</p>
+                  
+                  <h4 className="text-blue-400 font-bold mb-3 text-sm">שלב הבתים</h4>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
                     <div><label className="text-slate-400 text-xs block mb-2 font-bold uppercase tracking-wider">מחזור 1 (+עולות)</label><input type="datetime-local" value={deadlines.md1 || ""} onChange={e => setDeadlines({...deadlines, md1: e.target.value})} className="w-full bg-slate-950 text-white p-3 rounded-xl border border-slate-600 outline-none focus:border-blue-500" /></div>
                     <div><label className="text-slate-400 text-xs block mb-2 font-bold uppercase tracking-wider">מחזור 2</label><input type="datetime-local" value={deadlines.md2 || ""} onChange={e => setDeadlines({...deadlines, md2: e.target.value})} className="w-full bg-slate-950 text-white p-3 rounded-xl border border-slate-600 outline-none focus:border-blue-500" /></div>
                     <div><label className="text-slate-400 text-xs block mb-2 font-bold uppercase tracking-wider">מחזור 3</label><input type="datetime-local" value={deadlines.md3 || ""} onChange={e => setDeadlines({...deadlines, md3: e.target.value})} className="w-full bg-slate-950 text-white p-3 rounded-xl border border-slate-600 outline-none focus:border-blue-500" /></div>
                   </div>
+
+                  <h4 className="text-purple-400 font-bold mb-3 text-sm border-t border-slate-700/50 pt-4">שלבי הנוק-אאוט (דדליין מתחלף אחד)</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                    <div>
+                       <label className="text-slate-400 text-xs block mb-2 font-bold uppercase tracking-wider">מועד נעילה לסיבוב הקרוב</label>
+                       <input type="datetime-local" value={deadlines.knockout || ""} onChange={e => setDeadlines({...deadlines, knockout: e.target.value})} className="w-full bg-slate-950 text-white p-3 rounded-xl border border-slate-600 outline-none focus:border-purple-500" />
+                    </div>
+                    <div className="flex items-center text-slate-400 text-xs bg-slate-950 p-3 rounded-xl border border-slate-800">
+                       💡 ברגע שהדדליין עובר, השעון למעלה יציג אוטומטית "No More Bets! בהצלחה" למשתמשים, עד שתזין כאן תאריך חדש לשלב הבא.
+                    </div>
+                  </div>
+                  
                   <button onClick={handleSaveDeadlines} className="w-full py-3.5 bg-slate-700 hover:bg-slate-600 border border-slate-500 text-white font-bold rounded-xl transition-all shadow-sm active:scale-95">{savingId === "deadlines" ? "שומר..." : "💾 שמור שעוני עצר"}</button>
                 </div>
 
@@ -1579,7 +1557,6 @@ const handleCalculateScores = async (silentParam: any = false) => {
             </div>
           )}
 
-          {/* 📊 ראדאר סטטיסטיקות */}
           {activeTab === "STATS" && (
             <div className="space-y-8 relative animate-fade-in-up">
                <div className="flex flex-col md:flex-row justify-between items-start md:items-center bg-gradient-to-r from-indigo-900/50 to-slate-800 p-6 md:p-8 rounded-3xl border border-indigo-500/30 shadow-lg gap-6">
@@ -1706,18 +1683,15 @@ const handleCalculateScores = async (silentParam: any = false) => {
             </div>
           )}
           
-          {/* --- משתמשים וכתבות (עם עיצוב הטבלה החדש!) --- */}
           {activeTab === "USERS" && (
             
             <div className="space-y-8 max-w-4xl mx-auto animate-fade-in-up">
               
-              {/* המהדורה המרכזית */}
               <div className="bg-gradient-to-br from-slate-800 to-slate-900 p-8 rounded-3xl border border-emerald-500/30 shadow-xl relative overflow-hidden">
                 <div className="absolute top-0 right-0 w-2 h-full bg-gradient-to-b from-blue-400 to-emerald-500"></div>
                 <h2 className="text-2xl font-black text-white mb-2 flex items-center gap-2"><span>📰</span> עריכת המהדורה המרכזית (Rich Text)</h2>
                 <p className="text-slate-400 text-sm mb-6 leading-relaxed">השתמש בכפתורים כדי להוסיף עיצוב, תמונות וגיפים! משתמשים יראו את זה בלייב בכתבת המגזין שבדאשבורד.</p>
                 
-                {/* סרגל הכלים */}
                 <div className="flex flex-wrap gap-2 mb-0 bg-slate-950 p-3 rounded-t-xl border border-b-0 border-slate-700 items-center shadow-inner">
                   <button onClick={() => insertTagToDailyMessage('<b>', '</b>')} className="bg-slate-800 hover:bg-slate-700 text-white px-3 py-1.5 rounded-lg text-sm font-bold transition-colors border border-slate-600"><b>B</b> מודגש</button>
                   <button onClick={() => insertTagToDailyMessage('<i>', '</i>')} className="bg-slate-800 hover:bg-slate-700 text-white px-3 py-1.5 rounded-lg text-sm font-bold transition-colors border border-slate-600"><i>I</i> נטוי</button>
@@ -1806,7 +1780,6 @@ const handleCalculateScores = async (silentParam: any = false) => {
                 </div>
               </div>
               
-              {/* מחולל Wall of Fame/Shame */}
               <div className="bg-gradient-to-br from-indigo-900/40 to-slate-800 p-8 rounded-3xl border border-indigo-500/30 shadow-xl">
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4 border-b border-slate-700 pb-4">
                   <div>
@@ -1836,7 +1809,6 @@ const handleCalculateScores = async (silentParam: any = false) => {
                 )}
               </div> 
 
-              {/* טבלת המשתמשים */}
               <div className="bg-slate-800 p-8 rounded-3xl border border-blue-500/30 shadow-xl mt-8">
                 
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4 border-b border-slate-700 pb-6">
@@ -1849,7 +1821,6 @@ const handleCalculateScores = async (silentParam: any = false) => {
                   </button>
                 </div>
                 
-                {/* מעבדת סימולציות */}
                 <div className="bg-purple-900/10 p-5 rounded-2xl border border-purple-500/30 mb-8 flex flex-col xl:flex-row items-start xl:items-center justify-between gap-6 shadow-inner">
                   <div>
                     <h3 className="text-purple-400 font-black flex items-center gap-2 mb-1 text-lg"><span>🤖</span> מעבדת סימולציות (הזרקת בוטים)</h3>
@@ -1880,9 +1851,7 @@ const handleCalculateScores = async (silentParam: any = false) => {
                      </button>
                   </div>
                 </div>
-                {/* ========================================= */}
 
-                {/* טבלת המשתמשים המעוצבת */}
                 <div className="overflow-x-auto bg-slate-950 rounded-2xl border border-slate-700 shadow-inner">
                   <table className="w-full text-right text-slate-300">
                     <thead className="text-xs uppercase tracking-widest bg-slate-900/80 text-slate-500 border-b border-slate-800">
@@ -1929,7 +1898,6 @@ const handleCalculateScores = async (silentParam: any = false) => {
             </div>
           )}
 
-          {/* --- טאב שאלות בונוס --- */}
           {activeTab === "BONUS" && (
             <div className="space-y-12">
               
@@ -1941,7 +1909,6 @@ const handleCalculateScores = async (silentParam: any = false) => {
                     <div className="w-full md:w-32"><label className="text-slate-400 text-sm mb-1 block">ניקוד בסיס</label><input type="number" min="0" value={newQuestion.points} onChange={e => setNewQuestion({...newQuestion, points: Number(e.target.value)})} className="w-full bg-slate-950 text-white p-3 rounded-lg text-center text-amber-500 font-bold outline-none" /></div>
                   </div>
                   
-                  {/* השדרוגים לשאלות ההפתעה וקרבה */}
                   <div className="flex flex-wrap gap-6 mb-6 p-4 bg-slate-950 rounded-xl border border-slate-700">
                     <label className="flex items-center gap-2 text-purple-400 font-bold cursor-pointer hover:text-purple-300">
                        <input type="checkbox" checked={newQuestion.isSurprise} onChange={e => setNewQuestion({...newQuestion, isSurprise: e.target.checked})} className="w-5 h-5 accent-purple-500 cursor-pointer" />
@@ -2141,7 +2108,6 @@ const handleCalculateScores = async (silentParam: any = false) => {
             </div>
           )}
 
-          {/* --- עולות מבתים (עם ה-UI החדש והשווה) --- */}
           {activeTab === "QUALIFIERS" && (
             <div>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
@@ -2197,7 +2163,6 @@ const handleCalculateScores = async (silentParam: any = false) => {
             </div>
           )}
 
-          {/* --- 8 מעפילות (עם ה-UI החדש והשווה) --- */}
           {activeTab === "THIRD_PLACE" && (
             <div className="space-y-8">
               <div className="bg-slate-800 p-6 md:p-8 rounded-3xl border border-rose-500/30 shadow-xl relative overflow-hidden group">
@@ -2255,7 +2220,6 @@ const handleCalculateScores = async (silentParam: any = false) => {
             </div>
           )}
 
-          {/* --- משחקים --- */}
           {activeTab === "MATCHES" && (
             <div className="space-y-8">
               <div className="bg-slate-800 p-6 rounded-3xl border border-blue-500/30 shadow-lg flex justify-between items-center">
