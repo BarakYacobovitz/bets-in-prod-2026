@@ -11,7 +11,7 @@ const MASCOTS = [
   {
      id: "trump",
      name: "דונלד",
-     image: "/donaldIcon.jpg", 
+     image: "/donaldIcon.png", 
      quotes: [
        "ניחוש ענק. כולם אומרים שזה הניחוש הכי טוב שהם ראו. פייק ניוז מי שאומר אחרת!",
        "אנחנו נבנה פער ענק בטבלה, והחברים למשרד ישלמו על זה!",
@@ -22,7 +22,7 @@ const MASCOTS = [
   {
      id: "mexican",
      name: "חואן",
-     image: "/maxicanIcon.jpg",
+     image: "/maxicanIcon.png",
      quotes: [
        "איי קראמבה! איזה ניחוש חריף הבאת פה אמיגו! 🌶️",
        "ואמוס! תביא ירוק במטריצה ויוצאים לפיאסטה עד הבוקר! 🪅",
@@ -33,7 +33,7 @@ const MASCOTS = [
   {
      id: "canadian",
      name: "בוב",
-     image: "/candianIcon.jpg",
+     image: "/candianIcon.png",
      quotes: [
        "סליחה שאני מפריע, אה, אבל נראה לי שהניחוש שלך קצת קפוא. 🍁",
        "קח קפה, שים סירופ מייפל ובוא נראה קצת סוקר, אה? ☕",
@@ -526,15 +526,15 @@ export default function Dashboard({ userId, userName, setActiveTab, tournamentSt
   const currentLeader = allUsersList.length > 0 ? allUsersList[0].name?.split(' ')[0] : "אין";
   const currentKoLeader = allUsersList.length > 0 ? [...allUsersList].sort((a, b) => (Number(b.knockoutPoints) || 0) - (Number(a.knockoutPoints) || 0))[0]?.name?.split(' ')[0] : "אין";
 
-  let myLeagueRank = null;
-  let myLeagueName = "";
-  if (myLeagues.length > 0) {
-     const primaryLeague = myLeagues[0];
-     myLeagueName = primaryLeague.name;
-     const leagueUsers = allUsersList.filter(u => primaryLeague.members.includes(u.id));
+  const userLeaguesData = myLeagues.map(league => {
+     const leagueUsers = allUsersList.filter(u => league.members.includes(u.id));
      const myIndex = leagueUsers.findIndex(u => u.id === userId);
-     if (myIndex !== -1) myLeagueRank = myIndex + 1;
-  }
+     return {
+        id: league.id,
+        name: league.name,
+        rank: myIndex !== -1 ? myIndex + 1 : "-"
+     };
+  });
 
   const handlePrevMatch = () => setTodayMatchIndex(i => (i === 0 ? todayMatches.length - 1 : i - 1));
   const handleNextMatch = () => setTodayMatchIndex(i => (i === todayMatches.length - 1 ? 0 : i + 1));
@@ -687,12 +687,12 @@ export default function Dashboard({ userId, userName, setActiveTab, tournamentSt
                   </div>
                )}
 
-               {myLeagues.length > 0 && myLeagueRank && (
-                  <div className="min-w-[120px] flex-1 bg-blue-500/10 p-3 rounded-xl border border-blue-500/30 backdrop-blur-sm text-center shrink-0 snap-center flex flex-col justify-center">
-                     <div className="text-[9px] text-blue-400/80 font-black mb-0.5 uppercase tracking-wider truncate px-1" title={myLeagueName}>🏟️ {myLeagueName}</div>
-                     <div className="text-sm font-black text-blue-400 truncate">מקום {myLeagueRank}</div>
+               {userLeaguesData.map(league => (
+                  <div key={league.id} className="min-w-[120px] flex-1 bg-blue-500/10 p-3 rounded-xl border border-blue-500/30 backdrop-blur-sm text-center shrink-0 snap-center flex flex-col justify-center transition-all hover:bg-blue-500/20">
+                     <div className="text-[9px] text-blue-400/80 font-black mb-0.5 uppercase tracking-wider truncate px-1" title={league.name}>🏟️ {league.name}</div>
+                     <div className="text-sm font-black text-blue-400 truncate">מקום {league.rank}</div>
                   </div>
-               )}
+               ))}
             </div>
 
             <div className="flex justify-between items-center gap-2 mt-auto pt-4 border-t border-slate-700/50 relative z-10 text-center">
