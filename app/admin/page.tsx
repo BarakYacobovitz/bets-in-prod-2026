@@ -6,6 +6,8 @@ import { auth, db } from "../firebase";
 import Link from "next/link";
 import toast from "react-hot-toast";
 import { getFlagUrl } from "../utils/flags";
+import AdminMatchesTab from "@/components/admin/AdminMatchesTab"; 
+import AdminSystemTab from "@/components/admin/AdminSystemTab";
 
 const ADMIN_EMAIL = "bawak.y10@gmail.com"; 
 
@@ -20,11 +22,7 @@ export default function AdminPanel() {
   const [selectedStatBonus, setSelectedStatBonus] = useState<string>("");
   const [selectedStatGroup, setSelectedStatGroup] = useState<string>("A");
   const [statSpyModal, setStatSpyModal] = useState<{title: string, list: any[], type: "MATCH_DIRECTION" | "NAMES_ONLY"} | null>(null);
-  const [adminMatchGroup, setAdminMatchGroup] = useState<string>("A");
-  
-  const [adminKnockoutViewMode, setAdminKnockoutViewMode] = useState<"LIST" | "BRACKET">("LIST");
-  const [adminBracketModalMatch, setAdminBracketModalMatch] = useState<any | null>(null);
-  
+
   const [adminBonusCategory, setAdminBonusCategory] = useState<string>("TOURNAMENT");
   const [adminKnockoutRound, setAdminKnockoutRound] = useState<string>("ALL");
 
@@ -32,14 +30,23 @@ export default function AdminPanel() {
   const [savingId, setSavingId] = useState<string | null>(null);
   const [isCalculating, setIsCalculating] = useState(false);
   const [autoInsights, setAutoInsights] = useState<string[]>([]);
+  
   const [realQualifiers, setRealQualifiers] = useState<any>({});
   const [realThirdPlace, setRealThirdPlace] = useState<string[]>(Array(8).fill(""));
-  const [realBonus, setRealBonus] = useState<any>({});
+  
+  // -- מנגנון הבונוסים החכם: מנצחים, פסולים, מובילים ונעולים --
+  const [realBonus, setRealBonus] = useState<any>({}); 
+  const [bonusBlacklist, setBonusBlacklist] = useState<any>({}); 
+  const [bonusLeading, setBonusLeading] = useState<any>({}); 
+  const [bonusLocked, setBonusLocked] = useState<any>({}); 
+  const [allUserBonusAnswers, setAllUserBonusAnswers] = useState<any[]>([]); 
 
   const [tournamentState, setTournamentState] = useState<number>(0);
   const [deadlines, setDeadlines] = useState<any>({});
   const [usersList, setUsersList] = useState<any[]>([]);
   const [dailyMessage, setDailyMessage] = useState("");
+  const [dailyMediaUrl, setDailyMediaUrl] = useState("");
+  const [dailySubtext, setDailySubtext] = useState(""); 
 
   const [bonusQuestions, setBonusQuestions] = useState<any[]>([]); 
   const [editingId, setEditingId] = useState<string | null>(null); 
@@ -54,25 +61,7 @@ export default function AdminPanel() {
   const dailyMessageRef = useRef<HTMLTextAreaElement>(null); 
 
   const [simStage, setSimStage] = useState<string>("MD1");
-
   const groupsList = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L"];
-
-  const TIMELINE_STATES = [
-    { val: 0, label: "0. טרום טורניר", desc: "הכל פתוח לניחוש. שום דבר לא נעול." },
-    { val: 1, label: "1. שריקת הפתיחה (מחזור 1)", desc: "🔒 ננעלים: משחקי מחזור 1, עולות מבתים, 8 מעפילות, ושאלות טורניר/בתים." },
-    { val: 2, label: "2. תחילת מחזור 2", desc: "🔒 ננעלים: משחקי מחזור 2." },
-    { val: 3, label: "3. תחילת מחזור 3", desc: "🔒 ננעלים: משחקי מחזור 3 (שלב הבתים מסתיים למעשה)." },
-    { val: 4, label: "4. חשיפת 32 הגדולות", desc: "👁️ נחשפים: משחקים ושאלות בונוס של 32 הגדולות + כל הנוק-אאוט." },
-    { val: 5, label: "5. נעילת 32 הגדולות", desc: "🔒 ננעלים: משחקים ושאלות של 32 הגדולות + כל הנוק-אאוט." },
-    { val: 6, label: "6. חשיפת שמינית גמר", desc: "👁️ נחשפים: משחקים ושאלות של שמינית הגמר." },
-    { val: 7, label: "7. נעילת שמינית גמר", desc: "🔒 ננעלים: משחקים ושאלות של שמינית הגמר." },
-    { val: 8, label: "8. חשיפת רבע גמר", desc: "👁️ נחשפים: משחקים ושאלות של רבע הגמר." },
-    { val: 9, label: "9. נעילת רבע גמר", desc: "🔒 ננעלים: משחקים ושאלות של רבע הגמר." },
-    { val: 10, label: "10. חשיפת חצי גמר", desc: "👁️ נחשפים: משחקים ושאלות של חצי הגמר." },
-    { val: 11, label: "11. נעילת חצי גמר", desc: "🔒 ננעלים: משחקים ושאלות של חצי הגמר." },
-    { val: 12, label: "12. חשיפת הגמר", desc: "👁️ נחשפים: משחק הגמר ושאלות הגמר." },
-    { val: 13, label: "13. נעילת הגמר", desc: "🔒 ננעלים: משחק ושאלות הגמר. הטורניר נגמר!" }
-  ];
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
@@ -103,8 +92,17 @@ export default function AdminPanel() {
          setRealThirdPlace(Array(8).fill(""));
       }
 
+      const pbSnap = await getDocs(collection(db, "predictions_bonus"));
+      const pbData = pbSnap.docs.map(d => d.data().answers || {});
+      setAllUserBonusAnswers(pbData);
+
       const bonusSnap = await getDoc(doc(db, "admin_results", "bonus"));
-      if (bonusSnap.exists()) setRealBonus(bonusSnap.data().answers || {});
+      if (bonusSnap.exists()) {
+         setRealBonus(bonusSnap.data().answers || {});
+         setBonusBlacklist(bonusSnap.data().blacklist || {});
+         setBonusLeading(bonusSnap.data().leading || {});
+         setBonusLocked(bonusSnap.data().locked || {});
+      }
 
       const questionsSnap = await getDoc(doc(db, "settings", "bonus_questions"));
       if (questionsSnap.exists()) setBonusQuestions(questionsSnap.data().questions || []);
@@ -116,7 +114,11 @@ export default function AdminPanel() {
       }
 
       const dashSnap = await getDoc(doc(db, "settings", "dashboard"));
-      if (dashSnap.exists()) setDailyMessage(dashSnap.data().dailyMessage || "");
+      if (dashSnap.exists()) {
+         setDailyMessage(dashSnap.data().dailyMessage || "");
+         setDailyMediaUrl(dashSnap.data().dailyMediaUrl || "");
+         setDailySubtext(dashSnap.data().dailySubtext || ""); 
+      }
 
       const usersSnap = await getDocs(collection(db, "users"));
       const usersArray: any[] = [];
@@ -145,17 +147,17 @@ export default function AdminPanel() {
   const allTeams = Array.from(new Set(matches.flatMap(m => [m.homeTeam, m.awayTeam]))).sort();
 
   const handleSaveDailyMessage = async () => { 
-    setSavingId("dashboardMsg"); 
-    try { 
-      await setDoc(doc(db, "settings", "dashboard"), { dailyMessage }, { merge: true }); 
-      setTimeout(() => setSavingId(null), 500); 
-      toast.success("הטור היומי עודכן בהצלחה! משתמשים יראו את זה בלייב."); 
+  setSavingId("dashboardMsg"); 
+  try { 
+    await setDoc(doc(db, "settings", "dashboard"), { dailyMessage, dailyMediaUrl, dailySubtext }, { merge: true }); 
+    setTimeout(() => setSavingId(null), 500); 
+    toast.success("הטור היומי והמדיה עודכנו בהצלחה!"); 
     } catch (error) { 
-      toast.error("שגיאה בשמירת הטור היומי"); 
-      setSavingId(null); 
+    toast.error("שגיאה בשמירת הטור היומי"); 
+    setSavingId(null); 
     } 
   };
-  
+      
   const insertTagToDailyMessage = (before: string, after: string) => {
     const textarea = dailyMessageRef.current;
     if (!textarea) return;
@@ -185,6 +187,15 @@ export default function AdminPanel() {
       toast.error("שגיאה בעדכון הסטטוס"); 
     } 
   };
+  
+  const handleUpdateUserName = async (userId: string, newName: string) => {
+    try {
+      await updateDoc(doc(db, "users", userId), { name: newName });
+      toast.success("שם השחקן עודכן בהצלחה! 👑");
+    } catch (error) {
+      toast.error("שגיאה בעדכון שם השחקן");
+    }
+  };
 
   const handleSaveTournamentState = async () => { 
     setSavingId("system"); 
@@ -208,14 +219,23 @@ export default function AdminPanel() {
     } 
   };
 
-  const handleUpdateMatchday = async (matchId: string, day: number) => { 
-    try { 
-      await updateDoc(doc(db, "matches", matchId), { matchday: day }); 
-      setMatches(matches.map(m => m.id === matchId ? { ...m, matchday: day } : m));
-      toast.success(`מחזור עודכן ל-${day}`);
-    } catch (error) { 
-      toast.error("שגיאה בשמירת המחזור"); 
-    } 
+  const handleUpdateMatchDate = async (matchId: string, newDate: string) => {
+    try {
+      await updateDoc(doc(db, "matches", matchId), { matchDate: newDate });
+      setMatches(matches.map(m => m.id === matchId ? { ...m, matchDate: newDate } : m));
+      toast.success("תאריך ושעת המשחק עודכנו בהצלחה!");
+    } catch (error) {
+      toast.error("שגיאה בעדכון מועד המשחק");
+    }
+  };
+  const handleUpdateMatchday = async (matchId: string, newMatchday: number) => {
+    try {
+      await updateDoc(doc(db, "matches", matchId), { matchday: newMatchday });
+      setMatches(matches.map(m => m.id === matchId ? { ...m, matchday: newMatchday } : m));
+      toast.success("מחזור המשחק עודכן בהצלחה!");
+    } catch (error) {
+      toast.error("שגיאה בעדכון מחזור המשחק");
+    }
   };
   
   const handleAddCustomOption = () => { 
@@ -288,27 +308,58 @@ export default function AdminPanel() {
     } 
   };
 
-  const handleAddTruth = (qId: string, val: string) => { 
-    if (!val.trim()) return; 
-    setRealBonus((prev: any) => { 
-      const current = Array.isArray(prev[qId]) ? prev[qId] : (prev[qId] ? [prev[qId]] : []); 
-      if (!current.includes(val.trim())) return { ...prev, [qId]: [...current, val.trim()] }; 
-      return prev; 
-    }); 
+  // --- מנגנון הבונוסים החכם: אישור, מוביל זמני, פסילה ונעילה ---
+  const handleToggleBonusWinner = (qId: string, val: string) => {
+    if (!val.trim()) return;
+    const v = val.trim();
+    setBonusBlacklist((prev: any) => ({ ...prev, [qId]: (prev[qId] || []).filter((item:string) => item !== v) }));
+    setBonusLeading((prev: any) => ({ ...prev, [qId]: (prev[qId] || []).filter((item:string) => item !== v) }));
+    setRealBonus((prev: any) => {
+       const curr = prev[qId] || [];
+       if (curr.includes(v)) return { ...prev, [qId]: curr.filter((item:string) => item !== v) };
+       return { ...prev, [qId]: [...curr, v] };
+    });
   };
 
-  const handleRemoveTruth = (qId: string, val: string) => { 
-    setRealBonus((prev: any) => { 
-      const current = Array.isArray(prev[qId]) ? prev[qId] : (prev[qId] ? [prev[qId]] : []); 
-      return { ...prev, [qId]: current.filter((item: string) => item !== val) }; 
-    }); 
+  const handleToggleBonusBlacklist = (qId: string, val: string) => {
+    if (!val.trim()) return;
+    const v = val.trim();
+    setRealBonus((prev: any) => ({ ...prev, [qId]: (prev[qId] || []).filter((item:string) => item !== v) }));
+    setBonusLeading((prev: any) => ({ ...prev, [qId]: (prev[qId] || []).filter((item:string) => item !== v) }));
+    setBonusBlacklist((prev: any) => {
+       const curr = prev[qId] || [];
+       if (curr.includes(v)) return { ...prev, [qId]: curr.filter((item:string) => item !== v) };
+       return { ...prev, [qId]: [...curr, v] };
+    });
+  };
+
+  const handleToggleBonusLeading = (qId: string, val: string) => {
+    if (!val.trim()) return;
+    const v = val.trim();
+    setRealBonus((prev: any) => ({ ...prev, [qId]: (prev[qId] || []).filter((item:string) => item !== v) }));
+    setBonusBlacklist((prev: any) => ({ ...prev, [qId]: (prev[qId] || []).filter((item:string) => item !== v) }));
+    setBonusLeading((prev: any) => {
+       const curr = prev[qId] || [];
+       if (curr.includes(v)) return { ...prev, [qId]: curr.filter((item:string) => item !== v) };
+       return { ...prev, [qId]: [...curr, v] };
+    });
+  };
+
+  const handleToggleBonusLock = (qId: string) => {
+    setBonusLocked((prev: any) => ({ ...prev, [qId]: !prev[qId] }));
   };
 
   const handleSaveBonus = async () => { 
     setSavingId("bonus"); 
     try { 
-      await setDoc(doc(db, "admin_results", "bonus"), { answers: realBonus, updated_at: new Date() }); 
-      setTimeout(() => { setSavingId(null); toast.success("תוצאות בונוס נשמרו!"); }, 500); 
+      await setDoc(doc(db, "admin_results", "bonus"), { 
+          answers: realBonus, 
+          blacklist: bonusBlacklist,
+          leading: bonusLeading,
+          locked: bonusLocked,
+          updated_at: new Date() 
+      }); 
+      setTimeout(() => { setSavingId(null); toast.success("ניהול הבונוסים נשמר בהצלחה!"); }, 500); 
     } catch (error) { 
       setSavingId(null);
       toast.error("שגיאה בשמירת תוצאות הבונוס");
@@ -316,16 +367,38 @@ export default function AdminPanel() {
   };
 
   const handleClearBonus = async () => { 
-    if (!confirm("לאפס תוצאות אמת של הבונוסים?")) return; 
+    if (!confirm("לאפס את כל המנצחים והפסולים של הבונוסים?")) return; 
     setSavingId("bonus"); 
     try { 
-      await setDoc(doc(db, "admin_results", "bonus"), { answers: {}, updated_at: new Date() }); 
+      await setDoc(doc(db, "admin_results", "bonus"), { answers: {}, blacklist: {}, leading: {}, locked: {}, updated_at: new Date() }); 
       setRealBonus({}); 
-      setTimeout(() => { setSavingId(null); toast.success("תוצאות בונוס אופסו!"); }, 500); 
+      setBonusBlacklist({});
+      setBonusLeading({});
+      setBonusLocked({});
+      setTimeout(() => { setSavingId(null); toast.success("ניהול הבונוס אופס!"); }, 500); 
     } catch (error) { 
       setSavingId(null);
       toast.error("שגיאה באיפוס התוצאות");
     } 
+  };
+
+  const getUniqueAnswers = (qId: string) => {
+    const counts: Record<string, number> = {};
+    allUserBonusAnswers.forEach(uAns => {
+      const ans = uAns[qId];
+      if (ans !== undefined && ans !== null && ans !== "") {
+        if (Array.isArray(ans)) {
+           ans.forEach(a => {
+              const strAns = String(a).trim();
+              if (strAns) counts[strAns] = (counts[strAns] || 0) + 1;
+           });
+        } else {
+           const strAns = String(ans).trim();
+           if (strAns) counts[strAns] = (counts[strAns] || 0) + 1;
+        }
+      }
+    });
+    return Object.entries(counts).sort((a, b) => b[1] - a[1]); 
   };
 
   const handleQuickLiveStatusSave = async (qId: string) => {
@@ -430,7 +503,7 @@ export default function AdminPanel() {
 
 const handleCalculateScores = async (silentParam: any = false) => {
     const isSilent = silentParam === true;
-    if (!isSilent && !confirm("האם לחשב נקודות לכל המשתמשים? מנוע הקרבה החדש (בעל הבית השתגע) פעיל!")) return;
+    if (!isSilent && !confirm("האם לחשב נקודות לכל המשתמשים?")) return;
     setIsCalculating(true);
     
     let wasSnapshotTakenNow = false;
@@ -446,7 +519,6 @@ const handleCalculateScores = async (silentParam: any = false) => {
          console.log(`New football day detected! (Date: ${todayString}). Taking automated snapshot before calculating scores...`);
          await handleTakeSnapshot(true); 
          await setDoc(doc(db, "settings", "system"), { lastSnapshotDate: todayString }, { merge: true });
-         
          wasSnapshotTakenNow = true;
       }
 
@@ -603,7 +675,7 @@ const handleCalculateScores = async (silentParam: any = false) => {
       setUsersList(updatedUsersArray);
       
       if (!isSilent) {
-        toast.success("הניקוד חושב בהצלחה כולל פילוח לבועות ומנוע 'בעל הבית השתגע'! 🏆");
+        toast.success("הניקוד חושב בהצלחה! 🏆");
         if (wasSnapshotTakenNow) {
           setTimeout(() => {
             toast.success("מודיעין: המערכת זיהתה יום חדש וביצעה ריצת סוף יום (Snapshot) ברקע! 📸", { 
@@ -787,7 +859,7 @@ const handleCalculateScores = async (silentParam: any = false) => {
         const snap = await getDocs(collection(db, collName));
         for (const d of snap.docs) await deleteDoc(doc(db, collName, d.id));
       }
-      await setDoc(doc(db, "admin_results", "bonus"), { answers: {} });
+      await setDoc(doc(db, "admin_results", "bonus"), { answers: {}, blacklist: {}, leading: {}, locked: {} });
       await setDoc(doc(db, "admin_results", "qualifiers"), { results: {} });
       await setDoc(doc(db, "admin_results", "third_place"), { teams: Array(8).fill("") });
       const matchesSnap = await getDocs(collection(db, "matches"));
@@ -871,7 +943,7 @@ const handleCalculateScores = async (silentParam: any = false) => {
       for (const q of bonusQuestions) {
          rBonus[q.id] = (q.customOptions && q.customOptions.length > 0) ? q.customOptions[Math.floor(Math.random() * q.customOptions.length)] : (q.answerType === "NUMERIC" ? Math.floor(Math.random()*15).toString() : "תשובת סימולטור");
       }
-      await setDoc(doc(db, "admin_results", "bonus"), { answers: rBonus, updated_at: new Date() });
+      await setDoc(doc(db, "admin_results", "bonus"), { answers: rBonus, blacklist: {}, leading: {}, locked: {}, updated_at: new Date() });
 
       await handleCalculateScores(true);
 
@@ -1005,7 +1077,7 @@ const handleCalculateScores = async (silentParam: any = false) => {
         for (const q of bonusQuestions) {
            rBonus[q.id] = (q.customOptions && q.customOptions.length > 0) ? q.customOptions[Math.floor(Math.random() * q.customOptions.length)] : (q.answerType === "NUMERIC" ? Math.floor(Math.random()*15).toString() : "תשובת סימולטור");
         }
-        await setDoc(doc(db, "admin_results", "bonus"), { answers: rBonus, updated_at: new Date() });
+        await setDoc(doc(db, "admin_results", "bonus"), { answers: rBonus, blacklist: {}, leading: {}, locked: {}, updated_at: new Date() });
       }
 
       await handleCalculateScores(true); 
@@ -1500,62 +1572,19 @@ const handleCalculateScores = async (silentParam: any = false) => {
             </div>
           )}
 
-          {activeTab === "SYSTEM" && (
-            <div className="space-y-8 max-w-3xl mx-auto animate-fade-in-up">
-              <div className="bg-slate-800 p-6 md:p-8 rounded-3xl border border-blue-500/30 shadow-2xl relative overflow-hidden">
-                <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/10 rounded-full blur-3xl pointer-events-none"></div>
-                <h2 className="text-3xl font-black text-white mb-2 flex items-center gap-3 relative z-10"><span>⏱️</span> ציר הזמן של הטורניר</h2>
-                <p className="text-slate-400 text-sm mb-6 relative z-10">שינוי מצב כאן ינעל באופן אוטומטי כרטיסיות למשתמשים ויחשוף שלבים חדשים.</p>
-                
-                <div className="bg-slate-900/80 backdrop-blur-sm p-6 rounded-2xl border border-slate-700 relative z-10 shadow-inner">
-                  <h3 className="text-lg font-bold text-slate-300 mb-3">בחר סטטוס נוכחי:</h3>
-                  <select value={tournamentState} onChange={e => setTournamentState(Number(e.target.value))} className="w-full bg-slate-950 text-blue-400 font-bold text-lg p-4 rounded-xl border border-slate-600 focus:border-blue-500 outline-none cursor-pointer mb-6 shadow-sm">
-                    {TIMELINE_STATES.map(state => <option key={state.val} value={state.val}>{state.label}</option>)}
-                  </select>
-                  <div className="p-4 bg-blue-900/20 border border-blue-500/30 rounded-xl">
-                    <h4 className="text-blue-400 font-bold mb-1">משמעות הסטטוס:</h4>
-                    <p className="text-slate-300 text-sm font-medium">{TIMELINE_STATES.find(s => s.val === tournamentState)?.desc}</p>
-                  </div>
-                </div>
-                
-                <button onClick={handleSaveTournamentState} className="w-full mt-6 py-4 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white font-black rounded-xl text-lg transition-all shadow-[0_0_15px_rgba(59,130,246,0.3)] relative z-10 active:scale-95">
-                  {savingId === "system" ? "מעדכן... ⏳" : "💾 שמור מצב טורניר"}
-                </button>
-                
-                <div className="bg-slate-900/80 p-6 rounded-2xl border border-slate-700 relative z-10 mt-8 shadow-inner">
-                  <h3 className="text-xl font-bold text-white mb-2 flex items-center gap-2"><span>⏳</span> שעוני עצר (מועדי נעילה)</h3>
-                  <p className="text-slate-400 text-sm mb-4">הגדר כאן מתי יינעלו הניחושים לכל שלב. השעון יציג למשתמשים את השלב הקרוב ביותר אוטומטית.</p>
-                  
-                  <h4 className="text-blue-400 font-bold mb-3 text-sm">שלב הבתים</h4>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                    <div><label className="text-slate-400 text-xs block mb-2 font-bold uppercase tracking-wider">מחזור 1 (+עולות)</label><input type="datetime-local" value={deadlines.md1 || ""} onChange={e => setDeadlines({...deadlines, md1: e.target.value})} className="w-full bg-slate-950 text-white p-3 rounded-xl border border-slate-600 outline-none focus:border-blue-500" /></div>
-                    <div><label className="text-slate-400 text-xs block mb-2 font-bold uppercase tracking-wider">מחזור 2</label><input type="datetime-local" value={deadlines.md2 || ""} onChange={e => setDeadlines({...deadlines, md2: e.target.value})} className="w-full bg-slate-950 text-white p-3 rounded-xl border border-slate-600 outline-none focus:border-blue-500" /></div>
-                    <div><label className="text-slate-400 text-xs block mb-2 font-bold uppercase tracking-wider">מחזור 3</label><input type="datetime-local" value={deadlines.md3 || ""} onChange={e => setDeadlines({...deadlines, md3: e.target.value})} className="w-full bg-slate-950 text-white p-3 rounded-xl border border-slate-600 outline-none focus:border-blue-500" /></div>
-                  </div>
-
-                  <h4 className="text-purple-400 font-bold mb-3 text-sm border-t border-slate-700/50 pt-4">שלבי הנוק-אאוט (דדליין מתחלף אחד)</h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                    <div>
-                       <label className="text-slate-400 text-xs block mb-2 font-bold uppercase tracking-wider">מועד נעילה לסיבוב הקרוב</label>
-                       <input type="datetime-local" value={deadlines.knockout || ""} onChange={e => setDeadlines({...deadlines, knockout: e.target.value})} className="w-full bg-slate-950 text-white p-3 rounded-xl border border-slate-600 outline-none focus:border-purple-500" />
-                    </div>
-                    <div className="flex items-center text-slate-400 text-xs bg-slate-950 p-3 rounded-xl border border-slate-800">
-                       💡 ברגע שהדדליין עובר, השעון למעלה יציג אוטומטית "No More Bets! בהצלחה" למשתמשים, עד שתזין כאן תאריך חדש לשלב הבא.
-                    </div>
-                  </div>
-                  
-                  <button onClick={handleSaveDeadlines} className="w-full py-3.5 bg-slate-700 hover:bg-slate-600 border border-slate-500 text-white font-bold rounded-xl transition-all shadow-sm active:scale-95">{savingId === "deadlines" ? "שומר..." : "💾 שמור שעוני עצר"}</button>
-                </div>
-
-                <div className="bg-rose-900/20 p-6 rounded-2xl border border-rose-500/50 relative z-10 mt-12 overflow-hidden group">
-                  <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0IiBoZWlnaHQ9IjQiPgo8cmVjdCB3aWR0aD0iNCIgaGVpZ2h0PSI0IiBmaWxsPSIjZmZmIiBmaWxsLW9wYWNpdHk9IjAuMSIvPgo8L3N2Zz4=')] opacity-20 pointer-events-none"></div>
-                  <h3 className="text-xl font-black text-rose-500 mb-2 flex items-center gap-2 relative z-10"><span>⚠️</span> אזור סכנה (Danger Zone)</h3>
-                  <p className="text-rose-300 text-sm mb-6 relative z-10">כפתור זה ימחק לחלוטין את כל המשתמשים, ינקה את כל הניחושים, יאפס את תוצאות האמת, ויחזיר את שעון הטורניר ל-0. <strong>המשחקים ושאלות הבונוס לא יימחקו</strong>.</p>
-                  <button onClick={handleFactoryReset} disabled={isCalculating} className="w-full py-4 bg-rose-600 hover:bg-rose-700 text-white font-extrabold rounded-xl transition-all shadow-[0_0_20px_rgba(225,29,72,0.4)] relative z-10 active:scale-95">{isCalculating ? "משמיד נתונים... ⏳" : "🧨 Factory Reset (מחק נתוני משתמשים)"}</button>
-                </div>
-              </div>
-            </div>
-          )}
+        {activeTab === "SYSTEM" && (
+         <AdminSystemTab 
+            tournamentState={tournamentState}
+            setTournamentState={setTournamentState}
+            deadlines={deadlines}
+            setDeadlines={setDeadlines}
+            savingId={savingId}
+            isCalculating={isCalculating}
+            handleSaveTournamentState={handleSaveTournamentState}
+            handleSaveDeadlines={handleSaveDeadlines}
+            handleFactoryReset={handleFactoryReset}
+         />
+       )}
 
           {activeTab === "STATS" && (
             <div className="space-y-8 relative animate-fade-in-up">
@@ -1731,7 +1760,28 @@ const handleCalculateScores = async (silentParam: any = false) => {
                   <button onClick={() => insertTagToDailyMessage('<img src="', '" />')} className="bg-emerald-600/20 hover:bg-emerald-600/40 text-emerald-400 border border-emerald-500/30 px-3 py-1.5 rounded-lg text-sm font-bold transition-colors">🖼️ תמונה/גיף</button>
                   <button onClick={() => insertTagToDailyMessage('<a href="', '" target="_blank">טקסט ללחיצה</a>')} className="bg-blue-600/20 hover:bg-blue-600/40 text-blue-400 border border-blue-500/30 px-3 py-1.5 rounded-lg text-sm font-bold transition-colors">🔗 קישור</button>
                 </div>
-                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                   <div className="flex flex-col gap-1">
+                      <label className="text-blue-400 text-xs font-bold px-1">🖼️ לינק למדיה (תמונה/וידאו):</label>
+                      <input 
+                        type="text" 
+                        value={dailyMediaUrl} 
+                        onChange={(e) => setDailyMediaUrl(e.target.value)}
+                        placeholder="https://... (jpg, mp4, gif)"
+                        className="bg-slate-950 text-white p-3 rounded-xl border border-slate-700 focus:border-blue-500 outline-none text-sm"
+                      />
+                   </div>
+                   <div className="flex flex-col gap-1">
+                      <label className="text-emerald-400 text-xs font-bold px-1">📝 תקציר / כותרת משנה (מופיע בכרטיסייה):</label>
+                      <input 
+                        type="text" 
+                        value={dailySubtext} 
+                        onChange={(e) => setDailySubtext(e.target.value)}
+                        placeholder="הודעות מהנהלת הטורניר, עדכונים חמים..."
+                        className="bg-slate-950 text-white p-3 rounded-xl border border-slate-700 focus:border-emerald-500 outline-none text-sm"
+                      />
+                   </div>
+                </div>
                 <textarea 
                   ref={dailyMessageRef}
                   value={dailyMessage} 
@@ -1826,7 +1876,7 @@ const handleCalculateScores = async (silentParam: any = false) => {
                     <h3 className="text-purple-400 font-black flex items-center gap-2 mb-1 text-lg"><span>🤖</span> מעבדת סימולציות (הזרקת בוטים)</h3>
                     <p className="text-slate-400 text-sm">הזרק משתמשים פיקטיביים עם ניחושים אקראיים כדי למלא את הטבלה ולבדוק את האפליקציה.</p>
                   </div>
-                  <div className="flex gap-3 w-full xl:w-auto">
+                  <div className="flex flex-col sm:flex-row gap-3 w-full">
                      <select value={simStage} onChange={(e) => setSimStage(e.target.value)} className="bg-slate-950 text-white p-3 rounded-xl border border-purple-500/50 outline-none font-bold text-sm flex-1 xl:flex-none shadow-sm cursor-pointer">
                         <option value="BOTS_ONLY">🤖 בוטים בלבד (ללא תוצאות אמת)</option>
                         <option value="MD1">סמלץ מחזור 1 (תוצאות אמת)</option>
@@ -1852,8 +1902,8 @@ const handleCalculateScores = async (silentParam: any = false) => {
                   </div>
                 </div>
 
-                <div className="overflow-x-auto bg-slate-950 rounded-2xl border border-slate-700 shadow-inner">
-                  <table className="w-full text-right text-slate-300">
+                <div className="w-full overflow-x-auto bg-slate-950 rounded-2xl border border-slate-700 shadow-inner custom-scrollbar">
+                  <table className="w-full text-right text-slate-300 min-w-[600px]">
                     <thead className="text-xs uppercase tracking-widest bg-slate-900/80 text-slate-500 border-b border-slate-800">
                       <tr>
                         <th className="p-4 font-black">שם משתמש</th>
@@ -1867,10 +1917,23 @@ const handleCalculateScores = async (silentParam: any = false) => {
                       {usersList.length === 0 ? (<tr><td colSpan={5} className="p-12 text-center text-slate-500 font-bold">אין משתמשים במערכת.</td></tr>) : (
                         usersList.map((u, idx) => (
                           <tr key={u.id} className="border-b border-slate-800/50 hover:bg-slate-800/50 transition-colors">
-                            <td className="p-4 font-bold text-white flex items-center gap-3">
-                              <span className="text-slate-600 text-xs w-4">{idx + 1}.</span> 
-                              <span>{u.name || "ללא שם"}</span>
-                            </td>
+                            <td className="p-4 font-bold text-white flex items-center gap-2 min-w-[220px]">
+    <span className="text-slate-600 text-xs w-4">{idx + 1}.</span> 
+    <input 
+      type="text" 
+      value={u.name || ""} 
+      onChange={(e) => setUsersList(usersList.map(user => user.id === u.id ? { ...user, name: e.target.value } : user))}
+      className="bg-slate-900 border border-slate-700 text-white px-2 py-1.5 rounded-lg focus:border-blue-500 outline-none text-sm w-full transition-all shadow-inner"
+      placeholder="הכנס שם בעברית..."
+    />
+    <button 
+      onClick={() => handleUpdateUserName(u.id, u.name)}
+      className="bg-slate-800 hover:bg-blue-600 text-slate-400 hover:text-white p-1.5 rounded-lg border border-slate-700 shadow-sm transition-all active:scale-95 shrink-0"
+      title="שמור שם"
+    >
+      💾
+    </button>
+  </td>
                             <td className="p-4 text-sm text-slate-400 font-mono">{u.email}</td>
                             <td className="p-4 text-center font-black text-amber-400 text-lg">{u.totalPoints || 0}</td>
                             
@@ -1946,9 +2009,9 @@ const handleCalculateScores = async (silentParam: any = false) => {
                   {newQuestion.answerType !== "NUMERIC" && (
                     <div className="bg-slate-950/50 p-4 rounded-lg border border-slate-700/50 mb-4">
                       {newQuestion.answerType === "TEAM_SUBSET" && (<div className="flex flex-wrap gap-2 max-h-24 overflow-y-auto custom-scrollbar mb-3">{allTeams.map((t: any) => <button key={t} onClick={() => { if(!newQuestion.customOptions.includes(t)) setNewQuestion(prev => ({...prev, customOptions: [...prev.customOptions, t]})) }} className="bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs px-2 py-1 rounded">+ {t}</button>)}</div>)}
-                      <div className="flex flex-wrap gap-2 mb-4 mt-2 items-center">
-                        <input type="text" value={tempOption} onChange={e => setTempOption(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleAddCustomOption()} placeholder="הוסף אפשרות ידנית..." className="flex-grow bg-slate-900 text-white p-2 rounded-lg border border-slate-600 outline-none" />
-                        <button onClick={handleAddCustomOption} className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg font-bold">הוסף</button>
+                      <div className="flex flex-col sm:flex-row gap-2 mb-4 mt-2 items-center">
+                        <input type="text" value={tempOption} onChange={e => setTempOption(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleAddCustomOption()} placeholder="הוסף אפשרות ידנית..." className="w-full bg-slate-900 text-white p-3 rounded-xl border border-slate-600 outline-none" />
+                        <button onClick={handleAddCustomOption} className="bg-blue-600 hover:bg-blue-500 text-white px-6 py-3 rounded-xl font-bold w-full sm:w-auto whitespace-nowrap">הוסף</button>
                       </div>
                       <div className="flex flex-wrap gap-2 items-center">
                         {newQuestion.customOptions.map((opt, i) => <div key={i} className="flex items-center gap-2 bg-slate-800 border border-slate-600 px-3 py-1 rounded-full text-sm text-white"><span>{opt}</span><button onClick={() => handleRemoveCustomOption(opt)} className="text-rose-400 font-bold hover:text-rose-300">×</button></div>)}
@@ -1967,10 +2030,10 @@ const handleCalculateScores = async (silentParam: any = false) => {
 
               <div className="bg-slate-800 p-8 rounded-3xl border border-slate-700 shadow-xl">
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-                  <h2 className="text-2xl font-bold text-white">🎯 ניהול שאלות והזנת תוצאות אמת</h2>
-                  <div className="flex gap-2">
-                    <button onClick={handleSaveBonus} className="px-6 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl shadow-lg transition-colors">שמור תוצאות אמת 💾</button>
-                    <button onClick={handleClearBonus} className="px-4 py-3 bg-rose-600/20 hover:bg-rose-600/30 text-rose-400 border border-rose-500/30 font-bold rounded-xl transition-colors" title="אפס את כל התשובות">🗑️</button>
+                  <h2 className="text-xl md:text-2xl font-bold text-white">🎯 ניהול שאלות והזנת תוצאות אמת</h2>
+                  <div className="flex gap-2 w-full md:w-auto">
+                    <button onClick={handleSaveBonus} className="flex-1 md:flex-none px-4 md:px-6 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl shadow-lg transition-colors text-sm md:text-base">שמור תוצאות ופסילות 💾</button>
+                    <button onClick={handleClearBonus} className="px-4 py-3 bg-rose-600/20 hover:bg-rose-600/30 text-rose-400 border border-rose-500/30 font-bold rounded-xl transition-colors shrink-0" title="אפס את כל התשובות">🗑️</button>
                   </div>
                 </div>
 
@@ -2031,9 +2094,14 @@ const handleCalculateScores = async (silentParam: any = false) => {
                   const adminSurpriseQs = filteredAdminQuestions.filter(q => q.isSurprise);
 
                   const renderAdminTruthCard = (q: any) => {
-                    const currentAnswers = Array.isArray(realBonus[q.id]) ? realBonus[q.id] : (realBonus[q.id] ? [realBonus[q.id]] : []);
+                    const uniqueAnswersData = getUniqueAnswers(q.id); 
+                    const isLocked = bonusLocked[q.id] || false;
+                    const winners = realBonus[q.id] || [];
+                    const losers = bonusBlacklist[q.id] || [];
+                    const leaders = bonusLeading[q.id] || [];
+
                     return (
-                      <div key={q.id} className="bg-slate-900 p-5 rounded-2xl border border-slate-700 border-t-4 border-t-amber-500 flex flex-col justify-between shadow-lg hover:border-slate-600 transition-colors">
+                      <div key={q.id} className={`p-5 rounded-2xl border border-t-4 flex flex-col justify-between shadow-lg transition-colors ${isLocked ? "bg-rose-950/20 border-rose-500/50 border-t-rose-600" : "bg-slate-900 border-slate-700 border-t-amber-500 hover:border-slate-600"}`}>
                         <div className="flex justify-between items-start mb-4 gap-4">
                            <label className="text-white font-bold leading-snug">{q.label}</label>
                            <div className="flex gap-2 shrink-0">
@@ -2042,36 +2110,69 @@ const handleCalculateScores = async (silentParam: any = false) => {
                            </div>
                         </div>
 
-                        <div className="bg-slate-950/50 p-3 rounded-xl border border-slate-800 mb-4 shadow-inner">
-                           <label className="text-slate-500 text-xs mb-2 font-bold flex items-center gap-1"><span>📡</span> עדכון לייב (מופיע למשתמשים):</label>
-                           <div className="flex gap-2">
-                             <input type="text" id={`live_status_${q.id}`} defaultValue={q.liveStatus || ""} className="flex-grow bg-slate-900 text-slate-300 p-2 rounded-lg border border-slate-700 focus:border-blue-500 outline-none text-sm" placeholder="אמבפה (4), קיין (3)..." />
-                             <button onClick={() => handleQuickLiveStatusSave(q.id)} className="bg-blue-600/20 text-blue-400 hover:bg-blue-600 hover:text-white border border-blue-500/30 px-3 py-1.5 rounded-lg text-sm font-bold transition-all shrink-0">עדכן בלייב</button>
-                             <button onClick={() => handleClearLiveStatus(q.id)} className="bg-rose-600/20 text-rose-400 hover:bg-rose-600 hover:text-white border border-rose-500/30 px-3 py-1.5 rounded-lg text-sm font-bold transition-all shrink-0" title="נקה סטטוס חי">נקה</button>
-                           </div>
-                        </div>
-                        
-                        {currentAnswers.length > 0 && (
-                          <div className="flex flex-wrap gap-2 mb-4">
-                            {currentAnswers.map((ans: string, idx: number) => (
-                              <div key={idx} className="bg-emerald-600/20 border border-emerald-500/30 text-emerald-400 px-3 py-1 rounded-full text-sm font-bold flex items-center gap-2 shadow-sm">
-                                {getFlagUrl(ans) && <img src={getFlagUrl(ans)!} className="w-4 h-3 object-cover rounded-sm" alt="flag" />}
-                                <span>{ans}</span>
-                                <button onClick={() => handleRemoveTruth(q.id, ans)} className="hover:text-emerald-300 font-black">×</button>
+                        {/* סטטוס חי ונעילה */}
+                        <div className="bg-slate-950/50 p-3 rounded-xl border border-slate-800 mb-4 shadow-inner flex flex-col gap-3">
+                           <div>
+                              <label className="text-slate-500 text-xs mb-2 font-bold flex items-center gap-1"><span>📡</span> סטטוס לייב (למשתמשים):</label>
+                              <div className="flex flex-col sm:flex-row gap-2">
+                                <input type="text" id={`live_status_${q.id}`} defaultValue={q.liveStatus || ""} className="flex-grow bg-slate-900 text-slate-300 p-2 rounded-lg border border-slate-700 focus:border-blue-500 outline-none text-sm w-full" placeholder="אמבפה (4), אנגליה דקה 4..." />
+                                <div className="flex gap-2 w-full sm:w-auto shrink-0">
+                                  <button onClick={() => handleQuickLiveStatusSave(q.id)} className="flex-1 sm:flex-none bg-blue-600/20 text-blue-400 hover:bg-blue-600 hover:text-white border border-blue-500/30 px-3 py-2 rounded-lg text-sm font-bold transition-all">לשדר</button>
+                                </div>
                               </div>
-                            ))}
-                          </div>
-                        )}
-                        
-                        <div className="mt-auto">
-                           {q.answerType === "ALL_TEAMS" && <select value="" onChange={(e) => handleAddTruth(q.id, e.target.value)} className="w-full bg-slate-800 text-slate-300 p-3 rounded-xl border border-slate-600 focus:border-amber-500 outline-none font-bold"><option value="">➕ בחר להוספת תשובה...</option>{allTeams.map((t: any) => <option key={t} value={t}>{t}</option>)}{(q.customOptions || []).map((opt: string) => <option key={opt} value={opt}>{opt}</option>)}</select>}
-                           
-                           {(q.answerType === "MULTIPLE_CHOICE" || q.answerType === "TEAM_SUBSET") && <select value="" onChange={(e) => handleAddTruth(q.id, e.target.value)} className="w-full bg-slate-800 text-slate-300 p-3 rounded-xl border border-slate-600 focus:border-amber-500 outline-none font-bold"><option value="">➕ בחר להוספת תשובה...</option>{(q.customOptions || []).map((opt: string) => <option key={opt} value={opt}>{opt}</option>)}</select>}
-                           
-                           {(q.answerType === "OPEN_TEXT" || q.answerType === "PLAYER") && <div className="flex gap-2"><input type="text" id={`text_truth_${q.id}`} className="flex-grow bg-slate-800 text-white p-3 rounded-xl border border-slate-600 focus:border-amber-500 outline-none font-bold" placeholder="הקלד ולחץ אנטר..." onKeyDown={(e) => { if (e.key === 'Enter') { handleAddTruth(q.id, e.currentTarget.value); e.currentTarget.value = ''; } }} /><button onClick={() => { const inp = document.getElementById(`text_truth_${q.id}`) as HTMLInputElement; handleAddTruth(q.id, inp.value); inp.value = ''; }} className="bg-amber-600 hover:bg-amber-500 text-white px-4 py-2 rounded-xl font-bold shadow-md">הוסף</button></div>}
-                           
-                           {q.answerType === "NUMERIC" && (<div className="flex gap-2"><input type="number" id={`num_truth_${q.id}`} className="flex-grow bg-slate-800 text-white p-3 rounded-xl border border-slate-600 focus:border-amber-500 outline-none font-bold" placeholder="הכנס מספר..." onKeyDown={(e) => { if (e.key === 'Enter') { handleAddTruth(q.id, e.currentTarget.value); e.currentTarget.value = ''; } }} /><button onClick={() => { const inp = document.getElementById(`num_truth_${q.id}`) as HTMLInputElement; handleAddTruth(q.id, inp.value); inp.value = ''; }} className="bg-amber-600 hover:bg-amber-500 text-white px-4 py-2 rounded-xl font-bold shadow-md">הוסף</button></div>)}
+                           </div>
+                           <button onClick={() => handleToggleBonusLock(q.id)} className={`w-full py-2 rounded-lg font-bold text-xs transition-all border ${isLocked ? "bg-rose-600 hover:bg-rose-500 text-white border-rose-500 shadow-[0_0_10px_rgba(225,29,72,0.3)]" : "bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700 border-slate-700"}`}>
+                              {isLocked ? "🔓 שחרר נעילת שאלה" : "🔒 נעל שאלה סופית (כולם טעו)"}
+                           </button>
                         </div>
+                        
+                        {/* רשימת ניחושי הקהל המרכזית */}
+                        <div className="mb-4">
+                           <div className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mb-2 border-b border-slate-800 pb-1">ניחושי הקהל:</div>
+                           {uniqueAnswersData.length === 0 ? (
+                              <div className="text-xs text-slate-600 text-center py-2">אף אחד לא ענה עדיין.</div>
+                           ) : (
+                              <div className="flex flex-wrap gap-2 max-h-[150px] overflow-y-auto custom-scrollbar pr-1">
+                                 {uniqueAnswersData.map(([ansStr, count]: any) => {
+                                    const isWinner = winners.includes(ansStr);
+                                    const isLeading = leaders.includes(ansStr);
+                                    const isLoser = losers.includes(ansStr) || (isLocked && !isWinner); 
+
+                                    let badgeColor = "bg-slate-800 text-slate-300 border-slate-700";
+                                    if (isWinner) badgeColor = "bg-emerald-600/20 text-emerald-400 border-emerald-500/50 shadow-[0_0_8px_rgba(16,185,129,0.2)]";
+                                    else if (isLeading) badgeColor = "bg-amber-500/20 text-amber-400 border-amber-500/50 shadow-[0_0_8px_rgba(245,158,11,0.3)] animate-pulse";
+                                    else if (isLoser) badgeColor = "bg-rose-900/40 text-rose-400/50 border-rose-500/20 line-through decoration-rose-500/50";
+
+                                    return (
+                                       <div key={ansStr} className={`flex flex-col items-center gap-1.5 px-2 py-1.5 rounded-lg border text-xs font-bold transition-all ${badgeColor}`}>
+                                          <div className="flex items-center gap-1">
+                                             {getFlagUrl(ansStr) && <img src={getFlagUrl(ansStr)!} className="w-3 h-2 object-cover rounded-sm opacity-80" alt="flag" />}
+                                             <span className="truncate max-w-[100px]" title={ansStr}>{ansStr}</span>
+                                             <span className="text-[9px] opacity-60">({count})</span>
+                                          </div>
+                                          {/* כפתורי השליטה - כעת עם כתר! */}
+                                          {!isLocked && (
+                                             <div className="flex gap-1 border-t border-slate-700/30 pt-1 w-full justify-center">
+                                                <button onClick={() => handleToggleBonusWinner(q.id, ansStr)} title="פגיעה בול!" className={`w-5 h-5 rounded flex items-center justify-center ${isWinner ? 'bg-emerald-500 text-white' : 'bg-slate-700 hover:bg-emerald-500/50 text-slate-400'}`}>✅</button>
+                                                <button onClick={() => handleToggleBonusLeading(q.id, ansStr)} title="מוביל זמני" className={`w-5 h-5 rounded flex items-center justify-center ${isLeading ? 'bg-amber-500 text-white' : 'bg-slate-700 hover:bg-amber-500/50 text-slate-400'}`}>👑</button>
+                                                <button onClick={() => handleToggleBonusBlacklist(q.id, ansStr)} title="פסול תשובה זו" className={`w-5 h-5 rounded flex items-center justify-center ${losers.includes(ansStr) ? 'bg-rose-500 text-white' : 'bg-slate-700 hover:bg-rose-500/50 text-slate-400'}`}>❌</button>
+                                             </div>
+                                          )}
+                                       </div>
+                                    )
+                                 })}
+                              </div>
+                           )}
+                        </div>
+
+                       {/* גיבוי - הוספת תשובה חופשית שאיש לא ענה */}
+                       <div className="mt-auto border-t border-slate-800 pt-3">
+                          <div className="flex flex-col sm:flex-row gap-2">
+                             <input type="text" id={`manual_truth_${q.id}`} className="flex-grow w-full bg-slate-950 text-white p-2 rounded-lg border border-slate-700 focus:border-amber-500 outline-none text-xs" placeholder="הכנס תשובה שלא ברשימה..." onKeyDown={(e) => { if (e.key === 'Enter') { handleToggleBonusWinner(q.id, e.currentTarget.value); e.currentTarget.value = ''; } }} />
+                             <button onClick={() => { const inp = document.getElementById(`manual_truth_${q.id}`) as HTMLInputElement; handleToggleBonusWinner(q.id, inp.value); inp.value = ''; }} className="bg-slate-700 hover:bg-slate-600 text-white w-full sm:w-auto px-3 py-2 rounded-lg text-xs font-bold shrink-0 transition-colors">סמן ✅</button>
+                          </div>
+                       </div>
+
                       </div>
                     );
                   };
@@ -2085,19 +2186,19 @@ const handleCalculateScores = async (silentParam: any = false) => {
                        {adminRegularQs.length > 0 && (
                           <div>
                             <h3 className="text-xl font-bold text-blue-400 mb-4 border-b border-slate-700 pb-3 flex items-center gap-2"><span>🎯</span> שאלות רגילות</h3>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">{adminRegularQs.map(renderAdminTruthCard)}</div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">{adminRegularQs.map(renderAdminTruthCard)}</div>
                           </div>
                        )}
                        {adminDoubleQs.length > 0 && (
                           <div>
                             <h3 className="text-xl font-bold text-rose-400 mb-4 border-b border-slate-700 pb-3 flex items-center gap-2"><span>🔥</span> שאלות דאבל-בונוס</h3>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">{adminDoubleQs.map(renderAdminTruthCard)}</div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">{adminDoubleQs.map(renderAdminTruthCard)}</div>
                           </div>
                        )}
                        {adminSurpriseQs.length > 0 && (
                           <div>
                             <h3 className="text-xl font-bold text-purple-400 mb-4 border-b border-slate-700 pb-3 flex items-center gap-2"><span>🎁</span> שאלות הפתעה</h3>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">{adminSurpriseQs.map(renderAdminTruthCard)}</div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">{adminSurpriseQs.map(renderAdminTruthCard)}</div>
                           </div>
                        )}
                     </div>
@@ -2141,7 +2242,6 @@ const handleCalculateScores = async (silentParam: any = false) => {
                           {second ? <><img src={getFlagUrl(second)!} className="w-5 h-3.5 mr-2 rounded-sm" alt="" />{second}</> : "2️⃣ מקום 2"}
                         </div>
                       </div>
-
                       <div className="grid grid-cols-2 gap-2">
                         {teams.map((t: any) => {
                           const isSelected = first === t || second === t;
@@ -2152,11 +2252,19 @@ const handleCalculateScores = async (silentParam: any = false) => {
                           )
                         })}
                       </div>
+                      <div className="mt-4 pt-3 border-t border-slate-700/50 flex justify-end">
+                         <button 
+                            onClick={handleSaveQualifiers} 
+                            className="text-[10px] font-black bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded-lg shadow-md transition-all active:scale-95"
+                         >
+                            💾 שמור בית {group}
+                         </button>
+                      </div>
                     </div>
                   );
                 })}
               </div>
-              <div className="flex gap-4">
+              <div className="flex flex-col sm:flex-row gap-4">
                 <button onClick={handleSaveQualifiers} className="flex-1 py-4 bg-blue-600 hover:bg-blue-500 text-white font-black rounded-xl text-xl shadow-lg transition-all">💾 שמור עולות לכל הבתים</button>
                 <button onClick={handleClearQualifiers} className="px-6 py-4 bg-slate-800 text-rose-400 border border-slate-700 hover:border-rose-500 hover:bg-rose-900/20 font-bold rounded-xl transition-all">אפס הכל</button>
               </div>
@@ -2187,8 +2295,11 @@ const handleCalculateScores = async (silentParam: any = false) => {
                      );
                    })}
                  </div>
-
-                 <div className="bg-slate-900/50 p-4 rounded-2xl border border-slate-700">
+                 <div className="flex flex-col sm:flex-row gap-4">
+                    <button onClick={handleSaveThirdPlace} className="flex-1 py-4 bg-rose-600 hover:bg-rose-500 text-white font-black rounded-xl text-xl shadow-lg transition-all">💾 שמור 8 מעפילות</button>
+                    <button onClick={handleClearThirdPlace} className="px-6 py-4 bg-slate-800 text-rose-400 border border-slate-700 hover:border-rose-500 hover:bg-rose-900/20 font-bold rounded-xl transition-all">אפס הכל</button>
+                 </div>
+                 <div className="bg-slate-900/50 p-4 rounded-2xl border border-slate-700 mt-6">
                    <h3 className="text-slate-400 font-bold mb-4 text-sm">מאגר הנבחרות (לחץ כדי להוסיף לעמדה פנויה):</h3>
                    <div className="flex flex-wrap gap-2">
                      {allTeams.map((t: any) => {
@@ -2213,388 +2324,27 @@ const handleCalculateScores = async (silentParam: any = false) => {
                  </div>
               </div>
 
-              <div className="flex gap-4">
-                <button onClick={handleSaveThirdPlace} className="flex-1 py-4 bg-rose-600 hover:bg-rose-500 text-white font-black rounded-xl text-xl shadow-lg transition-all">💾 שמור 8 מעפילות</button>
-                <button onClick={handleClearThirdPlace} className="px-6 py-4 bg-slate-800 text-rose-400 border border-slate-700 hover:border-rose-500 hover:bg-rose-900/20 font-bold rounded-xl transition-all">אפס הכל</button>
-              </div>
+
             </div>
           )}
 
-          {activeTab === "MATCHES" && (
-            <div className="space-y-8">
-              <div className="bg-slate-800 p-6 rounded-3xl border border-blue-500/30 shadow-lg flex justify-between items-center">
-                <div><h3 className="text-lg font-bold text-white flex items-center gap-2"><span>📄</span> ניהול משחקים (טעינה ומחיקה)</h3></div>
-                <div className="flex gap-4"> 
-                   <button onClick={handleDeleteAllMatches} disabled={isCalculating || matches.length === 0} className="bg-rose-600 hover:bg-rose-500 text-white font-bold py-3 px-6 rounded-xl transition-all shadow-lg disabled:opacity-50">{isCalculating ? "מוחק... ⏳" : "🗑️ מחק את כל המשחקים"}</button>
-                   <input type="file" accept=".json" ref={fileInputRef} onChange={handleFileUpload} className="hidden" id="json-upload" />
-                   <label htmlFor="json-upload" className="cursor-pointer bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 px-6 rounded-xl transition-all shadow-lg">{isCalculating ? "טוען... ⏳" : "📤 העלה קובץ JSON"}</label>
-                </div>
-              </div>
-
-              <div className="flex flex-col md:flex-row gap-8 w-full border-t border-slate-800 pt-8">
-                <div className="w-full md:w-48 shrink-0">
-                  <div className="bg-slate-800 rounded-3xl p-4 border border-slate-700 md:sticky md:top-24 shadow-xl">
-                    <h3 className="text-lg font-bold text-white mb-4 px-2 border-b border-slate-700 pb-2">בחר קטגוריה</h3>
-                    <div className="flex flex-row md:flex-col gap-2 overflow-x-auto custom-scrollbar pb-2 md:pb-0">
-                      <button onClick={() => {setAdminMatchGroup("KNOCKOUT"); setAdminKnockoutViewMode("LIST");}} className={`p-3 rounded-xl font-bold transition-all text-right min-w-[120px] md:min-w-0 ${adminMatchGroup === "KNOCKOUT" ? "bg-purple-600 text-white shadow-lg" : "bg-slate-900 text-slate-400 hover:bg-slate-700 hover:text-white"}`}>🔥 נוק-אאוט</button>
-                      {groupsList.map(g => (<button key={g} onClick={() => setAdminMatchGroup(g)} className={`p-3 rounded-xl font-bold transition-all text-right min-w-[80px] md:min-w-0 ${adminMatchGroup === g ? "bg-blue-600 text-white shadow-lg" : "bg-slate-900 text-slate-400 hover:bg-slate-700 hover:text-white"}`}>בית {g}</button>))}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex-1 space-y-8">
-                  <h2 className="text-3xl font-bold text-white border-b border-slate-800 pb-4">{adminMatchGroup === "KNOCKOUT" ? "🔥 משחקי נוק-אאוט" : `⚽ משחקי בית ${adminMatchGroup}`}</h2>
-                  {adminMatchGroup === "KNOCKOUT" ? (
-                    <>
-                      <div className="flex bg-slate-950 p-1.5 rounded-xl border border-slate-800 w-full md:w-auto mb-6">
-                          <button 
-                            onClick={() => setAdminKnockoutViewMode("LIST")} 
-                            className={`flex-1 md:w-32 py-2 rounded-lg font-bold text-sm transition-all flex items-center justify-center gap-2 ${adminKnockoutViewMode === "LIST" ? "bg-purple-600 text-white shadow-md" : "text-slate-400 hover:text-white"}`}
-                          >
-                            <span>📄</span> רשימה
-                          </button>
-                          <button 
-                            onClick={() => setAdminKnockoutViewMode("BRACKET")} 
-                            className={`flex-1 md:w-32 py-2 rounded-lg font-bold text-sm transition-all flex items-center justify-center gap-2 ${adminKnockoutViewMode === "BRACKET" ? "bg-purple-600 text-white shadow-md" : "text-slate-400 hover:text-white"}`}
-                          >
-                            <span>🌳</span> עץ טורניר
-                          </button>
-                      </div>
-
-                      {adminKnockoutViewMode === "LIST" ? (
-                          <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-                            {matches.filter(m => m.stage === "KNOCKOUT").map(match => <AdminMatchCard key={match.id} match={match} onSave={handleSaveMatch} onClear={handleClearMatch} onUpdateMatchday={handleUpdateMatchday} isSaving={savingId === match.id} />)}
-                            {matches.filter(m => m.stage === "KNOCKOUT").length === 0 && <div className="text-slate-500">אין משחקי נוק-אאוט במערכת.</div>}
-                          </div>
-                      ) : (
-                          (() => {
-                              const rounds = ["32 הגדולות", "שמינית גמר", "רבע גמר", "חצי גמר", "גמר"];
-                              const expectedCounts: Record<string, number> = { "32 הגדולות": 16, "שמינית גמר": 8, "רבע גמר": 4, "חצי גמר": 2, "גמר": 1 };
-                              const firstRealRoundIdx = rounds.findIndex(r => matches.some(m => m.roundName === r));
-                              const roundsToRender = firstRealRoundIdx !== -1 ? rounds.slice(firstRealRoundIdx) : [];
-
-                              const treeMatchesByRound: Record<string, any[]> = {};
-                              let previousRoundMatches: any[] = [];
-
-                              roundsToRender.forEach(round => {
-                                  const realMatches = matches.filter(m => m.roundName === round).sort((a,b) => a.id.localeCompare(b.id));
-                                  const count = expectedCounts[round] || 0;
-                                  const nodes = [];
-
-                                  for (let i = 0; i < count; i++) {
-                                       const realMatch = realMatches[i];
-                                       let pHome = realMatch ? realMatch.homeTeam : "";
-                                       let pAway = realMatch ? realMatch.awayTeam : "";
-
-                                       if (previousRoundMatches.length > 0) {
-                                           const prev1 = previousRoundMatches[i * 2];
-                                           const prev2 = previousRoundMatches[i * 2 + 1];
-                                           
-                                           if (prev1 && prev1.isFinished && prev1.realQualifier) pHome = prev1.realQualifier; 
-                                           if (prev2 && prev2.isFinished && prev2.realQualifier) pAway = prev2.realQualifier; 
-                                       }
-
-                                       nodes.push({
-                                           id: realMatch ? realMatch.id : `dummy_${round}_${i}`,
-                                           isDummy: !realMatch,
-                                           roundName: round,
-                                           projectedHome: pHome,
-                                           projectedAway: pAway,
-                                           isFinished: realMatch ? realMatch.isFinished : false,
-                                           realHomeScore: realMatch ? realMatch.realHomeScore : undefined,
-                                           realAwayScore: realMatch ? realMatch.realAwayScore : undefined,
-                                           realQualifier: realMatch ? realMatch.realQualifier : undefined,
-                                           originalMatch: realMatch 
-                                       });
-                                  }
-                                  treeMatchesByRound[round] = nodes;
-                                  previousRoundMatches = nodes;
-                              });
-
-                              const renderAdminBracketNode = (node: any, isFinal: boolean = false) => {
-                                if (!node) return null;
-                                
-                                const isDummy = node.isDummy;
-                                const hScore = node.realHomeScore;
-                                const aScore = node.realAwayScore;
-                                const qual = node.realQualifier;
-
-                                const isHomeQual = qual === node.projectedHome && node.projectedHome !== "";
-                                const isAwayQual = qual === node.projectedAway && node.projectedAway !== "";
-
-                                return (
-                                  <div 
-                                    onClick={() => {
-                                        if (isDummy) {
-                                            toast('🔮 זהו משחק עתידי (טרם הוזן באדמין).', { icon: '🔮', style: { background: '#334155', color: '#cbd5e1', border: '1px solid #475569', fontSize: '14px' } });
-                                        } else {
-                                            setAdminBracketModalMatch(node.originalMatch);
-                                        }
-                                    }}
-                                    className={`w-36 sm:w-44 border-2 rounded-xl p-1.5 flex flex-col gap-0.5 shadow-lg relative z-10 transition-all h-fit max-w-[11rem] ${
-                                        isDummy 
-                                          ? "bg-slate-800/40 border-slate-700/50 border-dashed cursor-not-allowed opacity-80 hover:opacity-100" 
-                                          : "bg-slate-800 border-slate-700 hover:border-purple-500 cursor-pointer hover:-translate-y-1 hover:shadow-[0_0_15px_rgba(168,85,247,0.3)] group"
-                                    }`}
-                                  >
-                                      {isFinal && <div className="absolute -top-5 left-1/2 -translate-x-1/2 text-2xl drop-shadow-xl z-10">🏆</div>}
-                                      
-                                      {!isDummy && node.isFinished && <div className="absolute -top-2 -right-2 text-[10px] bg-emerald-600 border border-emerald-500 text-white px-1.5 py-0.5 rounded-md z-10 shadow-sm">סויים</div>}
-                                      {!isDummy && !node.isFinished && <div className="absolute -top-2 -right-2 text-[10px] bg-purple-600 border border-purple-500 text-white px-1.5 py-0.5 rounded-md z-10 opacity-0 group-hover:opacity-100 transition-opacity shadow-sm">ערוך</div>}
-                                      {isDummy && <div className="absolute -top-2 -right-2 text-[9px] bg-slate-800 border border-slate-600 text-slate-400 px-1.5 py-0.5 rounded-md z-10 tracking-widest uppercase">עתידי</div>}
-                                      
-                                      <div className={`flex justify-between items-center text-xs sm:text-sm font-bold px-1.5 py-1 rounded transition-colors ${isHomeQual ? "bg-emerald-500/20 text-emerald-400" : "text-slate-200"}`}>
-                                         <div className="flex items-center gap-1.5 truncate">
-                                           {getFlagUrl(node.projectedHome) ? <img src={getFlagUrl(node.projectedHome)!} className="w-4 h-3 object-cover rounded-sm" alt="flag" /> : <span className="text-[10px]">🏳️</span>}
-                                           <span className="truncate">{node.projectedHome || "TBD"}</span>
-                                         </div>
-                                         {hScore !== undefined && !isDummy && <span className="font-black ml-1 text-slate-400">{hScore}</span>}
-                                      </div>
-                                      
-                                      <div className="w-full h-px bg-slate-700/50 my-0.5"></div>
-                                      
-                                      <div className={`flex justify-between items-center text-xs sm:text-sm font-bold px-1.5 py-1 rounded transition-colors ${isAwayQual ? "bg-emerald-500/20 text-emerald-400" : "text-slate-200"}`}>
-                                         <div className="flex items-center gap-1.5 truncate">
-                                           {getFlagUrl(node.projectedAway) ? <img src={getFlagUrl(node.projectedAway)!} className="w-4 h-3 object-cover rounded-sm" alt="flag" /> : <span className="text-[10px]">🏳️</span>}
-                                           <span className="truncate">{node.projectedAway || "TBD"}</span>
-                                         </div>
-                                         {aScore !== undefined && !isDummy && <span className="font-black ml-1 text-slate-400">{aScore}</span>}
-                                      </div>
-                                  </div>
-                                );
-                              };
-
-                              const renderAdminColumn = (roundName: string, isFirst: boolean, isFinal: boolean) => {
-                                  const nodes = treeMatchesByRound[roundName];
-                                  if (!nodes || nodes.length === 0) return null;
-                                  const count = expectedCounts[roundName];
-
-                                  return (
-                                     <div className="relative h-full w-40 sm:w-48 shrink-0 py-8">
-                                         <div className={`absolute top-0 w-full text-center font-black uppercase tracking-widest ${isFinal ? 'text-amber-500 text-lg drop-shadow-md' : 'text-slate-500 text-xs'}`}>{roundName}</div>
-                                         
-                                         <div className="grid h-full w-full" style={{ gridTemplateRows: `repeat(${count}, minmax(0, 1fr))` }}>
-                                             {nodes.map((node) => (
-                                                 <div key={node.id} className="flex items-center justify-center relative px-2 sm:px-4 w-full h-full">
-                                                     {!isFirst && <div className="absolute right-0 w-2 sm:w-4 border-t-2 border-slate-600 top-1/2 -z-10"></div>}
-                                                     {renderAdminBracketNode(node, isFinal)}
-                                                     {!isFinal && <div className="absolute left-0 w-2 sm:w-4 border-t-2 border-slate-600 top-1/2 -z-10"></div>}
-                                                 </div>
-                                             ))}
-                                         </div>
-                                     </div>
-                                  );
-                              };
-
-                              const renderAdminConnectorCol = (count: number) => {
-                                  return (
-                                     <div className="relative h-full w-4 sm:w-6 shrink-0 py-8">
-                                         <div className="grid h-full w-full" style={{ gridTemplateRows: `repeat(${count}, minmax(0, 1fr))` }}>
-                                             {Array.from({length: count}).map((_, i) => (
-                                                 <div key={i} className="flex items-center justify-center w-full h-full relative">
-                                                     <div className="absolute w-full h-1/2 border-l-2 border-y-2 border-slate-600 rounded-l-lg -ml-[1px] z-0"></div>
-                                                 </div>
-                                             ))}
-                                         </div>
-                                     </div>
-                                  );
-                              };
-
-                              const dynamicHeight = roundsToRender.includes("32 הגדולות") ? "h-[1600px] md:h-[1800px]" : "h-[800px] md:h-[900px]";
-
-                              return (
-                                  <div className="bg-slate-900 rounded-3xl border border-purple-500/30 shadow-2xl p-6 relative overflow-hidden">
-                                      <div className="absolute top-0 right-0 w-full h-full bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-purple-900/20 via-slate-900 to-slate-900 pointer-events-none z-0"></div>
-                                      
-                                      <div className="mb-6 flex items-center gap-2 text-purple-300 text-sm font-bold bg-purple-900/20 w-fit px-4 py-2 rounded-lg border border-purple-500/30 relative z-10 shadow-sm">
-                                         <span>💡</span> לחץ על משחק כדי לעדכן תוצאות אמת. המעפילות מתמגנטות אוטומטית לשלבים הבאים!
-                                      </div>
-
-                                      <div className="overflow-x-auto custom-scrollbar pb-6 relative z-10" dir="rtl">
-                                         <div className={`flex min-w-max pt-6 ${dynamicHeight} items-stretch`}>
-                                            
-                                            {roundsToRender.map((round, idx) => {
-                                                const isFirst = idx === 0;
-                                                const isFinal = idx === roundsToRender.length - 1;
-                                                const count = expectedCounts[round];
-
-                                                return (
-                                                    <React.Fragment key={round}>
-                                                        {renderAdminColumn(round, isFirst, isFinal)}
-                                                        {!isFinal && renderAdminConnectorCol(count / 2)}
-                                                    </React.Fragment>
-                                                );
-                                            })}
-
-                                         </div>
-                                      </div>
-
-                                      {adminBracketModalMatch && (
-                                        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm animate-fade-in-up" dir="rtl">
-                                          <div className="relative w-full max-w-lg">
-                                             <button 
-                                               onClick={() => setAdminBracketModalMatch(null)} 
-                                               className="absolute -top-4 -right-4 md:-right-10 md:-top-4 w-10 h-10 flex items-center justify-center rounded-full bg-slate-800 hover:bg-rose-500/20 hover:text-rose-400 border border-slate-600 text-slate-300 transition-colors font-bold text-xl z-50 shadow-xl"
-                                             >
-                                               ✕
-                                             </button>
-                                             <AdminMatchCard 
-                                               match={adminBracketModalMatch} 
-                                               onSave={(id, h, a, q) => { handleSaveMatch(id, h, a, q); setAdminBracketModalMatch(null); }} 
-                                               onClear={(id) => { handleClearMatch(id); setAdminBracketModalMatch(null); }} 
-                                               onUpdateMatchday={handleUpdateMatchday} 
-                                               isSaving={savingId === adminBracketModalMatch.id} 
-                                             />
-                                          </div>
-                                        </div>
-                                      )}
-                                  </div>
-                              );
-                          })()
-                      )}
-                    </>
-                  ) : (
-                    <>
-                      {[1, 2, 3].map(day => {
-                        const dayMatches = matches.filter(m => m.group === adminMatchGroup && (Number(m.matchday) || 1) === day);
-                        if (dayMatches.length === 0) return null;
-                        return (
-                          <div key={day} className="space-y-4 mb-8">
-                            <h3 className="text-xl font-bold text-slate-400 bg-slate-800/50 p-2 rounded-lg border border-slate-700/50">מחזור {day}</h3>
-                            <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-                              {dayMatches.map(match => <AdminMatchCard key={match.id} match={match} onSave={handleSaveMatch} onClear={handleClearMatch} onUpdateMatchday={handleUpdateMatchday} isSaving={savingId === match.id} />)}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
+        {activeTab === "MATCHES" && (
+         <AdminMatchesTab 
+            matches={matches} 
+            isCalculating={isCalculating} 
+            handleDeleteAllMatches={handleDeleteAllMatches} 
+            handleFileUpload={handleFileUpload} 
+            fileInputRef={fileInputRef} 
+            handleSaveMatch={handleSaveMatch} 
+            handleClearMatch={handleClearMatch} 
+            handleUpdateMatchday={handleUpdateMatchday} 
+            handleUpdateMatchDate={handleUpdateMatchDate}
+            groupsList={groupsList} 
+            savingId={savingId}
+         />
+       )}
 
         </div>
-      </div>
-    </div>
-  );
-}
-
-function AdminMatchCard({ match, onSave, onClear, onUpdateMatchday, isSaving }) {
-  const [homeInput, setHomeInput] = useState(match.realHomeScore !== undefined && match.realHomeScore !== null ? String(match.realHomeScore) : "");
-  const [awayInput, setAwayInput] = useState(match.realAwayScore !== undefined && match.realAwayScore !== null ? String(match.realAwayScore) : "");
-  const [qualifierInput, setQualifierInput] = useState(match.realQualifier || "");
-
-  useEffect(() => { 
-    if (!match.isFinished) { 
-      setHomeInput(""); 
-      setAwayInput(""); 
-      setQualifierInput(""); 
-    } else {
-      setHomeInput(match.realHomeScore !== null ? String(match.realHomeScore) : "");
-      setAwayInput(match.realAwayScore !== null ? String(match.realAwayScore) : "");
-      setQualifierInput(match.realQualifier || "");
-    }
-  }, [match.isFinished, match.realHomeScore, match.realAwayScore, match.realQualifier]);
-
-  const isKnockout = match.stage === "KNOCKOUT";
-  const themeColor = isKnockout ? "purple" : "blue";
-
-  const updateDefaultQualifier = (hScore: string, aScore: string) => {
-    if (hScore === "" || aScore === "") return;
-    const h = Number(hScore); const a = Number(aScore);
-    if (h > a) setQualifierInput(match.homeTeam);
-    else if (a > h) setQualifierInput(match.awayTeam);
-    else setQualifierInput("");
-  };
-
-  const handleHomeChange = (val: string) => { setHomeInput(val); if(isKnockout) updateDefaultQualifier(val, awayInput); };
-  const handleAwayChange = (val: string) => { setAwayInput(val); if(isKnockout) updateDefaultQualifier(homeInput, val); };
-
-  const numberInputClass = "[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none";
-
-  return (
-    <div className={`bg-gradient-to-br from-slate-800 to-slate-900 rounded-2xl p-5 sm:p-7 shadow-xl border-t-4 border border-t-${themeColor}-500 border-slate-700 w-full max-w-lg mx-auto mb-4 transform transition-all relative ${match.isFinished ? "bg-emerald-900/10 border-emerald-500/30 grayscale-[15%]" : "hover:shadow-2xl"}`} dir="rtl">
-      
-      <div className="absolute top-4 right-4 flex items-center gap-2">
-        <span className={`text-[10px] uppercase font-black tracking-wider px-2.5 py-1.5 rounded-lg bg-${themeColor}-500/10 text-${themeColor}-400 border border-${themeColor}-500/20`}>
-          {isKnockout ? match.roundName : `בית ${match.group}`}
-        </span>
-        {!isKnockout && (
-          <select value={match.matchday || 1} onChange={(e) => onUpdateMatchday(match.id, parseInt(e.target.value))} className="bg-slate-950 text-slate-300 font-bold text-xs border border-slate-700 rounded-lg px-2 py-1 outline-none focus:border-blue-500 cursor-pointer">
-            <option value={1}>מחזור 1</option><option value={2}>מחזור 2</option><option value={3}>מחזור 3</option>
-          </select>
-        )}
-        {match.isFinished && <span className="text-emerald-400 text-sm drop-shadow-md" title="המשחק הסתיים ונקודות חושבו">✅</span>}
-      </div>
-
-      <div className="flex flex-col justify-center items-center mt-3 mb-6 gap-2">
-         <div className="text-xs font-bold text-slate-400 bg-slate-900/50 px-3 py-1 rounded-full border border-slate-800">
-           🕒 {match.matchDate} {isKnockout && "• תוצאה ב-120 דק'"}
-         </div>
-      </div>
-
-      <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 sm:gap-4 mb-6 mt-2">
-        <div className="flex justify-end">
-          <span className="text-xl sm:text-2xl font-black text-slate-100 break-words leading-tight text-left">
-            {match.homeTeam}
-          </span>
-        </div>
-        
-        <div className="flex items-center justify-center gap-3 sm:gap-4">
-          <div className="flex flex-col items-center">
-             <input type="number" min="0" className={`w-14 h-16 sm:w-16 sm:h-18 text-center text-3xl sm:text-4xl font-black rounded-xl border-2 focus:outline-none transition-all ${numberInputClass} ${match.isFinished ? "bg-slate-900 border-emerald-500/50 text-emerald-400 shadow-[inset_0_2px_10px_rgba(0,0,0,0.5)]" : `bg-slate-800 border-slate-600 text-white focus:border-${themeColor}-500 shadow-[inset_0_2px_10px_rgba(0,0,0,0.5)]`}`} value={homeInput} onChange={(e) => handleHomeChange(e.target.value)} placeholder="-" />
-          </div>
-          
-          <div className="flex flex-col items-center justify-center">
-             <span className="text-3xl sm:text-4xl font-black text-slate-600 leading-none pb-1">:</span>
-          </div>
-
-          <div className="flex flex-col items-center">
-             <input type="number" min="0" className={`w-14 h-16 sm:w-16 sm:h-18 text-center text-3xl sm:text-4xl font-black rounded-xl border-2 focus:outline-none transition-all ${numberInputClass} ${match.isFinished ? "bg-slate-900 border-emerald-500/50 text-emerald-400 shadow-[inset_0_2px_10px_rgba(0,0,0,0.5)]" : `bg-slate-800 border-slate-600 text-white focus:border-${themeColor}-500 shadow-[inset_0_2px_10px_rgba(0,0,0,0.5)]`}`} value={awayInput} onChange={(e) => handleAwayChange(e.target.value)} placeholder="-" />
-          </div>
-        </div>
-
-        <div className="flex justify-start">
-          <span className="text-xl sm:text-2xl font-black text-slate-100 break-words leading-tight text-right">
-            {match.awayTeam}
-          </span>
-        </div>
-      </div>
-
-      {isKnockout && (
-        <div className="bg-slate-900/80 p-4 rounded-xl border border-slate-700/50 mb-6 shadow-inner relative">
-          <label className="block text-slate-400 text-[11px] uppercase tracking-wider mb-3 font-black text-center">מי המעפילה האמיתית?</label>
-          <div className="flex gap-3">
-            <button type="button" onClick={() => setQualifierInput(match.homeTeam)} className={`flex-1 py-3 rounded-xl font-black text-sm transition-all border-2 flex items-center justify-center cursor-pointer active:scale-95 hover:border-slate-500 ${qualifierInput === match.homeTeam ? "bg-emerald-600 text-white border-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.3)]" : "bg-slate-900 text-slate-400 border-slate-700"}`}>
-              {match.homeTeam}
-            </button>
-            <button type="button" onClick={() => setQualifierInput(match.awayTeam)} className={`flex-1 py-3 rounded-xl font-black text-sm transition-all border-2 flex items-center justify-center cursor-pointer active:scale-95 hover:border-slate-500 ${qualifierInput === match.awayTeam ? "bg-emerald-600 text-white border-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.3)]" : "bg-slate-900 text-slate-400 border-slate-700"}`}>
-              {match.awayTeam}
-            </button>
-          </div>
-        </div>
-      )}
-
-      <div className="flex gap-3">
-        <button 
-          onClick={() => onSave(match.id, parseInt(homeInput), parseInt(awayInput), qualifierInput)} 
-          disabled={isSaving || homeInput === "" || awayInput === "" || (isKnockout && qualifierInput === "")} 
-          className={`flex-1 py-3.5 rounded-xl font-black text-sm transition-all shadow-lg flex items-center justify-center gap-2 ${isSaving ? "bg-slate-600 text-slate-300" : match.isFinished ? "bg-slate-800 text-emerald-400 border-2 border-emerald-500/30 hover:border-emerald-500 hover:bg-slate-700" : `bg-emerald-600 hover:bg-emerald-500 text-white border-2 border-emerald-500`} disabled:opacity-50 disabled:cursor-not-allowed`}
-        >
-          {isSaving ? "⏳ מעדכן..." : match.isFinished ? "עדכן תוצאה קיימת" : "💾 שמור וסיים משחק"}
-        </button>
-        
-        {match.isFinished && (
-          <button 
-            onClick={() => onClear(match.id)} 
-            disabled={isSaving} 
-            className="px-5 py-3.5 rounded-xl font-black bg-rose-600/10 text-rose-400 hover:bg-rose-600/20 border-2 border-rose-500/30 hover:border-rose-500/50 transition-all" 
-            title="אפס משחק למצב פתוח"
-          >
-            אפס
-          </button>
-        )}
       </div>
     </div>
   );

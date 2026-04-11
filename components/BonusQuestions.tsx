@@ -5,8 +5,22 @@ import { db } from "../app/firebase";
 import { getFlagUrl } from "../app/utils/flags";
 
 export default function BonusQuestions({ userId, tournamentState: propTournamentState, groups }: any) {
-  const allTeams = groups ? Object.values(groups).flat().sort() : [];
-
+// תיקון אגרסיבי: מוודאים שרק מחרוזות מגיעות למערך
+  let extractedTeams: string[] = [];
+  if (groups) {
+    Object.values(groups).forEach((g: any) => {
+      if (g instanceof Set) {
+        g.forEach((val) => {
+          if (typeof val === 'string') extractedTeams.push(val);
+        });
+      } else if (Array.isArray(g)) {
+        g.forEach((val) => {
+          if (typeof val === 'string') extractedTeams.push(val);
+        });
+      }
+    });
+  }
+  const allTeams = Array.from(new Set(extractedTeams)).filter(t => t.trim() !== "").sort();
   const [questions, setQuestions] = useState<any[]>([]);
   const [answers, setAnswers] = useState<any>({});
   const [realBonusAnswers, setRealBonusAnswers] = useState<any>({});
@@ -149,7 +163,6 @@ export default function BonusQuestions({ userId, tournamentState: propTournament
     return true;
   });
 
-  // ניהול חכם של טאב המשקל: אם עוברים קטגוריה ואין בה את הסוג הנוכחי, קופץ אוטומטית לסוג הקיים
   useEffect(() => {
     const weights = new Set(filteredQuestions.map(q => q.weight));
     if (weights.size > 0 && !weights.has(weightTab)) {
@@ -255,6 +268,20 @@ export default function BonusQuestions({ userId, tournamentState: propTournament
   const progressPercent = openCount > 0 ? Math.round((answeredCount / openCount) * 100) : 0;
   const isAllAnswered = openCount > 0 && answeredCount === openCount;
 
+  // --- חישוב הנקודות שנצברו בקטגוריה הנוכחית להצגה בכותרת ---
+  let currentCategoryPoints = 0;
+  let currentCategoryCorrect = 0;
+  let hasCategoryTruth = false; 
+
+  filteredQuestions.forEach(q => {
+    if (realBonusAnswers[q.id]) hasCategoryTruth = true;
+    const pts = checkAnswerPoints(q, answers[q.id]);
+    if (pts !== null && pts > 0) {
+      currentCategoryPoints += pts;
+      currentCategoryCorrect += 1;
+    }
+  });
+
   const sortGroup = (arr: any[]) => {
     return arr.sort((a, b) => {
       const aLocked = isQuestionLocked(a);
@@ -268,7 +295,6 @@ export default function BonusQuestions({ userId, tournamentState: propTournament
   const doubleQuestions = sortGroup(filteredQuestions.filter(q => q.weight === "DOUBLE"));
   const surpriseQuestions = sortGroup(filteredQuestions.filter(q => q.weight === "SURPRISE"));
 
-  // Questions to show based on active weight tab
   const activeQuestionsList = weightTab === "REGULAR" ? regularQuestions : weightTab === "DOUBLE" ? doubleQuestions : surpriseQuestions;
 
   const renderQuestionCard = (q: any) => {
@@ -349,12 +375,15 @@ export default function BonusQuestions({ userId, tournamentState: propTournament
           <div className="flex-1 w-full min-w-0">
             {q.answerType === "ALL_TEAMS" && (
               <select value={answers[q.id] || ""} disabled={locked} onChange={e => handleChange(q.id, e.target.value)} className={`h-[46px] ${combinedInputStyle}`}>
-                <option value="">-- בחר נבחרת --</option>{allTeams.map((t: string) => <option key={t} value={t}>{t}</option>)}{(q.customOptions || []).map((opt: string) => <option key={opt} value={opt}>{opt}</option>)}
+                <option value="">-- בחר נבחרת --</option>
+                {allTeams.map((t: any, i: number) => <option key={`team-${i}`} value={String(t)}>{String(t)}</option>)}
+                {(q.customOptions || []).map((opt: any, i: number) => <option key={`opt-${i}`} value={String(opt)}>{String(opt)}</option>)}
               </select>
             )}
             {(q.answerType === "MULTIPLE_CHOICE" || q.answerType === "TEAM_SUBSET") && (
               <select value={answers[q.id] || ""} disabled={locked} onChange={e => handleChange(q.id, e.target.value)} className={`h-[46px] ${combinedInputStyle}`}>
-                <option value="">-- בחר תשובה --</option>{(q.customOptions || []).map((opt: string) => <option key={opt} value={opt}>{opt}</option>)}
+                <option value="">-- בחר תשובה --</option>
+                {(q.customOptions || []).map((opt: any, i: number) => <option key={`mc-${i}`} value={String(opt)}>{String(opt)}</option>)}
               </select>
             )}
             {(q.answerType === "OPEN_TEXT" || q.answerType === "PLAYER") && (
@@ -408,44 +437,76 @@ export default function BonusQuestions({ userId, tournamentState: propTournament
     );
   };
 
+// חישובים עבור חלון הריגול
+  const hasSpyTruth = spyModalQuestion ? !!realBonusAnswers[spyModalQuestion.id] : false;
+  const spyStats = { correct: 0, incorrect: 0 };
+  if (hasSpyTruth) {
+    spyData.forEach(d => {
+      if (d.points && d.points > 0) spyStats.correct++;
+      else spyStats.incorrect++;
+    });
+  }
+
+  const filteredSpyData = spyData.filter(d => {
+    if (!d.userName.toLowerCase().includes(spySearchQuery.toLowerCase())) return false;
+    if (hasSpyTruth && spyFilter !== "ALL") {
+      if (spyFilter === "CORRECT" && (!d.points || d.points === 0)) return false;
+      if (spyFilter === "INCORRECT" && d.points && d.points > 0) return false;
+    }
+    return true;
+  });
+
   return (
     <div className="w-full animate-fade-in-up pb-8">
       
-      <div className="sticky top-[72px] md:top-[88px] z-40 bg-slate-950/85 backdrop-blur-xl p-4 md:p-5 rounded-3xl border border-slate-700 shadow-[0_10px_30px_rgba(0,0,0,0.6)] mb-6 md:mb-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 transition-all">
-         <div className="w-full md:w-auto">
-           <h2 className="text-xl md:text-2xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400 flex items-center gap-2">
+        <div className="sticky top-[72px] md:top-[88px] z-40 bg-slate-950/85 backdrop-blur-xl p-3 md:p-4 rounded-2xl border border-slate-700 shadow-[0_10px_30px_rgba(0,0,0,0.6)] mb-4 md:mb-6 flex flex-col md:flex-row justify-between items-center gap-3 transition-all">
+         <div className="w-full md:w-auto flex justify-between items-center md:justify-start md:gap-4">
+           <h2 className="text-lg md:text-2xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400 flex items-center gap-1.5 md:gap-2">
               <span>⭐</span> משימות בונוס
            </h2>
-           {openCount > 0 ? (
-             <div className="mt-2 flex items-center gap-3">
-               <span className="text-slate-400 text-xs md:text-sm font-bold bg-slate-900 px-2 py-1 rounded-lg border border-slate-800">
-                 הושלמו: {answeredCount}/{openCount}
-               </span>
-               <div className="w-24 md:w-32 h-2 bg-slate-900 rounded-full overflow-hidden border border-slate-700 shadow-inner">
-                 <div className={`h-full transition-all duration-500 ${isAllAnswered ? "bg-emerald-500" : "bg-blue-500"}`} style={{ width: `${progressPercent}%` }}></div>
+           
+           <div className="flex items-center gap-2">
+             {openCount > 0 ? (
+               <div className="flex items-center gap-2">
+                 <span className="text-slate-400 text-[10px] md:text-xs font-bold bg-slate-900 px-1.5 py-0.5 rounded-md border border-slate-800">
+                   {answeredCount}/{openCount}
+                 </span>
+                 <div className="w-16 md:w-24 h-1.5 bg-slate-900 rounded-full overflow-hidden border border-slate-700 shadow-inner">
+                   <div className={`h-full transition-all duration-500 ${isAllAnswered ? "bg-emerald-500" : "bg-blue-500"}`} style={{ width: `${progressPercent}%` }}></div>
+                 </div>
                </div>
-               {isAllAnswered && <span className="text-emerald-400 text-xs md:text-sm font-bold">✓ מוכן</span>}
-             </div>
-           ) : (
-             <div className="mt-2 text-slate-400 text-[11px] font-bold bg-slate-900 px-3 py-1 rounded-lg border border-slate-800 inline-block">
-               אין שאלות פתוחות בשלב זה
-             </div>
-           )}
+             ) : (
+               <div className="text-slate-400 text-[10px] font-bold bg-slate-900 px-2 py-0.5 rounded-md border border-slate-800">
+                 אין שאלות פתוחות
+               </div>
+             )}
+           </div>
          </div>
          
-         <div className="flex items-center gap-3 w-full md:w-auto justify-end">
-            {filteredQuestions.some(q => !isQuestionLocked(q)) && (
-               <button 
-                  onClick={handleRandomizeCategory} 
-                  disabled={isRandomizing}
-                  className="bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-[11px] md:text-sm font-bold py-2 px-3 rounded-xl border border-slate-600 flex items-center gap-1.5 transition-all shadow-sm disabled:opacity-50 active:scale-95"
-               >
-                 <span className="text-base">🎲</span> {isRandomizing ? "מגריל..." : "הגרל פתוחות"}
-               </button>
+         <div className="flex flex-col-reverse md:flex-row items-center gap-2 md:gap-4 w-full md:w-auto justify-end">
+            {/* שורת סיכום הנקודות - בולטת וגדולה יותר! */}
+            {hasCategoryTruth && (
+               <div className="flex gap-2 md:gap-3 text-xs md:text-sm font-bold bg-slate-900 px-3 py-1.5 rounded-xl border border-amber-500/40 items-center w-full md:w-fit justify-center shadow-md">
+                  <span className="text-emerald-400" title="תשובות נכונות">🎯 {currentCategoryCorrect} נכונות</span>
+                  <span className="text-slate-600">|</span>
+                  <span className="text-amber-400 font-black text-sm md:text-base tracking-wider drop-shadow-md">נצברו: +{currentCategoryPoints} נק'</span>
+               </div>
             )}
-            <div className="h-6 flex items-center">
-               {saveStatus === "saving" && <span className="text-amber-400 text-[10px] animate-pulse font-bold tracking-widest">⏳ שומר...</span>}
-               {saveStatus === "saved" && <span className="text-emerald-400 text-[10px] font-bold tracking-widest">✓ נשמר</span>}
+            
+            <div className="flex justify-between w-full md:w-auto gap-3 items-center">
+               <div className="h-6 flex items-center">
+                  {saveStatus === "saving" && <span className="text-amber-400 text-[10px] animate-pulse font-bold tracking-widest">⏳ שומר...</span>}
+                  {saveStatus === "saved" && <span className="text-emerald-400 text-[10px] font-bold tracking-widest">✓ נשמר</span>}
+               </div>
+               {filteredQuestions.some(q => !isQuestionLocked(q)) && (
+                  <button 
+                     onClick={handleRandomizeCategory} 
+                     disabled={isRandomizing}
+                     className="bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-[10px] md:text-xs font-bold py-1.5 px-2.5 rounded-lg border border-slate-600 flex items-center gap-1 transition-all shadow-sm disabled:opacity-50 active:scale-95"
+                  >
+                    <span className="text-sm">🎲</span> {isRandomizing ? "מגריל..." : "הגרל פתוחות"}
+                  </button>
+               )}
             </div>
          </div>
       </div>
@@ -511,7 +572,6 @@ export default function BonusQuestions({ userId, tournamentState: propTournament
         </div>
       )}
 
-      {/* --- תת-טאבים חדשים ומהודרים לסוג השאלה (במקום גלילה ארוכה) --- */}
       {filteredQuestions.length > 0 && (
          <div className="flex flex-wrap justify-center gap-2 mb-6 md:mb-8 bg-slate-900/60 p-1.5 rounded-2xl border border-slate-800/80 w-fit mx-auto shadow-inner backdrop-blur-sm">
             {regularQuestions.length > 0 && (
@@ -532,7 +592,6 @@ export default function BonusQuestions({ userId, tournamentState: propTournament
          </div>
       )}
 
-      {/* --- תצוגת הגריד המודרנית --- */}
       {filteredQuestions.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-16 px-4 bg-slate-900/50 rounded-3xl border border-dashed border-slate-700">
           <span className="text-5xl block mb-4 opacity-50">🤷‍♂️</span>
@@ -544,7 +603,6 @@ export default function BonusQuestions({ userId, tournamentState: propTournament
         </div>
       )}
 
-      {/* חלון הריגול */}
       {spyModalQuestion && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-md animate-fade-in-up" dir="rtl">
           <div className="bg-gradient-to-b from-slate-800 to-slate-900 border border-slate-700 p-5 md:p-6 rounded-3xl w-full max-w-md md:max-w-[600px] md:min-w-[400px] min-h-[500px] h-[85vh] md:h-[650px] md:max-h-[90vh] flex flex-col shadow-2xl relative overflow-hidden md:resize">            

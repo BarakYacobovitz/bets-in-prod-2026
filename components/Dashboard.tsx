@@ -4,11 +4,51 @@ import { doc, getDoc, collection, onSnapshot, getDocs, query, where, updateDoc, 
 import { db } from "../app/firebase";
 import { getFlagUrl } from "../app/utils/flags"; 
 import toast from "react-hot-toast";
+import Link from "next/link";
+
+// המארחים של מונדיאל 2026 - קמעות האפליקציה!
+const MASCOTS = [
+  {
+     id: "trump",
+     name: "דונלד",
+     image: "/donaldIcon.jpg", 
+     quotes: [
+       "ניחוש ענק. כולם אומרים שזה הניחוש הכי טוב שהם ראו. פייק ניוז מי שאומר אחרת!",
+       "אנחנו נבנה פער ענק בטבלה, והחברים למשרד ישלמו על זה!",
+       "המונדיאל באמריקה יהיה הכי גדול אי פעם. נקודה. גם הניקוד שלך בסדר.",
+       "אני ניצחתי בטבלת השקיפות, כולם יודעים את זה. גנבו לי נקודות!"
+     ]
+  },
+  {
+     id: "mexican",
+     name: "חואן",
+     image: "/maxicanIcon.jpg",
+     quotes: [
+       "איי קראמבה! איזה ניחוש חריף הבאת פה אמיגו! 🌶️",
+       "ואמוס! תביא ירוק במטריצה ויוצאים לפיאסטה עד הבוקר! 🪅",
+       "הכדורגל שלנו במקסיקו הכי שמח, אבל הניחושים שלך... איי איי איי.",
+       "אל תהיה לוקו, תבדוק טוב טוב את הפצועים לפני שאתה שם תוצאה."
+     ]
+  },
+  {
+     id: "canadian",
+     name: "בוב",
+     image: "/candianIcon.jpg",
+     quotes: [
+       "סליחה שאני מפריע, אה, אבל נראה לי שהניחוש שלך קצת קפוא. 🍁",
+       "קח קפה, שים סירופ מייפל ובוא נראה קצת סוקר, אה? ☕",
+       "הוקי קרח זה הספורט האמיתי, אבל מונדיאל בקנדה זה גם נחמד, סליחה על ההתלהבות.",
+       "אל תשכח להיות מנומס ליריב שלך כשתעקוף אותו בטבלה, אה?"
+     ]
+  }
+];
 
 export default function Dashboard({ userId, userName, setActiveTab, tournamentState }: any) {
   const [userStats, setUserStats] = useState<any>({ points: 0, hasPaid: false, prevPoints: 0, prevRank: 0, nemesisId: null });
   const [leaderboardInfo, setLeaderboardInfo] = useState({ rank: 0, totalUsers: 0 });
   const [dailyMessage, setDailyMessage] = useState("");
+  const [dailyMediaUrl, setDailyMediaUrl] = useState("");
+  const [dailySubtext, setDailySubtext] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [allUsersList, setAllUsersList] = useState<any[]>([]);
   
@@ -33,7 +73,7 @@ export default function Dashboard({ userId, userName, setActiveTab, tournamentSt
   const [todayTargets, setTodayTargets] = useState<any[]>([]);
   const [todayMatches, setTodayMatches] = useState<any[]>([]);
   
-  const [activeBannerMode, setActiveBannerMode] = useState<"MATCHES" | "BONUS">("MATCHES");
+  const [activeBannerMode, setActiveBannerMode] = useState<"MATCHES" | "BONUS" | "RADAR">("MATCHES");
   const [todayMatchIndex, setTodayMatchIndex] = useState(0);
   const [todayBonusIndex, setTodayBonusIndex] = useState(0);
 
@@ -46,6 +86,14 @@ export default function Dashboard({ userId, userName, setActiveTab, tournamentSt
 
   const [showMagazineModal, setShowMagazineModal] = useState(false);
   const [showRealStandingsModal, setShowRealStandingsModal] = useState(false);
+
+  const [realBonusFull, setRealBonusFull] = useState<any>({ answers: {}, blacklist: {}, locked: {}, leading: {} });
+  const [userBonusAnswersState, setUserBonusAnswersState] = useState<any>({});
+  const [bonusQuestionsList, setBonusQuestionsList] = useState<any[]>([]);
+
+  // סטייט עבור הקמעות הקופצים!
+  const [mascotQuote, setMascotQuote] = useState<{mascot: any, quote: string} | null>(null);
+  const [showMascot, setShowMascot] = useState(false);
 
   const rankUsers = (usersArr: any[], field: string) => {
     const sorted = [...usersArr].sort((a, b) => (b[field] || 0) - (a[field] || 0));
@@ -73,6 +121,23 @@ export default function Dashboard({ userId, userName, setActiveTab, tournamentSt
       return false;
     }
   };
+
+  // הפעלת הקמע האקראי
+  useEffect(() => {
+    const timer = setTimeout(() => {
+       // 40% סיכוי להופעת דמות בכל כניסה לדאשבורד (שלא יהיה חופר מדי)
+       if (Math.random() < 0.4) {
+          const randomMascot = MASCOTS[Math.floor(Math.random() * MASCOTS.length)];
+          const randomQuote = randomMascot.quotes[Math.floor(Math.random() * randomMascot.quotes.length)];
+          setMascotQuote({ mascot: randomMascot, quote: randomQuote });
+          setShowMascot(true);
+          
+          // נעלם מעצמו אחרי 8 שניות
+          setTimeout(() => setShowMascot(false), 8000);
+        }
+    }, 2000); // מופיע 2 שניות אחרי טעינת הדף
+    return () => clearTimeout(timer);
+  }, []);
 
   useEffect(() => {
     if (!userId) return;
@@ -112,8 +177,10 @@ export default function Dashboard({ userId, userName, setActiveTab, tournamentSt
     });
 
     const unsubscribeDash = onSnapshot(doc(db, "settings", "dashboard"), (dashSnap) => {
-      if (dashSnap.exists() && dashSnap.data().dailyMessage !== undefined) {
-        setDailyMessage(dashSnap.data().dailyMessage);
+      if (dashSnap.exists()) {
+        if (dashSnap.data().dailyMessage !== undefined) setDailyMessage(dashSnap.data().dailyMessage);
+        if (dashSnap.data().dailyMediaUrl !== undefined) setDailyMediaUrl(dashSnap.data().dailyMediaUrl);
+        if (dashSnap.data().dailySubtext !== undefined) setDailySubtext(dashSnap.data().dailySubtext);
       }
     });
 
@@ -212,13 +279,20 @@ export default function Dashboard({ userId, userName, setActiveTab, tournamentSt
         const matches = mSnap.docs.map(d=>({id: d.id, ...d.data()}));
         const rQualSnap = await getDoc(doc(db, "admin_results", "qualifiers")); const realQuals = rQualSnap.exists() ? rQualSnap.data().results : {};
         const rThirdSnap = await getDoc(doc(db, "admin_results", "third_place")); const realThird = rThirdSnap.exists() ? rThirdSnap.data().teams : [];
-        const rBonusSnap = await getDoc(doc(db, "admin_results", "bonus")); const realBonusAnswers = rBonusSnap.exists() ? rBonusSnap.data().answers : {};
         
+        const rBonusSnap = await getDoc(doc(db, "admin_results", "bonus"));
+        const rBonusData = rBonusSnap.exists() ? rBonusSnap.data() : { answers: {}, blacklist: {}, locked: {}, leading: {} };
+        const realBonusAnswers = rBonusData.answers || {};
+        
+        setRealBonusFull(rBonusData);
+
         const bqSnap = await getDoc(doc(db, "settings", "bonus_questions")); 
         const bonusQuestions = bqSnap.exists() ? bqSnap.data().questions : [];
+        setBonusQuestionsList(bonusQuestions);
 
         const pbSnap = await getDoc(doc(db, "predictions_bonus", userId));
         const userBonusAnswers = pbSnap.exists() ? pbSnap.data().answers || {} : {};
+        setUserBonusAnswersState(userBonusAnswers);
 
         const pmSnap = await getDocs(query(collection(db, "predictions_matches"), where("userId", "==", userId)));
         const pkSnap = await getDocs(query(collection(db, "predictions_knockout"), where("userId", "==", userId)));
@@ -294,6 +368,7 @@ export default function Dashboard({ userId, userName, setActiveTab, tournamentSt
         setTodayTargets(targets);
         if (tMatches.length > 0) setActiveBannerMode("MATCHES");
         else if (targets.length > 0) setActiveBannerMode("BONUS");
+        else setActiveBannerMode("RADAR");
 
         pmSnap.forEach(d => {
           const data = d.data(); const match = matches.find((m:any) => m.id === data.matchId);
@@ -466,7 +541,6 @@ export default function Dashboard({ userId, userName, setActiveTab, tournamentSt
   const handlePrevBonus = () => setTodayBonusIndex(i => (i === 0 ? todayTargets.length - 1 : i - 1));
   const handleNextBonus = () => setTodayBonusIndex(i => (i === todayTargets.length - 1 ? 0 : i + 1));
 
-  // פונקציית העזר לתגיוצ הניקוד (כדי שלא ישברו שורות)
   const getPointsBadge = (points: number | null) => {
     if (points === null) return null;
     if (points === 0) return <span className="inline-flex items-center gap-1 whitespace-nowrap shrink-0 bg-rose-950/50 text-rose-400 border border-rose-500/40 px-2 py-1 rounded text-[10px] font-black shadow-sm">0 נק'</span>;
@@ -507,11 +581,22 @@ export default function Dashboard({ userId, userName, setActiveTab, tournamentSt
   });
 
   return (
-    <div className="w-full space-y-8 animate-fade-in-up pb-8">
+    <div className="w-full space-y-8 animate-fade-in-up pb-8 relative">
       
-      {/* ==================================================== */}
+      {/* ========================================================================= */}
+      {/* 🎈 קמעות פופ-אפ (המארחות של 2026!) */}
+      {/* ========================================================================= */}
+      <div className={`fixed bottom-4 left-4 md:left-8 z-[100] transition-all duration-700 transform ${showMascot ? 'translate-y-0 opacity-100' : 'translate-y-32 opacity-0 pointer-events-none'} flex items-end gap-3`} dir="ltr">
+         <div className="bg-slate-50 text-slate-900 p-4 rounded-2xl rounded-bl-none shadow-[0_10px_25px_rgba(0,0,0,0.5)] max-w-[220px] md:max-w-[280px] relative border-2 border-slate-300" dir="rtl">
+            <button onClick={() => setShowMascot(false)} className="absolute top-1 right-2 text-slate-400 hover:text-rose-500 font-black text-xs p-1">✕</button>
+            <p className="text-sm font-bold leading-tight pt-2">{mascotQuote?.quote}</p>
+         </div>
+         <div className="relative shrink-0">
+            <img src={mascotQuote?.mascot.image} alt={mascotQuote?.mascot.name} className="w-20 h-20 md:w-24 md:h-24 rounded-full border-4 border-slate-800 shadow-2xl object-cover bg-white" />
+         </div>
+      </div>
+
       {/* 🚨 באנר אזהרה חסרים ניחושים להיום! */}
-      {/* ==================================================== */}
       {missingMatchesToday > 0 && (
          <div className="bg-gradient-to-r from-amber-600 via-orange-600 to-amber-600 p-6 rounded-3xl border border-amber-300 shadow-[0_0_40px_rgba(245,158,11,0.6)] relative overflow-hidden">
             <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0IiBoZWlnaHQ9IjQiPgo8cmVjdCB3aWR0aD0iNCIgaGVpZ2h0PSI0IiBmaWxsPSIjZmZmIiBmaWxsLW9wYWNpdHk9IjAuMSIvPgo8L3N2Zz4=')] opacity-30"></div>
@@ -551,6 +636,7 @@ export default function Dashboard({ userId, userName, setActiveTab, tournamentSt
          </div>
       )}
 
+      {/* 1. באנר נתונים אישיים ומהדורה מרכזית */}
       <div className="flex md:grid md:grid-cols-2 overflow-x-auto snap-x snap-mandatory md:overflow-visible gap-4 md:gap-8 pb-4 md:pb-0 custom-scrollbar -mx-4 px-4 md:mx-0 md:px-0">
          
          <div className="w-[90%] md:w-auto shrink-0 snap-center rounded-3xl p-6 shadow-2xl relative overflow-hidden bg-slate-900 border border-slate-700 group flex flex-col justify-center">
@@ -558,8 +644,9 @@ export default function Dashboard({ userId, userName, setActiveTab, tournamentSt
             <div className="absolute inset-0 z-0 bg-gradient-to-l from-slate-950/90 via-slate-900/60 to-slate-950/90 pointer-events-none"></div>
             
             <div className="relative z-10 text-right mb-6">
-               <h1 className="text-3xl md:text-4xl font-extrabold text-white mb-1 tracking-tight drop-shadow-md">
-                  אהלן, <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400">{userName?.split(" ")[0]}</span>! 👋
+               <h1 className="text-3xl md:text-4xl font-black text-white flex items-center justify-center md:justify-start gap-2 mb-2" dir="rtl">
+                  <span>אהלן, {allUsersList.find(u => u.id === userId)?.name?.split(" ")[0] || "אלוף"}!</span>
+                  <span className="origin-bottom-right">👋</span>
                </h1>
                <p className="text-slate-300 text-sm font-medium drop-shadow-lg">ברוך הבא לחדר ההלבשה. הנה המצב שלך כרגע:</p>
             </div>
@@ -583,14 +670,9 @@ export default function Dashboard({ userId, userName, setActiveTab, tournamentSt
                </div>
             </div>
 
-            {/* ==================================================== */}
-            {/* 🏅 שורת הטופ 3 עם האפקט המהבהב לכדור הזהב/נעל הזהב! */}
-            {/* ==================================================== */}
             <div className="flex gap-3 relative z-10 w-full mb-4 overflow-x-auto custom-scrollbar pb-2 snap-x snap-mandatory">
-               
                <div className="min-w-[120px] flex-1 bg-amber-500/10 p-3 rounded-xl border border-amber-500/30 backdrop-blur-sm text-center shrink-0 snap-center relative overflow-hidden group">
                   <div className="absolute top-0 left-1/2 -translate-x-1/2 w-16 h-16 bg-amber-500/20 rounded-full blur-xl pointer-events-none"></div>
-                  {/* האייקון עכשיו כדורגל שזורח ומקפץ */}
                   <div className="text-2xl drop-shadow-[0_0_10px_rgba(251,191,36,0.8)] animate-pulse mb-1">⚽</div>
                   <div className="text-[9px] text-amber-500 font-black mb-1 uppercase tracking-wider relative z-10">כדור הזהב</div>
                   <div className="text-sm font-black text-amber-400 truncate relative z-10">{currentLeader}</div>
@@ -599,7 +681,6 @@ export default function Dashboard({ userId, userName, setActiveTab, tournamentSt
                {tournamentState >= 4 && (
                   <div className="min-w-[120px] flex-1 bg-emerald-500/10 p-3 rounded-xl border border-emerald-500/30 backdrop-blur-sm text-center shrink-0 snap-center relative overflow-hidden group">
                      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-16 h-16 bg-emerald-500/20 rounded-full blur-xl pointer-events-none"></div>
-                     {/* האייקון עכשיו נעל שזורחת ומקפצת */}
                      <div className="text-2xl drop-shadow-[0_0_10px_rgba(16,185,129,0.8)] animate-pulse mb-1">👟</div>
                      <div className="text-[9px] text-emerald-500 font-black mb-1 uppercase tracking-wider relative z-10">נעל הזהב</div>
                      <div className="text-sm font-black text-emerald-400 truncate relative z-10">{currentKoLeader}</div>
@@ -612,7 +693,6 @@ export default function Dashboard({ userId, userName, setActiveTab, tournamentSt
                      <div className="text-sm font-black text-blue-400 truncate">מקום {myLeagueRank}</div>
                   </div>
                )}
-
             </div>
 
             <div className="flex justify-between items-center gap-2 mt-auto pt-4 border-t border-slate-700/50 relative z-10 text-center">
@@ -644,10 +724,20 @@ export default function Dashboard({ userId, userName, setActiveTab, tournamentSt
                   <div className="text-3xl drop-shadow-md">📰</div>
                </div>
 
+               {dailyMediaUrl && (
+                  <div className="relative z-10 mb-5 w-full h-48 md:h-64 rounded-xl overflow-hidden border border-slate-700/50 shadow-inner bg-slate-950/80 flex items-center justify-center">
+                     {dailyMediaUrl.match(/\.(jpeg|jpg|gif|png|webp)$/i) != null ? (
+                        <img src={dailyMediaUrl} alt="Magazine Cover" className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-500" />
+                     ) : (
+                        <video src={dailyMediaUrl} autoPlay loop muted playsInline className="w-full h-full object-contain opacity-80 group-hover:opacity-100 transition-opacity" />
+                     )}
+                  </div>
+               )}
+
                <div className="relative z-10 mt-auto">
                   <h2 className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400 mb-2">המהדורה המרכזית</h2>
                   <p className="text-slate-300 text-sm font-medium leading-relaxed mb-6 line-clamp-3">
-                     הודעות מהנהלת הטורניר, עדכונים חמים, סיכום המחזור, וכל מה שצריך לדעת כדי לא להישאר מאחור.
+                     {dailySubtext || "הודעות הנהלה, עדכונים חמים, וכל מה שצריך לדעת כדי לא להישאר מאחור."}
                   </p>
                   <button className="bg-slate-800 hover:bg-slate-700 text-white font-bold py-3 w-full rounded-xl border border-slate-600 transition-colors flex justify-center items-center gap-2 text-sm shadow-md group-hover:bg-blue-600 group-hover:border-blue-500">
                      קרא את המהדורה המלאה <span>👈</span>
@@ -664,19 +754,18 @@ export default function Dashboard({ userId, userName, setActiveTab, tournamentSt
               onClick={() => setTimelineTab("TODAY")}
               className={`flex-1 py-4 text-sm font-bold transition-all rounded-tr-3xl flex items-center justify-center gap-2 ${timelineTab === "TODAY" ? "bg-slate-800 text-white shadow-inner border-b-2 border-blue-500" : "text-slate-500 hover:bg-slate-900 hover:text-slate-300"}`}
             >
-              <span>📅</span> מה צפוי היום
+              <span>📅</span> צפוי היום
             </button>
             <button 
               onClick={() => setTimelineTab("YESTERDAY")}
-              className={`flex-1 py-4 text-sm font-bold transition-all rounded-tl-3xl flex items-center justify-center gap-2 ${timelineTab === "YESTERDAY" ? "bg-slate-800 text-white shadow-inner border-b-2 border-emerald-500" : "text-slate-500 hover:bg-slate-900 hover:text-slate-300"}`}
+              className={`flex-1 py-4 text-sm font-bold transition-all flex items-center justify-center gap-2 ${timelineTab === "YESTERDAY" ? "bg-slate-800 text-white shadow-inner border-b-2 border-emerald-500" : "text-slate-500 hover:bg-slate-900 hover:text-slate-300"}`}
             >
-              <span>🧾</span> מה היה אתמול
+              <span>🧾</span> היה אתמול
             </button>
          </div>
 
          <div className="flex-1 flex flex-col lg:flex-row overflow-hidden bg-slate-800 rounded-b-3xl lg:rounded-3xl">
             <div className={`${timelineTab === "YESTERDAY" ? "flex" : "hidden"} lg:flex flex-col w-full lg:w-1/2 h-full bg-slate-800/50 lg:border-l border-slate-700`}>
-               
                <div className="hidden lg:flex bg-slate-900/80 px-6 h-20 border-b border-slate-700 justify-between items-center z-10 shadow-sm shrink-0">
                  <h2 className="text-xl font-black text-white flex items-center gap-2"><span>🧾</span> מה היה לנו אתמול?</h2>
                  <div className="flex gap-2">
@@ -738,31 +827,94 @@ export default function Dashboard({ userId, userName, setActiveTab, tournamentSt
             <div className={`${timelineTab === "TODAY" ? "flex" : "hidden"} lg:flex flex-col w-full lg:w-1/2 h-full bg-slate-800`}>
                <div className="hidden lg:flex bg-slate-900/80 px-6 h-20 border-b border-slate-700 justify-between items-center z-10 shadow-sm shrink-0">
                  <h2 className="text-xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-cyan-400 flex items-center gap-2"><span>📅</span> מה צפוי היום?</h2>
-                 {(todayMatches.length > 0 && todayTargets.length > 0) && (
-                   <div className="flex bg-slate-950 p-1.5 rounded-xl border border-slate-700/50 shadow-inner">
-                     <button onClick={() => { setActiveBannerMode("MATCHES"); setTodayMatchIndex(0); }} className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${isMatchesMode ? "bg-gradient-to-r from-blue-600 to-cyan-600 text-white shadow-md" : "text-slate-400 hover:text-white hover:bg-slate-800"}`}>⚽ משחקים</button>
-                     <button onClick={() => { setActiveBannerMode("BONUS"); setTodayBonusIndex(0); }} className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${!isMatchesMode ? "bg-gradient-to-r from-rose-600 to-amber-600 text-white shadow-md" : "text-slate-400 hover:text-white hover:bg-slate-800"}`}>🎯 בונוסים</button>
-                   </div>
-                 )}
+                 <div className="flex bg-slate-950 p-1.5 rounded-xl border border-slate-700/50 shadow-inner">
+                   {todayMatches.length > 0 && <button onClick={() => { setActiveBannerMode("MATCHES"); setTodayMatchIndex(0); }} className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${isMatchesMode ? "bg-gradient-to-r from-blue-600 to-cyan-600 text-white shadow-md" : "text-slate-400 hover:text-white hover:bg-slate-800"}`}>⚽ להיום</button>}
+                   {todayTargets.length > 0 && <button onClick={() => { setActiveBannerMode("BONUS"); setTodayBonusIndex(0); }} className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${activeBannerMode === "BONUS" ? "bg-gradient-to-r from-rose-600 to-amber-600 text-white shadow-md" : "text-slate-400 hover:text-white hover:bg-slate-800"}`}>🎯 מטרות</button>}
+                   <button onClick={() => setActiveBannerMode("RADAR")} className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1 ${activeBannerMode === "RADAR" ? "bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-md" : "text-slate-400 hover:text-white hover:bg-slate-800"}`}>📡 ראדאר</button>
+                 </div>
                </div>
 
-               {(todayMatches.length > 0 && todayTargets.length > 0) && (
-                 <div className="flex lg:hidden bg-slate-950 px-4 py-3 border-b border-slate-800 shrink-0 justify-center">
-                    <div className="flex bg-slate-900 p-1.5 rounded-xl border border-slate-700/50 shadow-inner w-full max-w-xs">
-                      <button onClick={() => { setActiveBannerMode("MATCHES"); setTodayMatchIndex(0); }} className={`flex-1 px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${isMatchesMode ? "bg-gradient-to-r from-blue-600 to-cyan-600 text-white shadow-md" : "text-slate-400 hover:text-white hover:bg-slate-800"}`}>⚽ משחקים</button>
-                      <button onClick={() => { setActiveBannerMode("BONUS"); setTodayBonusIndex(0); }} className={`flex-1 px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${!isMatchesMode ? "bg-gradient-to-r from-rose-600 to-amber-600 text-white shadow-md" : "text-slate-400 hover:text-white hover:bg-slate-800"}`}>🎯 בונוסים</button>
-                    </div>
-                 </div>
-               )}
+               <div className="flex lg:hidden bg-slate-950 px-4 py-3 border-b border-slate-800 shrink-0 justify-center w-full">
+                  <div className="flex bg-slate-900 p-1.5 rounded-xl border border-slate-700/50 shadow-inner w-full max-w-sm">
+                    {todayMatches.length > 0 && <button onClick={() => { setActiveBannerMode("MATCHES"); setTodayMatchIndex(0); }} className={`flex-1 px-2 py-2 rounded-lg text-xs font-bold transition-all ${isMatchesMode ? "bg-gradient-to-r from-blue-600 to-cyan-600 text-white shadow-md" : "text-slate-400 hover:text-white hover:bg-slate-800"}`}>⚽ להיום</button>}
+                    {todayTargets.length > 0 && <button onClick={() => { setActiveBannerMode("BONUS"); setTodayBonusIndex(0); }} className={`flex-1 px-2 py-2 rounded-lg text-xs font-bold transition-all ${activeBannerMode === "BONUS" ? "bg-gradient-to-r from-rose-600 to-amber-600 text-white shadow-md" : "text-slate-400 hover:text-white hover:bg-slate-800"}`}>🎯 מטרות</button>}
+                    <button onClick={() => setActiveBannerMode("RADAR")} className={`flex-1 px-2 py-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1 ${activeBannerMode === "RADAR" ? "bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-md" : "text-slate-400 hover:text-white hover:bg-slate-800"}`}>📡 ראדאר מלא</button>
+                  </div>
+               </div>
 
                <div className="flex-1 p-4 md:p-6 flex flex-col justify-center items-center relative overflow-y-auto">
-                  {(todayMatches.length === 0 && todayTargets.length === 0) ? (
+                  {(todayMatches.length === 0 && todayTargets.length === 0 && activeBannerMode !== "RADAR") ? (
                     <div className="text-center py-10">
                       <div className="text-5xl mb-4 opacity-50">😴</div>
                       <h3 className="text-xl font-bold text-slate-300 mb-2">שקט היום על הדשא</h3>
                       <p className="text-slate-500 text-sm max-w-sm mx-auto">אין משחקים או נבחרות מהבונוסים שלך שמשחקות היום.</p>
+                      <button onClick={() => setActiveBannerMode("RADAR")} className="mt-4 text-purple-400 font-bold underline hover:text-purple-300">פתח את ראדאר הבונוסים המלא</button>
                     </div>
-                  ) : isMatchesMode ? (
+                  ) : activeBannerMode === "RADAR" ? (
+                    <div className="w-full max-w-md mx-auto flex flex-col h-full animate-fade-in-up">
+                      <div className="text-center mb-4 shrink-0 bg-slate-950 p-3 rounded-2xl border border-slate-700 shadow-inner">
+                        <p className="text-slate-400 text-xs font-bold leading-relaxed">
+                          מעקב לייב אחרי מצב שאלות הבונוס שלך לכל אורך הטורניר.<br/>
+                          <span className="text-emerald-400">✅ פגעת</span> | <span className="text-amber-400">👑 מוביל</span> | <span className="text-blue-400">🔵 פתוח</span> | <span className="text-rose-400">❌ נפסל</span>
+                        </p>
+                      </div>
+                      
+                      <div className="overflow-y-auto custom-scrollbar flex-1 pr-1 space-y-3 pb-2 max-h-[380px] lg:max-h-full">
+                        {bonusQuestionsList.length === 0 ? (
+                          <div className="text-slate-500 text-center py-8 text-sm font-bold">אין שאלות בונוס במערכת.</div>
+                        ) : (
+                          bonusQuestionsList.map(q => {
+                            const uAns = userBonusAnswersState[q.id];
+                            if (!uAns || String(uAns).trim() === "") return null; 
+
+                            const ansStr = String(uAns).trim();
+                            const isWinner = realBonusFull.answers?.[q.id]?.includes(ansStr);
+                            const isLeading = realBonusFull.leading?.[q.id]?.includes(ansStr);
+                            const isLocked = realBonusFull.locked?.[q.id];
+                            const isLoser = realBonusFull.blacklist?.[q.id]?.includes(ansStr) || (isLocked && !isWinner);
+
+                            let bgColor = "bg-blue-900/10 border-blue-500/30 hover:bg-blue-900/20";
+                            let icon = "🔵";
+                            let statusText = "במשחק / פתוח";
+                            let textColor = "text-blue-400";
+
+                            if (isWinner) {
+                              bgColor = "bg-emerald-900/20 border-emerald-500/50 shadow-[0_0_15px_rgba(16,185,129,0.15)]";
+                              icon = "✅";
+                              statusText = "פגיעה בול!";
+                              textColor = "text-emerald-400";
+                            } else if (isLeading) {
+                              bgColor = "bg-amber-900/20 border-amber-500/50 shadow-[0_0_15px_rgba(245,158,11,0.2)]";
+                              icon = "👑";
+                              statusText = "מוביל כרגע";
+                              textColor = "text-amber-400";
+                            } else if (isLoser) {
+                              bgColor = "bg-rose-900/10 border-rose-500/20 opacity-60 grayscale-[30%]";
+                              icon = "❌";
+                              statusText = "אבוד (נפסל או ננעל)";
+                              textColor = "text-rose-400";
+                            }
+
+                            return (
+                              <div key={q.id} className={`p-4 rounded-xl border transition-all ${bgColor}`}>
+                                <div className="flex justify-between items-start mb-2 gap-2">
+                                  <span className="text-slate-300 text-xs font-bold leading-tight flex-1">{q.label}</span>
+                                  <span className="text-[10px] font-black text-slate-500 bg-slate-950 px-2 py-0.5 rounded border border-slate-800 shrink-0">{q.points} נק'</span>
+                                </div>
+                                <div className="flex justify-between items-end mt-3">
+                                  <div className="flex items-center gap-2">
+                                    {getFlagUrl(ansStr) ? <img src={getFlagUrl(ansStr)!} className={`w-6 h-4 object-cover rounded-sm shadow-sm ${isLoser ? 'opacity-50' : ''}`} alt="flag" /> : <span className="text-lg drop-shadow-md">{icon}</span>}
+                                    <span className={`font-black text-sm md:text-base ${textColor} ${isLoser ? 'line-through decoration-rose-500/50' : ''}`}>{ansStr}</span>
+                                  </div>
+                                  <div className={`text-[10px] font-bold ${textColor} ${isLeading && !isWinner ? 'animate-pulse' : ''}`}>{statusText}</div>
+                                </div>
+                              </div>
+                            );
+                          })
+                        )}
+                      </div>
+                    </div>
+                  ) : activeBannerMode === "MATCHES" ? (
                     todayMatches.length > 0 && (
                       <div className="w-full max-w-md mx-auto flex flex-col items-center animate-fade-in-up">
                          <div className="flex items-center justify-between w-full bg-slate-950 p-2 rounded-2xl border border-slate-800 mb-6 shadow-inner shrink-0">
@@ -831,7 +983,7 @@ export default function Dashboard({ userId, userName, setActiveTab, tournamentSt
                       <div className="w-full max-w-md mx-auto flex flex-col items-center animate-fade-in-up">
                          <div className="flex items-center justify-between w-full bg-slate-950 p-2 rounded-2xl border border-slate-800 mb-6 shadow-inner shrink-0">
                             <button onClick={handlePrevBonus} className="w-10 h-10 flex items-center justify-center rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors border border-slate-700 active:scale-95 text-lg">▶</button>
-                            <div className="text-sm font-bold text-slate-400">בונוס {todayBonusIndex + 1} מתוך {todayTargets.length}</div>
+                            <div className="text-sm font-bold text-slate-400">מטרה {todayBonusIndex + 1} מתוך {todayTargets.length}</div>
                             <button onClick={handleNextBonus} className="w-10 h-10 flex items-center justify-center rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors border border-slate-700 active:scale-95 text-lg">◀</button>
                          </div>
 
@@ -876,7 +1028,23 @@ export default function Dashboard({ userId, userName, setActiveTab, tournamentSt
          </div>
       </div>
 
-      {/* 3. זירת הקרב */}
+      {/* 3. טבלת השקיפות */}
+      <div className="mb-4 mt-8">
+         <Link href="/matrix" className="w-full flex items-center justify-between bg-gradient-to-l from-slate-800 to-slate-900 hover:from-blue-900/40 hover:to-slate-800 border border-slate-700 hover:border-blue-500/50 p-4 rounded-2xl shadow-lg transition-all active:scale-95 group">
+            <div className="flex items-center gap-3">
+               <span className="text-3xl group-hover:scale-110 transition-transform drop-shadow-md">👁️</span>
+               <div className="flex flex-col text-right">
+                  <span className="font-black text-blue-400 text-lg">טבלת השקיפות של המשרד</span>
+                  <span className="text-[11px] md:text-xs text-slate-400">מי ניחש מה? לחץ לצפייה בכל הניחושים של כולם (במשחקים שהחלו)</span>
+               </div>
+            </div>
+            <div className="w-10 h-10 bg-slate-800 rounded-full flex items-center justify-center border border-slate-700 group-hover:border-blue-400 group-hover:text-blue-400 transition-colors">
+               ▶
+            </div>
+         </Link>
+      </div>
+
+      {/* 4. זירת הקרב */}
       <div className="bg-slate-900 rounded-3xl border border-slate-700 shadow-xl flex flex-col h-[400px]">
          <div className="flex bg-slate-950 rounded-t-3xl border-b border-slate-700 shrink-0">
             <button 
@@ -978,6 +1146,12 @@ export default function Dashboard({ userId, userName, setActiveTab, tournamentSt
                     ) : (
                        myLeagues.map(league => {
                           const isMyLeague = league.adminId === userId;
+                          
+                          // חישוב דירוג השחקן בליגה הספציפית
+                          const leagueUsers = allUsersList.filter(u => league.members.includes(u.id));
+                          const myRankIndex = leagueUsers.findIndex(u => u.id === userId);
+                          const myRank = myRankIndex !== -1 ? myRankIndex + 1 : "-";
+
                           return (
                              <div 
                                 key={league.id} 
@@ -986,12 +1160,13 @@ export default function Dashboard({ userId, userName, setActiveTab, tournamentSt
                              >
                                 <div className="flex flex-col truncate pr-2">
                                    <span className="font-bold text-slate-200 text-base truncate">{league.name}</span>
-                                   <div className="flex items-center gap-2 mt-1.5">
+                                   <div className="flex items-center gap-2 mt-1.5 flex-wrap">
                                       <span className="text-[10px] text-slate-500 bg-slate-800 px-2 py-0.5 rounded border border-slate-700">👤 {league.members?.length || 1} חברים</span>
+                                      <span className="text-[10px] font-bold text-amber-400 bg-amber-500/10 border border-amber-500/30 px-2 py-0.5 rounded shadow-sm">🏆 מקום {myRank}</span>
                                       {isMyLeague && <span className="text-[10px] text-blue-400 bg-blue-900/20 border border-blue-500/30 px-2 py-0.5 rounded" title="קוד ההצטרפות לליגה">קוד: {league.pin}</span>}
                                    </div>
                                 </div>
-                                <div className="text-slate-600 group-hover:text-blue-400 transition-colors bg-slate-800 w-10 h-10 flex items-center justify-center rounded-full text-lg shadow-inner">▶</div>
+                                <div className="text-slate-600 group-hover:text-blue-400 transition-colors bg-slate-800 w-10 h-10 flex items-center justify-center rounded-full text-lg shadow-inner shrink-0">▶</div>
                              </div>
                           );
                        })
@@ -1002,7 +1177,6 @@ export default function Dashboard({ userId, userName, setActiveTab, tournamentSt
          </div>
       </div>
 
-      {/* מודל המהדורה המרכזית */}
       {showMagazineModal && (
         <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/85 p-4 backdrop-blur-md animate-fade-in-up" dir="rtl">
           <div className="bg-slate-900 border border-slate-700 p-6 md:p-8 rounded-3xl w-full max-w-3xl max-h-[90vh] flex flex-col shadow-2xl relative overflow-hidden">
@@ -1021,6 +1195,16 @@ export default function Dashboard({ userId, userName, setActiveTab, tournamentSt
             </div>
 
             <div className="overflow-y-auto custom-scrollbar flex-1 pr-4 pb-4">
+                 {dailyMediaUrl && (
+                    <div className="w-full rounded-2xl overflow-hidden mb-6 border border-slate-800 shadow-lg">
+                       {dailyMediaUrl.match(/\.(jpeg|jpg|gif|png|webp)$/i) != null ? (
+                          <img src={dailyMediaUrl} alt="Magazine Cover" className="w-full max-h-[300px] md:max-h-[400px] object-cover mx-auto" />
+                       ) : (
+                          <video src={dailyMediaUrl} autoPlay loop muted playsInline controls className="w-full max-h-[300px] md:max-h-[400px] object-cover mx-auto" />
+                       )}
+                    </div>
+                 )}
+
                  <div className="text-slate-200 text-base md:text-lg leading-relaxed whitespace-pre-wrap
                                  [&_div]:w-full
                                  [&_b]:text-amber-400 [&_strong]:text-amber-400
@@ -1052,7 +1236,6 @@ export default function Dashboard({ userId, userName, setActiveTab, tournamentSt
         </div>
       )}
 
-      {/* מודל טבלאות אמת עם הכותרת החדשה */}
       {showRealStandingsModal && (
         <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/90 p-2 md:p-4 backdrop-blur-md animate-fade-in-up" dir="rtl">
           <div className="bg-slate-900 border border-slate-700 p-2 md:p-6 rounded-3xl w-full max-w-5xl h-[90vh] flex flex-col shadow-2xl relative overflow-hidden md:resize">
@@ -1093,7 +1276,7 @@ export default function Dashboard({ userId, userName, setActiveTab, tournamentSt
                    <span>🏟️</span> טבלת {selectedLeague.name}
                 </h3>
                 <div className="flex items-center gap-3 mt-1.5">
-                   <p className="text-slate-400 text-sm">קוד: <strong className="text-blue-400 font-mono tracking-widest bg-blue-900/20 px-1.5 py-0.5 rounded border border-blue-500/30">{selectedLeague.pin}</strong></p>
+                   <p className="text-slate-400 text-sm">קוד: <strong className="text-indigo-400 font-mono tracking-widest bg-indigo-900/20 px-1.5 py-0.5 rounded border border-indigo-500/30">{selectedLeague.pin}</strong></p>
                 </div>
               </div>
               <button onClick={() => setSelectedLeague(null)} className="w-8 h-8 flex items-center justify-center rounded-full bg-slate-800 hover:bg-rose-500/20 hover:text-rose-400 text-slate-400 transition-colors font-black text-sm border border-slate-700">✕</button>
@@ -1115,11 +1298,11 @@ export default function Dashboard({ userId, userName, setActiveTab, tournamentSt
                            .map((u, index) => {
                               const isMe = u.id === userId;
                               return (
-                                 <tr key={u.id} className={`border-b border-slate-800/50 ${isMe ? 'bg-blue-900/20' : 'hover:bg-slate-800/50'}`}>
+                                 <tr key={u.id} className={`border-b border-slate-800/50 ${isMe ? 'bg-indigo-900/20' : 'hover:bg-slate-800/50'}`}>
                                     <td className="p-3 text-center font-black text-slate-400">{index + 1}</td>
                                     <td className="p-3 font-bold text-slate-200">
                                        {u.name}
-                                       {isMe && <span className="mr-2 text-[9px] bg-blue-600 text-white px-1.5 py-0.5 rounded uppercase">אתה</span>}
+                                       {isMe && <span className="mr-2 text-[9px] bg-indigo-600 text-white px-1.5 py-0.5 rounded uppercase">אתה</span>}
                                     </td>
                                     <td className="p-3 text-center font-black text-amber-400 text-lg">{u.totalPoints || 0}</td>
                                  </tr>
@@ -1264,12 +1447,7 @@ export default function Dashboard({ userId, userName, setActiveTab, tournamentSt
                               
                               {spyModalMatch.isFinished && data.points !== null && (
                                 <div>
-                                  {(() => {
-                                    if (data.points === 0) return <span className="inline-flex items-center gap-1 whitespace-nowrap shrink-0 bg-rose-950/50 text-rose-400 border border-rose-500/40 px-2 py-1 rounded text-[10px] font-black shadow-sm">0 נק'</span>;
-                                    if (data.points > 0 && data.points < 15) return <span className="inline-flex items-center gap-1 whitespace-nowrap shrink-0 bg-amber-900/40 text-amber-400 border border-amber-500/50 px-2 py-1 rounded text-[10px] font-black shadow-sm">+{data.points} נק'</span>;
-                                    if (data.points >= 15) return <span className="inline-flex items-center gap-1 whitespace-nowrap shrink-0 bg-emerald-900/40 text-emerald-400 border border-emerald-500/50 px-2 py-1 rounded text-[10px] font-black shadow-[0_0_10px_rgba(16,185,129,0.2)]">🎯 +{data.points} נק'</span>;
-                                    return <span className="inline-flex items-center gap-1 whitespace-nowrap shrink-0 bg-blue-900/40 text-blue-400 border border-blue-500/40 px-2 py-1 rounded text-[10px] font-black shadow-sm">+{data.points} נק'</span>;
-                                  })()}
+                                  {getPointsBadge(data.points)}
                                 </div>
                               )}
                             </div>

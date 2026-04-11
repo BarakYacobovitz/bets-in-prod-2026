@@ -106,7 +106,7 @@ export default function Home() {
         {/* תת-תפריט ניחושים (מוצג רק אם אנחנו בטאב ניחושים) */}
         {/* ========================================== */}
         {mainTab === "PREDICTIONS" && (
-           <div className="flex overflow-x-auto gap-2 mb-8 pb-2 custom-scrollbar bg-slate-900/50 p-2 rounded-2xl border border-slate-800/50 max-w-4xl mx-auto">
+           <div className="flex overflow-x-auto gap-2 mb-8 pb-2 custom-scrollbar bg-slate-900/50 p-2 rounded-2xl border border-slate-800/50 max-w-4xl mx-auto md:justify-center">
               <button 
                 onClick={() => setPredictionTab("MATCHES")}
                 className={`px-5 py-2.5 rounded-xl font-bold whitespace-nowrap transition-all text-sm border flex items-center gap-2 ${predictionTab === "MATCHES" ? "bg-blue-500/20 text-blue-400 border-blue-500/50" : "bg-slate-800 text-slate-400 border-slate-700 hover:bg-slate-700 hover:text-white"}`}

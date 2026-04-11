@@ -68,7 +68,7 @@ export default function Login() {
         playsInline 
         className="absolute inset-0 w-full h-full object-cover z-0 opacity-40"
       >
-        <source src="/preview.mp4" type="video/mp4" />
+        <source src="./preview.mp4" type="video/mp4" />
       </video>
 
       {/* שכבת כהות על הוידאו */}

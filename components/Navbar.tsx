@@ -22,7 +22,10 @@ export default function Navbar() {
   const [ptsDiff, setPtsDiff] = useState(0);
   const [missingMatchesToday, setMissingMatchesToday] = useState(0);
   const [activeSurpriseAlert, setActiveSurpriseAlert] = useState<number>(0);
+  
   const [showNotifMenu, setShowNotifMenu] = useState(false);
+  const [hasViewedNotifs, setHasViewedNotifs] = useState(false);
+  const [userCleared, setUserCleared] = useState(false); // סטייט חדש לניקוי ידני של ההתראות
 
   const notifMenuRef = useRef<HTMLDivElement>(null);
 
@@ -51,7 +54,14 @@ export default function Navbar() {
             const data = userDoc.data();
             setUserName(data.name || "שחקן");
             setUserPoints(data.totalPoints || 0);
-            setPtsDiff((data.totalPoints || 0) - (data.previousTotalPoints || data.totalPoints || 0));
+            
+            const newPtsDiff = (data.totalPoints || 0) - (data.previousTotalPoints || data.totalPoints || 0);
+            
+            if (newPtsDiff !== ptsDiff) {
+               setPtsDiff(newPtsDiff);
+               setHasViewedNotifs(false); 
+               setUserCleared(false); // מדליק מחדש אם יש משהו חדש
+            }
           }
         });
       } else {
@@ -65,7 +75,7 @@ export default function Navbar() {
       unsubscribeAuth();
       if (unsubscribeUser) unsubscribeUser();
     };
-  }, []);
+  }, [ptsDiff]);
 
   useEffect(() => {
     if (!userId) return;
@@ -75,7 +85,6 @@ export default function Navbar() {
     return () => unsubSys();
   }, [userId]);
 
-  // שעון עצר - עכשיו עם לוגיקת "No More Bets!" והדדליין המתחלף לנוקאאוט
   useEffect(() => {
     const updateTimer = () => {
       const now = new Date().getTime();
@@ -104,13 +113,11 @@ export default function Navbar() {
         if (d > 0) setTimeLeft(`${d}ימ ${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`);
         else setTimeLeft(`${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`);
       } else if (allEmpty) {
-        // אם בכלל לא הוגדרו דדליינים במערכת מעולם
         setIsNoMoreBets(false);
         setNextNameFull("טרם נקבע מועד");
         setNextNameShort("טרם נקבע");
         setTimeLeft("--:--:--");
       } else {
-        // הדדליין האחרון עבר ואין דדליין חדש עתידי!
         setIsNoMoreBets(true);
       }
     };
@@ -152,6 +159,11 @@ export default function Navbar() {
               }
            }
         });
+
+        if (missingMatches > missingMatchesToday) {
+           setHasViewedNotifs(false);
+           setUserCleared(false);
+        }
         setMissingMatchesToday(missingMatches);
 
         let surprises = 0;
@@ -166,6 +178,11 @@ export default function Navbar() {
              }
            }
         });
+
+        if (surprises > activeSurpriseAlert) {
+           setHasViewedNotifs(false);
+           setUserCleared(false);
+        }
         setActiveSurpriseAlert(surprises);
 
       } catch (e) { console.error(e); }
@@ -174,7 +191,7 @@ export default function Navbar() {
     fetchNotifs();
     const interval = setInterval(fetchNotifs, 60000); 
     return () => clearInterval(interval);
-  }, [userId]);
+  }, [userId, missingMatchesToday, activeSurpriseAlert]);
 
   const handleLogout = () => {
     if (confirm("בטוח שברצונך להתנתק?")) {
@@ -182,9 +199,19 @@ export default function Navbar() {
     }
   };
 
+  const handleToggleNotifMenu = () => {
+    setShowNotifMenu(!showNotifMenu);
+    if (!showNotifMenu) {
+       setHasViewedNotifs(true);
+    }
+  };
+
   if (!isLoggedIn) return null;
 
-  const totalNotifs = (ptsDiff > 0 ? 1 : 0) + (missingMatchesToday > 0 ? 1 : 0) + (activeSurpriseAlert > 0 ? 1 : 0);
+  const realNotifsCount = (ptsDiff > 0 ? 1 : 0) + (missingMatchesToday > 0 ? 1 : 0) + (activeSurpriseAlert > 0 ? 1 : 0);
+  const totalNotifs = userCleared ? 0 : realNotifsCount;
+  
+  const shouldShowBadge = totalNotifs > 0 && !hasViewedNotifs;
 
   return (
     <nav className="w-full bg-slate-950 border-b border-slate-800 p-2 md:p-3 shadow-[0_4px_20px_rgba(0,0,0,0.5)] sticky top-0 z-50" dir="rtl">
@@ -200,6 +227,7 @@ export default function Navbar() {
              <span className="text-emerald-400/90 font-bold text-sm tracking-[0.15em] mt-0.5">מהמרים בייצור</span>
           </div>
         </a>
+        
         {/* מרכז: השעון או הודעת No More Bets */}
         <div className="flex-1 flex justify-center items-center px-1">
            {isNoMoreBets ? (
@@ -227,13 +255,17 @@ export default function Navbar() {
            
            <div className="relative shrink-0" ref={notifMenuRef}>
               <button 
-                onClick={() => setShowNotifMenu(!showNotifMenu)}
-                className={`w-9 h-9 md:w-11 md:h-11 rounded-full flex items-center justify-center text-lg md:text-xl transition-all shadow-sm ${showNotifMenu ? "bg-slate-700 border-slate-500" : "bg-slate-800 hover:bg-slate-700 border-slate-700"} border`}
+                onClick={handleToggleNotifMenu}
+                className={`w-9 h-9 md:w-11 md:h-11 rounded-full flex items-center justify-center text-lg md:text-xl transition-all shadow-sm ${showNotifMenu ? "bg-slate-700 border-slate-500" : "bg-slate-800 hover:bg-slate-700 border-slate-700"} border relative`}
               >
                 🔔
+                {totalNotifs > 0 && !shouldShowBadge && (
+                   <span className="absolute top-0 right-0 w-2.5 h-2.5 bg-emerald-500 rounded-full border border-slate-900"></span>
+                )}
               </button>
-              {totalNotifs > 0 && (
-                <span className="absolute -top-1 -right-1 bg-rose-500 text-white text-[9px] md:text-[10px] font-black w-4 h-4 md:w-5 md:h-5 flex items-center justify-center rounded-full shadow-md border-2 border-slate-900 animate-pulse pointer-events-none">
+              
+              {shouldShowBadge && (
+                <span className="absolute -top-1 -right-1 bg-rose-500 text-white text-[9px] md:text-[10px] font-black w-4 h-4 md:w-5 md:h-5 flex items-center justify-center rounded-full shadow-md border-2 border-slate-900 animate-pulse pointer-events-none z-10">
                   {totalNotifs}
                 </span>
               )}
@@ -242,10 +274,14 @@ export default function Navbar() {
                  <div className="absolute top-12 md:top-14 left-0 md:left-1/2 md:-translate-x-1/2 w-64 md:w-72 bg-slate-800 border border-slate-600 rounded-2xl shadow-2xl p-4 z-50 animate-fade-in-up">
                     <h4 className="text-white font-bold mb-3 border-b border-slate-700 pb-2 flex justify-between items-center">
                       <span>עדכונים מהמגרש</span>
-                      {totalNotifs > 0 && <span className="bg-rose-500 text-white text-[10px] px-2 py-0.5 rounded-full">{totalNotifs} חדשים</span>}
+                      {realNotifsCount > 0 && !userCleared && (
+                         <button onClick={() => setUserCleared(true)} className="text-[10px] text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 px-2 py-1 rounded transition-colors border border-transparent hover:border-rose-500/30 font-bold">
+                            נקה הכל ✕
+                         </button>
+                      )}
                     </h4>
                     <div className="space-y-3">
-                       {ptsDiff > 0 && (
+                       {ptsDiff > 0 && !userCleared && (
                           <div className="flex items-start gap-3 bg-emerald-900/20 p-2 rounded-xl border border-emerald-500/20">
                              <span className="text-xl mt-1">💸</span>
                              <div>
@@ -254,7 +290,7 @@ export default function Navbar() {
                              </div>
                           </div>
                        )}
-                       {activeSurpriseAlert > 0 && (
+                       {activeSurpriseAlert > 0 && !userCleared && (
                           <Link href="/" onClick={() => setShowNotifMenu(false)}>
                             <div className="flex items-start gap-3 bg-purple-900/20 p-2 rounded-xl border border-purple-500/20 cursor-pointer hover:bg-purple-900/40 transition-colors mt-2">
                                <span className="text-xl mt-1 animate-bounce">🎁</span>
@@ -265,7 +301,7 @@ export default function Navbar() {
                             </div>
                           </Link>
                        )}
-                       {missingMatchesToday > 0 && (
+                       {missingMatchesToday > 0 && !userCleared && (
                           <Link href="/" onClick={() => setShowNotifMenu(false)}>
                             <div className="flex items-start gap-3 bg-amber-900/20 p-2 rounded-xl border border-amber-500/20 cursor-pointer hover:bg-amber-900/40 transition-colors mt-2">
                                <span className="text-xl mt-1">⚠️</span>
@@ -279,7 +315,7 @@ export default function Navbar() {
                        {totalNotifs === 0 && (
                           <div className="text-slate-500 text-sm text-center py-4 flex flex-col items-center gap-2">
                             <span className="text-3xl opacity-50">🧘‍♂️</span>
-                            <span>הכל רגוע, אין עדכונים חדשים.</span>
+                            <span>הכל נקי, אין עדכונים חדשים.</span>
                           </div>
                        )}
                     </div>

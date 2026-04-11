@@ -94,7 +94,7 @@ export default function GroupsView({ matches, groups, userId, tournamentState }:
         snapshot.forEach(document => {
            const data = document.data();
            if (data.predictedHomeScore !== "" && data.predictedAwayScore !== "") {
-               matchPreds[data.matchId] = true;
+               matchPreds[data.matchId] = data; 
            }
         });
         setUserMatchPredictions(matchPreds);
@@ -186,6 +186,21 @@ export default function GroupsView({ matches, groups, userId, tournamentState }:
     }
     return points;
   };
+
+  let currentGroupExact = 0;
+  let currentGroupDir = 0;
+  let currentGroupMatchPts = 0;
+  activeMatches.forEach(m => {
+    if (m.isFinished) {
+      const pred = userMatchPredictions[m.id];
+      if (pred) {
+         const pH = Number(pred.predictedHomeScore); const pA = Number(pred.predictedAwayScore);
+         const rH = Number(m.realHomeScore); const rA = Number(m.realAwayScore);
+         if (pH === rH && pA === rA) { currentGroupExact++; currentGroupMatchPts += 15; }
+         else if (Math.sign(pH - pA) === Math.sign(rH - rA)) { currentGroupDir++; currentGroupMatchPts += 5; }
+      }
+    }
+  });
 
   const handleOpenSpy = async () => {
     setShowSpyModal(true);
@@ -311,7 +326,6 @@ export default function GroupsView({ matches, groups, userId, tournamentState }:
   };
 
   const myQualPoints = calculateGroupQualifiersPoints(qualifiers[activeGroup], realQualifiers[activeGroup]);
-
   const hasTruth = !!(realQualifiers[activeGroup]?.first || realQualifiers[activeGroup]?.second);
   const spyStats = { exact: 0, partial: 0, miss: 0 };
   
@@ -336,55 +350,81 @@ export default function GroupsView({ matches, groups, userId, tournamentState }:
   return (
     <div className="w-full animate-fade-in-up pb-8">
       
-      {/* כותרת עליונה - רווח תחתון צומצם ל-mb-1 */}
+      {/* כותרת עליונה - בית גדול וסיכום ניקוד! */}
       <div className="flex flex-col items-center mb-1 w-full">
          <div className="w-full max-w-sm mx-auto bg-slate-900/80 p-2.5 rounded-2xl border border-slate-800 shadow-md backdrop-blur-md flex flex-col gap-2">
             
             <div className="flex items-center justify-between w-full">
-               <button onClick={handlePrevGroup} className="w-8 h-8 flex items-center justify-center rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors border border-slate-700 active:scale-95">
-                  <span className="text-base leading-none">▶</span>
+               <button onClick={handlePrevGroup} className="w-10 h-10 flex items-center justify-center rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors border border-slate-700 active:scale-95">
+                  <span className="text-xl leading-none">▶</span>
                </button>
                
-               <div className="flex flex-col items-center justify-center flex-1">
-                  <div className="flex items-center gap-2">
-                     <h2 className="text-lg font-black text-white">בית {activeGroup}</h2>
+               <div className="flex flex-col items-center justify-center flex-1 px-2">
+                  <div className="flex items-center justify-center gap-2 w-full">
+                     <h2 className="text-2xl font-black text-white">בית {activeGroup}</h2>
                      {getGroupProgress(activeGroup) === 100 ? (
                         <span className="text-[10px] bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded font-bold border border-emerald-500/30">✓ הושלם</span>
                      ) : (
                         <span className="text-[10px] text-slate-400 font-bold bg-slate-950 px-2 py-0.5 rounded border border-slate-800">{getGroupProgress(activeGroup)}%</span>
                      )}
                   </div>
+                
+                  {(activeMatches.some(m => m.isFinished) || !!(realQualifiers[activeGroup]?.first || realQualifiers[activeGroup]?.second)) && (
+                    <div className="flex gap-2 md:gap-3 text-[11px] md:text-sm font-bold mt-1.5 bg-slate-950/60 px-3 py-2 rounded-xl border border-amber-500/40 items-center justify-center w-full shadow-md flex-wrap">
+                       {activeMatches.some(m => m.isFinished) && (
+                         <>
+                           <span className="text-emerald-400" title="נקודות מפגיעות בול">🎯 +{currentGroupExact * 15}</span>
+                           <span className="text-slate-600">|</span>
+                           <span className="text-blue-400" title="נקודות מכיוונים">✅ +{currentGroupDir * 5}</span>
+                           {(realQualifiers[activeGroup]?.first || realQualifiers[activeGroup]?.second) && <span className="text-slate-600">|</span>}
+                         </>
+                       )}
+                       {(realQualifiers[activeGroup]?.first || realQualifiers[activeGroup]?.second) && (
+                         <>
+                           <span className="text-purple-400" title="נקודות מעפילות">🥇 +{myQualPoints || 0}</span>
+                           <span className="text-slate-600 hidden sm:inline">|</span>
+                         </>
+                       )}
+                       <span className="text-amber-400 font-black text-sm md:text-base tracking-wider drop-shadow-md w-full sm:w-auto mt-1 sm:mt-0 text-center">
+                         סה"כ: {(currentGroupMatchPts || 0) + (myQualPoints || 0)} נק'
+                       </span>
+                    </div>
+                  )}
                </div>
                
-               <button onClick={handleNextGroup} className="w-8 h-8 flex items-center justify-center rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors border border-slate-700 active:scale-95">
-                  <span className="text-base leading-none">◀</span>
+               <button onClick={handleNextGroup} className="w-10 h-10 flex items-center justify-center rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors border border-slate-700 active:scale-95">
+                  <span className="text-xl leading-none">◀</span>
                </button>
             </div>
 
-            <div className="w-full h-px bg-slate-800/50"></div>
+            <div className="w-full h-px bg-slate-800/50 mt-1"></div>
 
-            <div className="flex items-center justify-between w-full px-1">
-               {viewMode === "MATCHES" && canRandomizeGroupMatches ? (
-                  <button 
-                     onClick={handleRandomizeGroup} 
-                     disabled={isRandomizing}
-                     className="bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] font-bold py-1.5 px-2.5 rounded-xl border border-slate-600 flex items-center gap-1 transition-all shadow-sm active:scale-95"
-                  >
-                    <span className="text-xs">🎲</span> הגרל הכל
-                  </button>
-               ) : viewMode === "QUALIFIERS" && !isQualifiersLocked ? (
-                  <button 
-                     onClick={handleRandomizeQualifiers} 
-                     disabled={isRandomizing}
-                     className="bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] font-bold py-1.5 px-2.5 rounded-xl border border-slate-600 flex items-center gap-1 transition-all shadow-sm active:scale-95"
-                  >
-                    <span className="text-xs">🎲</span> הגרל מעפילות
-                  </button>
-               ) : (
-                  <div className="w-[80px]"></div>
-               )}
+            {/* כאן התיקון למרכוז הכפתורים! */}
+            <div className="relative flex items-center justify-center w-full px-1 mt-1 min-h-[32px]">
+               {/* כפתור ההגרלה בצד ימין */}
+               <div className="absolute right-1">
+                   {viewMode === "MATCHES" && canRandomizeGroupMatches && (
+                      <button 
+                         onClick={handleRandomizeGroup} 
+                         disabled={isRandomizing}
+                         className="bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] font-bold py-1.5 px-2.5 rounded-xl border border-slate-600 flex items-center gap-1 transition-all shadow-sm active:scale-95"
+                      >
+                        <span className="text-xs">🎲</span> הגרל
+                      </button>
+                   )}
+                   {viewMode === "QUALIFIERS" && !isQualifiersLocked && (
+                      <button 
+                         onClick={handleRandomizeQualifiers} 
+                         disabled={isRandomizing}
+                         className="bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] font-bold py-1.5 px-2.5 rounded-xl border border-slate-600 flex items-center gap-1 transition-all shadow-sm active:scale-95"
+                      >
+                        <span className="text-xs">🎲</span> הגרל
+                      </button>
+                   )}
+               </div>
 
-               <div className="flex bg-slate-950 p-1 rounded-xl border border-slate-800 shadow-inner">
+               {/* כפתורי הטאבים ממורכזים באופן מושלם */}
+               <div className="flex bg-slate-950 p-1 rounded-xl border border-slate-800 shadow-inner z-10">
                   <button 
                     onClick={() => setViewMode("MATCHES")} 
                     className={`px-3 py-1 rounded-lg font-bold text-[10px] transition-all flex items-center gap-1 ${viewMode === "MATCHES" ? "bg-blue-600 text-white shadow-sm" : "text-slate-400 hover:text-white"}`}
@@ -427,14 +467,11 @@ export default function GroupsView({ matches, groups, userId, tournamentState }:
          </div>
       )}
 
-      {/* אזור המעפילות המהודק - padding הוקטן ל-p-3 */}
       {viewMode === "QUALIFIERS" && (
          <div className={`bg-slate-800 p-3 rounded-3xl border-t-4 border-t-purple-500 border border-slate-700 shadow-xl relative overflow-hidden transition-all animate-fade-in-up max-w-sm mx-auto ${isQualifiersLocked && myQualPoints === null ? "opacity-80 grayscale-[10%]" : ""}`}>
           
-          {/* מרווח תחתון קוצץ ל-mb-1.5 */}
           <div className="flex justify-between items-center mb-1.5 px-1">
             <div>
-              {/* מרווח תחתון קוצץ ל-mb-0.5 */}
               <h3 className="text-lg font-bold text-white leading-none mb-0.5">דירוג סופי</h3>
               <p className="text-slate-400 text-[10px]">בחר את העולות מבית {activeGroup}.</p>
             </div>
@@ -442,14 +479,13 @@ export default function GroupsView({ matches, groups, userId, tournamentState }:
             <div className="flex flex-col items-end gap-1">
               {isQualifiersLocked && myQualPoints === null && <span className="bg-rose-500/10 text-rose-400 text-[9px] font-bold px-2 py-0.5 rounded-full border border-rose-500/30 shadow-sm">🔒 נעול</span>}
               {myQualPoints !== null && (
-                 <div className={`px-2.5 py-1 rounded-xl text-[10px] font-black border shadow-lg ${myQualPoints > 0 ? "bg-purple-600/20 text-purple-400 border-purple-500/50 shadow-[0_0_15px_rgba(168,85,247,0.2)]" : "bg-slate-900 text-slate-500 border-slate-700"}`}>
+                 <div className={`px-3 py-1.5 rounded-xl text-xs md:text-sm font-black border shadow-lg ${myQualPoints > 0 ? "bg-purple-900/40 text-purple-400 border-purple-500/50 shadow-[0_0_15px_rgba(168,85,247,0.3)]" : "bg-slate-900 text-slate-500 border-slate-700"}`}>
                    {myQualPoints > 0 ? `🎯 סה"כ: +${myQualPoints}` : "0 נק'"}
                  </div>
               )}
             </div>
           </div>
           
-          {/* מרווח בין השורות קוצץ ל-space-y-1.5 */}
           <div className="space-y-1.5">
             {activeTeams.map((team: any) => {
               const isFirst = qualifiers[activeGroup]?.first === team;
@@ -485,7 +521,6 @@ export default function GroupsView({ matches, groups, userId, tournamentState }:
             })}
           </div>
 
-          {/* שורת הכפתורים - מרווח תחתון קוצץ */}
           <div className="mt-2.5 border-t border-slate-700/50 pt-2.5 flex flex-row gap-2">
              {isQualifiersLocked && (
                <button onClick={handleOpenSpy} className="flex-1 py-1.5 rounded-xl font-bold text-[11px] transition-all border flex items-center justify-center gap-1.5 bg-slate-900 text-slate-400 hover:text-white border-slate-700 hover:bg-slate-800">
