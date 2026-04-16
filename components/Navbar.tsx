@@ -132,7 +132,6 @@ export default function Navbar() {
      return () => unsub2();
   }, [userId]);
 
-  // חישוב שאלות הפתעה באופן חי ומקומי בלבד
   useEffect(() => {
      let surpriseCount = 0;
      liveBonusQs.forEach((q: any) => {
@@ -218,18 +217,38 @@ export default function Navbar() {
     window.location.href = "/";
   };
 
+  const navigateToLeaderboard = (e: any) => {
+    e.preventDefault();
+    if (window.location.pathname === '/') {
+       const event = new CustomEvent("changeTab", { detail: "LEADERBOARD" });
+       window.dispatchEvent(event);
+    } else {
+       sessionStorage.setItem("startupTab", "LEADERBOARD");
+       window.location.href = "/";
+    }
+  };
+
   const totalNotifs = missingMatchesToday + activeSurpriseAlert;
 
   return (
     <nav className="bg-slate-950/80 backdrop-blur-md border-b border-slate-800 sticky top-0 z-50 text-white shadow-lg" dir="rtl">
       <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
         
-        <a href="/" className="flex items-center gap-3 group">
-          <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl flex items-center justify-center shadow-[0_0_15px_rgba(37,99,235,0.4)] group-hover:scale-105 transition-transform overflow-hidden bg-slate-900 border border-slate-700">
-             <img src="/B.svg" alt="Bets in Prod Logo" className="w-full h-full object-cover" />
+        {/* העיצוב המשוחזר במדויק! טקסט שמאלי מיושר לימין, קו מפריד, ואז לוגו ה-B */}
+        <a href="/" className="flex items-center gap-3 md:gap-4 group" dir="ltr">
+          <div className="hidden sm:flex flex-col items-end justify-center">
+             <div className="font-black text-2xl md:text-[28px] bg-gradient-to-b from-[#fef08a] via-[#fbbf24] to-[#d97706] bg-clip-text text-transparent leading-none tracking-wide">
+                Bets in PROD
+             </div>
+             <div className="text-[#34d399] font-black text-xs md:text-[13px] tracking-widest mt-1.5">
+                מהמרים בייצור
+             </div>
           </div>
-          <div className="hidden sm:block font-black text-xl tracking-tight">
-             מהמרים <span className="text-blue-400">בייצור</span>
+          
+          <div className="hidden sm:block w-px h-10 md:h-12 bg-slate-700/80"></div>
+          
+          <div className="w-10 h-10 md:w-12 md:h-12 flex-shrink-0 group-hover:scale-110 transition-transform">
+             <img src="/B.svg" alt="Bets in Prod Logo" className="w-full h-full object-contain drop-shadow-lg" />
           </div>
         </a>
 
@@ -281,8 +300,12 @@ export default function Navbar() {
              </div>
 
              <div className="flex flex-col gap-1">
-                {userEmail === ADMIN_EMAIL && (
+                {userEmail === ADMIN_EMAIL ? (
                   <Link href="/admin" className="text-[10px] bg-emerald-600 text-white font-bold px-2 py-0.5 rounded shadow-sm text-center hover:bg-emerald-500 transition-colors">אדמין</Link>
+                ) : (
+                  <a href="/" onClick={navigateToLeaderboard} className="text-[10px] bg-amber-600 text-slate-900 font-black px-2 py-0.5 rounded shadow-sm text-center hover:bg-amber-500 transition-colors cursor-pointer flex items-center justify-center gap-1">
+                    לוח תוצאות 🏆
+                  </a>
                 )}
                 <button onClick={handleLogout} className="text-[10px] bg-slate-800 text-rose-400 font-bold px-2 py-0.5 rounded shadow-sm hover:bg-slate-700 transition-colors">התנתק</button>
              </div>
