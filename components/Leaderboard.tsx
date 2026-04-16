@@ -1,9 +1,10 @@
 "use client";
 import { useState, useEffect, useRef } from "react";
-import { collection, getDocs, doc, getDoc, query, where, onSnapshot } from "firebase/firestore";
+import { collection, getDocs, doc, getDoc, query, where, onSnapshot, updateDoc, addDoc, arrayUnion, arrayRemove } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth, db } from "../app/firebase";
 import { getFlagUrl } from "../app/utils/flags"; 
+import toast from "react-hot-toast";
 
 // רכיב קונפטי עצמאי שיופעל רק עבור המקום הראשון! 🎊
 const Confetti = () => {
@@ -53,6 +54,7 @@ export default function Leaderboard() {
   const [activeBoard, setActiveBoard] = useState<"GENERAL" | "KNOCKOUT" | "LEAGUES">("GENERAL");
   const [myLeagues, setMyLeagues] = useState<any[]>([]);
   const [selectedLeagueId, setSelectedLeagueId] = useState<string | null>(null);
+  const [isLeagueLoading, setIsLeagueLoading] = useState(false);
 
   const [isLoading, setIsLoading] = useState(true);
 
@@ -85,6 +87,21 @@ export default function Leaderboard() {
   const [isFirstPlace, setIsFirstPlace] = useState(false);
 
   const groupsList = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L"];
+
+  // --- קליטת ניתוב מהדאשבורד ---
+  useEffect(() => {
+    const targetBoard = sessionStorage.getItem("targetBoard");
+  if (targetBoard === "GENERAL" || targetBoard === "KNOCKOUT" || targetBoard === "LEAGUES") {
+    setActiveBoard(targetBoard);
+    sessionStorage.removeItem("targetBoard");
+  }
+    const targetLeagueId = sessionStorage.getItem("targetLeagueId");
+    if (targetLeagueId) {
+      setActiveBoard("LEAGUES");
+      setSelectedLeagueId(targetLeagueId);
+      sessionStorage.removeItem("targetLeagueId");
+    }
+  }, []);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
@@ -153,12 +170,68 @@ export default function Leaderboard() {
         const leagues: any[] = [];
         snap.forEach(doc => leagues.push({ id: doc.id, ...doc.data() }));
         setMyLeagues(leagues);
-        if (leagues.length > 0 && !selectedLeagueId) {
+        
+        // אם אין ליגה נבחרת (או שהגיעה מהסשן), נבחר את הראשונה
+        if (leagues.length > 0 && !selectedLeagueId && !sessionStorage.getItem("targetLeagueId")) {
             setSelectedLeagueId(leagues[0].id);
         }
     });
     return () => unsubscribeLeagues();
   }, [currentUserId]);
+
+  const handleCreateLeague = async () => {
+    if (!currentUserId) return;
+    const name = prompt("איך קוראים לליגה החדשה שלכם?");
+    if (!name || name.trim() === "") return;
+    setIsLeagueLoading(true);
+    try {
+        const pin = Math.random().toString(36).substring(2, 8).toUpperCase(); 
+        await addDoc(collection(db, "mini_leagues"), {
+            name: name.trim(),
+            pin: pin,
+            adminId: currentUserId,
+            members: [currentUserId],
+            createdAt: new Date()
+        });
+        toast.success(`הליגה '${name}' הוקמה! קוד הצטרפות: ${pin}`, { duration: 6000 });
+    } catch(e) { toast.error("שגיאה בהקמת הליגה."); }
+    finally { setIsLeagueLoading(false); }
+  };
+
+  const handleJoinLeague = async () => {
+    if (!currentUserId) return;
+    const pin = prompt("הכנס קוד הצטרפות (6 תווים):");
+    if (!pin || pin.trim() === "") return;
+    setIsLeagueLoading(true);
+    try {
+        const q = query(collection(db, "mini_leagues"), where("pin", "==", pin.trim().toUpperCase()));
+        const snap = await getDocs(q);
+        if (snap.empty) {
+            toast.error("לא נמצאה ליגה עם הקוד הזה.");
+            return;
+        }
+        const leagueDoc = snap.docs[0];
+        const leagueData = leagueDoc.data();
+        if (leagueData.members.includes(currentUserId)) {
+            toast.error("אתה כבר חבר בליגה הזו!");
+            return;
+        }
+        await updateDoc(doc(db, "mini_leagues", leagueDoc.id), { members: arrayUnion(currentUserId) });
+        setSelectedLeagueId(leagueDoc.id);
+        toast.success(`הצטרפת לליגה '${leagueData.name}' בהצלחה!`);
+    } catch(e) { toast.error("שגיאה בהצטרפות לליגה."); }
+    finally { setIsLeagueLoading(false); }
+  };
+
+  const handleLeaveLeague = async (leagueId: string, leagueName: string) => {
+    if (!currentUserId) return;
+    if (!confirm(`בטוח שאתה רוצה לצאת מהליגה '${leagueName}'?`)) return;
+    try {
+        await updateDoc(doc(db, "mini_leagues", leagueId), { members: arrayRemove(currentUserId) });
+        if (selectedLeagueId === leagueId) setSelectedLeagueId(null);
+        toast.success("יצאת מהליגה.");
+    } catch(e) { toast.error("שגיאה ביציאה מהליגה."); }
+  };
 
   let currentUsers: any[] = [];
   if (activeBoard === "GENERAL") {
@@ -486,20 +559,35 @@ export default function Leaderboard() {
         <button onClick={() => setActiveBoard("LEAGUES")} className={`flex-1 min-w-[120px] py-3 rounded-xl font-black transition-all ${activeBoard === "LEAGUES" ? "bg-blue-600 text-white shadow-lg shadow-blue-500/20" : "text-slate-500 hover:bg-slate-800 hover:text-slate-300"}`}>🏟️ ליגות פרטיות</button>
       </div>
 
-      {/* תתי-טאבים לבחירת הליגה (אם נמצאים בטאב ליגות פרטיות) */}
-      {activeBoard === "LEAGUES" && myLeagues.length > 0 && (
-         <div className="flex gap-2 overflow-x-auto mb-6 custom-scrollbar pb-2 bg-slate-900/30 p-2 rounded-xl border border-slate-800/50">
-            <span className="text-slate-500 text-xs font-bold py-2 px-1 flex items-center shrink-0">בחר ליגה:</span>
-            {myLeagues.map(l => (
-               <button 
-                  key={l.id} 
-                  onClick={() => setSelectedLeagueId(l.id)} 
-                  className={`px-5 py-2 rounded-lg font-bold whitespace-nowrap transition-all text-sm border shrink-0 ${selectedLeagueId === l.id ? 'bg-blue-600 text-white border-blue-500 shadow-md' : 'bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-white border-slate-700'}`}
-               >
-                  {l.name}
-               </button>
-            ))}
-         </div>
+      {/* פאנל ניהול ובחירת ליגות פרטיות */}
+      {activeBoard === "LEAGUES" && (
+        <div className="mb-6 animate-fade-in-up">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-4 bg-slate-800/50 p-4 rounded-2xl border border-slate-700 shadow-inner">
+            <div>
+              <h3 className="text-lg font-black text-blue-400">ניהול ליגות פרטיות</h3>
+              <p className="text-slate-400 text-xs">הקם ליגה למשרד או הצטרף לליגה קיימת.</p>
+            </div>
+            <div className="flex gap-2 w-full md:w-auto">
+              <button onClick={handleCreateLeague} disabled={isLeagueLoading} className="flex-1 md:flex-none bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold py-2.5 px-4 rounded-xl shadow-md transition-transform active:scale-95 flex justify-center items-center gap-2">➕ צור ליגה</button>
+              <button onClick={handleJoinLeague} disabled={isLeagueLoading} className="flex-1 md:flex-none bg-slate-700 hover:bg-slate-600 text-white text-xs font-bold py-2.5 px-4 rounded-xl shadow-md transition-transform active:scale-95 flex justify-center items-center gap-2">🔗 הצטרף עם קוד</button>
+            </div>
+          </div>
+
+          {myLeagues.length > 0 && (
+             <div className="flex gap-2 overflow-x-auto custom-scrollbar pb-2 bg-slate-900/30 p-2 rounded-xl border border-slate-800/50">
+               <span className="text-slate-500 text-xs font-bold py-2 px-1 flex items-center shrink-0">הליגות שלי:</span>
+               {myLeagues.map(l => (
+                  <button 
+                     key={l.id} 
+                     onClick={() => setSelectedLeagueId(l.id)} 
+                     className={`px-5 py-2 rounded-lg font-bold whitespace-nowrap transition-all text-sm border shrink-0 ${selectedLeagueId === l.id ? 'bg-blue-600 text-white border-blue-500 shadow-md' : 'bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-white border-slate-700'}`}
+                  >
+                     {l.name}
+                  </button>
+               ))}
+             </div>
+          )}
+        </div>
       )}
 
       {/* מצב שאין למשתמש אף ליגה */}
@@ -508,17 +596,34 @@ export default function Leaderboard() {
            <div className="text-6xl mb-4 opacity-80">🏟️</div>
            <h3 className="text-xl font-bold text-white mb-2">אין לך ליגות פרטיות</h3>
            <p className="text-slate-400 text-sm max-w-sm mx-auto">
-             כנס ל<span className="text-blue-400 font-bold">דאשבורד</span> כדי ליצור ליגה חדשה או להצטרף לליגה קיימת עם קוד, ובוא להתחרות מול החברים מהמשרד!
+             השתמש בכפתורים למעלה כדי ליצור ליגה חדשה או להצטרף לליגה קיימת עם קוד, ובוא להתחרות מול החברים!
            </p>
          </div>
       ) : (
          <div className="bg-slate-800 pt-10 rounded-3xl border border-slate-700 shadow-2xl relative overflow-hidden flex flex-col">
            <div className={`absolute top-0 right-0 w-64 h-64 rounded-full blur-3xl pointer-events-none -mr-20 -mt-20 ${activeBoard === "GENERAL" ? "bg-amber-500/10" : activeBoard === "LEAGUES" ? "bg-blue-500/10" : "bg-emerald-500/10"}`}></div>
            
-           {/* כותרת הטבלה */}
-           <h2 className="text-2xl md:text-3xl font-extrabold text-white mb-2 px-6 md:px-10 relative z-10 text-center md:text-right">
-             {activeBoard === "GENERAL" ? "טבלת הדירוג הכללי" : activeBoard === "KNOCKOUT" ? "טבלת שלב הנוק-אאוט" : `ליגה: ${myLeagues.find(l => l.id === selectedLeagueId)?.name || "פרטית"}`}
-           </h2>
+           {/* כותרת הטבלה ופאנל שליטה פנימי לליגות */}
+           <div className="flex flex-col md:flex-row justify-between items-center mb-2 px-6 md:px-10 relative z-10">
+              <h2 className="text-2xl md:text-3xl font-extrabold text-white text-center md:text-right">
+                {activeBoard === "GENERAL" ? "טבלת הדירוג הכללי" : activeBoard === "KNOCKOUT" ? "טבלת שלב הנוק-אאוט" : `ליגה: ${myLeagues.find(l => l.id === selectedLeagueId)?.name || "פרטית"}`}
+              </h2>
+
+              {/* חיווי קוד וכפתור עזיבה בתוך הליגה */}
+              {activeBoard === "LEAGUES" && selectedLeagueId && (
+                 <div className="flex items-center gap-3 mt-3 md:mt-0 bg-slate-900/50 p-1.5 rounded-xl border border-slate-700/50 shadow-inner">
+                    <span className="bg-blue-900/40 text-blue-300 border border-blue-500/30 px-3 py-1.5 rounded-lg text-sm font-mono tracking-widest flex items-center gap-2" title="קוד הצטרפות לחברים">
+                      <span className="text-[10px] text-blue-400/70 font-sans font-bold">קוד:</span> {myLeagues.find(l => l.id === selectedLeagueId)?.pin}
+                    </span>
+                    <button onClick={() => {
+                       const l = myLeagues.find(l => l.id === selectedLeagueId);
+                       if(l) handleLeaveLeague(l.id, l.name);
+                    }} className="text-xs font-bold text-rose-400 hover:text-white bg-rose-900/20 hover:bg-rose-600 px-3 py-1.5 rounded-lg border border-rose-500/30 transition-colors shadow-sm">
+                      🚪 עזוב
+                    </button>
+                 </div>
+              )}
+           </div>
            
            {currentUsers.length > 0 && (
              <div className="flex justify-center items-end gap-2 md:gap-6 mb-6 relative z-10 px-2 pt-4">

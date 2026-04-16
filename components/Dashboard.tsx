@@ -1,117 +1,111 @@
 "use client";
 import { useState, useEffect } from "react";
-import { doc, getDoc, collection, onSnapshot, getDocs, query, where, updateDoc, addDoc, arrayUnion, arrayRemove } from "firebase/firestore";
+import { doc, getDoc, collection, onSnapshot, getDocs, query, where, updateDoc } from "firebase/firestore";
 import { db } from "../app/firebase";
 import { getFlagUrl } from "../app/utils/flags"; 
 import toast from "react-hot-toast";
 import Link from "next/link";
 
-// המארחים של מונדיאל 2026 - קמעות האפליקציה!
 const MASCOTS = [
-  {
-     id: "trump",
-     name: "דונלד",
-     image: "/donaldIcon.png", 
-     quotes: [
-       "ניחוש ענק. כולם אומרים שזה הניחוש הכי טוב שהם ראו. פייק ניוז מי שאומר אחרת!",
-       "אנחנו נבנה פער ענק בטבלה, והחברים למשרד ישלמו על זה!",
-       "המונדיאל באמריקה יהיה הכי גדול אי פעם. נקודה. גם הניקוד שלך בסדר.",
-       "אני ניצחתי בטבלת השקיפות, כולם יודעים את זה. גנבו לי נקודות!"
-     ]
-  },
-  {
-     id: "mexican",
-     name: "חואן",
-     image: "/maxicanIcon.png",
-     quotes: [
-       "איי קראמבה! איזה ניחוש חריף הבאת פה אמיגו! 🌶️",
-       "ואמוס! תביא ירוק במטריצה ויוצאים לפיאסטה עד הבוקר! 🪅",
-       "הכדורגל שלנו במקסיקו הכי שמח, אבל הניחושים שלך... איי איי איי.",
-       "אל תהיה לוקו, תבדוק טוב טוב את הפצועים לפני שאתה שם תוצאה."
-     ]
-  },
-  {
-     id: "canadian",
-     name: "בוב",
-     image: "/candianIcon.png",
-     quotes: [
-       "סליחה שאני מפריע, אה, אבל נראה לי שהניחוש שלך קצת קפוא. 🍁",
-       "קח קפה, שים סירופ מייפל ובוא נראה קצת סוקר, אה? ☕",
-       "הוקי קרח זה הספורט האמיתי, אבל מונדיאל בקנדה זה גם נחמד, סליחה על ההתלהבות.",
-       "אל תשכח להיות מנומס ליריב שלך כשתעקוף אותו בטבלה, אה?"
-     ]
-  }
+  { id: "trump", name: "דונלד", image: "/donaldIcon.jpg", quotes: ["ניחוש ענק. כולם אומרים שזה הניחוש הכי טוב שהם ראו. פייק ניוז מי שאומר אחרת!", "אנחנו נבנה פער ענק בטבלה, והחברים למשרד ישלמו על זה!", "המונדיאל באמריקה יהיה הכי גדול אי פעם. נקודה. גם הניקוד שלך בסדר.", "אני ניצחתי בטבלת השקיפות, כולם יודעים את זה. גנבו לי נקודות!"] },
+  { id: "mexican", name: "חואן", image: "/maxicanIcon.jpg", quotes: ["איי קראמבה! איזה ניחוש חריף הבאת פה אמיגו! 🌶️", "ואמוס! תביא ירוק במטריצה ויוצאים לפיאסטה עד הבוקר! 🪅", "הכדורגל שלנו במקסיקו הכי שמח, אבל הניחושים שלך... איי איי איי.", "אל תהיה לוקו, תבדוק טוב טוב את הפצועים לפני שאתה שם תוצאה."] },
+  { id: "canadian", name: "בוב", image: "/candianIcon.jpg", quotes: ["סליחה שאני מפריע, אה, אבל נראה לי שהניחוש שלך קצת קפוא. 🍁", "קח קפה, שים סירופ מייפל ובוא נראה קצת סוקר, אה? ☕", "הוקי קרח זה הספורט האמיתי, אבל מונדיאל בקנדה זה גם נחמד, סליחה על ההתלהבות.", "אל תשכח להיות מנומס ליריב שלך כשתעקוף אותו בטבלה, אה?"] }
 ];
 
-export default function Dashboard({ userId, userName, setActiveTab, tournamentState }: any) {
-  const [userStats, setUserStats] = useState<any>({ points: 0, hasPaid: false, prevPoints: 0, prevRank: 0, nemesisId: null });
-  const [leaderboardInfo, setLeaderboardInfo] = useState({ rank: 0, totalUsers: 0 });
+const parseDateTimeLocal = (dtStr: string) => {
+  if (!dtStr) return 0;
+  try {
+    if (dtStr.includes("T")) {
+      const [datePart, timePart] = dtStr.split("T");
+      const [year, month, day] = datePart.split("-").map(Number);
+      const [hour, minute] = timePart.split(":").map(Number);
+      return new Date(year, month - 1, day, hour, minute).getTime();
+    }
+    return new Date(dtStr).getTime();
+  } catch { return 0; }
+};
+
+export default function Dashboard({ userId, userName, setActiveTab, setPredictionTab, tournamentState }: any) {
+  const [userStats, setUserStats] = useState<any>({ points: 0, rank: 0, koPoints: 0, koRank: 0, hasPaid: false, prevPoints: 0, prevRank: 0, prevKoRank: 0, nemesisId: null });
+  const [leaderboardInfo, setLeaderboardInfo] = useState({ totalUsers: 0 });
   const [dailyMessage, setDailyMessage] = useState("");
   const [dailyMediaUrl, setDailyMediaUrl] = useState("");
   const [dailySubtext, setDailySubtext] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [allUsersList, setAllUsersList] = useState<any[]>([]);
-  
-  const [arenaTab, setArenaTab] = useState<"NEMESIS" | "LEAGUES">("NEMESIS");
   const [nemesisData, setNemesisData] = useState<any>(null);
   const [nemesisInput, setNemesisInput] = useState<string>("");
   const [isSavingNemesis, setIsSavingNemesis] = useState(false);
-
   const [myLeagues, setMyLeagues] = useState<any[]>([]);
-  const [isLeagueLoading, setIsLeagueActionLoading] = useState(false);
-  const [selectedLeague, setSelectedLeague] = useState<any | null>(null);
-
   const [timelineTab, setTimelineTab] = useState<"TODAY" | "YESTERDAY">("TODAY");
-
   const [pointsFeed, setPointsFeed] = useState<any[]>([]);
   const [isFeedLoading, setIsFeedLoading] = useState(true);
   const [showFullHistory, setShowFullHistory] = useState(false);
-
   const [missingMatchesToday, setMissingMatchesToday] = useState(0);
-  const [activeSurpriseAlert, setActiveSurpriseAlert] = useState<any[]>([]);
   
   const [todayTargets, setTodayTargets] = useState<any[]>([]);
   const [todayMatches, setTodayMatches] = useState<any[]>([]);
-  
   const [activeBannerMode, setActiveBannerMode] = useState<"MATCHES" | "BONUS" | "RADAR">("MATCHES");
   const [todayMatchIndex, setTodayMatchIndex] = useState(0);
   const [todayBonusIndex, setTodayBonusIndex] = useState(0);
-
   const [spyModalMatch, setSpyModalMatch] = useState<any | null>(null);
   const [spyData, setSpyData] = useState<any[]>([]);
   const [isLoadingSpy, setIsLoadingSpy] = useState(false);
-  
   const [spySearchQuery, setSpySearchQuery] = useState("");
   const [spyFilter, setSpyFilter] = useState<"ALL" | "EXACT" | "DIRECTION" | "MISS">("ALL");
-
   const [showMagazineModal, setShowMagazineModal] = useState(false);
   const [showRealStandingsModal, setShowRealStandingsModal] = useState(false);
-
   const [realBonusFull, setRealBonusFull] = useState<any>({ answers: {}, blacklist: {}, locked: {}, leading: {} });
   const [userBonusAnswersState, setUserBonusAnswersState] = useState<any>({});
   const [bonusQuestionsList, setBonusQuestionsList] = useState<any[]>([]);
-
-  // סטייט עבור הקמעות הקופצים!
   const [mascotQuote, setMascotQuote] = useState<{mascot: any, quote: string} | null>(null);
   const [showMascot, setShowMascot] = useState(false);
 
-  const rankUsers = (usersArr: any[], field: string) => {
-    const sorted = [...usersArr].sort((a, b) => (b[field] || 0) - (a[field] || 0));
-    let currentRank = 1;
-    return sorted.map((u, i) => {
-      if (i > 0 && (u[field] || 0) < (sorted[i - 1][field] || 0)) currentRank = i + 1;
-      return { ...u, displayRank: currentRank };
-    });
-  };
+  const [nowMs, setNowMs] = useState(Date.now());
+  const [liveBonusQs, setLiveBonusQs] = useState<any[]>([]);
+  const [liveBonusAns, setLiveBonusAns] = useState<any>({});
+  const [activeSurpriseAlert, setActiveSurpriseAlert] = useState<number>(0);
+
+  useEffect(() => {
+    const interval = setInterval(() => setNowMs(Date.now()), 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+     const unsub1 = onSnapshot(doc(db, "settings", "bonus_questions"), (snap) => {
+        if(snap.exists()) setLiveBonusQs(snap.data().questions || []);
+     });
+     return () => unsub1();
+  }, []);
+
+  useEffect(() => {
+     if(!userId) return;
+     const unsub2 = onSnapshot(doc(db, "predictions_bonus", userId), (snap) => {
+        if(snap.exists()) setLiveBonusAns(snap.data().answers || {});
+     });
+     return () => unsub2();
+  }, [userId]);
+
+  useEffect(() => {
+     let surpriseCount = 0;
+     liveBonusQs.forEach((q: any) => {
+        if (q.isSurprise && q.openTime && q.closeTime) {
+           const openMs = parseDateTimeLocal(q.openTime);
+           const closeMs = parseDateTimeLocal(q.closeTime);
+           if (nowMs >= openMs && nowMs <= closeMs) {
+              const ans = liveBonusAns[q.id];
+              if (!ans || String(ans).trim() === "") surpriseCount++;
+           }
+        }
+     });
+     setActiveSurpriseAlert(surpriseCount);
+  }, [liveBonusQs, liveBonusAns, nowMs]);
 
   const checkIsMatchLocked = (m: any, state: number) => {
     const s = Number(state) || 0;
     if (m.stage !== "KNOCKOUT") {
       const md = Number(m.matchday) || 1;
-      if (md === 1 && s >= 1) return true;
-      if (md === 2 && s >= 2) return true;
-      if (md === 3 && s >= 3) return true;
-      return false;
+      return (md === 1 && s >= 1) || (md === 2 && s >= 2) || (md === 3 && s >= 3);
     } else {
       if (m.roundName === "32 הגדולות" && s >= 5) return true;
       if (m.roundName === "שמינית גמר" && s >= 7) return true;
@@ -122,20 +116,22 @@ export default function Dashboard({ userId, userName, setActiveTab, tournamentSt
     }
   };
 
-  // הפעלת הקמע האקראי
   useEffect(() => {
     const timer = setTimeout(() => {
-       // 40% סיכוי להופעת דמות בכל כניסה לדאשבורד (שלא יהיה חופר מדי)
-       if (Math.random() < 0.4) {
-          const randomMascot = MASCOTS[Math.floor(Math.random() * MASCOTS.length)];
-          const randomQuote = randomMascot.quotes[Math.floor(Math.random() * randomMascot.quotes.length)];
-          setMascotQuote({ mascot: randomMascot, quote: randomQuote });
-          setShowMascot(true);
-          
-          // נעלם מעצמו אחרי 8 שניות
-          setTimeout(() => setShowMascot(false), 8000);
-        }
-    }, 2000); // מופיע 2 שניות אחרי טעינת הדף
+       const lastMascotTime = sessionStorage.getItem("lastMascotShowTime");
+       const now = new Date().getTime();
+       const cooldownMs = 15 * 60 * 1000; 
+       if (!lastMascotTime || (now - Number(lastMascotTime) > cooldownMs)) {
+           if (Math.random() < 0.3) { 
+              const randomMascot = MASCOTS[Math.floor(Math.random() * MASCOTS.length)];
+              const randomQuote = randomMascot.quotes[Math.floor(Math.random() * randomMascot.quotes.length)];
+              setMascotQuote({ mascot: randomMascot, quote: randomQuote });
+              setShowMascot(true);
+              sessionStorage.setItem("lastMascotShowTime", now.toString());
+              setTimeout(() => setShowMascot(false), 8000);
+            }
+       }
+    }, 2000); 
     return () => clearTimeout(timer);
   }, []);
 
@@ -145,22 +141,40 @@ export default function Dashboard({ userId, userName, setActiveTab, tournamentSt
     const unsubscribeUsers = onSnapshot(collection(db, "users"), (usersSnap) => {
       const allUsers: any[] = [];
       usersSnap.forEach(doc => allUsers.push({ id: doc.id, ...doc.data() }));
-      const rankedUsers = rankUsers(allUsers, "totalPoints");
-      setAllUsersList(rankedUsers);
       
-      const myData = rankedUsers.find(u => u.id === userId);
+      allUsers.sort((a, b) => (b.totalPoints || 0) - (a.totalPoints || 0));
+      let currRank = 1;
+      allUsers.forEach((u, i) => {
+         if (i > 0 && (u.totalPoints || 0) < (allUsers[i-1].totalPoints || 0)) currRank = i + 1;
+         u.displayRank = currRank;
+      });
+
+      allUsers.sort((a, b) => (b.knockoutPoints || 0) - (a.knockoutPoints || 0));
+      currRank = 1;
+      allUsers.forEach((u, i) => {
+         if (i > 0 && (u.knockoutPoints || 0) < (allUsers[i-1].knockoutPoints || 0)) currRank = i + 1;
+         u.displayKoRank = currRank;
+      });
+
+      setAllUsersList(allUsers);
+      
+      const myData = allUsers.find(u => u.id === userId);
       if (myData) {
         setUserStats({
           points: myData.totalPoints || 0,
+          rank: myData.displayRank || 0,
+          koPoints: myData.knockoutPoints || 0,
+          koRank: myData.displayKoRank || 0,
           hasPaid: myData.hasPaid || false,
           prevPoints: myData.previousTotalPoints ?? (myData.totalPoints || 0),
           prevRank: myData.previousRankGeneral ?? myData.displayRank,
+          prevKoRank: myData.previousRankKnockout ?? myData.displayKoRank,
           nemesisId: myData.nemesisId || null
         });
-        setLeaderboardInfo({ rank: myData.displayRank, totalUsers: rankedUsers.length });
+        setLeaderboardInfo({ totalUsers: allUsers.length });
 
         if (myData.nemesisId) {
-           const nData = rankedUsers.find(u => u.id === myData.nemesisId);
+           const nData = allUsers.find(u => u.id === myData.nemesisId);
            setNemesisData(nData || null);
         } else {
            setNemesisData(null);
@@ -209,56 +223,6 @@ export default function Dashboard({ userId, userName, setActiveTab, tournamentSt
     } catch (e) { toast.error("שגיאה בביטול יריב."); }
   };
 
-  const handleCreateLeague = async () => {
-      const name = prompt("איך קוראים לליגה החדשה שלכם?");
-      if (!name || name.trim() === "") return;
-      setIsLeagueActionLoading(true);
-      try {
-          const pin = Math.random().toString(36).substring(2, 8).toUpperCase(); 
-          await addDoc(collection(db, "mini_leagues"), {
-              name: name.trim(),
-              pin: pin,
-              adminId: userId,
-              members: [userId],
-              createdAt: new Date()
-          });
-          toast.success(`הליגה '${name}' הוקמה! קוד הצטרפות: ${pin}`, { duration: 6000 });
-      } catch(e) { toast.error("שגיאה בהקמת הליגה."); }
-      finally { setIsLeagueActionLoading(false); }
-  };
-
-  const handleJoinLeague = async () => {
-      const pin = prompt("הכנס קוד הצטרפות (6 תווים):");
-      if (!pin || pin.trim() === "") return;
-      setIsLeagueActionLoading(true);
-      try {
-          const q = query(collection(db, "mini_leagues"), where("pin", "==", pin.trim().toUpperCase()));
-          const snap = await getDocs(q);
-          if (snap.empty) {
-              toast.error("לא נמצאה ליגה עם הקוד הזה.");
-              return;
-          }
-          const leagueDoc = snap.docs[0];
-          const leagueData = leagueDoc.data();
-          if (leagueData.members.includes(userId)) {
-              toast.error("אתה כבר חבר בליגה הזו!");
-              return;
-          }
-          await updateDoc(doc(db, "mini_leagues", leagueDoc.id), { members: arrayUnion(userId) });
-          toast.success(`הצטרפת לליגה '${leagueData.name}' בהצלחה!`);
-      } catch(e) { toast.error("שגיאה בהצטרפות לליגה."); }
-      finally { setIsLeagueActionLoading(false); }
-  };
-
-  const handleLeaveLeague = async (leagueId: string, leagueName: string) => {
-      if (!confirm(`לצאת מהליגה '${leagueName}'?`)) return;
-      try {
-          await updateDoc(doc(db, "mini_leagues", leagueId), { members: arrayRemove(userId) });
-          setSelectedLeague(null);
-          toast.success("יצאת מהליגה.");
-      } catch(e) { toast.error("שגיאה ביציאה מהליגה."); }
-  };
-
   useEffect(() => {
     if (!userId) return;
     
@@ -266,11 +230,16 @@ export default function Dashboard({ userId, userName, setActiveTab, tournamentSt
       try {
         const feed: any[] = [];
         const parseDate = (str: string) => {
-          if(!str) return 0;
+          if(!str || typeof str !== 'string') return 0;
           try {
-             const [d, t] = str.split(" ");
-             const [day, month, year] = d.split("/");
-             const [h, m] = t.split(":");
+             const parts = str.split(" ");
+             const dParts = (parts[0] || "").split("/");
+             const tParts = (parts[1] || "00:00").split(":");
+             const day = dParts[0] || "1";
+             const month = dParts[1] || "1";
+             const year = dParts[2] || "2026";
+             const h = tParts[0] || "0";
+             const m = tParts[1] || "0";
              return new Date(Number(year), Number(month)-1, Number(day), Number(h), Number(m)).getTime();
           } catch { return 0; }
         };
@@ -300,40 +269,25 @@ export default function Dashboard({ userId, userName, setActiveTab, tournamentSt
         pmSnap.forEach(d => { userMatchPreds[d.data().matchId] = d.data(); });
         pkSnap.forEach(d => { userMatchPreds[d.data().matchId] = d.data(); });
 
-        const now = new Date();
-        const nowMs = now.getTime();
         const today = new Date();
-
-        const activeSurprises: any[] = [];
-        bonusQuestions.forEach((q: any) => {
-           if (q.isSurprise && q.openTime && q.closeTime) {
-             const openMs = new Date(q.openTime).getTime();
-             const closeMs = new Date(q.closeTime).getTime();
-             if (nowMs >= openMs && nowMs <= closeMs) {
-                const hasAnswered = userBonusAnswers[q.id] && userBonusAnswers[q.id].toString().trim() !== "";
-                if (!hasAnswered) activeSurprises.push(q); 
-             }
-           }
-        });
-        setActiveSurpriseAlert(activeSurprises);
-
         const targets: any[] = [];
         const tMatches: any[] = [];
         const todayTeams = new Set<string>();
         let missingMatches = 0;
         
         matches.forEach(m => {
-           if (!m.isFinished && m.matchDate) {
-              const [d, t] = m.matchDate.split(" ");
-              if(d) {
-                 const [day, month, year] = d.split("/");
+           if (!m.isFinished && m.matchDate && typeof m.matchDate === 'string') {
+              const parts = m.matchDate.split(" ");
+              const d = parts[0] || "";
+              const t = parts[1] || "";
+              const dParts = d.split("/");
+              if(dParts.length === 3) {
+                 const [day, month, year] = dParts;
                  if (today.getDate() === Number(day) && today.getMonth() === Number(month) - 1 && today.getFullYear() === Number(year)) {
                     todayTeams.add(m.homeTeam);
                     todayTeams.add(m.awayTeam);
-                    
                     const pred = userMatchPreds[m.id];
                     tMatches.push({ ...m, time: t, userPrediction: pred || null });
-
                     if (!pred || pred.predictedHomeScore === "") missingMatches++;
                  }
               }
@@ -378,7 +332,7 @@ export default function Dashboard({ userId, userName, setActiveTab, tournamentSt
             if(!isNaN(pH) && !isNaN(pA) && !isNaN(rH) && !isNaN(rA)) {
               if(Math.sign(pH-pA) === Math.sign(rH-rA)) {
                 const exact = (pH===rH && pA===rA);
-                feed.push({ id: `gm_${match.id}`, icon: exact ? '🎯' : '✅', title: `${match.homeTeam} נגד ${match.awayTeam}`, desc: exact ? `פגיעה בול! (${pH}-${pA})` : `כיוון נכון`, points: exact ? 15 : 5, ts: parseDate(match.matchDate) });
+                feed.push({ id: `gm_${match.id}`, matchId: match.id, matchday: match.matchday, icon: exact ? '🎯' : '✅', title: `${match.homeTeam} נגד ${match.awayTeam}`, desc: exact ? `פגיעה בול! (${pH}-${pA})` : `כיוון נכון`, points: exact ? 15 : 5, ts: parseDate(match.matchDate) });
               }
             }
           }
@@ -392,12 +346,12 @@ export default function Dashboard({ userId, userName, setActiveTab, tournamentSt
             if(!isNaN(pH) && !isNaN(pA) && !isNaN(rH) && !isNaN(rA)) {
               if(Math.sign(pH-pA) === Math.sign(rH-rA)) {
                 const exact = (pH===rH && pA===rA);
-                feed.push({ id: `ko_${match.id}`, icon: exact ? '🎯' : '✅', title: `${match.homeTeam} נגד ${match.awayTeam}`, desc: exact ? `בול בנוק-אאוט! (${pH}-${pA})` : `כיוון בנוק-אאוט`, points: exact ? 15 : 5, ts: parseDate(match.matchDate) });
+                feed.push({ id: `ko_${match.id}`, matchId: match.id, roundName: match.roundName, icon: exact ? '🎯' : '✅', title: `${match.homeTeam} נגד ${match.awayTeam}`, desc: exact ? `בול בנוק-אאוט! (${pH}-${pA})` : `כיוון בנוק-אאוט`, points: exact ? 15 : 5, ts: parseDate(match.matchDate) });
               }
             }
             if(data.qualifier && data.qualifier === match.realQualifier) {
                const qMap:any = { "32 הגדולות": 5, "שמינית גמר": 10, "רבע גמר": 15, "חצי גמר": 20, "גמר": 25 };
-               feed.push({ id: `qko_${match.id}`, icon: '🔥', title: `${data.qualifier}`, desc: `ניחוש העפלה (${match.roundName})`, points: qMap[match.roundName] || 0, ts: parseDate(match.matchDate) + 1 });
+               feed.push({ id: `qko_${match.id}`, matchId: match.id, roundName: match.roundName, icon: '🔥', title: `${data.qualifier}`, desc: `ניחוש העפלה (${match.roundName})`, points: qMap[match.roundName] || 0, ts: parseDate(match.matchDate) + 1 });
             }
           }
         });
@@ -430,7 +384,7 @@ export default function Dashboard({ userId, userName, setActiveTab, tournamentSt
               if(truth && uAns) {
                  const tArr = Array.isArray(truth) ? truth : [truth];
                  if(tArr.some((t:any) => t.toString().trim().toLowerCase() === uAns.toString().trim().toLowerCase())) {
-                    feed.push({ id: `b_${q.id}`, icon: '🎁', title: q.label, desc: `שאלת בונוס (${uAns})`, points: Number(q.points)||0, ts: Infinity });
+                    feed.push({ id: `b_${q.id}`, qId: q.id, icon: '🎁', title: q.label, desc: `שאלת בונוס (${uAns})`, points: Number(q.points)||0, ts: Infinity });
                  }
               }
            });
@@ -520,14 +474,24 @@ export default function Dashboard({ userId, userName, setActiveTab, tournamentSt
   };
 
   const displayFeed = showFullHistory ? pointsFeed : getRecentFeedItems();
-  const ptsDiff = userStats.points - userStats.prevPoints;
-  const rankDiff = userStats.prevRank > 0 ? userStats.prevRank - leaderboardInfo.rank : 0;
   
-  const currentLeader = allUsersList.length > 0 ? allUsersList[0].name?.split(' ')[0] : "אין";
-  const currentKoLeader = allUsersList.length > 0 ? [...allUsersList].sort((a, b) => (Number(b.knockoutPoints) || 0) - (Number(a.knockoutPoints) || 0))[0]?.name?.split(' ')[0] : "אין";
+  const ptsDiff = userStats.points - userStats.prevPoints;
+  const rankDiff = (userStats.prevRank > 0 && userStats.rank > 0) ? userStats.prevRank - userStats.rank : 0;
+  const koRankDiff = (userStats.prevKoRank > 0 && userStats.koRank > 0) ? userStats.prevKoRank - userStats.koRank : 0;
+  
+  const topUser = [...allUsersList].sort((a, b) => (Number(b.totalPoints) || 0) - (Number(a.totalPoints) || 0))[0];
+  const currentLeader = (topUser && topUser.name) ? topUser.name.split(' ')[0] : "אין";
+  
+  const topKoUser = [...allUsersList].sort((a, b) => (Number(b.knockoutPoints) || 0) - (Number(a.knockoutPoints) || 0))[0];
+  const currentKoLeader = (topKoUser && topKoUser.name) ? topKoUser.name.split(' ')[0] : "אין";
+
+  const myDataInfo = allUsersList.find(u => u.id === userId);
+  const safeUserName = myDataInfo?.name ? myDataInfo.name.split(" ")[0] : "אלוף";
+  const nemesisFirstName = (nemesisData && nemesisData.name) ? nemesisData.name.split(" ")[0] : "";
 
   const userLeaguesData = myLeagues.map(league => {
-     const leagueUsers = allUsersList.filter(u => league.members.includes(u.id));
+     const leagueUsers = allUsersList.filter(u => league.members?.includes(u.id));
+     leagueUsers.sort((a,b) => (b.totalPoints || 0) - (a.totalPoints || 0));
      const myIndex = leagueUsers.findIndex(u => u.id === userId);
      return {
         id: league.id,
@@ -583,9 +547,7 @@ export default function Dashboard({ userId, userName, setActiveTab, tournamentSt
   return (
     <div className="w-full space-y-8 animate-fade-in-up pb-8 relative">
       
-      {/* ========================================================================= */}
-      {/* 🎈 קמעות פופ-אפ (המארחות של 2026!) */}
-      {/* ========================================================================= */}
+      {/* 🎈 קמעות פופ-אפ */}
       <div className={`fixed bottom-4 left-4 md:left-8 z-[100] transition-all duration-700 transform ${showMascot ? 'translate-y-0 opacity-100' : 'translate-y-32 opacity-0 pointer-events-none'} flex items-end gap-3`} dir="ltr">
          <div className="bg-slate-50 text-slate-900 p-4 rounded-2xl rounded-bl-none shadow-[0_10px_25px_rgba(0,0,0,0.5)] max-w-[220px] md:max-w-[280px] relative border-2 border-slate-300" dir="rtl">
             <button onClick={() => setShowMascot(false)} className="absolute top-1 right-2 text-slate-400 hover:text-rose-500 font-black text-xs p-1">✕</button>
@@ -596,7 +558,7 @@ export default function Dashboard({ userId, userName, setActiveTab, tournamentSt
          </div>
       </div>
 
-      {/* 🚨 באנר אזהרה חסרים ניחושים להיום! */}
+      {/* 🚨 אזהרה משחקים חסרים */}
       {missingMatchesToday > 0 && (
          <div className="bg-gradient-to-r from-amber-600 via-orange-600 to-amber-600 p-6 rounded-3xl border border-amber-300 shadow-[0_0_40px_rgba(245,158,11,0.6)] relative overflow-hidden">
             <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0IiBoZWlnaHQ9IjQiPgo8cmVjdCB3aWR0aD0iNCIgaGVpZ2h0PSI0IiBmaWxsPSIjZmZmIiBmaWxsLW9wYWNpdHk9IjAuMSIvPgo8L3N2Zz4=')] opacity-30"></div>
@@ -609,15 +571,15 @@ export default function Dashboard({ userId, userName, setActiveTab, tournamentSt
                      ישנם <strong>{missingMatchesToday} משחקים</strong> שמתקיימים היום וטרם הזנת להם ניחוש. אל תאבד נקודות סתם.
                   </p>
                </div>
-               <button onClick={() => { setActiveTab(0); window.scrollTo({top:0, behavior:'smooth'}); }} className="bg-white text-amber-700 hover:bg-slate-100 font-black px-8 py-4 rounded-xl text-lg shadow-xl hover:-translate-y-1 transition-transform w-full md:w-auto flex-shrink-0">
+               <button onClick={() => { setActiveTab("PREDICTIONS"); if(setPredictionTab) setPredictionTab("MATCHES"); window.scrollTo({top:0, behavior:'smooth'}); }} className="bg-white text-amber-700 hover:bg-slate-100 font-black px-8 py-4 rounded-xl text-lg shadow-xl hover:-translate-y-1 transition-transform w-full md:w-auto flex-shrink-0">
                   קח אותי למשחקים 🏃‍♂️
                </button>
             </div>
          </div>
       )}
 
-      {/* 🎁 באנר שאלת הפתעה! */}
-      {activeSurpriseAlert.length > 0 && (
+      {/* 🎁 באנר שאלת הפתעה מתוקן שעובד על מספר (>0) */}
+      {activeSurpriseAlert > 0 && (
          <div className="bg-gradient-to-r from-purple-600 via-pink-600 to-purple-600 p-6 rounded-3xl border border-purple-300 shadow-[0_0_40px_rgba(168,85,247,0.6)] relative overflow-hidden animate-pulse">
             <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0IiBoZWlnaHQ9IjQiPgo8cmVjdCB3aWR0aD0iNCIgaGVpZ2h0PSI0IiBmaWxsPSIjZmZmIiBmaWxsLW9wYWNpdHk9IjAuMSIvPgo8L3N2Zz4=')] opacity-30"></div>
             <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-6 text-center md:text-right">
@@ -626,201 +588,363 @@ export default function Dashboard({ userId, userName, setActiveTab, tournamentSt
                      <span className="animate-bounce">🎁</span> שאלת הפתעה באוויר!
                   </h2>
                   <p className="text-white/90 font-medium text-lg leading-snug">
-                     האדמין פתח עכשיו <strong>{activeSurpriseAlert.length} שאלות הפתעה</strong> לזמן מוגבל מאוד!<br/>כנס מהר לענות עליהן לפני שהשעון ייגמר.
+                     האדמין פתח עכשיו <strong>{activeSurpriseAlert} שאלות הפתעה</strong> לזמן מוגבל מאוד!<br/>כנס מהר לענות עליהן לפני שהשעון ייגמר.
                   </p>
                </div>
-               <button onClick={() => setActiveTab(4)} className="bg-white text-purple-700 hover:bg-slate-100 font-black px-8 py-4 rounded-xl text-lg shadow-xl hover:-translate-y-1 transition-transform w-full md:w-auto flex-shrink-0">
+               <button onClick={() => { setActiveTab("PREDICTIONS"); if(setPredictionTab) setPredictionTab("BONUS"); window.scrollTo({top:0, behavior:'smooth'}); }} className="bg-white text-purple-700 hover:bg-slate-100 font-black px-8 py-4 rounded-xl text-lg shadow-xl hover:-translate-y-1 transition-transform w-full md:w-auto flex-shrink-0">
                   לקחת אותי לבונוסים! 🏃‍♂️
                </button>
             </div>
          </div>
       )}
 
-      {/* 1. באנר נתונים אישיים ומהדורה מרכזית */}
-      <div className="flex md:grid md:grid-cols-2 overflow-x-auto snap-x snap-mandatory md:overflow-visible gap-4 md:gap-8 pb-4 md:pb-0 custom-scrollbar -mx-4 px-4 md:mx-0 md:px-0">
+      {/* 1. מרכז השליטה האישי המפוצל */}
+      <div className="flex md:grid md:grid-cols-2 items-stretch overflow-x-auto snap-x snap-mandatory md:overflow-visible gap-4 md:gap-8 pb-4 md:pb-0 custom-scrollbar -mx-4 px-4 md:mx-0 md:px-0">
          
-         <div className="w-[90%] md:w-auto shrink-0 snap-center rounded-3xl p-6 shadow-2xl relative overflow-hidden bg-slate-900 border border-slate-700 group flex flex-col justify-center">
-            <img src="tunnel.png" alt="Bets in Prod Tunnel" className="absolute inset-0 w-full h-full object-cover z-0 opacity-40 group-hover:opacity-60 group-hover:scale-105 transition-all duration-1000 pointer-events-none" />
+         <div className="w-[90%] md:w-auto shrink-0 snap-center rounded-3xl p-6 shadow-2xl relative overflow-hidden bg-slate-900 border border-slate-700 flex flex-col min-h-full">
+            <img src="tunnel.png" alt="Bets in Prod Tunnel" className="absolute inset-0 w-full h-full object-cover z-0 opacity-40 transition-all duration-1000 pointer-events-none" />
             <div className="absolute inset-0 z-0 bg-gradient-to-l from-slate-950/90 via-slate-900/60 to-slate-950/90 pointer-events-none"></div>
             
             <div className="relative z-10 text-right mb-6">
                <h1 className="text-3xl md:text-4xl font-black text-white flex items-center justify-center md:justify-start gap-2 mb-2" dir="rtl">
-                  <span>אהלן, {allUsersList.find(u => u.id === userId)?.name?.split(" ")[0] || "אלוף"}!</span>
+                  <span>אהלן, {safeUserName}!</span>
                   <span className="origin-bottom-right">👋</span>
                </h1>
                <p className="text-slate-300 text-sm font-medium drop-shadow-lg">ברוך הבא לחדר ההלבשה. הנה המצב שלך כרגע:</p>
             </div>
 
-            <div className="flex justify-between gap-3 relative z-10 w-full mb-6">
-               <div className="flex-1 bg-slate-900/80 backdrop-blur-md px-4 py-3 rounded-2xl border border-slate-700 text-center relative shadow-xl">
-                  <div className="text-slate-400 text-[10px] font-black uppercase tracking-widest mb-1">ניקוד</div>
-                  <div className="text-3xl font-black text-emerald-400 drop-shadow-lg">{userStats.points}</div>
+            <div className={`grid gap-3 relative z-10 w-full mb-6 ${tournamentState >= 4 ? 'grid-cols-2' : 'grid-cols-1'}`}>
+               <div 
+                  onClick={() => {
+                     sessionStorage.setItem("targetBoard", "GENERAL");
+                     setActiveTab("LEADERBOARD");
+                  }}
+                  className="bg-slate-900/80 backdrop-blur-md p-3 rounded-2xl border border-slate-700 text-center shadow-xl cursor-pointer hover:bg-slate-800 hover:scale-[1.02] transition-all group relative flex flex-col justify-between"
+               >
                   {ptsDiff > 0 && <div className="absolute -top-3 left-1/2 -translate-x-1/2 text-[10px] font-black text-white bg-gradient-to-r from-blue-600 to-blue-400 px-2 py-0.5 rounded-lg border border-blue-300 shadow-lg transform rotate-3 animate-pulse whitespace-nowrap z-20">+{ptsDiff} היום!</div>}
-               </div>
-               <div className="flex-1 bg-slate-900/80 backdrop-blur-md px-4 py-3 rounded-2xl border border-slate-700 text-center shadow-xl">
-                  <div className="text-slate-400 text-[10px] font-black uppercase tracking-widest mb-1">מיקום</div>
-                  <div className="text-3xl font-black text-amber-400 drop-shadow-lg">
-                    {leaderboardInfo.rank > 0 ? leaderboardInfo.rank : "-"}
+                  
+                  <div className="text-slate-500 text-[10px] font-black uppercase mb-3 group-hover:text-blue-400 transition-colors">דירוג כללי</div>
+                  
+                  <div className="flex justify-around items-center mb-3 px-4">
+                     <div className="flex flex-col items-center">
+                        <span className="text-2xl md:text-3xl font-black text-emerald-400 drop-shadow-lg leading-none">{userStats.points}</span>
+                        <span className="text-[9px] text-slate-400 font-bold mt-1.5">נקודות</span>
+                     </div>
+                     <div className="w-px h-8 bg-slate-700/50"></div>
+                     <div className="flex flex-col items-center">
+                        <span className="text-2xl md:text-3xl font-black text-amber-400 drop-shadow-lg leading-none">{userStats.rank > 0 ? userStats.rank : "-"}</span>
+                        <span className="text-[9px] text-slate-400 font-bold mt-1.5">מיקום</span>
+                     </div>
                   </div>
-                  <div className="mt-1 flex justify-center">
-                    {rankDiff > 0 && <span className="text-[9px] font-bold text-emerald-400 bg-emerald-950/80 px-1.5 py-0.5 rounded border border-emerald-500/30">▲ עלית {rankDiff}</span>}
-                    {rankDiff < 0 && <span className="text-[9px] font-bold text-rose-400 bg-rose-950/80 px-1.5 py-0.5 rounded border border-rose-500/30">▼ ירדת {Math.abs(rankDiff)}</span>}
-                    {rankDiff === 0 && <span className="text-[9px] font-bold text-slate-400 bg-slate-800/80 px-1.5 py-0.5 rounded border border-slate-700/50">- ללא שינוי</span>}
+                  
+                  <div className="mt-auto flex justify-center items-center min-h-[22px]">
+                    {rankDiff > 0 && <span className="text-[9px] font-bold text-emerald-400 bg-emerald-950/80 px-2 py-0.5 rounded border border-emerald-500/30">▲ עלית {rankDiff}</span>}
+                    {rankDiff < 0 && <span className="text-[9px] font-bold text-rose-400 bg-rose-950/80 px-2 py-0.5 rounded border border-rose-500/30">▼ ירדת {Math.abs(rankDiff)}</span>}
+                    {rankDiff === 0 && <span className="text-[9px] font-bold text-slate-400 bg-slate-800/80 px-2 py-0.5 rounded border border-slate-700/50">- ללא שינוי</span>}
                   </div>
-               </div>
-            </div>
-
-            <div className="flex gap-3 relative z-10 w-full mb-4 overflow-x-auto custom-scrollbar pb-2 snap-x snap-mandatory">
-               <div className="min-w-[120px] flex-1 bg-amber-500/10 p-3 rounded-xl border border-amber-500/30 backdrop-blur-sm text-center shrink-0 snap-center relative overflow-hidden group">
-                  <div className="absolute top-0 left-1/2 -translate-x-1/2 w-16 h-16 bg-amber-500/20 rounded-full blur-xl pointer-events-none"></div>
-                  <div className="text-2xl drop-shadow-[0_0_10px_rgba(251,191,36,0.8)] animate-pulse mb-1">⚽</div>
-                  <div className="text-[9px] text-amber-500 font-black mb-1 uppercase tracking-wider relative z-10">כדור הזהב</div>
-                  <div className="text-sm font-black text-amber-400 truncate relative z-10">{currentLeader}</div>
                </div>
                
                {tournamentState >= 4 && (
-                  <div className="min-w-[120px] flex-1 bg-emerald-500/10 p-3 rounded-xl border border-emerald-500/30 backdrop-blur-sm text-center shrink-0 snap-center relative overflow-hidden group">
-                     <div className="absolute top-0 left-1/2 -translate-x-1/2 w-16 h-16 bg-emerald-500/20 rounded-full blur-xl pointer-events-none"></div>
-                     <div className="text-2xl drop-shadow-[0_0_10px_rgba(16,185,129,0.8)] animate-pulse mb-1">👟</div>
-                     <div className="text-[9px] text-emerald-500 font-black mb-1 uppercase tracking-wider relative z-10">נעל הזהב</div>
-                     <div className="text-sm font-black text-emerald-400 truncate relative z-10">{currentKoLeader}</div>
+                  <div 
+                     onClick={() => {
+                        sessionStorage.setItem("targetBoard", "KNOCKOUT");
+                        setActiveTab("LEADERBOARD");
+                     }}
+                     className="bg-emerald-900/20 backdrop-blur-md p-3 rounded-2xl border border-emerald-500/30 text-center shadow-xl cursor-pointer hover:bg-emerald-900/40 hover:border-emerald-400 hover:scale-[1.02] transition-all group relative flex flex-col justify-between"
+                  >
+                     <div className="text-emerald-500 text-[10px] font-black uppercase mb-3 group-hover:text-emerald-300 transition-colors">דירוג נוקאאוט</div>
+                     
+                     <div className="flex justify-around items-center mb-3 px-4">
+                        <div className="flex flex-col items-center">
+                           <span className="text-2xl md:text-3xl font-black text-white drop-shadow-lg leading-none">{userStats.koPoints}</span>
+                           <span className="text-[9px] text-emerald-400/70 font-bold mt-1.5">נקודות</span>
+                        </div>
+                        <div className="w-px h-8 bg-emerald-500/30"></div>
+                        <div className="flex flex-col items-center">
+                           <span className="text-2xl md:text-3xl font-black text-white drop-shadow-lg leading-none">{userStats.koRank > 0 ? userStats.koRank : "-"}</span>
+                           <span className="text-[9px] text-emerald-400/70 font-bold mt-1.5">מיקום</span>
+                        </div>
+                     </div>
+
+                     <div className="mt-auto flex justify-center items-center min-h-[22px]">
+                        {koRankDiff > 0 && <span className="text-[9px] font-bold text-emerald-400 bg-emerald-950/80 px-2 py-0.5 rounded border border-emerald-500/30">▲ עלית {koRankDiff}</span>}
+                        {koRankDiff < 0 && <span className="text-[9px] font-bold text-rose-400 bg-rose-950/80 px-2 py-0.5 rounded border border-rose-500/30">▼ ירדת {Math.abs(koRankDiff)}</span>}
+                        {koRankDiff === 0 && <span className="text-[9px] font-bold text-emerald-200 bg-emerald-800/50 px-2 py-0.5 rounded border border-emerald-500/30">🏆 שלב ההכרעות</span>}
+                     </div>
                   </div>
                )}
-
-               {userLeaguesData.map(league => (
-                  <div key={league.id} className="min-w-[120px] flex-1 bg-blue-500/10 p-3 rounded-xl border border-blue-500/30 backdrop-blur-sm text-center shrink-0 snap-center flex flex-col justify-center transition-all hover:bg-blue-500/20">
-                     <div className="text-[9px] text-blue-400/80 font-black mb-0.5 uppercase tracking-wider truncate px-1" title={league.name}>🏟️ {league.name}</div>
-                     <div className="text-sm font-black text-blue-400 truncate">מקום {league.rank}</div>
-                  </div>
-               ))}
             </div>
 
-            <div className="flex justify-between items-center gap-2 mt-auto pt-4 border-t border-slate-700/50 relative z-10 text-center">
-               <div className="flex-1">
-                  <div className="text-[10px] text-slate-400 uppercase tracking-widest font-bold">משתתפים באפליקציה</div>
-                  <div className="text-base font-black text-slate-200 mt-0.5">{leaderboardInfo.totalUsers}</div>
+            <div className={`grid gap-3 relative z-10 w-full mb-5 ${tournamentState >= 4 ? 'grid-cols-2' : 'grid-cols-1'}`}>
+               <div 
+                  onClick={() => {
+                     sessionStorage.setItem("targetBoard", "GENERAL");
+                     setActiveTab("LEADERBOARD");
+                  }}
+                  className="bg-gradient-to-br from-amber-500/20 to-amber-900/40 p-4 rounded-2xl border border-amber-500/50 shadow-[0_0_20px_rgba(245,158,11,0.15)] relative overflow-hidden flex flex-col items-center justify-center text-center gap-1 cursor-pointer hover:scale-[1.02] hover:border-amber-400 transition-all"
+               >
+                  <div className="absolute top-0 left-1/2 -translate-x-1/2 w-24 h-24 bg-amber-400/20 rounded-full blur-2xl pointer-events-none"></div>
+                  <div className="text-3xl md:text-4xl drop-shadow-[0_0_15px_rgba(251,191,36,0.8)] relative z-10 mb-1 animate-pulse">🏆</div>
+                  <span className="text-[10px] text-amber-200/70 font-black uppercase tracking-widest relative z-10">כדור הזהב (מקום 1)</span>
+                  <span className="text-base md:text-lg font-black text-amber-400 truncate relative z-10 w-full px-2">
+                     {currentLeader} <span className="text-xs text-amber-200/60 font-normal">({allUsersList.sort((a,b)=>(b.totalPoints||0)-(a.totalPoints||0))[0]?.totalPoints || 0} נק')</span>
+                  </span>
                </div>
-               <div className="w-px h-8 bg-slate-700/50"></div>
-               <div className="flex-1">
-                  <div className="text-[10px] text-slate-400 uppercase tracking-widest font-bold">ממוצע נקודות קהל</div>
-                  <div className="text-base font-black text-slate-200 mt-0.5">{avgPoints}</div>
+
+               {tournamentState >= 4 && (
+                 <div 
+                    onClick={() => {
+                       sessionStorage.setItem("targetBoard", "KNOCKOUT");
+                       setActiveTab("LEADERBOARD");
+                    }}
+                    className="bg-gradient-to-br from-emerald-500/20 to-emerald-900/40 p-4 rounded-2xl border border-emerald-500/50 shadow-[0_0_20px_rgba(16,185,129,0.15)] relative overflow-hidden flex flex-col items-center justify-center text-center gap-1 cursor-pointer hover:scale-[1.02] hover:border-emerald-400 transition-all"
+                 >
+                    <div className="absolute top-0 left-1/2 -translate-x-1/2 w-24 h-24 bg-emerald-400/20 rounded-full blur-2xl pointer-events-none"></div>
+                    <div className="text-3xl md:text-4xl drop-shadow-[0_0_15px_rgba(16,185,129,0.8)] relative z-10 mb-1 animate-pulse">👟</div>
+                    <span className="text-[10px] text-emerald-200/70 font-black uppercase tracking-widest relative z-10">נעל הזהב (נוקאאוט)</span>
+                    <span className="text-base md:text-lg font-black text-emerald-400 truncate relative z-10 w-full px-2">
+                       {currentKoLeader} <span className="text-xs text-emerald-200/60 font-normal">({allUsersList.sort((a,b)=>(b.knockoutPoints||0)-(a.knockoutPoints||0))[0]?.knockoutPoints || 0} נק')</span>
+                    </span>
+                 </div>
+               )}
+            </div>
+
+            <div className="relative z-10 w-full mb-6">
+               <div className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-2.5 px-1 flex items-center gap-1.5">
+                  <span>🏟️</span> הליגות שלי
                </div>
+               <div className="flex gap-2.5 overflow-x-auto custom-scrollbar pb-2 snap-x snap-mandatory">
+                 {userLeaguesData.length === 0 ? (
+                    <div 
+                       onClick={() => {
+                          sessionStorage.setItem("targetBoard", "LEAGUES");
+                          sessionStorage.removeItem("targetLeagueId");
+                          setActiveTab("LEADERBOARD");
+                       }} 
+                       className="min-w-[140px] flex-1 bg-indigo-500/10 p-3 rounded-xl border border-indigo-500/30 backdrop-blur-sm text-center shrink-0 snap-center flex flex-col justify-center cursor-pointer hover:bg-indigo-500/20 transition-all border-dashed group"
+                    >
+                       <div className="text-xl mb-1 group-hover:scale-110 transition-transform">➕</div>
+                       <div className="text-[10px] text-indigo-300 font-bold uppercase tracking-wider">הוסף ליגה פרטית</div>
+                    </div>
+                 ) : (
+                   <>
+                     {userLeaguesData.map(league => (
+                        <div 
+                           key={league.id} 
+                           onClick={() => {
+                             sessionStorage.setItem("targetBoard", "LEAGUES");
+                             sessionStorage.setItem("targetLeagueId", league.id);
+                             setActiveTab("LEADERBOARD");
+                           }}
+                           className="min-w-[120px] flex-1 bg-slate-800/60 p-2.5 rounded-xl border border-slate-700/80 backdrop-blur-sm text-center shrink-0 snap-center flex flex-col justify-center transition-all hover:bg-slate-700 hover:border-blue-500/50 cursor-pointer shadow-sm group"
+                        >
+                           <div className="text-[11px] text-slate-300 font-black mb-1.5 truncate px-1 group-hover:text-white transition-colors" title={league.name}>{league.name}</div>
+                           <div className="text-[11px] font-bold text-blue-400 truncate bg-blue-950/40 rounded-md py-0.5 px-2 inline-block mx-auto border border-blue-900/50">מקום {league.rank}</div>
+                        </div>
+                     ))}
+                     <div 
+                        onClick={() => {
+                           sessionStorage.setItem("targetBoard", "LEAGUES");
+                           sessionStorage.removeItem("targetLeagueId");
+                           setActiveTab("LEADERBOARD");
+                        }} 
+                        className="min-w-[70px] bg-slate-800/30 p-2 rounded-xl border border-slate-700 backdrop-blur-sm text-center shrink-0 snap-center flex flex-col justify-center cursor-pointer hover:bg-slate-700/80 transition-all border-dashed group"
+                     >
+                        <div className="text-lg mb-0.5 group-hover:scale-110 transition-transform opacity-70">⚙️</div>
+                        <div className="text-[9px] text-slate-500 font-bold uppercase tracking-wider">נהל</div>
+                     </div>
+                   </>
+                 )}
+               </div>
+            </div>
+
+            <div className="relative z-10 w-full mb-4 pt-4 border-t border-slate-700/50 mt-auto">
+               {!nemesisData ? (
+                 <div className="flex flex-col sm:flex-row items-center justify-between bg-slate-800/40 p-3 rounded-xl border border-slate-700/50 gap-3 backdrop-blur-sm">
+                    <div className="text-xs font-bold text-slate-300 flex items-center gap-2"><span>🎯</span> בחר יריב למעקב:</div>
+                    <div className="flex w-full sm:w-auto gap-2">
+                      <select 
+                        value={nemesisInput} onChange={(e) => setNemesisInput(e.target.value)}
+                        className="bg-slate-950 text-white p-2 rounded-lg border border-slate-700 text-xs outline-none focus:border-rose-500 flex-1"
+                      >
+                        <option value="">משתתפי הליגה...</option>
+                        {allUsersList.filter(u => u.id !== userId).map(u => (<option key={u.id} value={u.id}>{u.name}</option>))}
+                      </select>
+                      <button onClick={handleSaveNemesis} disabled={isSavingNemesis || !nemesisInput} className="bg-rose-600 hover:bg-rose-500 disabled:opacity-50 text-white font-bold py-2 px-3 rounded-lg text-xs transition-colors shadow-sm">
+                        {isSavingNemesis ? "..." : "קרב!"}
+                      </button>
+                    </div>
+                 </div>
+               ) : (
+                 <div className="bg-slate-800/40 p-3 rounded-xl border border-slate-700/50 relative backdrop-blur-sm shadow-inner">
+                    <button onClick={handleClearNemesis} className="absolute top-2 left-2 text-slate-500 hover:text-rose-400 text-xs font-bold p-1">✕</button>
+                    <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest text-center mb-2">ראש בראש</div>
+                    
+                    <div className="flex justify-between items-center px-4 gap-4">
+                       <div className="flex flex-col items-center">
+                          <span className="text-[9px] bg-blue-600 text-white px-1.5 py-0.5 rounded font-black mb-1">אתה</span>
+                          <span className="text-base font-black text-blue-400 leading-none">{userStats.points}</span>
+                       </div>
+                       
+                       <div className="flex-1 flex flex-col justify-center">
+                          {(() => {
+                             const myPts = userStats.points; const enemyPts = nemesisData.totalPoints || 0;
+                             const total = myPts + enemyPts || 1; const myPercent = (myPts === 0 && enemyPts === 0) ? 50 : Math.round((myPts / total) * 100);
+                             const diff = myPts - enemyPts;
+                             return (
+                               <>
+                                 <div className="w-full h-1.5 bg-slate-950 rounded-full overflow-hidden flex border border-slate-700/50">
+                                    <div className="h-full bg-blue-500 transition-all duration-1000" style={{ width: `${myPercent}%` }}></div>
+                                    <div className="h-full bg-rose-500 transition-all duration-1000" style={{ width: `${100 - myPercent}%` }}></div>
+                                 </div>
+                                 <div className="text-center mt-1.5 text-[9px] text-slate-400 font-bold">
+                                   {diff > 0 ? `מוביל ב-${diff}` : diff < 0 ? `בפיגור ${Math.abs(diff)}` : "שוויון!"}
+                                 </div>
+                               </>
+                             );
+                          })()}
+                       </div>
+                       
+                       <div className="flex flex-col items-center">
+                          <span className="text-[9px] bg-rose-600 text-white px-1.5 py-0.5 rounded font-black mb-1 truncate max-w-[60px]">{nemesisFirstName}</span>
+                          <span className="text-base font-black text-rose-400 leading-none">{nemesisData.totalPoints || 0}</span>
+                       </div>
+                    </div>
+                 </div>
+               )}
+            </div>
+
+            <div className="flex justify-between items-center gap-2 pt-2 border-t border-slate-700/50 relative z-10 text-center">
+               <div className="flex-1"><div className="text-[10px] text-slate-400 uppercase tracking-widest font-bold">משתתפים</div><div className="text-sm font-black text-slate-200">{leaderboardInfo.totalUsers}</div></div>
+               <div className="w-px h-6 bg-slate-700/50"></div>
+               <div className="flex-1"><div className="text-[10px] text-slate-400 uppercase tracking-widest font-bold">ממוצע קהל</div><div className="text-sm font-black text-slate-200">{avgPoints}</div></div>
             </div>
          </div>
 
-         {dailyMessage && (
-            <div 
-               onClick={() => setShowMagazineModal(true)}
-               className="w-[90%] md:w-auto shrink-0 snap-center rounded-3xl p-6 shadow-xl relative overflow-hidden bg-slate-900 border border-slate-700 group cursor-pointer flex flex-col hover:border-blue-500/50 transition-all duration-300"
-            >
-               <div className="absolute inset-0 bg-gradient-to-br from-blue-900/20 to-emerald-900/10 z-0"></div>
-               <div className="absolute -bottom-10 -left-10 text-9xl opacity-5 transform -rotate-12 pointer-events-none group-hover:scale-110 transition-transform duration-500">📰</div>
-               <div className="absolute top-0 right-0 w-1.5 h-full bg-gradient-to-b from-blue-400 to-emerald-500"></div>
+         <div className="w-[90%] md:w-auto shrink-0 snap-center flex flex-col gap-4 md:gap-6 h-full">
+            {dailyMessage && (
+               <div 
+                  onClick={() => setShowMagazineModal(true)}
+                  className="bg-slate-900 rounded-3xl p-6 shadow-xl relative overflow-hidden border border-slate-700 group cursor-pointer flex flex-col hover:border-blue-500/50 transition-all duration-300 flex-1"
+               >
+                  <div className="absolute inset-0 bg-gradient-to-br from-blue-900/20 to-emerald-900/10 z-0"></div>
+                  <div className="absolute -bottom-10 -left-10 text-9xl opacity-5 transform -rotate-12 pointer-events-none group-hover:scale-110 transition-transform duration-500">📰</div>
+                  <div className="absolute top-0 right-0 w-1.5 h-full bg-gradient-to-b from-blue-400 to-emerald-500"></div>
 
-               <div className="relative z-10 flex justify-between items-start mb-4">
-                  <div className="bg-slate-950/80 px-3 py-1.5 rounded-lg border border-slate-800 backdrop-blur-sm text-slate-400 text-xs font-bold">
-                     {new Date().toLocaleDateString('he-IL')}
+                  <div className="relative z-10 flex justify-between items-start mb-4 shrink-0">
+                     <div className="bg-slate-950/80 px-3 py-1.5 rounded-lg border border-slate-800 backdrop-blur-sm text-slate-400 text-xs font-bold">
+                        {new Date().toLocaleDateString('he-IL')}
+                     </div>
+                     <div className="text-3xl drop-shadow-md">📰</div>
                   </div>
-                  <div className="text-3xl drop-shadow-md">📰</div>
-               </div>
 
-               {dailyMediaUrl && (
-                  <div className="relative z-10 mb-5 w-full h-48 md:h-64 rounded-xl overflow-hidden border border-slate-700/50 shadow-inner bg-slate-950/80 flex items-center justify-center">
-                     {dailyMediaUrl.match(/\.(jpeg|jpg|gif|png|webp)$/i) != null ? (
-                        <img src={dailyMediaUrl} alt="Magazine Cover" className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-500" />
-                     ) : (
-                        <video src={dailyMediaUrl} autoPlay loop muted playsInline className="w-full h-full object-contain opacity-80 group-hover:opacity-100 transition-opacity" />
-                     )}
+                  {dailyMediaUrl && (
+                     <div className="relative z-10 mb-5 w-full h-48 md:h-56 rounded-xl overflow-hidden border border-slate-700/50 shadow-inner bg-slate-950/80 flex items-center justify-center shrink-0">
+                        {dailyMediaUrl.match(/\.(jpeg|jpg|gif|png|webp)$/i) != null ? (
+                           <img src={dailyMediaUrl} alt="Magazine Cover" className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-500" />
+                        ) : (
+                           <video src={dailyMediaUrl} autoPlay loop muted playsInline className="w-full h-full object-contain opacity-80 group-hover:opacity-100 transition-opacity" />
+                        )}
+                     </div>
+                  )}
+
+                  <div className="relative z-10 flex-1 flex flex-col">
+                     <h2 className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400 mb-2 shrink-0">המהדורה המרכזית</h2>
+                     
+                     <div 
+                        className="text-slate-300 text-sm font-medium leading-relaxed mb-6 line-clamp-5 flex-1 whitespace-pre-wrap [&_b]:text-amber-400 [&_strong]:text-amber-400 [&_mark]:px-1.5 [&_mark]:rounded [&_mark.yellow]:bg-amber-500/20 [&_mark.yellow]:text-amber-300 [&_mark.green]:bg-emerald-500/20 [&_mark.green]:text-emerald-300 [&_mark.red]:bg-rose-500/20 [&_mark.red]:text-rose-400 [&_a]:text-cyan-400 [&_a]:underline"
+                        dangerouslySetInnerHTML={{ __html: dailySubtext || "הודעות הנהלה, עדכונים חמים, וכל מה שצריך לדעת כדי לא להישאר מאחור." }} 
+                     />
+                     
+                     <button className="bg-slate-800 hover:bg-slate-700 text-white font-bold py-3 w-full rounded-xl border border-slate-600 transition-colors flex justify-center items-center gap-2 text-sm shadow-md group-hover:bg-blue-600 group-hover:border-blue-500 shrink-0 mt-auto">
+                        קרא את המהדורה המלאה <span>👈</span>
+                     </button>
                   </div>
-               )}
-
-               <div className="relative z-10 mt-auto">
-                  <h2 className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400 mb-2">המהדורה המרכזית</h2>
-                  <p className="text-slate-300 text-sm font-medium leading-relaxed mb-6 line-clamp-3">
-                     {dailySubtext || "הודעות הנהלה, עדכונים חמים, וכל מה שצריך לדעת כדי לא להישאר מאחור."}
-                  </p>
-                  <button className="bg-slate-800 hover:bg-slate-700 text-white font-bold py-3 w-full rounded-xl border border-slate-600 transition-colors flex justify-center items-center gap-2 text-sm shadow-md group-hover:bg-blue-600 group-hover:border-blue-500">
-                     קרא את המהדורה המלאה <span>👈</span>
-                  </button>
                </div>
-            </div>
-         )}
+            )}
+
+            <Link href="/matrix" className="w-full flex flex-col md:flex-row items-center justify-between bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 hover:from-blue-900/30 hover:to-slate-800 border-2 border-slate-700 hover:border-blue-500/50 p-5 md:p-6 rounded-3xl shadow-[0_10px_30px_rgba(0,0,0,0.4)] transition-all active:scale-[0.98] group relative overflow-hidden shrink-0">
+               <div className="absolute top-0 right-0 w-2 h-full bg-blue-500"></div>
+               <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0IiBoZWlnaHQ9IjQiPgo8cmVjdCB3aWR0aD0iNCIgaGVpZ2h0PSI0IiBmaWxsPSIjZmZmIiBmaWxsLW9wYWNpdHk9IjAuMSIvPgo8L3N2Zz4=')] opacity-20"></div>
+               
+               <div className="flex flex-col md:flex-row items-center gap-4 md:gap-6 relative z-10 w-full md:w-auto text-center md:text-right mb-4 md:mb-0">
+                  <div className="w-16 h-16 md:w-20 md:h-20 bg-slate-950 rounded-2xl flex items-center justify-center border border-slate-700 shadow-inner group-hover:scale-110 group-hover:border-blue-500/50 transition-all shrink-0">
+                     <span className="text-3xl md:text-4xl drop-shadow-lg">👁️</span>
+                  </div>
+                  <div className="flex flex-col">
+                     <span className="font-black text-white text-xl md:text-2xl mb-1 tracking-wide">טבלת הגילוי הנאות</span>
+                     <span className="text-xs md:text-sm text-slate-400 font-medium">מי ניחש מה? כנסו לראות.</span>
+                  </div>
+               </div>
+               
+               <div className="w-full md:w-auto flex justify-center md:justify-end relative z-10">
+                  <div className="bg-blue-600 text-white px-6 md:px-8 py-3 rounded-xl font-bold flex items-center justify-center gap-3 group-hover:bg-blue-500 transition-colors shadow-lg w-full md:w-auto">
+                     לכניסה <span className="text-xl">👉</span>
+                  </div>
+               </div>
+            </Link>
+         </div>
+
       </div>
 
-      {/* 2. ציר הזמן */}
       <div className="bg-slate-900 rounded-3xl border border-slate-700 shadow-xl flex flex-col lg:h-[600px] overflow-hidden">
-         <div className="flex lg:hidden bg-slate-950 rounded-t-3xl border-b border-slate-700 shrink-0">
-            <button 
-              onClick={() => setTimelineTab("TODAY")}
-              className={`flex-1 py-4 text-sm font-bold transition-all rounded-tr-3xl flex items-center justify-center gap-2 ${timelineTab === "TODAY" ? "bg-slate-800 text-white shadow-inner border-b-2 border-blue-500" : "text-slate-500 hover:bg-slate-900 hover:text-slate-300"}`}
-            >
-              <span>📅</span> צפוי היום
-            </button>
-            <button 
-              onClick={() => setTimelineTab("YESTERDAY")}
-              className={`flex-1 py-4 text-sm font-bold transition-all flex items-center justify-center gap-2 ${timelineTab === "YESTERDAY" ? "bg-slate-800 text-white shadow-inner border-b-2 border-emerald-500" : "text-slate-500 hover:bg-slate-900 hover:text-slate-300"}`}
-            >
-              <span>🧾</span> היה אתמול
-            </button>
+         <div className="flex lg:hidden bg-slate-950 border-b border-slate-700 shrink-0">
+            <button onClick={() => setTimelineTab("TODAY")} className={`flex-1 py-4 text-sm font-bold transition-all ${timelineTab === "TODAY" ? "bg-slate-800 text-white border-b-2 border-blue-500" : "text-slate-500 hover:bg-slate-900"}`}>📅 צפוי היום</button>
+            <button onClick={() => setTimelineTab("YESTERDAY")} className={`flex-1 py-4 text-sm font-bold transition-all ${timelineTab === "YESTERDAY" ? "bg-slate-800 text-white border-b-2 border-emerald-500" : "text-slate-500 hover:bg-slate-900"}`}>🧾 היה אתמול</button>
          </div>
 
-         <div className="flex-1 flex flex-col lg:flex-row overflow-hidden bg-slate-800 rounded-b-3xl lg:rounded-3xl">
+         <div className="flex-1 flex flex-col lg:flex-row overflow-hidden bg-slate-800">
             <div className={`${timelineTab === "YESTERDAY" ? "flex" : "hidden"} lg:flex flex-col w-full lg:w-1/2 h-full bg-slate-800/50 lg:border-l border-slate-700`}>
                <div className="hidden lg:flex bg-slate-900/80 px-6 h-20 border-b border-slate-700 justify-between items-center z-10 shadow-sm shrink-0">
                  <h2 className="text-xl font-black text-white flex items-center gap-2"><span>🧾</span> מה היה לנו אתמול?</h2>
                  <div className="flex gap-2">
-                   <button onClick={() => setShowRealStandingsModal(true)} className="text-[11px] text-emerald-400 font-bold bg-emerald-900/20 hover:bg-emerald-900/40 px-3 py-2 rounded transition-colors border border-emerald-500/30 whitespace-nowrap flex items-center gap-1.5 shadow-sm active:scale-95">
-                     <span className="text-sm">🌍</span> תמונת מצב בתים
-                   </button>
-                   <button onClick={() => setShowFullHistory(!showFullHistory)} className="text-[11px] text-blue-400 font-bold bg-blue-900/20 hover:bg-blue-900/40 px-3 py-2 rounded transition-colors border border-blue-500/30 whitespace-nowrap shadow-sm active:scale-95">
-                     {showFullHistory ? "הצג רק חדשים" : "היסטוריה מלאה"}
-                   </button>
+                   <button onClick={() => setShowRealStandingsModal(true)} className="text-[11px] text-emerald-400 font-bold bg-emerald-900/20 hover:bg-emerald-900/40 px-3 py-2 rounded transition-colors border border-emerald-500/30 whitespace-nowrap flex items-center gap-1.5 shadow-sm active:scale-95"><span className="text-sm">🌍</span> תמונת מצב בתים</button>
+                   <button onClick={() => setShowFullHistory(!showFullHistory)} className="text-[11px] text-blue-400 font-bold bg-blue-900/20 hover:bg-blue-900/40 px-3 py-2 rounded transition-colors border border-blue-500/30 whitespace-nowrap shadow-sm active:scale-95">{showFullHistory ? "הצג רק חדשים" : "היסטוריה מלאה"}</button>
                  </div>
                </div>
                
                <div className="flex lg:hidden bg-slate-800 px-4 sm:px-6 py-4 border-b border-slate-700 justify-between items-center z-10 shadow-sm shrink-0 gap-2">
                   <div className="text-sm font-bold text-slate-300">נקודות שנכנסו:</div>
                   <div className="flex gap-2 shrink-0">
-                    <button onClick={() => setShowRealStandingsModal(true)} className="text-[10px] text-emerald-400 font-bold bg-emerald-900/20 hover:bg-emerald-900/40 px-2.5 py-1.5 rounded transition-colors border border-emerald-500/30 whitespace-nowrap flex items-center gap-1 shadow-sm active:scale-95">
-                      <span className="text-sm">🌍</span> תמונת מצב בתים
-                    </button>
-                    <button onClick={() => setShowFullHistory(!showFullHistory)} className="text-[10px] text-blue-400 font-bold bg-blue-900/20 hover:bg-blue-900/40 px-2.5 py-1.5 rounded transition-colors border border-blue-500/30 whitespace-nowrap shadow-sm active:scale-95">
-                      {showFullHistory ? "רק חדשים" : "הכל"}
-                    </button>
+                    <button onClick={() => setShowRealStandingsModal(true)} className="text-[10px] text-emerald-400 font-bold bg-emerald-900/20 hover:bg-emerald-900/40 px-2.5 py-1.5 rounded transition-colors border border-emerald-500/30 whitespace-nowrap flex items-center gap-1 shadow-sm active:scale-95"><span className="text-sm">🌍</span> תמונת מצב בתים</button>
+                    <button onClick={() => setShowFullHistory(!showFullHistory)} className="text-[10px] text-blue-400 font-bold bg-blue-900/20 hover:bg-blue-900/40 px-2.5 py-1.5 rounded transition-colors border border-blue-500/30 whitespace-nowrap shadow-sm active:scale-95">{showFullHistory ? "רק חדשים" : "הכל"}</button>
                   </div>
                </div>
                
                <div className="overflow-y-auto custom-scrollbar flex-1 p-4 md:p-6 space-y-3 bg-slate-900/30">
-                  {isFeedLoading ? (
-                     <div className="text-center py-12 text-slate-500 animate-pulse font-bold text-sm">שולף קבלות...</div>
-                  ) : pointsFeed.length === 0 ? (
-                     <div className="flex flex-col items-center justify-center py-16 opacity-50 h-full">
-                        <span className="text-4xl mb-3">🕸️</span>
-                        <span className="text-slate-400 text-sm font-bold">הקופה ריקה בינתיים.</span>
-                     </div>
-                  ) : (!showFullHistory && ptsDiff <= 0) ? (
-                     <div className="flex flex-col items-center justify-center py-16 text-center px-4 h-full">
-                        <span className="text-5xl mb-4 opacity-80">📭</span>
-                        <span className="text-slate-300 font-bold text-lg mb-2">לא נרשמו הכנסות חדשות</span>
-                        <p className="text-slate-500 text-sm mb-4 leading-relaxed">אל תדאג, המשחקים הבאים מעבר לפינה.</p>
-                        <button onClick={() => setShowFullHistory(true)} className="text-blue-400 text-sm font-bold underline hover:text-blue-300">הצג את כל הקבלות שאספתי</button>
-                     </div>
-                  ) : (
-                     displayFeed.map((item, idx) => (
-                        <div key={idx} className="flex justify-between items-center bg-slate-800 p-4 rounded-2xl border border-slate-700 hover:border-slate-500 transition-colors group shadow-sm max-w-xl mx-auto w-full">
-                           <div className="flex items-center gap-3 md:gap-4">
-                              <div className="text-2xl md:text-3xl bg-slate-900 w-12 h-12 flex items-center justify-center rounded-xl shadow-inner shrink-0 group-hover:scale-110 transition-transform">{item.icon}</div>
-                              <div>
-                                <div className="text-white font-bold text-sm md:text-base leading-tight">{item.title}</div>
-                                <div className="text-[11px] md:text-xs text-slate-400 mt-1 font-medium bg-slate-900 inline-block px-2 py-0.5 rounded">{item.desc}</div>
-                              </div>
-                           </div>
-                           <div className="text-emerald-400 font-black text-lg md:text-xl bg-emerald-950/30 px-4 py-2 rounded-lg border border-emerald-500/20 shrink-0">
-                             +{item.points}
-                           </div>
-                        </div>
-                     ))
-                  )}
+                  {isFeedLoading ? <div className="text-center py-12 text-slate-500 animate-pulse font-bold text-sm">שולף קבלות...</div> : displayFeed.length === 0 ? <div className="flex flex-col items-center justify-center py-16 opacity-50 h-full"><span className="text-4xl mb-3">🕸️</span><span className="text-slate-400 text-sm font-bold">הקופה ריקה בינתיים.</span></div> : (!showFullHistory && ptsDiff <= 0) ? <div className="flex flex-col items-center justify-center py-16 text-center px-4 h-full"><span className="text-5xl mb-4 opacity-80">📭</span><span className="text-slate-300 font-bold text-lg mb-2">לא נרשמו הכנסות חדשות</span><p className="text-slate-500 text-sm mb-4 leading-relaxed">אל תדאג, המשחקים הבאים מעבר לפינה.</p><button onClick={() => setShowFullHistory(true)} className="text-blue-400 text-sm font-bold underline hover:text-blue-300">הצג את כל הקבלות שאספתי</button></div> : displayFeed.map((item, idx) => {
+                    const handleFeedClick = () => {
+                      if (item.id.startsWith("gm_")) { 
+                         sessionStorage.setItem("targetMatchday", item.matchday || "1");
+                         sessionStorage.setItem("scrollToMatch", item.matchId);
+                         setActiveTab("PREDICTIONS"); if(setPredictionTab) setPredictionTab("MATCHES");
+                      }
+                      else if (item.id.startsWith("ko_") || item.id.startsWith("qko_")) { 
+                         sessionStorage.setItem("scrollToMatch", item.matchId);
+                         setActiveTab("PREDICTIONS"); if(setPredictionTab) setPredictionTab("KNOCKOUT");
+                      }
+                      else if (item.id.startsWith("q1_") || item.id.startsWith("q2_")) { 
+                         setActiveTab("PREDICTIONS"); if(setPredictionTab) setPredictionTab("QUALIFIERS");
+                      }
+                      else if (item.id.startsWith("t3_")) { 
+                         setActiveTab("PREDICTIONS"); if(setPredictionTab) setPredictionTab("THIRD_PLACE");
+                      }
+                      else if (item.id.startsWith("b_")) { 
+                         sessionStorage.setItem("scrollToBonus", item.qId);
+                         setActiveTab("PREDICTIONS"); if(setPredictionTab) setPredictionTab("BONUS");
+                      }
+                    };
+
+                    return (
+                      <div key={idx} onClick={handleFeedClick} className="flex justify-between items-center bg-slate-800 p-4 rounded-2xl border border-slate-700 hover:border-blue-500 hover:bg-slate-700/50 cursor-pointer transition-all group shadow-sm max-w-xl mx-auto w-full active:scale-95">
+                         <div className="flex items-center gap-3 md:gap-4">
+                            <div className="text-2xl md:text-3xl bg-slate-900 w-12 h-12 flex items-center justify-center rounded-xl shadow-inner shrink-0 group-hover:scale-110 transition-transform">{item.icon}</div>
+                            <div><div className="text-white font-bold text-sm md:text-base leading-tight group-hover:text-blue-300 transition-colors">{item.title}</div><div className="text-[11px] md:text-xs text-slate-400 mt-1 font-medium bg-slate-900 inline-block px-2 py-0.5 rounded">{item.desc}</div></div>
+                         </div>
+                         <div className="text-emerald-400 font-black text-lg md:text-xl bg-emerald-950/30 px-4 py-2 rounded-lg border border-emerald-500/20 shrink-0">+{item.points}</div>
+                      </div>
+                    );
+                  })}
                </div>
             </div>
 
@@ -830,7 +954,7 @@ export default function Dashboard({ userId, userName, setActiveTab, tournamentSt
                  <div className="flex bg-slate-950 p-1.5 rounded-xl border border-slate-700/50 shadow-inner">
                    {todayMatches.length > 0 && <button onClick={() => { setActiveBannerMode("MATCHES"); setTodayMatchIndex(0); }} className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${isMatchesMode ? "bg-gradient-to-r from-blue-600 to-cyan-600 text-white shadow-md" : "text-slate-400 hover:text-white hover:bg-slate-800"}`}>⚽ להיום</button>}
                    {todayTargets.length > 0 && <button onClick={() => { setActiveBannerMode("BONUS"); setTodayBonusIndex(0); }} className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${activeBannerMode === "BONUS" ? "bg-gradient-to-r from-rose-600 to-amber-600 text-white shadow-md" : "text-slate-400 hover:text-white hover:bg-slate-800"}`}>🎯 מטרות</button>}
-                   <button onClick={() => setActiveBannerMode("RADAR")} className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1 ${activeBannerMode === "RADAR" ? "bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-md" : "text-slate-400 hover:text-white hover:bg-slate-800"}`}>📡 ראדאר</button>
+                   <button onClick={() => setActiveBannerMode("RADAR")} className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1 ${activeBannerMode === "RADAR" ? "bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-md" : "text-slate-400 hover:text-white hover:bg-slate-800"}`}>📡 ראדר כל שאלות הבונוס</button>
                  </div>
                </div>
 
@@ -914,7 +1038,7 @@ export default function Dashboard({ userId, userName, setActiveTab, tournamentSt
                         )}
                       </div>
                     </div>
-                  ) : activeBannerMode === "MATCHES" ? (
+                  ) : isMatchesMode ? (
                     todayMatches.length > 0 && (
                       <div className="w-full max-w-md mx-auto flex flex-col items-center animate-fade-in-up">
                          <div className="flex items-center justify-between w-full bg-slate-950 p-2 rounded-2xl border border-slate-800 mb-6 shadow-inner shrink-0">
@@ -962,13 +1086,13 @@ export default function Dashboard({ userId, userName, setActiveTab, tournamentSt
                                               <span className="text-base">👁️</span> הצג ניחושי חברים (ריגול)
                                            </button>
                                          ) : (
-                                           <button onClick={() => setActiveTab(m.stage === "KNOCKOUT" ? 2 : 0)} className="w-full text-xs font-bold text-blue-300 bg-blue-900/20 hover:bg-blue-900/40 py-3 rounded-xl border border-blue-500/30 text-center shadow-sm flex justify-center items-center gap-2 transition-all">
+                                           <button onClick={() => { setActiveTab("PREDICTIONS"); if(setPredictionTab) setPredictionTab(m.stage === "KNOCKOUT" ? "KNOCKOUT" : "MATCHES"); }} className="w-full text-xs font-bold text-blue-300 bg-blue-900/20 hover:bg-blue-900/40 py-3 rounded-xl border border-blue-500/30 text-center shadow-sm flex justify-center items-center gap-2 transition-all">
                                               <span className="text-base">✍️</span> עדכן את הניחוש שלך
                                            </button>
                                          )}
                                       </div>
                                    ) : (
-                                      <button onClick={() => setActiveTab(m.stage === "KNOCKOUT" ? 2 : 0)} className="w-full text-sm font-bold text-slate-900 bg-amber-500 hover:bg-amber-400 py-3 rounded-xl text-center shadow-md transition-transform active:scale-95 animate-pulse">
+                                      <button onClick={() => { setActiveTab("PREDICTIONS"); if(setPredictionTab) setPredictionTab(m.stage === "KNOCKOUT" ? "KNOCKOUT" : "MATCHES"); }} className="w-full text-sm font-bold text-slate-900 bg-amber-500 hover:bg-amber-400 py-3 rounded-xl text-center shadow-md transition-transform active:scale-95 animate-pulse">
                                         הזן ניחוש למשחק זה! ⚠️
                                       </button>
                                    )}
@@ -1028,155 +1152,7 @@ export default function Dashboard({ userId, userName, setActiveTab, tournamentSt
          </div>
       </div>
 
-      {/* 3. טבלת השקיפות */}
-      <div className="mb-4 mt-8">
-         <Link href="/matrix" className="w-full flex items-center justify-between bg-gradient-to-l from-slate-800 to-slate-900 hover:from-blue-900/40 hover:to-slate-800 border border-slate-700 hover:border-blue-500/50 p-4 rounded-2xl shadow-lg transition-all active:scale-95 group">
-            <div className="flex items-center gap-3">
-               <span className="text-3xl group-hover:scale-110 transition-transform drop-shadow-md">👁️</span>
-               <div className="flex flex-col text-right">
-                  <span className="font-black text-blue-400 text-lg">טבלת השקיפות של המשרד</span>
-                  <span className="text-[11px] md:text-xs text-slate-400">מי ניחש מה? לחץ לצפייה בכל הניחושים של כולם (במשחקים שהחלו)</span>
-               </div>
-            </div>
-            <div className="w-10 h-10 bg-slate-800 rounded-full flex items-center justify-center border border-slate-700 group-hover:border-blue-400 group-hover:text-blue-400 transition-colors">
-               ▶
-            </div>
-         </Link>
-      </div>
-
-      {/* 4. זירת הקרב */}
-      <div className="bg-slate-900 rounded-3xl border border-slate-700 shadow-xl flex flex-col h-[400px]">
-         <div className="flex bg-slate-950 rounded-t-3xl border-b border-slate-700 shrink-0">
-            <button 
-              onClick={() => setArenaTab("NEMESIS")}
-              className={`flex-1 py-4 text-sm font-bold transition-colors rounded-tr-3xl flex items-center justify-center gap-2 ${arenaTab === "NEMESIS" ? "bg-slate-800 text-white shadow-inner border-b-2 border-rose-500" : "text-slate-500 hover:bg-slate-900 hover:text-slate-300"}`}
-            >
-              <span>🎯</span> קרב 1-על-1
-            </button>
-            <button 
-              onClick={() => setArenaTab("LEAGUES")}
-              className={`flex-1 py-4 text-sm font-bold transition-colors rounded-tl-3xl flex items-center justify-center gap-2 ${arenaTab === "LEAGUES" ? "bg-slate-800 text-white shadow-inner border-b-2 border-indigo-500" : "text-slate-500 hover:bg-slate-900 hover:text-slate-300"}`}
-            >
-              <span>🏟️</span> ליגות פרטיות
-            </button>
-         </div>
-
-         <div className="p-6 flex-1 flex flex-col overflow-hidden bg-slate-800 rounded-b-3xl">
-           {arenaTab === "NEMESIS" && (
-              <div className="h-full flex flex-col justify-center">
-                 {!nemesisData ? (
-                   <div className="text-center animate-fade-in-up max-w-sm mx-auto w-full">
-                      <div className="text-white font-bold mb-2 text-base">בחר יריב מושבע</div>
-                      <p className="text-xs text-slate-400 mb-4">מעקב לייב מול החבר מהמשרד שחייב להפסיד.</p>
-                      <select 
-                        value={nemesisInput} onChange={(e) => setNemesisInput(e.target.value)}
-                        className="w-full bg-slate-950 text-white p-3 rounded-xl border border-slate-600 mb-4 outline-none focus:border-purple-500 text-sm font-bold shadow-inner"
-                      >
-                        <option value="">בחר משתמש...</option>
-                        {allUsersList.filter(u => u.id !== userId).map(u => (<option key={u.id} value={u.id}>{u.name}</option>))}
-                      </select>
-                      <button onClick={handleSaveNemesis} disabled={isSavingNemesis || !nemesisInput} className="w-full bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white font-bold py-3 rounded-xl shadow-md text-sm">
-                        {isSavingNemesis ? "שומר..." : "התחל קרב! ⚔️"}
-                      </button>
-                   </div>
-                 ) : (
-                   <div className="bg-gradient-to-b from-slate-800 to-slate-900 p-6 rounded-2xl border border-slate-700 shadow-inner h-full flex flex-col justify-center animate-fade-in-up relative">
-                      <div className="flex justify-between items-start mb-6">
-                         <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest mt-1">ראש בראש</span>
-                         <button onClick={handleClearNemesis} className="text-slate-400 hover:text-rose-400 transition-colors text-[10px] font-bold bg-slate-900/50 px-2.5 py-1.5 rounded border border-slate-700 hover:border-rose-500/50 flex items-center gap-1 shadow-sm shrink-0" title="בטל יריבות">
-                           <span>✕</span> החלף יריב
-                         </button>
-                      </div>
-                      
-                      <div className="flex justify-between items-center my-auto">
-                         <div className="flex flex-col items-center flex-1 w-2/5">
-                            <span className="text-[11px] bg-blue-600 text-white px-2 py-0.5 rounded font-black mb-2 shadow-sm">אתה</span>
-                            <span className="text-sm md:text-base font-bold text-white truncate max-w-[100px] md:max-w-[120px]">{userName?.split(" ")[0]}</span>
-                            <span className="text-4xl font-black text-blue-400 mt-2">{userStats.points}</span>
-                         </div>
-                         <div className="flex flex-col items-center px-1 shrink-0"><span className="text-3xl font-black text-slate-600 italic">VS</span></div>
-                         <div className="flex flex-col items-center flex-1 w-2/5">
-                            <span className="text-[11px] bg-rose-600 text-white px-2 py-0.5 rounded font-black mb-2 shadow-sm">היריב</span>
-                            <span className="text-sm md:text-base font-bold text-white truncate max-w-[100px] md:max-w-[120px]">{nemesisData.name?.split(" ")[0]}</span>
-                            <span className="text-4xl font-black text-rose-400 mt-2">{nemesisData.totalPoints || 0}</span>
-                         </div>
-                      </div>
-
-                      {(() => {
-                         const myPts = userStats.points; const enemyPts = nemesisData.totalPoints || 0;
-                         const total = myPts + enemyPts || 1; const myPercent = (myPts === 0 && enemyPts === 0) ? 50 : Math.round((myPts / total) * 100);
-                         const diff = myPts - enemyPts;
-                         let msg = "";
-                         if (diff > 0) msg = `אתה רומס אותו! (פער: ${diff} נק')`;
-                         else if (diff < 0) msg = `הוא בורח לך... (פיגור: ${Math.abs(diff)} נק')`;
-                         else msg = "מלחמת התשה! שוויון מוחלט.";
-
-                         return (
-                           <div className="mt-8">
-                              <div className="w-full h-3 bg-slate-950 rounded-full overflow-hidden flex border border-slate-700/50 relative shadow-inner">
-                                 <div className="h-full bg-blue-500 transition-all duration-1000 ease-out" style={{ width: `${myPercent}%` }}></div>
-                                 <div className="h-full bg-rose-500 transition-all duration-1000 ease-out" style={{ width: `${100 - myPercent}%` }}></div>
-                                 <div className="absolute top-0 left-1/2 -translate-x-1/2 w-0.5 h-full bg-white/30 z-10"></div>
-                              </div>
-                              <div className="text-center mt-3 text-[11px] font-bold text-slate-300">{msg}</div>
-                           </div>
-                         );
-                      })()}
-                   </div>
-                 )}
-              </div>
-           )}
-
-           {arenaTab === "LEAGUES" && (
-              <div className="h-full flex flex-col animate-fade-in-up">
-                 <div className="flex gap-3 mb-4 shrink-0">
-                    <button onClick={handleCreateLeague} disabled={isLeagueLoading} className="flex-1 bg-slate-700 hover:bg-slate-600 text-white text-xs font-bold py-3 rounded-xl border border-slate-600 transition-colors shadow-sm">
-                       ➕ צור ליגה
-                    </button>
-                    <button onClick={handleJoinLeague} disabled={isLeagueLoading} className="flex-1 bg-slate-700 hover:bg-slate-600 text-white text-xs font-bold py-3 rounded-xl border border-slate-600 transition-colors shadow-sm">
-                       🔗 הצטרף עם קוד
-                    </button>
-                 </div>
-                 
-                 <div className="overflow-y-auto custom-scrollbar flex-1 pr-1 space-y-3">
-                    {myLeagues.length === 0 ? (
-                       <div className="text-center text-slate-500 text-sm py-10 px-4 leading-relaxed">
-                          עדיין לא הצטרפת לשום ליגה פרטית.<br/>צור אחת ושתף את הקוד עם החברים!
-                       </div>
-                    ) : (
-                       myLeagues.map(league => {
-                          const isMyLeague = league.adminId === userId;
-                          
-                          // חישוב דירוג השחקן בליגה הספציפית
-                          const leagueUsers = allUsersList.filter(u => league.members.includes(u.id));
-                          const myRankIndex = leagueUsers.findIndex(u => u.id === userId);
-                          const myRank = myRankIndex !== -1 ? myRankIndex + 1 : "-";
-
-                          return (
-                             <div 
-                                key={league.id} 
-                                onClick={() => setSelectedLeague(league)}
-                                className="bg-slate-900 p-4 rounded-2xl border border-slate-700 cursor-pointer hover:border-blue-500 transition-colors group flex justify-between items-center shadow-sm"
-                             >
-                                <div className="flex flex-col truncate pr-2">
-                                   <span className="font-bold text-slate-200 text-base truncate">{league.name}</span>
-                                   <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-                                      <span className="text-[10px] text-slate-500 bg-slate-800 px-2 py-0.5 rounded border border-slate-700">👤 {league.members?.length || 1} חברים</span>
-                                      <span className="text-[10px] font-bold text-amber-400 bg-amber-500/10 border border-amber-500/30 px-2 py-0.5 rounded shadow-sm">🏆 מקום {myRank}</span>
-                                      {isMyLeague && <span className="text-[10px] text-blue-400 bg-blue-900/20 border border-blue-500/30 px-2 py-0.5 rounded" title="קוד ההצטרפות לליגה">קוד: {league.pin}</span>}
-                                   </div>
-                                </div>
-                                <div className="text-slate-600 group-hover:text-blue-400 transition-colors bg-slate-800 w-10 h-10 flex items-center justify-center rounded-full text-lg shadow-inner shrink-0">▶</div>
-                             </div>
-                          );
-                       })
-                    )}
-                 </div>
-              </div>
-           )}
-         </div>
-      </div>
-
+      {/* מודאלים נקיים */}
       {showMagazineModal && (
         <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/85 p-4 backdrop-blur-md animate-fade-in-up" dir="rtl">
           <div className="bg-slate-900 border border-slate-700 p-6 md:p-8 rounded-3xl w-full max-w-3xl max-h-[90vh] flex flex-col shadow-2xl relative overflow-hidden">
@@ -1198,11 +1174,19 @@ export default function Dashboard({ userId, userName, setActiveTab, tournamentSt
                  {dailyMediaUrl && (
                     <div className="w-full rounded-2xl overflow-hidden mb-6 border border-slate-800 shadow-lg">
                        {dailyMediaUrl.match(/\.(jpeg|jpg|gif|png|webp)$/i) != null ? (
-                          <img src={dailyMediaUrl} alt="Magazine Cover" className="w-full max-h-[300px] md:max-h-[400px] object-cover mx-auto" />
+                          <img src={dailyMediaUrl} alt="Magazine Cover" className="w-full max-h-[300px] md:max-h-[400px] object-contain mx-auto" />
                        ) : (
-                          <video src={dailyMediaUrl} autoPlay loop muted playsInline controls className="w-full max-h-[300px] md:max-h-[400px] object-cover mx-auto" />
+                          <video src={dailyMediaUrl} autoPlay loop muted playsInline controls className="w-full max-h-[300px] md:max-h-[400px] object-contain mx-auto" />
                        )}
                     </div>
+                 )}
+
+                 {/* תמיכה במרווחים כפי שביקשת באדמין */}
+                 {dailySubtext && (
+                    <div 
+                      className="text-slate-300 text-base md:text-lg leading-relaxed mb-6 font-medium whitespace-pre-wrap italic border-r-4 border-slate-600 pr-4 [&_b]:text-amber-400 [&_strong]:text-amber-400 [&_mark]:px-1.5 [&_mark]:rounded [&_mark.yellow]:bg-amber-500/20 [&_mark.yellow]:text-amber-300 [&_mark.green]:bg-emerald-500/20 [&_mark.green]:text-emerald-300 [&_mark.red]:bg-rose-500/20 [&_mark.red]:text-rose-400 [&_a]:text-cyan-400 [&_a]:underline"
+                      dangerouslySetInnerHTML={{ __html: dailySubtext }}
+                    />
                  )}
 
                  <div className="text-slate-200 text-base md:text-lg leading-relaxed whitespace-pre-wrap
@@ -1262,64 +1246,6 @@ export default function Dashboard({ userId, userName, setActiveTab, tournamentSt
                ></iframe>
             </div>
             
-          </div>
-        </div>
-      )}
-
-      {selectedLeague && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/85 p-4 backdrop-blur-sm animate-fade-in-up" dir="rtl">
-          <div className="bg-slate-900 border border-slate-700 p-6 rounded-3xl w-full max-w-lg max-h-[85vh] flex flex-col shadow-2xl relative">
-            
-            <div className="flex justify-between items-start mb-6 pb-4 border-b border-slate-800">
-              <div className="pr-1">
-                <h3 className="text-xl font-black text-white flex items-center gap-2">
-                   <span>🏟️</span> טבלת {selectedLeague.name}
-                </h3>
-                <div className="flex items-center gap-3 mt-1.5">
-                   <p className="text-slate-400 text-sm">קוד: <strong className="text-indigo-400 font-mono tracking-widest bg-indigo-900/20 px-1.5 py-0.5 rounded border border-indigo-500/30">{selectedLeague.pin}</strong></p>
-                </div>
-              </div>
-              <button onClick={() => setSelectedLeague(null)} className="w-8 h-8 flex items-center justify-center rounded-full bg-slate-800 hover:bg-rose-500/20 hover:text-rose-400 text-slate-400 transition-colors font-black text-sm border border-slate-700">✕</button>
-            </div>
-
-            <div className="overflow-y-auto custom-scrollbar flex-1 pr-2 mb-4">
-               <div className="bg-slate-950 rounded-2xl border border-slate-800 overflow-hidden">
-                  <table className="w-full text-right">
-                     <thead className="bg-slate-900/80 text-slate-500 text-xs uppercase tracking-widest border-b border-slate-800">
-                        <tr>
-                           <th className="p-3 font-bold text-center w-12">#</th>
-                           <th className="p-3 font-bold">שחקן</th>
-                           <th className="p-3 font-bold text-center">נקודות</th>
-                        </tr>
-                     </thead>
-                     <tbody>
-                        {allUsersList
-                           .filter(u => selectedLeague.members.includes(u.id))
-                           .map((u, index) => {
-                              const isMe = u.id === userId;
-                              return (
-                                 <tr key={u.id} className={`border-b border-slate-800/50 ${isMe ? 'bg-indigo-900/20' : 'hover:bg-slate-800/50'}`}>
-                                    <td className="p-3 text-center font-black text-slate-400">{index + 1}</td>
-                                    <td className="p-3 font-bold text-slate-200">
-                                       {u.name}
-                                       {isMe && <span className="mr-2 text-[9px] bg-indigo-600 text-white px-1.5 py-0.5 rounded uppercase">אתה</span>}
-                                    </td>
-                                    <td className="p-3 text-center font-black text-amber-400 text-lg">{u.totalPoints || 0}</td>
-                                 </tr>
-                              );
-                           })
-                        }
-                     </tbody>
-                  </table>
-               </div>
-            </div>
-
-            <div className="pt-4 border-t border-slate-800 text-center">
-               <button onClick={() => handleLeaveLeague(selectedLeague.id, selectedLeague.name)} className="text-xs text-rose-500 hover:text-rose-400 font-bold underline transition-colors p-2">
-                  🚪 עזוב את הליגה
-               </button>
-            </div>
-
           </div>
         </div>
       )}

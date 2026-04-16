@@ -26,6 +26,20 @@ const checkIsMatchLocked = (m: any, state: number) => {
   }
 };
 
+// פונקציית קריאת זמנים בדיוק לפי השעון המקומי
+const parseDateTimeLocal = (dtStr: string) => {
+  if (!dtStr) return 0;
+  try {
+    if (dtStr.includes("T")) {
+      const [datePart, timePart] = dtStr.split("T");
+      const [year, month, day] = datePart.split("-").map(Number);
+      const [hour, minute] = timePart.split(":").map(Number);
+      return new Date(year, month - 1, day, hour, minute).getTime();
+    }
+    return new Date(dtStr).getTime();
+  } catch { return 0; }
+};
+
 export default function MatrixPage() {
   const [users, setUsers] = useState<any[]>([]);
   const [matches, setMatches] = useState<any[]>([]);
@@ -47,6 +61,13 @@ export default function MatrixPage() {
   const [searchTeam, setSearchTeam] = useState("");
   const [filterMatchday, setFilterMatchday] = useState("ALL");
   const [filterDate, setFilterDate] = useState("");
+
+  // שעון חי כדי לחשוף שאלות הפתעה ברגע שהן נסגרות
+  const [nowMs, setNowMs] = useState(Date.now());
+  useEffect(() => {
+    const interval = setInterval(() => setNowMs(Date.now()), 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     const fetchAllData = async () => {
@@ -170,7 +191,6 @@ export default function MatrixPage() {
              const uData = predictions[u.id];
              const p = uData ? uData[m.id] : null;
              
-             // התיקון באקסל: אם סטטוס 0, שום דבר לא חשוף!
              const isMatchExposed = tournamentState > 0 && (m.isFinished || checkIsMatchLocked(m, tournamentState));
              
              if (!isMatchExposed) row.push("מוסתר");
@@ -225,7 +245,13 @@ export default function MatrixPage() {
              if (bData && bData[q.id] !== undefined) answerText = String(bData[q.id]);
 
              const phase = q.phase || "TOURNAMENT";
-             const isExposed = (phase === "KNOCKOUT") ? (tournamentState >= 5) : (tournamentState >= 1);
+             let isExposed = (phase === "KNOCKOUT") ? (tournamentState >= 5) : (tournamentState >= 1);
+
+             // הגנה מיוחדת לשאלות הפתעה באקסל
+             if (q.isSurprise) {
+                const closeMs = parseDateTimeLocal(q.closeTime);
+                isExposed = nowMs > closeMs;
+             }
 
              if (!isExposed) row.push("מוסתר");
              else row.push(answerText);
@@ -239,13 +265,13 @@ export default function MatrixPage() {
     const link = document.createElement("a");
     link.setAttribute("href", url);
     const tabName = activeTab === "MATCHES" ? "matches" : activeTab === "QUALIFIERS" ? "qualifiers" : "bonus";
-    link.setAttribute("download", `transparency_matrix_${tabName}_${new Date().toISOString().split('T')[0]}.csv`);
+    link.setAttribute("download", `due_disclosure_${tabName}_${new Date().toISOString().split('T')[0]}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
   };
 
-  if (isLoading) return <div className="min-h-screen flex items-center justify-center bg-slate-950 text-blue-400 font-black animate-pulse text-2xl" dir="rtl">טוען נתוני שקיפות... 🕵️‍♂️</div>;
+  if (isLoading) return <div className="min-h-screen flex items-center justify-center bg-slate-950 text-blue-400 font-black animate-pulse text-2xl" dir="rtl">טוען נתוני גילוי נאות... 🕵️‍♂️</div>;
 
   const groupsList = ["A","B","C","D","E","F","G","H","I","J","K","L"];
 
@@ -254,11 +280,11 @@ export default function MatrixPage() {
       
       <div className="max-w-[98vw] mx-auto flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
          <div>
-            <h1 className="text-2xl md:text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400">טבלת שקיפות המשרד 👁️</h1>
+            <h1 className="text-2xl md:text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400">דף גילוי נאות 👁️</h1>
             <p className="text-slate-400 text-xs mt-1 font-medium bg-slate-900 px-3 py-1.5 rounded-lg border border-slate-800 inline-block">
                {activeTab === "MATCHES" && "🟢 בול | 🔵 כיוון נכון | 🔴 טעות | 🔒 נחשף בתחילת השלב"}
                {activeTab === "QUALIFIERS" && "🟢 בול | 🔵 פגיעה חלקית (הצלבה) | 🔴 טעות | 🔒 נחשף בתחילת השלב"}
-               {activeTab === "BONUS" && "🟢 בול | 👑 מוביל זמני | 🔵 במשחק | 🔴 נפסל (קו חוצה) | 🔒 נחשף בהתאם לשלב"}
+               {activeTab === "BONUS" && "🟢 בול | 👑 מוביל זמני | 🔵 במשחק | 🔴 נפסל (קו חוצה) | 🔒 נחשף בהתאם לשלב או לסגירת השאלה"}
             </p>
          </div>
          <div className="flex flex-wrap gap-3 items-center">
@@ -405,7 +431,6 @@ export default function MatrixPage() {
                         const uData = predictions[u.id];
                         const p = uData ? uData[m.id] : null;
                         
-                        // התיקון: אם הסטטוס הוא 0, שום דבר לא חשוף! חוסם תצוגה לפני תחילת טורניר
                         const isMatchExposed = tournamentState > 0 && (m.isFinished || checkIsMatchLocked(m, tournamentState));
                         
                         let tdClass = "border-b border-l border-slate-800/50 p-2 text-sm font-mono tracking-widest text-center transition-colors ";
@@ -503,7 +528,7 @@ export default function MatrixPage() {
                          )
                       })()}
 
-                      {/* תאים בונוסים */}
+                      {/* תאים בונוסים - עכשיו תומכים בחשיפת הפתעות מותאמת אישית! */}
                       {activeTab === "BONUS" && bonusQuestions.map(q => {
                         let answerText = "--";
                         const bData = bonusPredictions[u.id];
@@ -512,7 +537,13 @@ export default function MatrixPage() {
                         }
 
                         const phase = q.phase || "TOURNAMENT";
-                        const isExposed = (phase === "KNOCKOUT") ? (tournamentState >= 5) : (tournamentState >= 1);
+                        let isExposed = (phase === "KNOCKOUT") ? (tournamentState >= 5) : (tournamentState >= 1);
+
+                        // הלוגיקה החדשה: שאלת הפתעה מתעלמת מסטטוס הטורניר ונחשפת רק כשהיא נסגרת באמת
+                        if (q.isSurprise) {
+                           const closeTimeMs = parseDateTimeLocal(q.closeTime);
+                           isExposed = nowMs > closeTimeMs;
+                        }
 
                         const truth = realBonusFull.answers?.[q.id] || [];
                         const leaders = realBonusFull.leading?.[q.id] || [];

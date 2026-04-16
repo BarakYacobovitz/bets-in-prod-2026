@@ -32,6 +32,7 @@ export default function MatchCard({ match, userId, tournamentState = 0 }: { matc
     const interval = setInterval(() => setNow(new Date()), 60000);
     return () => clearInterval(interval);
   }, []);
+  
 
   useEffect(() => {
     if (!userId || !match.id) return;
@@ -294,7 +295,7 @@ export default function MatchCard({ match, userId, tournamentState = 0 }: { matc
   return (
     <>
       {/* 2. עיצוב מכווץ: הפאדינג פה צומצם ל-p-4 sm:p-5 */}
-      <div className={`rounded-2xl p-4 sm:p-5 w-full max-w-lg mx-auto relative ${cardStyle}`} dir="rtl">
+      <div id={`match-${match.id}`} className={`rounded-2xl p-4 sm:p-5 w-full max-w-lg mx-auto relative ${cardStyle}`} dir="rtl">
         
         <div className="absolute top-3 left-3 z-10">
           {match.isFinished ? (

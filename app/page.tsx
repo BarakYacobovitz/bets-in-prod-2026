@@ -19,9 +19,10 @@ export default function Home() {
   const [user, setUser] = useState<any>(null);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
 
-  const [mainTab, setMainTab] = useState<MainTab>("DASHBOARD");
+  // הסטייט המאוחד! עכשיו הכל עובד על activeTab
+  const [activeTab, setActiveTab] = useState<MainTab>("DASHBOARD");
   const [predictionTab, setPredictionTab] = useState<PredictionTab>("MATCHES");
-
+  
   const [matches, setMatches] = useState<any[]>([]);
   const [groups, setGroups] = useState<any>({});
   const [tournamentState, setTournamentState] = useState<number>(0);
@@ -83,20 +84,20 @@ export default function Home() {
         {/* ========================================== */}
         <div className="flex bg-slate-900 p-1.5 rounded-2xl border border-slate-800 shadow-lg mb-6 max-w-2xl mx-auto z-40 relative">
            <button 
-             onClick={() => setMainTab("DASHBOARD")}
-             className={`flex-1 py-3 rounded-xl font-black text-sm transition-all flex items-center justify-center gap-2 ${mainTab === "DASHBOARD" ? "bg-blue-600 text-white shadow-md" : "text-slate-400 hover:text-white hover:bg-slate-800/50"}`}
+             onClick={() => setActiveTab("DASHBOARD")}
+             className={`flex-1 py-3 rounded-xl font-black text-sm transition-all flex items-center justify-center gap-2 ${activeTab === "DASHBOARD" ? "bg-blue-600 text-white shadow-md" : "text-slate-400 hover:text-white hover:bg-slate-800/50"}`}
            >
              <span>🏠</span> דאשבורד
            </button>
            <button 
-             onClick={() => setMainTab("PREDICTIONS")}
-             className={`flex-1 py-3 rounded-xl font-black text-sm transition-all flex items-center justify-center gap-2 ${mainTab === "PREDICTIONS" ? "bg-purple-600 text-white shadow-md" : "text-slate-400 hover:text-white hover:bg-slate-800/50"}`}
+             onClick={() => setActiveTab("PREDICTIONS")}
+             className={`flex-1 py-3 rounded-xl font-black text-sm transition-all flex items-center justify-center gap-2 ${activeTab === "PREDICTIONS" ? "bg-purple-600 text-white shadow-md" : "text-slate-400 hover:text-white hover:bg-slate-800/50"}`}
            >
              <span>✍️</span> אזור הניחושים
            </button>
            <button 
-             onClick={() => setMainTab("LEADERBOARD")}
-             className={`flex-1 py-3 rounded-xl font-black text-sm transition-all flex items-center justify-center gap-2 ${mainTab === "LEADERBOARD" ? "bg-amber-500 text-slate-900 shadow-md" : "text-slate-400 hover:text-white hover:bg-slate-800/50"}`}
+             onClick={() => setActiveTab("LEADERBOARD")}
+             className={`flex-1 py-3 rounded-xl font-black text-sm transition-all flex items-center justify-center gap-2 ${activeTab === "LEADERBOARD" ? "bg-amber-500 text-slate-900 shadow-md" : "text-slate-400 hover:text-white hover:bg-slate-800/50"}`}
            >
              <span>🏆</span> טבלת הליגה
            </button>
@@ -105,7 +106,7 @@ export default function Home() {
         {/* ========================================== */}
         {/* תת-תפריט ניחושים (מוצג רק אם אנחנו בטאב ניחושים) */}
         {/* ========================================== */}
-        {mainTab === "PREDICTIONS" && (
+        {activeTab === "PREDICTIONS" && (
            <div className="flex overflow-x-auto gap-2 mb-8 pb-2 custom-scrollbar bg-slate-900/50 p-2 rounded-2xl border border-slate-800/50 max-w-4xl mx-auto md:justify-center">
               <button 
                 onClick={() => setPredictionTab("MATCHES")}
@@ -128,7 +129,7 @@ export default function Home() {
                 <span>⭐</span> בונוסים
               </button>
 
-              {/* נוקאאוט מוסתר אם הטורניר עדיין לא בשלב 4 (חשיפת 32 הגדולות) */}
+              {/* נוקאאוט מוסתר אם הטורניר עדיין לא בשלב 4 */}
               {tournamentState >= 4 && (
                 <button 
                   onClick={() => setPredictionTab("KNOCKOUT")}
@@ -144,10 +145,10 @@ export default function Home() {
         {/* תוכן העמודים */}
         {/* ========================================== */}
         <div className="animate-fade-in-up mt-4">
-           {mainTab === "DASHBOARD" && <Dashboard userId={user.uid} tournamentState={tournamentState} matches={matches} />}
-           {mainTab === "LEADERBOARD" && <Leaderboard currentUserId={user.uid} tournamentState={tournamentState} />}
+           {activeTab === "DASHBOARD" && <Dashboard userId={user.uid} tournamentState={tournamentState} matches={matches} setActiveTab={setActiveTab} setPredictionTab={setPredictionTab} />}
+           {activeTab === "LEADERBOARD" && <Leaderboard currentUserId={user.uid} tournamentState={tournamentState} />}
            
-           {mainTab === "PREDICTIONS" && (
+           {activeTab === "PREDICTIONS" && (
              <>
                {predictionTab === "MATCHES" && <GroupsView matches={matches} groups={groups} userId={user.uid} tournamentState={tournamentState} />}
                {predictionTab === "THIRD_PLACE" && <ThirdPlaceQualifiers groups={groups} userId={user.uid} tournamentState={tournamentState} />}

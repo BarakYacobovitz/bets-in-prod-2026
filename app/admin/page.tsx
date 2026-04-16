@@ -8,6 +8,7 @@ import toast from "react-hot-toast";
 import { getFlagUrl } from "../utils/flags";
 import AdminMatchesTab from "@/components/admin/AdminMatchesTab"; 
 import AdminSystemTab from "@/components/admin/AdminSystemTab";
+import AdminMagazineTab from "@/components/admin/AdminMagazineTab"; // הטאב החדש למהדורה!
 
 const ADMIN_EMAIL = "bawak.y10@gmail.com"; 
 
@@ -15,7 +16,8 @@ export default function AdminPanel() {
   const [user, setUser] = useState<any>(null);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   
-  const [activeTab, setActiveTab] = useState<"SYSTEM" | "USERS" | "MATCHES" | "QUALIFIERS" | "THIRD_PLACE" | "BONUS" | "STATS" | "BACKUP">("SYSTEM");
+  // הוספנו את MAGAZINE לסטייט
+  const [activeTab, setActiveTab] = useState<"SYSTEM" | "MAGAZINE" | "USERS" | "MATCHES" | "QUALIFIERS" | "THIRD_PLACE" | "BONUS" | "STATS" | "BACKUP">("SYSTEM");
   
   const [statsData, setStatsData] = useState<any>(null);
   const [selectedStatMatch, setSelectedStatMatch] = useState<string>("");
@@ -42,11 +44,11 @@ export default function AdminPanel() {
   const [allUserBonusAnswers, setAllUserBonusAnswers] = useState<any[]>([]); 
 
   const [tournamentState, setTournamentState] = useState<number>(0);
-  const [deadlines, setDeadlines] = useState<any>({});
+  
+  // שעון עצר מרכזי חדש במקום deadlines מרובים
+  const [activeDeadline, setActiveDeadline] = useState<{ stage: string, time: string }>({ stage: "1", time: "" });
+  
   const [usersList, setUsersList] = useState<any[]>([]);
-  const [dailyMessage, setDailyMessage] = useState("");
-  const [dailyMediaUrl, setDailyMediaUrl] = useState("");
-  const [dailySubtext, setDailySubtext] = useState(""); 
 
   const [bonusQuestions, setBonusQuestions] = useState<any[]>([]); 
   const [editingId, setEditingId] = useState<string | null>(null); 
@@ -58,10 +60,9 @@ export default function AdminPanel() {
   const [tempOption, setTempOption] = useState(""); 
   
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const dailyMessageRef = useRef<HTMLTextAreaElement>(null); 
 
   const [simStage, setSimStage] = useState<string>("MD1");
-  const groupsList = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L"];
+  const [groupsList, setGroupsList] = useState<string[]>([]);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
@@ -76,7 +77,17 @@ export default function AdminPanel() {
       const querySnapshot = await getDocs(collection(db, "matches"));
       const matchesArray: any[] = [];
       querySnapshot.forEach((doc) => matchesArray.push({ id: doc.id, ...doc.data() }));
-      matchesArray.sort((a, b) => a.id.localeCompare(b.id));
+      
+      matchesArray.sort((a, b) => {
+         if (!a.matchDate || !b.matchDate) return 0;
+         const [dA, tA] = (a.matchDate as string).split(" ");
+         const [dB, tB] = (b.matchDate as string).split(" ");
+         const [dayA, monthA, yearA] = (dA||"").split("/");
+         const [dayB, monthB, yearB] = (dB||"").split("/");
+         const dateA = new Date(`${yearA}-${monthA}-${dayA}T${tA||"00:00"}`);
+         const dateB = new Date(`${yearB}-${monthB}-${dayB}T${tB||"00:00"}`);
+         return dateA.getTime() - dateB.getTime();
+      });
       setMatches(matchesArray);
 
       const qualSnap = await getDoc(doc(db, "admin_results", "qualifiers"));
@@ -110,14 +121,12 @@ export default function AdminPanel() {
       const settingsSnap = await getDoc(doc(db, "settings", "system"));
       if (settingsSnap.exists()) {
         setTournamentState(settingsSnap.data().tournamentState || 0);
-        setDeadlines(settingsSnap.data().deadlines || {});
       }
 
-      const dashSnap = await getDoc(doc(db, "settings", "dashboard"));
-      if (dashSnap.exists()) {
-         setDailyMessage(dashSnap.data().dailyMessage || "");
-         setDailyMediaUrl(dashSnap.data().dailyMediaUrl || "");
-         setDailySubtext(dashSnap.data().dailySubtext || ""); 
+      // משיכת השעון המרכזי החדש
+      const deadSnap = await getDoc(doc(db, "settings", "deadlines"));
+      if (deadSnap.exists() && deadSnap.data().activeDeadline) {
+         setActiveDeadline(deadSnap.data().activeDeadline);
       }
 
       const usersSnap = await getDocs(collection(db, "users"));
@@ -125,6 +134,9 @@ export default function AdminPanel() {
       usersSnap.forEach(doc => usersArray.push({ id: doc.id, ...doc.data() }));
       usersArray.sort((a, b) => (b.totalPoints || 0) - (a.totalPoints || 0));
       setUsersList(usersArray);
+
+      const groups = Array.from(new Set(matchesArray.filter(m => m.group && m.stage !== "KNOCKOUT").map(m => m.group))).sort();
+      setGroupsList(groups as string[]);
 
     } catch (error) { 
        console.error("שגיאה:", error); 
@@ -146,38 +158,6 @@ export default function AdminPanel() {
   });
   const allTeams = Array.from(new Set(matches.flatMap(m => [m.homeTeam, m.awayTeam]))).sort();
 
-  const handleSaveDailyMessage = async () => { 
-  setSavingId("dashboardMsg"); 
-  try { 
-    await setDoc(doc(db, "settings", "dashboard"), { dailyMessage, dailyMediaUrl, dailySubtext }, { merge: true }); 
-    setTimeout(() => setSavingId(null), 500); 
-    toast.success("הטור היומי והמדיה עודכנו בהצלחה!"); 
-    } catch (error) { 
-    toast.error("שגיאה בשמירת הטור היומי"); 
-    setSavingId(null); 
-    } 
-  };
-      
-  const insertTagToDailyMessage = (before: string, after: string) => {
-    const textarea = dailyMessageRef.current;
-    if (!textarea) return;
-    const start = textarea.selectionStart;
-    const end = textarea.selectionEnd;
-    const text = dailyMessage;
-    const selectedText = text.substring(start, end);
-    let newText = text.substring(0, start) + before + selectedText + after + text.substring(end);
-    
-    if (before === "<hr>" || before === "<br>") {
-       newText = text.substring(0, start) + before + text.substring(end);
-    }
-    
-    setDailyMessage(newText);
-    setTimeout(() => {
-      textarea.focus();
-      textarea.setSelectionRange(start + before.length, start + before.length + selectedText.length);
-    }, 0);
-  };
-
   const handleTogglePayment = async (userId: string, currentStatus: boolean) => { 
     try { 
       await updateDoc(doc(db, "users", userId), { hasPaid: !currentStatus }); 
@@ -198,7 +178,7 @@ export default function AdminPanel() {
   };
 
   const handleSaveTournamentState = async () => { 
-    setSavingId("system"); 
+    setSavingId("state"); 
     try { 
       await setDoc(doc(db, "settings", "system"), { tournamentState }, { merge: true }); 
       setTimeout(() => { setSavingId(null); toast.success("מצב הטורניר עודכן בהצלחה!"); }, 500); 
@@ -208,14 +188,14 @@ export default function AdminPanel() {
     } 
   };
 
-  const handleSaveDeadlines = async () => { 
+  const handleSaveDeadline = async () => { 
     setSavingId("deadlines"); 
     try { 
-      await setDoc(doc(db, "settings", "system"), { deadlines }, { merge: true }); 
-      setTimeout(() => { setSavingId(null); toast.success("מועדי הנעילה עודכנו בהצלחה!"); }, 500); 
+      await setDoc(doc(db, "settings", "deadlines"), { activeDeadline }, { merge: true }); 
+      setTimeout(() => { setSavingId(null); toast.success("שעון העצר המרכזי הופעל!"); }, 500); 
     } catch (error) { 
       setSavingId(null);
-      toast.error("שגיאה בשמירת מועדי נעילה");
+      toast.error("שגיאה בשמירת שעון העצר");
     } 
   };
 
@@ -228,6 +208,7 @@ export default function AdminPanel() {
       toast.error("שגיאה בעדכון מועד המשחק");
     }
   };
+
   const handleUpdateMatchday = async (matchId: string, newMatchday: number) => {
     try {
       await updateDoc(doc(db, "matches", matchId), { matchday: newMatchday });
@@ -308,7 +289,6 @@ export default function AdminPanel() {
     } 
   };
 
-  // --- מנגנון הבונוסים החכם: אישור, מוביל זמני, פסילה ונעילה ---
   const handleToggleBonusWinner = (qId: string, val: string) => {
     if (!val.trim()) return;
     const v = val.trim();
@@ -412,19 +392,6 @@ export default function AdminPanel() {
       toast.success("סטטוס חי עודכן וישודר למשתמשים!", { icon: '📡' }); 
     } catch (e) { 
       toast.error("שגיאה בעדכון סטטוס חי."); 
-    }
-  };
-
-  const handleClearLiveStatus = async (qId: string) => {
-    const inputEl = document.getElementById(`live_status_${qId}`) as HTMLInputElement;
-    if (inputEl) inputEl.value = ""; 
-    const updatedQuestions = bonusQuestions.map(q => q.id === qId ? { ...q, liveStatus: "" } : q);
-    try { 
-      await setDoc(doc(db, "settings", "bonus_questions"), { questions: updatedQuestions }); 
-      setBonusQuestions(updatedQuestions); 
-      toast.success("סטטוס חי נוקה.");
-    } catch (e) { 
-      toast.error("שגיאה בניקוי סטטוס חי."); 
     }
   };
 
@@ -840,10 +807,17 @@ const handleCalculateScores = async (silentParam: any = false) => {
     setAutoInsights(shuffled);
   };
 
-  const addInsightToMessage = (text: string) => {
-    const htmlBullet = `<ul>\n  <li>${text}</li>\n</ul>\n`;
-    setDailyMessage(prev => prev + htmlBullet);
-    toast.success("התובנה נוספה לטור היומי!");
+  // תוקן: שומר ישירות ל-DB כך שזה יופיע מיד בעורך של המגזין!
+  const addInsightToMessage = async (text: string) => {
+    try {
+      const snap = await getDoc(doc(db, "settings", "dashboard"));
+      const currentMsg = snap.exists() ? (snap.data().dailyMessage || "") : "";
+      const htmlBullet = `<ul>\n  <li>${text}</li>\n</ul>\n`;
+      await setDoc(doc(db, "settings", "dashboard"), { dailyMessage: currentMsg + htmlBullet }, { merge: true });
+      toast.success("התובנה נוספה לטור היומי!");
+    } catch(e) {
+      toast.error("שגיאה בהוספת התובנה");
+    }
   };
 
   const handleFactoryReset = async () => {
@@ -1521,7 +1495,7 @@ const handleCalculateScores = async (silentParam: any = false) => {
              <p className="text-slate-400 text-sm">הזנת תוצאה באדמין? לחץ על הריצת מנוע כדי לעדכן את הטבלאות. שמור תמונת מצב בלילה כדי לייצר מגמות למחר.</p>
           </div>
           <div className="flex gap-3 w-full md:w-auto relative z-10">
-             <button onClick={handleTakeSnapshot} disabled={isCalculating} className="flex-1 md:flex-none px-6 py-3 rounded-xl font-bold border border-emerald-500/50 text-emerald-400 hover:bg-emerald-900/50 transition-all shadow-sm">
+             <button onClick={() => handleTakeSnapshot()} disabled={isCalculating} className="flex-1 md:flex-none px-6 py-3 rounded-xl font-bold border border-emerald-500/50 text-emerald-400 hover:bg-emerald-900/50 transition-all shadow-sm">
                {isCalculating ? "⏳" : "📸 סוף יום (Snapshot)"}
              </button>
              <button onClick={() => handleCalculateScores()} disabled={isCalculating} className="flex-1 md:flex-none px-8 py-3 rounded-xl font-black shadow-[0_0_15px_rgba(16,185,129,0.3)] bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white transition-all transform active:scale-95">
@@ -1530,31 +1504,33 @@ const handleCalculateScores = async (silentParam: any = false) => {
           </div>
         </div>
 
-        <div className="flex gap-2 mb-8 bg-slate-900/60 p-2 rounded-2xl border border-slate-800 overflow-x-auto custom-scrollbar shadow-inner">
+        {/* 🟢 שורת הטאבים הדביקה שהוספנו לה את טאב ה-MAGAZINE 🟢 */}
+        <div className="flex flex-wrap gap-2 mb-8 bg-slate-900/80 p-2 rounded-2xl border border-slate-800/50 sticky top-4 z-50 backdrop-blur-md shadow-2xl">
           {[
-            { id: "SYSTEM", label: "⏱️ שעון המערכת" }, 
-            { id: "USERS", label: "👥 משתמשים" },
-            { id: "MATCHES", label: "⚽ משחקים" }, 
-            { id: "QUALIFIERS", label: "🥇 בתים" }, 
-            { id: "THIRD_PLACE", label: "🥉 8 מעפילות" }, 
-            { id: "BONUS", label: "⭐ בונוסים" },
-            { id: "STATS", label: "📊 ראדאר" },
-            { id: "BACKUP", label: "💾 גיבוי" }
+            { id: "SYSTEM", icon: "🛠️", label: "מערכת" }, 
+            { id: "MAGAZINE", icon: "📰", label: "טור יומי" }, // טאב חדש!
+            { id: "MATCHES", icon: "⚽", label: "משחקים" }, 
+            { id: "QUALIFIERS", icon: "🥇", label: "בתים" }, 
+            { id: "THIRD_PLACE", icon: "🥉", label: "8 מעפילות" }, 
+            { id: "BONUS", icon: "🎁", label: "בונוסים" },
+            { id: "USERS", icon: "👥", label: "משתמשים" },
+            { id: "STATS", icon: "📊", label: "ראדאר" },
+            { id: "BACKUP", icon: "💾", label: "גיבוי" }
           ].map(tab => (
             <button 
                key={tab.id} 
                onClick={() => setActiveTab(tab.id as any)} 
-               className={`px-5 py-3 rounded-xl font-bold whitespace-nowrap transition-all flex-1 text-center text-sm md:text-base ${activeTab === tab.id ? "bg-gradient-to-r from-blue-600 to-cyan-600 text-white shadow-lg transform scale-[1.02] border border-blue-500/50" : "text-slate-400 hover:text-white hover:bg-slate-800"}`}
+               className={`flex-1 min-w-[90px] sm:min-w-[100px] px-3 py-2.5 rounded-xl font-bold whitespace-nowrap transition-all text-center text-xs sm:text-sm flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 shadow-sm ${activeTab === tab.id ? "bg-blue-600 text-white shadow-lg transform scale-[1.02] border border-blue-400" : "bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700 border border-slate-700"}`}
             >
-              {tab.label}
+              <span className="text-lg mb-0.5 sm:mb-0">{tab.icon}</span> <span>{tab.label}</span>
             </button>
           ))}
         </div>
 
-        <div className="bg-slate-900 p-4 md:p-8 rounded-3xl border border-slate-800 shadow-xl min-h-[50vh]">
+        <div className="bg-slate-900 p-4 md:p-8 rounded-3xl border border-slate-800 shadow-xl min-h-[50vh] animate-fade-in-up">
 
           {activeTab === "BACKUP" && (
-            <div className="space-y-8 max-w-3xl mx-auto animate-fade-in-up">
+            <div className="space-y-8 max-w-3xl mx-auto">
               <div className="bg-gradient-to-br from-slate-800 to-slate-900 p-8 rounded-3xl border border-blue-500/30 shadow-xl relative overflow-hidden">
                 <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500 to-cyan-400"></div>
                 <h2 className="text-2xl font-bold text-white mb-2 flex items-center gap-2"><span>💾</span> גיבוי נתונים מלא (Export)</h2>
@@ -1572,22 +1548,26 @@ const handleCalculateScores = async (silentParam: any = false) => {
             </div>
           )}
 
-        {activeTab === "SYSTEM" && (
-         <AdminSystemTab 
-            tournamentState={tournamentState}
-            setTournamentState={setTournamentState}
-            deadlines={deadlines}
-            setDeadlines={setDeadlines}
-            savingId={savingId}
-            isCalculating={isCalculating}
-            handleSaveTournamentState={handleSaveTournamentState}
-            handleSaveDeadlines={handleSaveDeadlines}
-            handleFactoryReset={handleFactoryReset}
-         />
-       )}
+          {activeTab === "SYSTEM" && (
+             <AdminSystemTab 
+                tournamentState={tournamentState}
+                setTournamentState={setTournamentState}
+                activeDeadline={activeDeadline}
+                setActiveDeadline={setActiveDeadline}
+                savingId={savingId}
+                isCalculating={isCalculating}
+                handleSaveTournamentState={handleSaveTournamentState}
+                handleSaveDeadline={handleSaveDeadline}
+                handleFactoryReset={handleFactoryReset}
+             />
+          )}
+
+          {activeTab === "MAGAZINE" && (
+             <AdminMagazineTab />
+          )}
 
           {activeTab === "STATS" && (
-            <div className="space-y-8 relative animate-fade-in-up">
+            <div className="space-y-8 relative">
                <div className="flex flex-col md:flex-row justify-between items-start md:items-center bg-gradient-to-r from-indigo-900/50 to-slate-800 p-6 md:p-8 rounded-3xl border border-indigo-500/30 shadow-lg gap-6">
                  <div>
                    <h2 className="text-2xl md:text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-purple-400 flex items-center gap-2"><span>📡</span> ראדאר תובנות וביון</h2>
@@ -1714,121 +1694,7 @@ const handleCalculateScores = async (silentParam: any = false) => {
           
           {activeTab === "USERS" && (
             
-            <div className="space-y-8 max-w-4xl mx-auto animate-fade-in-up">
-              
-              <div className="bg-gradient-to-br from-slate-800 to-slate-900 p-8 rounded-3xl border border-emerald-500/30 shadow-xl relative overflow-hidden">
-                <div className="absolute top-0 right-0 w-2 h-full bg-gradient-to-b from-blue-400 to-emerald-500"></div>
-                <h2 className="text-2xl font-black text-white mb-2 flex items-center gap-2"><span>📰</span> עריכת המהדורה המרכזית (Rich Text)</h2>
-                <p className="text-slate-400 text-sm mb-6 leading-relaxed">השתמש בכפתורים כדי להוסיף עיצוב, תמונות וגיפים! משתמשים יראו את זה בלייב בכתבת המגזין שבדאשבורד.</p>
-                
-                <div className="flex flex-wrap gap-2 mb-0 bg-slate-950 p-3 rounded-t-xl border border-b-0 border-slate-700 items-center shadow-inner">
-                  <button onClick={() => insertTagToDailyMessage('<b>', '</b>')} className="bg-slate-800 hover:bg-slate-700 text-white px-3 py-1.5 rounded-lg text-sm font-bold transition-colors border border-slate-600"><b>B</b> מודגש</button>
-                  <button onClick={() => insertTagToDailyMessage('<i>', '</i>')} className="bg-slate-800 hover:bg-slate-700 text-white px-3 py-1.5 rounded-lg text-sm font-bold transition-colors border border-slate-600"><i>I</i> נטוי</button>
-                  <button onClick={() => insertTagToDailyMessage('<u>', '</u>')} className="bg-slate-800 hover:bg-slate-700 text-white px-3 py-1.5 rounded-lg text-sm font-bold transition-colors border border-slate-600"><u>U</u> קו תחתון</button>
-                  
-                  <div className="w-px h-6 bg-slate-700 mx-1 self-center"></div>
-                  
-                  <div className="flex items-center gap-1 bg-slate-900 p-1 rounded-lg border border-slate-700 shadow-inner">
-                    <button onClick={() => insertTagToDailyMessage('<div style="text-align: right;">\n', '\n</div>')} className="px-2 py-1 hover:bg-slate-800 rounded text-sm transition-colors text-slate-300" title="יישור לימין">▶️</button>
-                    <button onClick={() => insertTagToDailyMessage('<div style="text-align: center;">\n', '\n</div>')} className="px-2 py-1 hover:bg-slate-800 rounded text-sm transition-colors text-slate-300" title="יישור למרכז">⏸️</button>
-                    <button onClick={() => insertTagToDailyMessage('<div style="text-align: left;">\n', '\n</div>')} className="px-2 py-1 hover:bg-slate-800 rounded text-sm transition-colors text-slate-300" title="יישור לשמאל">◀️</button>
-                  </div>
-                  
-                  <div className="w-px h-6 bg-slate-700 mx-1 self-center"></div>
-                  
-                  <button onClick={() => insertTagToDailyMessage('<h2>', '</h2>')} className="bg-slate-800 hover:bg-slate-700 text-blue-300 px-3 py-1.5 rounded-lg text-sm font-bold transition-colors border border-slate-600">📝 כותרת גדולה</button>
-                  <button onClick={() => insertTagToDailyMessage('<h3>', '</h3>')} className="bg-slate-800 hover:bg-slate-700 text-emerald-300 px-3 py-1.5 rounded-lg text-sm font-bold transition-colors border border-slate-600">📝 תת-כותרת</button>
-                  
-                  <div className="w-px h-6 bg-slate-700 mx-1 self-center"></div>
-                  
-                  <button onClick={() => insertTagToDailyMessage('<blockquote>', '</blockquote>')} className="bg-slate-800 hover:bg-slate-700 text-emerald-300 px-3 py-1.5 rounded-lg text-sm font-bold transition-colors border border-slate-600">❝ ציטוט</button>
-                  
-                  <div className="w-px h-6 bg-slate-700 mx-1 self-center"></div>
-                  
-                  <div className="flex items-center gap-1.5 bg-slate-900 p-1.5 rounded-lg border border-slate-700 shadow-inner">
-                    <span className="text-[10px] text-slate-500 font-bold px-1 uppercase">מרקר:</span>
-                    <button onClick={() => insertTagToDailyMessage('<mark class="yellow">', '</mark>')} className="w-5 h-5 rounded-md bg-amber-500/80 hover:bg-amber-400 border border-amber-600 transition-colors shadow-sm" title="צהוב"></button>
-                    <button onClick={() => insertTagToDailyMessage('<mark class="green">', '</mark>')} className="w-5 h-5 rounded-md bg-emerald-500/80 hover:bg-emerald-400 border border-emerald-600 transition-colors shadow-sm" title="ירוק"></button>
-                    <button onClick={() => insertTagToDailyMessage('<mark class="blue">', '</mark>')} className="w-5 h-5 rounded-md bg-blue-500/80 hover:bg-blue-400 border border-blue-600 transition-colors shadow-sm" title="כחול"></button>
-                    <button onClick={() => insertTagToDailyMessage('<mark class="red">', '</mark>')} className="w-5 h-5 rounded-md bg-rose-500/80 hover:bg-rose-400 border border-rose-600 transition-colors shadow-sm" title="אדום"></button>
-                  </div>
-
-                  <div className="w-px h-6 bg-slate-700 mx-1 self-center"></div>
-                  <button onClick={() => insertTagToDailyMessage('<ul>\n  <li>', '</li>\n</ul>')} className="bg-slate-800 hover:bg-slate-700 text-white px-3 py-1.5 rounded-lg text-sm font-bold transition-colors border border-slate-600">📑 רשימה</button>
-                  <button onClick={() => insertTagToDailyMessage('<hr>\n', '')} className="bg-slate-800 hover:bg-slate-700 text-white px-3 py-1.5 rounded-lg text-sm font-bold transition-colors border border-slate-600">➖ קו הפרדה</button>
-                  <div className="w-px h-6 bg-slate-700 mx-1 self-center"></div>
-                  <button onClick={() => insertTagToDailyMessage('<img src="', '" />')} className="bg-emerald-600/20 hover:bg-emerald-600/40 text-emerald-400 border border-emerald-500/30 px-3 py-1.5 rounded-lg text-sm font-bold transition-colors">🖼️ תמונה/גיף</button>
-                  <button onClick={() => insertTagToDailyMessage('<a href="', '" target="_blank">טקסט ללחיצה</a>')} className="bg-blue-600/20 hover:bg-blue-600/40 text-blue-400 border border-blue-500/30 px-3 py-1.5 rounded-lg text-sm font-bold transition-colors">🔗 קישור</button>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                   <div className="flex flex-col gap-1">
-                      <label className="text-blue-400 text-xs font-bold px-1">🖼️ לינק למדיה (תמונה/וידאו):</label>
-                      <input 
-                        type="text" 
-                        value={dailyMediaUrl} 
-                        onChange={(e) => setDailyMediaUrl(e.target.value)}
-                        placeholder="https://... (jpg, mp4, gif)"
-                        className="bg-slate-950 text-white p-3 rounded-xl border border-slate-700 focus:border-blue-500 outline-none text-sm"
-                      />
-                   </div>
-                   <div className="flex flex-col gap-1">
-                      <label className="text-emerald-400 text-xs font-bold px-1">📝 תקציר / כותרת משנה (מופיע בכרטיסייה):</label>
-                      <input 
-                        type="text" 
-                        value={dailySubtext} 
-                        onChange={(e) => setDailySubtext(e.target.value)}
-                        placeholder="הודעות מהנהלת הטורניר, עדכונים חמים..."
-                        className="bg-slate-950 text-white p-3 rounded-xl border border-slate-700 focus:border-emerald-500 outline-none text-sm"
-                      />
-                   </div>
-                </div>
-                <textarea 
-                  ref={dailyMessageRef}
-                  value={dailyMessage} 
-                  onChange={e => setDailyMessage(e.target.value)} 
-                  className="w-full bg-slate-950 text-slate-300 p-5 rounded-b-xl border border-slate-700 focus:border-emerald-500 min-h-[200px] outline-none font-mono text-sm leading-relaxed shadow-inner" 
-                  placeholder="כתוב את הטור היומי כאן... אפשר להיעזר בכפתורים למעלה." 
-                />
-                
-                <button onClick={handleSaveDailyMessage} className="mt-5 w-full bg-emerald-600 hover:bg-emerald-500 text-white font-black py-4 px-6 rounded-xl transition-all shadow-[0_0_15px_rgba(16,185,129,0.3)] text-lg active:scale-95">
-                  {savingId === "dashboardMsg" ? "שומר ומשדר... ⏳" : "💾 פרסם את המהדורה בלייב"}
-                </button>
-
-                <div className="mt-8 border-t border-slate-700 pt-6">
-                   <h4 className="text-slate-500 text-sm font-bold mb-4 flex items-center gap-2 uppercase tracking-widest"><span>👀</span> תצוגה מקדימה למשתמשים:</h4>
-                   
-                   <div className="bg-slate-900 rounded-3xl border border-slate-700 shadow-xl overflow-hidden flex flex-col max-w-2xl mx-auto">
-                      <div className="bg-slate-950 p-4 border-b border-slate-800 flex justify-between items-center">
-                         <div className="flex items-center gap-3">
-                            <span className="text-2xl">📰</span>
-                            <h2 className="text-xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400">המהדורה המרכזית</h2>
-                         </div>
-                         <div className="text-slate-500 text-sm font-medium">{new Date().toLocaleDateString('he-IL')}</div>
-                      </div>
-                      <div className="p-6 md:p-8">
-                         <div className="text-slate-200 text-lg leading-relaxed whitespace-pre-wrap
-                                         [&_div]:w-full
-                                         [&_b]:text-amber-400 [&_strong]:text-amber-400
-                                         [&_i]:text-slate-400 [&_u]:underline [&_u]:decoration-blue-400 [&_u]:underline-offset-4
-                                         [&_h1]:text-3xl [&_h1]:font-black [&_h1]:mb-3 [&_h1]:text-transparent [&_h1]:bg-clip-text [&_h1]:bg-gradient-to-r [&_h1]:from-blue-400 [&_h1]:to-emerald-400
-                                         [&_h2]:text-2xl [&_h2]:font-bold [&_h2]:mb-4 [&_h2]:mt-6 [&_h2]:text-blue-300
-                                         [&_h3]:text-xl [&_h3]:font-bold [&_h3]:mb-2 [&_h3]:mt-4 [&_h3]:text-emerald-300
-                                         [&_h4]:text-lg [&_h4]:font-bold [&_h4]:mb-2 [&_h4]:mt-4 [&_h4]:text-slate-300
-                                         [&_mark]:px-1.5 [&_mark]:rounded [&_mark]:font-bold
-                                         [&_mark.yellow]:!bg-amber-500/20 [&_mark.yellow]:!text-amber-300
-                                         [&_mark.green]:!bg-emerald-500/20 [&_mark.green]:!text-emerald-300
-                                         [&_mark.blue]:!bg-blue-500/20 [&_mark.blue]:!text-blue-300
-                                         [&_mark.red]:!bg-rose-500/20 [&_mark.red]:!text-rose-400
-                                         [&_blockquote]:border-r-4 [&_blockquote]:border-emerald-500 [&_blockquote]:bg-slate-800/50 [&_blockquote]:p-4 [&_blockquote]:rounded-l-xl [&_blockquote]:my-4 [&_blockquote]:italic [&_blockquote]:text-slate-300
-                                         [&_ul]:list-disc [&_ul]:list-inside [&_ul]:space-y-2 [&_ul]:my-4 [&_ul]:text-slate-300
-                                         [&_hr]:border-slate-700 [&_hr]:my-6
-                                         [&_img]:inline-block [&_img]:rounded-2xl [&_img]:shadow-lg [&_img]:my-4 [&_img]:max-h-[400px] [&_img]:w-auto [&_img]:max-w-full [&_img]:object-contain [&_img]:border [&_img]:border-slate-700
-                                         [&_a]:text-cyan-400 [&_a]:underline hover:[&_a]:text-cyan-300" 
-                              dangerouslySetInnerHTML={{ __html: dailyMessage || "<span class='text-slate-600 font-medium'>השורות שלך יופיעו כאן...</span>" }} />
-                      </div>
-                   </div>
-                </div>
-              </div>
+            <div className="space-y-8 max-w-5xl mx-auto">
               
               <div className="bg-gradient-to-br from-indigo-900/40 to-slate-800 p-8 rounded-3xl border border-indigo-500/30 shadow-xl">
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4 border-b border-slate-700 pb-4">
@@ -1847,7 +1713,7 @@ const handleCalculateScores = async (silentParam: any = false) => {
                       <div key={idx} className="bg-slate-900/80 border border-slate-700 p-4 rounded-2xl flex justify-between items-center gap-4 group hover:border-indigo-500/50 hover:bg-slate-800 transition-colors shadow-sm">
                         <span className="text-slate-200 text-sm font-medium leading-relaxed">{insight}</span>
                         <button onClick={() => addInsightToMessage(insight)} className="bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600 hover:text-white border border-emerald-500/30 px-4 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap opacity-0 group-hover:opacity-100 flex items-center gap-1">
-                          <span>➕</span> הוסף לטור
+                          <span>➕</span> הוסף לטור המגזין
                         </button>
                       </div>
                     ))}
@@ -1918,22 +1784,22 @@ const handleCalculateScores = async (silentParam: any = false) => {
                         usersList.map((u, idx) => (
                           <tr key={u.id} className="border-b border-slate-800/50 hover:bg-slate-800/50 transition-colors">
                             <td className="p-4 font-bold text-white flex items-center gap-2 min-w-[220px]">
-    <span className="text-slate-600 text-xs w-4">{idx + 1}.</span> 
-    <input 
-      type="text" 
-      value={u.name || ""} 
-      onChange={(e) => setUsersList(usersList.map(user => user.id === u.id ? { ...user, name: e.target.value } : user))}
-      className="bg-slate-900 border border-slate-700 text-white px-2 py-1.5 rounded-lg focus:border-blue-500 outline-none text-sm w-full transition-all shadow-inner"
-      placeholder="הכנס שם בעברית..."
-    />
-    <button 
-      onClick={() => handleUpdateUserName(u.id, u.name)}
-      className="bg-slate-800 hover:bg-blue-600 text-slate-400 hover:text-white p-1.5 rounded-lg border border-slate-700 shadow-sm transition-all active:scale-95 shrink-0"
-      title="שמור שם"
-    >
-      💾
-    </button>
-  </td>
+                                <span className="text-slate-600 text-xs w-4">{idx + 1}.</span> 
+                                <input 
+                                  type="text" 
+                                  value={u.name || ""} 
+                                  onChange={(e) => setUsersList(usersList.map(user => user.id === u.id ? { ...user, name: e.target.value } : user))}
+                                  className="bg-slate-900 border border-slate-700 text-white px-2 py-1.5 rounded-lg focus:border-blue-500 outline-none text-sm w-full transition-all shadow-inner"
+                                  placeholder="הכנס שם בעברית..."
+                                />
+                                <button 
+                                  onClick={() => handleUpdateUserName(u.id, u.name)}
+                                  className="bg-slate-800 hover:bg-blue-600 text-slate-400 hover:text-white p-1.5 rounded-lg border border-slate-700 shadow-sm transition-all active:scale-95 shrink-0"
+                                  title="שמור שם"
+                                >
+                                  💾
+                                </button>
+                              </td>
                             <td className="p-4 text-sm text-slate-400 font-mono">{u.email}</td>
                             <td className="p-4 text-center font-black text-amber-400 text-lg">{u.totalPoints || 0}</td>
                             
