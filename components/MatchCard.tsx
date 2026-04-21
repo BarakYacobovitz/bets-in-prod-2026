@@ -6,7 +6,6 @@ import { getFlagUrl } from "../app/utils/flags";
 
 export default function MatchCard({ match, userId, tournamentState = 0 }: { match: any, userId: string, tournamentState?: number }) {
   
-  // 1. הגנת הקריסה שלנו (מונעת את מסך השגיאה המפחיד)
   if (!match || !match.id) return null;
 
   const [homeScore, setHomeScore] = useState("");
@@ -249,7 +248,17 @@ export default function MatchCard({ match, userId, tournamentState = 0 }: { matc
     statusBadge = <div className="px-3 py-1 rounded-full text-[10px] uppercase tracking-wide font-black flex items-center gap-2 bg-slate-950 text-slate-500 border border-slate-800">🏁 סיום</div>;
   } else if (isLive) {
     cardStyle = "bg-gradient-to-br from-slate-800 to-slate-900 border border-rose-500 shadow-[0_0_25px_rgba(225,29,72,0.15)]";
-    statusBadge = <div className="px-3 py-1 rounded-full text-[10px] uppercase tracking-wider font-black flex items-center gap-2 bg-rose-500/10 text-rose-400 border border-rose-500/50 shadow-[0_0_10px_rgba(225,29,72,0.3)]"><span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-ping"></span> LIVE</div>;
+    
+    // --- הקסם שלנו לשילוב כפתור השידור בתוך באדג' ה-LIVE ---
+    if (match.broadcastUrl) {
+       statusBadge = (
+         <a href={match.broadcastUrl} target="_blank" rel="noopener noreferrer" className="px-4 py-1.5 rounded-full text-[11px] uppercase tracking-wider font-black flex items-center gap-2 bg-rose-600 hover:bg-rose-500 text-white border border-rose-400 shadow-[0_0_15px_rgba(225,29,72,0.6)] transition-all active:scale-95 cursor-pointer mt-1">
+           <span className="w-2 h-2 rounded-full bg-white animate-ping"></span> שידור חי (LIVE)
+         </a>
+       );
+    } else {
+       statusBadge = <div className="px-3 py-1 rounded-full text-[10px] uppercase tracking-wider font-black flex items-center gap-2 bg-rose-500/10 text-rose-400 border border-rose-500/50 shadow-[0_0_10px_rgba(225,29,72,0.3)]"><span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-ping"></span> LIVE</div>;
+    }
   } else if (isWaitingForResult) {
     cardStyle = "bg-gradient-to-br from-slate-800 to-slate-900 border border-indigo-500/50 shadow-[0_0_15px_rgba(99,102,241,0.1)] opacity-95";
     statusBadge = <div className="px-3 py-1 rounded-full text-[10px] uppercase tracking-wide font-black flex items-center gap-2 bg-indigo-500/10 text-indigo-400 border border-indigo-500/50"><span className="animate-pulse">⏳</span> ממתין</div>;
@@ -294,7 +303,6 @@ export default function MatchCard({ match, userId, tournamentState = 0 }: { matc
 
   return (
     <>
-      {/* 2. עיצוב מכווץ: הפאדינג פה צומצם ל-p-4 sm:p-5 */}
       <div id={`match-${match.id}`} className={`rounded-2xl p-4 sm:p-5 w-full max-w-lg mx-auto relative ${cardStyle}`} dir="rtl">
         
         <div className="absolute top-3 left-3 z-10">
@@ -315,8 +323,26 @@ export default function MatchCard({ match, userId, tournamentState = 0 }: { matc
 
         <div className="absolute top-3 right-3 z-10"><span className={`text-[9px] uppercase font-black tracking-wider px-2 py-1 rounded-lg bg-${themeColor}-500/10 text-${themeColor}-400 border border-${themeColor}-500/20`}>{isKnockout ? match.roundName : `בית ${match.group}`}</span></div>
 
+        {/* האזור ששודרג עם הלינקים! */}
         <div className="flex flex-col justify-center items-center mt-2 mb-4 gap-1.5">
-           <div className="text-[11px] font-bold text-slate-400 bg-slate-900/50 px-2 py-1 rounded-full border border-slate-800">🕒 {getSmartDateText()}</div>
+           <div className="flex flex-wrap justify-center items-center gap-2">
+              <div className="text-[11px] font-bold text-slate-400 bg-slate-900/50 px-2.5 py-1 rounded-full border border-slate-800 flex items-center gap-1.5">
+                 🕒 {getSmartDateText()}
+                 {/* אייקון טלוויזיה אלגנטי כשזה טרם החל */}
+                 {!isLive && match.broadcastUrl && (
+                    <a href={match.broadcastUrl} target="_blank" rel="noopener noreferrer" title="לינק לשידור" className="text-slate-500 hover:text-cyan-400 transition-colors border-r border-slate-700 pr-1.5 ml-0.5">
+                       📺
+                    </a>
+                 )}
+              </div>
+           </div>
+           
+           {(match.stadium || match.city) && (
+              <div className="text-[10px] font-bold text-slate-500 flex items-center gap-1">
+                 <span>🏟️</span>
+                 <span>{match.stadium}{match.stadium && match.city ? " • " : ""}{match.city}</span>
+              </div>
+           )}
            {statusBadge}
         </div>
 
@@ -330,7 +356,6 @@ export default function MatchCard({ match, userId, tournamentState = 0 }: { matc
           
           <div className="flex items-center justify-center gap-3 sm:gap-4">
             <div className="flex flex-col items-center">
-               {/* כיווץ קופסאות קלט: w-12 h-14 טקסט 2xl במקום המפלצות שהיו קודם */}
                <input 
                  type="number" min="0" disabled={isLocked} 
                  className={`w-12 h-14 sm:w-14 sm:h-16 text-center text-2xl sm:text-3xl font-black rounded-xl border-2 focus:outline-none transition-all ${numberInputClass} ${isLocked ? "bg-slate-900 border-slate-800 text-slate-500 cursor-not-allowed" : isMissingPrediction ? "bg-slate-900 border-amber-500/50 text-white shadow-[inset_0_2px_10px_rgba(0,0,0,0.5)]" : `bg-slate-800 border-slate-600 text-white focus:border-${themeColor}-500 shadow-[inset_0_2px_10px_rgba(0,0,0,0.5)]`} ${match.isFinished && homeScore === String(match.realHomeScore) ? "border-emerald-500/50 text-emerald-400 bg-emerald-900/20" : ""}`} 
@@ -529,7 +554,7 @@ export default function MatchCard({ match, userId, tournamentState = 0 }: { matc
                                 {data.userRank || "-"}
                               </div>
                               <span className="text-sm truncate max-w-[110px] sm:max-w-[160px]">{data.userName}</span>
-                              {data.userId === userId && <span className="text-[8px] bg-blue-600 text-white px-1.5 py-0.5 rounded uppercase">אתה</span>}
+                              {data.userId === userId && <span className="text-[8px] font-black bg-blue-600 text-white px-1.5 py-0.5 rounded uppercase">אתה</span>}
                             </div>
                             <div className="text-[9px] font-bold text-slate-400 bg-slate-950 px-1.5 py-0.5 rounded border border-slate-700/50 shrink-0">
                               סה״כ: <span className="text-amber-400">{data.userTotalPoints}</span>

@@ -25,6 +25,39 @@ const parseDateTimeLocal = (dtStr: string) => {
   } catch { return 0; }
 };
 
+const isMatchInCurrentActivePhase = (m: any, state: number) => {
+  const s = Number(state) || 0;
+  if (m.stage !== "KNOCKOUT") {
+     const md = Number(m.matchday) || 1;
+     if (s === 0 && md === 1) return true;
+     if (s === 1 && md === 2) return true;
+     if (s === 2 && md === 3) return true;
+     return false;
+  } else {
+     if (s === 4 && m.roundName === "32 הגדולות") return true;
+     if (s === 6 && m.roundName === "שמינית גמר") return true;
+     if (s === 8 && m.roundName === "רבע גמר") return true;
+     if (s === 10 && m.roundName === "חצי גמר") return true;
+     if (s === 12 && (m.roundName === "גמר" || m.roundName === "מקום שלישי")) return true;
+     return false;
+  }
+};
+
+const getPhaseName = (state: number) => {
+  const s = Number(state) || 0;
+  switch(s) {
+    case 0: return "מחזור 1";
+    case 1: return "מחזור 2";
+    case 2: return "מחזור 3";
+    case 4: return "32 הגדולות";
+    case 6: return "שמינית הגמר";
+    case 8: return "רבע הגמר";
+    case 10: return "חצי הגמר";
+    case 12: return "משחקי הגמר";
+    default: return "השלב הנוכחי";
+  }
+};
+
 export default function Dashboard({ userId, userName, setActiveTab, setPredictionTab, tournamentState }: any) {
   const [userStats, setUserStats] = useState<any>({ points: 0, rank: 0, koPoints: 0, koRank: 0, hasPaid: false, prevPoints: 0, prevRank: 0, prevKoRank: 0, nemesisId: null });
   const [leaderboardInfo, setLeaderboardInfo] = useState({ totalUsers: 0 });
@@ -41,7 +74,9 @@ export default function Dashboard({ userId, userName, setActiveTab, setPredictio
   const [pointsFeed, setPointsFeed] = useState<any[]>([]);
   const [isFeedLoading, setIsFeedLoading] = useState(true);
   const [showFullHistory, setShowFullHistory] = useState(false);
-  const [missingMatchesToday, setMissingMatchesToday] = useState(0);
+  
+  const [missingTasksList, setMissingTasksList] = useState<any[]>([]);
+  const [activeDeadlineTime, setActiveDeadlineTime] = useState<number | null>(null);
   
   const [todayTargets, setTodayTargets] = useState<any[]>([]);
   const [todayMatches, setTodayMatches] = useState<any[]>([]);
@@ -69,6 +104,16 @@ export default function Dashboard({ userId, userName, setActiveTab, setPredictio
   useEffect(() => {
     const interval = setInterval(() => setNowMs(Date.now()), 1000);
     return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    const unsubDeadlines = onSnapshot(doc(db, "settings", "deadlines"), (snap) => {
+      if (snap.exists() && snap.data().activeDeadline?.time) {
+        setActiveDeadlineTime(parseDateTimeLocal(snap.data().activeDeadline.time)); // ✅ בום. מתוקן.      } else {
+        setActiveDeadlineTime(null);
+      }
+    });
+    return () => unsubDeadlines();
   }, []);
 
   useEffect(() => {
@@ -101,6 +146,7 @@ export default function Dashboard({ userId, userName, setActiveTab, setPredictio
      setActiveSurpriseAlert(surpriseCount);
   }, [liveBonusQs, liveBonusAns, nowMs]);
 
+  // הפונקציה האבודה שהחזרנו!
   const checkIsMatchLocked = (m: any, state: number) => {
     const s = Number(state) || 0;
     if (m.stage !== "KNOCKOUT") {
@@ -111,7 +157,7 @@ export default function Dashboard({ userId, userName, setActiveTab, setPredictio
       if (m.roundName === "שמינית גמר" && s >= 7) return true;
       if (m.roundName === "רבע גמר" && s >= 9) return true;
       if (m.roundName === "חצי גמר" && s >= 11) return true;
-      if (m.roundName === "גמר" && s >= 13) return true;
+      if (m.roundName === "גמר" || m.roundName === "מקום שלישי") return s >= 13;
       return false;
     }
   };
@@ -269,14 +315,21 @@ export default function Dashboard({ userId, userName, setActiveTab, setPredictio
         pmSnap.forEach(d => { userMatchPreds[d.data().matchId] = d.data(); });
         pkSnap.forEach(d => { userMatchPreds[d.data().matchId] = d.data(); });
 
+        const pqSnap = await getDoc(doc(db, "predictions_qualifiers", userId));
+        const userQualsData = pqSnap.exists() ? pqSnap.data().groups || {} : {};
+
+        const ptSnap = await getDoc(doc(db, "predictions_third_place", userId));
+        const userThirdData = ptSnap.exists() ? ptSnap.data().teams || [] : [];
+
         const today = new Date();
         const targets: any[] = [];
         const tMatches: any[] = [];
         const todayTeams = new Set<string>();
-        let missingMatches = 0;
+        
+        const currentMissingList: any[] = [];
         
         matches.forEach(m => {
-           if (!m.isFinished && m.matchDate && typeof m.matchDate === 'string') {
+           if (m.matchDate && typeof m.matchDate === 'string') {
               const parts = m.matchDate.split(" ");
               const d = parts[0] || "";
               const t = parts[1] || "";
@@ -288,12 +341,87 @@ export default function Dashboard({ userId, userName, setActiveTab, setPredictio
                     todayTeams.add(m.awayTeam);
                     const pred = userMatchPreds[m.id];
                     tMatches.push({ ...m, time: t, userPrediction: pred || null });
-                    if (!pred || pred.predictedHomeScore === "") missingMatches++;
                  }
               }
            }
+           
+           if (!m.isFinished && isMatchInCurrentActivePhase(m, tournamentState)) {
+              const pred = userMatchPreds[m.id];
+              if (!pred || pred.predictedHomeScore === "" || pred.predictedAwayScore === "" || (m.stage === "KNOCKOUT" && !pred.qualifier)) {
+                 currentMissingList.push({
+                    type: 'MATCH',
+                    id: m.id,
+                    title: `משחק: ${m.homeTeam} נגד ${m.awayTeam}`,
+                    stage: m.stage,
+                    matchday: m.matchday,
+                    group: m.group,
+                    tab: m.stage === "KNOCKOUT" ? "KNOCKOUT" : "MATCHES"
+                 });
+              }
+           }
         });
-        setMissingMatchesToday(missingMatches);
+
+        if (tournamentState === 0) {
+           const uniqueGroups = Array.from(new Set(matches.filter(m => m.stage !== "KNOCKOUT").map(m => m.group))).filter(Boolean).sort();
+           uniqueGroups.forEach(g => {
+              const gPred = userQualsData[g as string];
+              if (!gPred || !gPred.first || !gPred.second) {
+                 currentMissingList.push({
+                    type: 'QUALIFIER',
+                    title: `עולות מבית ${g}`,
+                    group: g,
+                    tab: 'MATCHES',
+                    subTab: 'QUALIFIERS'
+                 });
+              }
+           });
+
+           const validThird = userThirdData.filter((t: string) => t.trim() !== "");
+           if (validThird.length < 8) {
+              currentMissingList.push({
+                 type: 'THIRD_PLACE',
+                 title: `מעפילות ממקום 3 (${8 - validThird.length} חסרות)`,
+                 tab: 'THIRD_PLACE'
+              });
+           }
+        }
+
+        const isQuestionLockedLocal = (q: any) => {
+          if (rBonusData.locked?.[q.id]) return true;
+          if (q.isSurprise) {
+            if (!q.openTime || !q.closeTime) return false;
+            const open = parseDateTimeLocal(q.openTime);
+            const close = parseDateTimeLocal(q.closeTime);
+            return nowMs < open || nowMs > close; 
+          }
+          const state = tournamentState;
+          if (state === 0) return false;
+          if (q.phase === "TOURNAMENT" || q.phase === "GROUPS") return state >= 1;
+          if (q.phase === "KNOCKOUT") {
+            if (q.knockoutRound === "ALL" || q.knockoutRound === "32 הגדולות") return state >= 5;
+            if (q.knockoutRound === "שמינית גמר") return state >= 7;
+            if (q.knockoutRound === "רבע גמר") return state >= 9;
+            if (q.knockoutRound === "חצי גמר") return state >= 11;
+            if (q.knockoutRound === "גמר" || q.knockoutRound === "מקום שלישי") return state >= 13;
+          }
+          return false;
+        };
+
+        bonusQuestionsList.forEach((q: any) => {
+           if (!isQuestionLockedLocal(q)) {
+              const ans = userBonusAnswers[q.id];
+              if (!ans || String(ans).trim() === "") {
+                 currentMissingList.push({
+                    type: 'BONUS',
+                    id: q.id,
+                    title: `שאלת בונוס: ${q.label}`,
+                    tab: 'BONUS'
+                 });
+              }
+           }
+        });
+        
+        setMissingTasksList(currentMissingList);
 
         const noneKeywords = ["אף נבחרת", "אף אחת", "אין", "none"];
         
@@ -303,8 +431,12 @@ export default function Dashboard({ userId, userName, setActiveTab, setPredictio
               if (!ansStr) continue;
 
               const truthArray = realBonusAnswers[qId] ? (Array.isArray(realBonusAnswers[qId]) ? realBonusAnswers[qId] : [realBonusAnswers[qId]]) : [];
+              const blacklistArray = rBonusData.blacklist?.[qId] ? (Array.isArray(rBonusData.blacklist[qId]) ? rBonusData.blacklist[qId] : [rBonusData.blacklist[qId]]) : [];
+
               if (truthArray.includes(ansStr)) continue;
               if (noneKeywords.includes(ansStr) && truthArray.length > 0) continue;
+              if (blacklistArray.includes(ansStr)) continue;
+              if (rBonusData.locked?.[qId] && !truthArray.includes(ansStr)) continue;
 
               const q = bonusQuestions.find((q:any) => q.id === qId);
               if (!q) continue;
@@ -356,10 +488,7 @@ export default function Dashboard({ userId, userName, setActiveTab, setPredictio
           }
         });
 
-        const pqSnap = await getDoc(doc(db, "predictions_qualifiers", userId));
-        if(pqSnap.exists()) {
-          const groups = pqSnap.data().groups || {};
-          for(const [g, preds] of Object.entries<any>(groups)) {
+        for(const [g, preds] of Object.entries<any>(userQualsData)) {
             const rG = realQuals[g];
             if(rG) {
                if(preds.first === rG.first && preds.first) feed.push({ id: `q1_${g}`, icon: '🥇', title: `${preds.first} עולה מבית ${g}`, desc: `פגיעה מדויקת - מקום 1`, points: 15, ts: Infinity });
@@ -367,16 +496,11 @@ export default function Dashboard({ userId, userName, setActiveTab, setPredictio
                if(preds.second === rG.second && preds.second) feed.push({ id: `q2_${g}`, icon: '🥇', title: `${preds.second} עולה מבית ${g}`, desc: `פגיעה מדויקת - מקום 2`, points: 15, ts: Infinity });
                else if(preds.second === rG.first && preds.second) feed.push({ id: `q2s_${g}`, icon: '🥈', title: `${preds.second} עולה מבית ${g}`, desc: `עלתה בפועל מהמקום ה-1`, points: 7, ts: Infinity });
             }
-          }
         }
 
-        const ptSnap = await getDoc(doc(db, "predictions_third_place", userId));
-        if(ptSnap.exists()) {
-           const teams = ptSnap.data().teams || [];
-           teams.forEach((t:string, i:number) => {
-              if(t && realThird.includes(t)) feed.push({ id: `t3_${i}`, icon: '🥉', title: `${t}`, desc: `צדקת! העפילה לשמינית ממקום 3`, points: 10, ts: Infinity });
-           });
-        }
+        userThirdData.forEach((t:string, i:number) => {
+            if(t && realThird.includes(t)) feed.push({ id: `t3_${i}`, icon: '🥉', title: `${t}`, desc: `צדקת! העפילה לשמינית ממקום 3`, points: 10, ts: Infinity });
+        });
 
         if(Object.keys(realBonusAnswers).length > 0) {
            bonusQuestions.forEach((q:any) => {
@@ -544,9 +668,86 @@ export default function Dashboard({ userId, userName, setActiveTab, setPredictio
     return true;
   });
 
+  let urgencyLevel = "NORMAL";
+  let bannerStyle = "bg-gradient-to-r from-amber-600 via-orange-600 to-amber-600 border-amber-300 shadow-[0_0_40px_rgba(245,158,11,0.6)]";
+  let urgencyTitle = "משחקים מחכים לניחוש שלך!";
+  let urgencyIcon = "⚠️";
+  
+  if (activeDeadlineTime) {
+     const hoursLeft = (activeDeadlineTime - nowMs) / (1000 * 60 * 60);
+     if (hoursLeft > 0 && hoursLeft <= 4) {
+       urgencyLevel = "CRITICAL";
+       bannerStyle = "bg-gradient-to-r from-rose-600 via-red-600 to-rose-600 border-rose-300 shadow-[0_0_40px_rgba(225,29,72,0.6)] animate-pulse";
+       urgencyTitle = "הדד-ליין נושף בעורף! שעות אחרונות לנעילה!";
+       urgencyIcon = "🚨";
+     } else if (hoursLeft > 4 && hoursLeft <= 24) {
+       urgencyLevel = "HIGH";
+       bannerStyle = "bg-gradient-to-r from-orange-600 via-red-500 to-orange-600 border-orange-300 shadow-[0_0_40px_rgba(249,115,22,0.6)]";
+       urgencyTitle = "הזמן אוזל! פחות מ-24 שעות לנעילה";
+       urgencyIcon = "⏳";
+     }
+  }
+
+  const missingMatchesCount = missingTasksList.filter(t => t.type === 'MATCH').length;
+  const missingQualsCount = missingTasksList.filter(t => t.type === 'QUALIFIER').length;
+  const missingThirdCount = missingTasksList.filter(t => t.type === 'THIRD_PLACE').length;
+  const missingBonusCount = missingTasksList.filter(t => t.type === 'BONUS').length;
+
+  const summaryParts = [];
+  if (missingMatchesCount > 0) summaryParts.push(`**${missingMatchesCount} משחקים**`);
+  if (missingQualsCount > 0) summaryParts.push(`**עולות מ-${missingQualsCount} בתים**`);
+  if (missingThirdCount > 0) summaryParts.push(`**מעפילות ממקום 3**`);
+  if (missingBonusCount > 0) summaryParts.push(`**${missingBonusCount} שאלות בונוס**`);
+
+  let summaryText = "";
+  if (summaryParts.length === 1) summaryText = summaryParts[0];
+  else if (summaryParts.length === 2) summaryText = `${summaryParts[0]} ו-${summaryParts[1]}`;
+  else if (summaryParts.length > 2) {
+     const last = summaryParts.pop();
+     summaryText = `${summaryParts.join(", ")} ו-${last}`;
+  }
+
+  const handleTaskClick = () => {
+      const firstTask = missingTasksList[0];
+      if (!firstTask) return;
+      
+      if (firstTask.type === 'MATCH') {
+          if (firstTask.stage !== "KNOCKOUT") {
+              sessionStorage.setItem("targetMatchday", firstTask.matchday || "1");
+              sessionStorage.setItem("targetGroup", firstTask.group);
+              sessionStorage.setItem("groupsViewMode", "MATCHES");
+          }
+          sessionStorage.setItem("scrollToMatch", firstTask.id);
+      } else if (firstTask.type === 'QUALIFIER') {
+          sessionStorage.setItem("targetGroup", firstTask.group);
+          sessionStorage.setItem("groupsViewMode", "QUALIFIERS");
+      } else if (firstTask.type === 'BONUS') {
+          sessionStorage.setItem("scrollToBonus", firstTask.id);
+      }
+      
+      setActiveTab("PREDICTIONS");
+      if(setPredictionTab) setPredictionTab(firstTask.tab);
+      window.scrollTo({top:0, behavior:'smooth'});
+  };
+
   return (
     <div className="w-full space-y-8 animate-fade-in-up pb-8 relative">
       
+      <style dangerouslySetInnerHTML={{__html: `
+        @keyframes eyeBlink {
+          0%, 90%, 100% { transform: scaleY(1); }
+          92% { transform: scaleY(0.1); }
+          94% { transform: scaleY(1); }
+          96% { transform: scaleY(0.1); }
+          98% { transform: scaleY(1); }
+        }
+        .animate-eye-blink {
+          display: inline-block;
+          animation: eyeBlink 4s infinite;
+          transform-origin: center;
+        }
+      `}} />
+
       {/* 🎈 קמעות פופ-אפ */}
       <div className={`fixed bottom-4 left-4 md:left-8 z-[100] transition-all duration-700 transform ${showMascot ? 'translate-y-0 opacity-100' : 'translate-y-32 opacity-0 pointer-events-none'} flex items-end gap-3`} dir="ltr">
          <div className="bg-slate-50 text-slate-900 p-4 rounded-2xl rounded-bl-none shadow-[0_10px_25px_rgba(0,0,0,0.5)] max-w-[220px] md:max-w-[280px] relative border-2 border-slate-300" dir="rtl">
@@ -558,27 +759,33 @@ export default function Dashboard({ userId, userName, setActiveTab, setPredictio
          </div>
       </div>
 
-      {/* 🚨 אזהרה משחקים חסרים */}
-      {missingMatchesToday > 0 && (
-         <div className="bg-gradient-to-r from-amber-600 via-orange-600 to-amber-600 p-6 rounded-3xl border border-amber-300 shadow-[0_0_40px_rgba(245,158,11,0.6)] relative overflow-hidden">
+      {/* 🚨 אזהרת דדליין ומשימות חסרות - חכמה ומקיפה! */}
+      {missingTasksList.length > 0 && (
+         <div className={`${bannerStyle} p-6 rounded-3xl border relative overflow-hidden transition-all duration-500`}>
             <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0IiBoZWlnaHQ9IjQiPgo8cmVjdCB3aWR0aD0iNCIgaGVpZ2h0PSI0IiBmaWxsPSIjZmZmIiBmaWxsLW9wYWNpdHk9IjAuMSIvPgo8L3N2Zz4=')] opacity-30"></div>
             <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-6 text-center md:text-right">
                <div>
                   <h2 className="text-2xl md:text-3xl font-black text-white mb-2 flex items-center justify-center md:justify-start gap-3 drop-shadow-md">
-                     <span className="animate-pulse text-amber-950">⚠️</span> משחקים להיום מחכים לך!
+                     <span className={urgencyLevel === "CRITICAL" ? "animate-bounce" : "animate-pulse"}>{urgencyIcon}</span> {urgencyTitle}
                   </h2>
                   <p className="text-white/90 font-medium text-base md:text-lg leading-snug">
-                     ישנם <strong>{missingMatchesToday} משחקים</strong> שמתקיימים היום וטרם הזנת להם ניחוש. אל תאבד נקודות סתם.
+                     מתוך {getPhaseName(tournamentState)}, ישנם <span dangerouslySetInnerHTML={{__html: summaryText.replace(/\*\*/g, '')}}></span> שפתוחים כרגע לניחושים וטרם הוזנו.
+                     <br />
+                     <span className="text-sm font-bold opacity-90 mt-1 block">
+                        לדוגמה: {missingTasksList[0].title}
+                     </span>
                   </p>
                </div>
-               <button onClick={() => { setActiveTab("PREDICTIONS"); if(setPredictionTab) setPredictionTab("MATCHES"); window.scrollTo({top:0, behavior:'smooth'}); }} className="bg-white text-amber-700 hover:bg-slate-100 font-black px-8 py-4 rounded-xl text-lg shadow-xl hover:-translate-y-1 transition-transform w-full md:w-auto flex-shrink-0">
-                  קח אותי למשחקים 🏃‍♂️
+               <button onClick={handleTaskClick} 
+                 className={`bg-white font-black px-8 py-4 rounded-xl text-lg shadow-xl hover:-translate-y-1 transition-transform w-full md:w-auto flex-shrink-0 ${urgencyLevel === "CRITICAL" ? "text-rose-700" : "text-amber-700"}`}
+               >
+                  קח אותי למשימה! 🏃‍♂️
                </button>
             </div>
          </div>
       )}
 
-      {/* 🎁 באנר שאלת הפתעה מתוקן שעובד על מספר (>0) */}
+      {/* 🎁 באנר שאלת הפתעה מתוקן */}
       {activeSurpriseAlert > 0 && (
          <div className="bg-gradient-to-r from-purple-600 via-pink-600 to-purple-600 p-6 rounded-3xl border border-purple-300 shadow-[0_0_40px_rgba(168,85,247,0.6)] relative overflow-hidden animate-pulse">
             <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0IiBoZWlnaHQ9IjQiPgo8cmVjdCB3aWR0aD0iNCIgaGVpZ2h0PSI0IiBmaWxsPSIjZmZmIiBmaWxsLW9wYWNpdHk9IjAuMSIvPgo8L3N2Zz4=')] opacity-30"></div>
@@ -822,46 +1029,44 @@ export default function Dashboard({ userId, userName, setActiveTab, setPredictio
          </div>
 
          <div className="w-[90%] md:w-auto shrink-0 snap-center flex flex-col gap-4 md:gap-6 h-full">
-            {dailyMessage && (
-               <div 
-                  onClick={() => setShowMagazineModal(true)}
-                  className="bg-slate-900 rounded-3xl p-6 shadow-xl relative overflow-hidden border border-slate-700 group cursor-pointer flex flex-col hover:border-blue-500/50 transition-all duration-300 flex-1"
-               >
-                  <div className="absolute inset-0 bg-gradient-to-br from-blue-900/20 to-emerald-900/10 z-0"></div>
-                  <div className="absolute -bottom-10 -left-10 text-9xl opacity-5 transform -rotate-12 pointer-events-none group-hover:scale-110 transition-transform duration-500">📰</div>
-                  <div className="absolute top-0 right-0 w-1.5 h-full bg-gradient-to-b from-blue-400 to-emerald-500"></div>
+            <div 
+               onClick={() => setShowMagazineModal(true)}
+               className="bg-slate-900 rounded-3xl p-6 shadow-xl relative overflow-hidden border border-slate-700 group cursor-pointer flex flex-col hover:border-blue-500/50 transition-all duration-300 flex-1"
+            >
+               <div className="absolute inset-0 bg-gradient-to-br from-blue-900/20 to-emerald-900/10 z-0"></div>
+               <div className="absolute -bottom-10 -left-10 text-9xl opacity-5 transform -rotate-12 pointer-events-none group-hover:scale-110 transition-transform duration-500">📰</div>
+               <div className="absolute top-0 right-0 w-1.5 h-full bg-gradient-to-b from-blue-400 to-emerald-500"></div>
 
-                  <div className="relative z-10 flex justify-between items-start mb-4 shrink-0">
-                     <div className="bg-slate-950/80 px-3 py-1.5 rounded-lg border border-slate-800 backdrop-blur-sm text-slate-400 text-xs font-bold">
-                        {new Date().toLocaleDateString('he-IL')}
-                     </div>
-                     <div className="text-3xl drop-shadow-md">📰</div>
+               <div className="relative z-10 flex justify-between items-start mb-4 shrink-0">
+                  <div className="bg-slate-950/80 px-3 py-1.5 rounded-lg border border-slate-800 backdrop-blur-sm text-slate-400 text-xs font-bold">
+                     {new Date().toLocaleDateString('he-IL')}
                   </div>
-
-                  {dailyMediaUrl && (
-                     <div className="relative z-10 mb-5 w-full h-48 md:h-56 rounded-xl overflow-hidden border border-slate-700/50 shadow-inner bg-slate-950/80 flex items-center justify-center shrink-0">
-                        {dailyMediaUrl.match(/\.(jpeg|jpg|gif|png|webp)$/i) != null ? (
-                           <img src={dailyMediaUrl} alt="Magazine Cover" className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-500" />
-                        ) : (
-                           <video src={dailyMediaUrl} autoPlay loop muted playsInline className="w-full h-full object-contain opacity-80 group-hover:opacity-100 transition-opacity" />
-                        )}
-                     </div>
-                  )}
-
-                  <div className="relative z-10 flex-1 flex flex-col">
-                     <h2 className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400 mb-2 shrink-0">המהדורה המרכזית</h2>
-                     
-                     <div 
-                        className="text-slate-300 text-sm font-medium leading-relaxed mb-6 line-clamp-5 flex-1 whitespace-pre-wrap [&_b]:text-amber-400 [&_strong]:text-amber-400 [&_mark]:px-1.5 [&_mark]:rounded [&_mark.yellow]:bg-amber-500/20 [&_mark.yellow]:text-amber-300 [&_mark.green]:bg-emerald-500/20 [&_mark.green]:text-emerald-300 [&_mark.red]:bg-rose-500/20 [&_mark.red]:text-rose-400 [&_a]:text-cyan-400 [&_a]:underline"
-                        dangerouslySetInnerHTML={{ __html: dailySubtext || "הודעות הנהלה, עדכונים חמים, וכל מה שצריך לדעת כדי לא להישאר מאחור." }} 
-                     />
-                     
-                     <button className="bg-slate-800 hover:bg-slate-700 text-white font-bold py-3 w-full rounded-xl border border-slate-600 transition-colors flex justify-center items-center gap-2 text-sm shadow-md group-hover:bg-blue-600 group-hover:border-blue-500 shrink-0 mt-auto">
-                        קרא את המהדורה המלאה <span>👈</span>
-                     </button>
-                  </div>
+                  <div className="text-3xl drop-shadow-md">📰</div>
                </div>
-            )}
+
+               {dailyMediaUrl && (
+                  <div className="relative z-10 mb-5 w-full h-48 md:h-56 rounded-xl overflow-hidden border border-slate-700/50 shadow-inner bg-slate-950/80 flex items-center justify-center shrink-0">
+                     {dailyMediaUrl.match(/\.(jpeg|jpg|gif|png|webp)$/i) != null ? (
+                        <img src={dailyMediaUrl} alt="Magazine Cover" className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-500" />
+                     ) : (
+                        <video src={dailyMediaUrl} autoPlay loop muted playsInline className="w-full h-full object-contain opacity-80 group-hover:opacity-100 transition-opacity" />
+                     )}
+                  </div>
+               )}
+
+               <div className="relative z-10 flex-1 flex flex-col">
+                  <h2 className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400 mb-2 shrink-0">המהדורה המרכזית</h2>
+                  
+                  <div 
+                     className="text-slate-300 text-sm font-medium leading-relaxed mb-6 line-clamp-5 flex-1 whitespace-pre-wrap [&_b]:text-amber-400 [&_strong]:text-amber-400 [&_mark]:px-1.5 [&_mark]:rounded [&_mark.yellow]:bg-amber-500/20 [&_mark.yellow]:text-amber-300 [&_mark.green]:bg-emerald-500/20 [&_mark.green]:text-emerald-300 [&_mark.red]:bg-rose-500/20 [&_mark.red]:text-rose-400 [&_a]:text-cyan-400 [&_a]:underline"
+                     dangerouslySetInnerHTML={{ __html: dailySubtext || "אין עדכונים מיוחדים הבוקר. שווה לעקוב במהלך היום!" }} 
+                  />
+                  
+                  <button className="bg-slate-800 hover:bg-slate-700 text-white font-bold py-3 w-full rounded-xl border border-slate-600 transition-colors flex justify-center items-center gap-2 text-sm shadow-md group-hover:bg-blue-600 group-hover:border-blue-500 shrink-0 mt-auto">
+                     קרא את המהדורה המלאה <span>👈</span>
+                  </button>
+               </div>
+            </div>
 
             <Link href="/matrix" className="w-full flex flex-col md:flex-row items-center justify-between bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 hover:from-blue-900/30 hover:to-slate-800 border-2 border-slate-700 hover:border-blue-500/50 p-5 md:p-6 rounded-3xl shadow-[0_10px_30px_rgba(0,0,0,0.4)] transition-all active:scale-[0.98] group relative overflow-hidden shrink-0">
                <div className="absolute top-0 right-0 w-2 h-full bg-blue-500"></div>
@@ -869,7 +1074,7 @@ export default function Dashboard({ userId, userName, setActiveTab, setPredictio
                
                <div className="flex flex-col md:flex-row items-center gap-4 md:gap-6 relative z-10 w-full md:w-auto text-center md:text-right mb-4 md:mb-0">
                   <div className="w-16 h-16 md:w-20 md:h-20 bg-slate-950 rounded-2xl flex items-center justify-center border border-slate-700 shadow-inner group-hover:scale-110 group-hover:border-blue-500/50 transition-all shrink-0">
-                     <span className="text-3xl md:text-4xl drop-shadow-lg">👁️</span>
+                     <span className="animate-eye-blink text-3xl md:text-4xl drop-shadow-lg">👁️</span>
                   </div>
                   <div className="flex flex-col">
                      <span className="font-black text-white text-xl md:text-2xl mb-1 tracking-wide">טבלת הגילוי הנאות</span>
@@ -954,7 +1159,7 @@ export default function Dashboard({ userId, userName, setActiveTab, setPredictio
                  <div className="flex bg-slate-950 p-1.5 rounded-xl border border-slate-700/50 shadow-inner">
                    {todayMatches.length > 0 && <button onClick={() => { setActiveBannerMode("MATCHES"); setTodayMatchIndex(0); }} className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${isMatchesMode ? "bg-gradient-to-r from-blue-600 to-cyan-600 text-white shadow-md" : "text-slate-400 hover:text-white hover:bg-slate-800"}`}>⚽ להיום</button>}
                    {todayTargets.length > 0 && <button onClick={() => { setActiveBannerMode("BONUS"); setTodayBonusIndex(0); }} className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${activeBannerMode === "BONUS" ? "bg-gradient-to-r from-rose-600 to-amber-600 text-white shadow-md" : "text-slate-400 hover:text-white hover:bg-slate-800"}`}>🎯 מטרות</button>}
-                   <button onClick={() => setActiveBannerMode("RADAR")} className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1 ${activeBannerMode === "RADAR" ? "bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-md" : "text-slate-400 hover:text-white hover:bg-slate-800"}`}>📡 ראדר כל שאלות הבונוס</button>
+                   <button onClick={() => setActiveBannerMode("RADAR")} className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1 ${activeBannerMode === "RADAR" ? "bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-md" : "text-slate-400 hover:text-white hover:bg-slate-800"}`}>📡 ראדאר</button>
                  </div>
                </div>
 
@@ -1181,7 +1386,6 @@ export default function Dashboard({ userId, userName, setActiveTab, setPredictio
                     </div>
                  )}
 
-                 {/* תמיכה במרווחים כפי שביקשת באדמין */}
                  {dailySubtext && (
                     <div 
                       className="text-slate-300 text-base md:text-lg leading-relaxed mb-6 font-medium whitespace-pre-wrap italic border-r-4 border-slate-600 pr-4 [&_b]:text-amber-400 [&_strong]:text-amber-400 [&_mark]:px-1.5 [&_mark]:rounded [&_mark.yellow]:bg-amber-500/20 [&_mark.yellow]:text-amber-300 [&_mark.green]:bg-emerald-500/20 [&_mark.green]:text-emerald-300 [&_mark.red]:bg-rose-500/20 [&_mark.red]:text-rose-400 [&_a]:text-cyan-400 [&_a]:underline"
@@ -1207,7 +1411,7 @@ export default function Dashboard({ userId, userName, setActiveTab, setPredictio
                                  [&_hr]:border-slate-700 [&_hr]:my-8
                                  [&_img]:inline-block [&_img]:rounded-2xl [&_img]:shadow-lg [&_img]:my-6 [&_img]:max-h-[300px] md:[&_img]:max-h-[400px] [&_img]:w-auto [&_img]:max-w-full [&_img]:object-contain [&_img]:border [&_img]:border-slate-700
                                  [&_a]:text-cyan-400 [&_a]:underline hover:[&_a]:text-cyan-300" 
-                      dangerouslySetInnerHTML={{ __html: dailyMessage }} 
+                      dangerouslySetInnerHTML={{ __html: dailyMessage || "הודעות הנהלה, עדכונים חמים, וכל מה שצריך לדעת כדי לא להישאר מאחור." }} 
                  />
             </div>
             
@@ -1234,16 +1438,17 @@ export default function Dashboard({ userId, userName, setActiveTab, setPredictio
               <button onClick={() => setShowRealStandingsModal(false)} className="w-8 h-8 md:w-10 md:h-10 flex items-center justify-center rounded-full bg-slate-800 hover:bg-rose-500/20 hover:text-rose-400 text-slate-400 transition-colors font-black text-lg border border-slate-700">✕</button>
             </div>
 
-            <div className="flex-1 w-full bg-white rounded-xl overflow-hidden shadow-inner">
+            <div className="flex-1 w-full bg-slate-900 rounded-xl overflow-hidden shadow-inner flex flex-col">
                <iframe 
-                 id="sofa-standings-embed-1" 
+                 id="sofa-standings-embed-undefined-58210" 
                  width="100%" 
                  height="100%" 
-                 src="https://widgets.sofascore.com/embed/tournament/16/season/41087/standings/regular?widgetTitle=World Cup" 
+                 src="https://widgets.sofascore.com/embed/unique-tournament/16/season/58210/multiple-standings?widgetTitle=FIFA+World+Cup&showCompetitionLogo=true&widgetTheme=dark" 
                  frameBorder="0" 
                  scrolling="yes"
-                 className="w-full h-full"
+                 className="w-full flex-1"
                ></iframe>
+
             </div>
             
           </div>
@@ -1325,6 +1530,7 @@ export default function Dashboard({ userId, userName, setActiveTab, setPredictio
               {isLoadingSpy ? (<div className="flex justify-center py-8 text-blue-400 animate-pulse font-black tracking-wide">טוען נתונים מהשטח... ⏳</div>) : filteredSpyData.length === 0 ? (<div className="text-center text-slate-500 py-8 font-bold">לא נמצאו ניחושים שמתאימים לחיפוש.</div>) : (
                 <div className="space-y-2">
                   {filteredSpyData.map((data, idx) => {
+                    
                     let cardStyle = "px-3 py-2.5 rounded-xl border transition-all ";
                     if (spyModalMatch.isFinished) {
                       const pH = Number(data.predictedHomeScore); const pA = Number(data.predictedAwayScore);

@@ -277,10 +277,28 @@ export default function MatrixPage() {
 
   return (
     <div className="min-h-screen bg-slate-950 p-4 md:p-8" dir="rtl">
-      
+      {/* פה אנחנו מכניסים את הסטייל של המצמוץ! */}
+      <style dangerouslySetInnerHTML={{__html: `
+        @keyframes eyeBlink {
+          0%, 90%, 100% { transform: scaleY(1); }
+          92% { transform: scaleY(0.1); }
+          94% { transform: scaleY(1); }
+          96% { transform: scaleY(0.1); }
+          98% { transform: scaleY(1); }
+        }
+        .animate-eye-blink {
+          display: inline-block;
+          animation: eyeBlink 4s infinite;
+          transform-origin: center;
+        }
+      `}} />
+
       <div className="max-w-[98vw] mx-auto flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
          <div>
-            <h1 className="text-2xl md:text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400">דף גילוי נאות 👁️</h1>
+            <h1 className="text-2xl md:text-3xl font-black flex items-center gap-2">
+               <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400">דף גילוי נאות</span>
+               <span className="animate-eye-blink drop-shadow-md">👁️</span>
+            </h1>
             <p className="text-slate-400 text-xs mt-1 font-medium bg-slate-900 px-3 py-1.5 rounded-lg border border-slate-800 inline-block">
                {activeTab === "MATCHES" && "🟢 בול | 🔵 כיוון נכון | 🔴 טעות | 🔒 נחשף בתחילת השלב"}
                {activeTab === "QUALIFIERS" && "🟢 בול | 🔵 פגיעה חלקית (הצלבה) | 🔴 טעות | 🔒 נחשף בתחילת השלב"}
@@ -436,7 +454,7 @@ export default function MatrixPage() {
                         let tdClass = "border-b border-l border-slate-800/50 p-2 text-sm font-mono tracking-widest text-center transition-colors ";
                         
                         if (!isMatchExposed) return <td key={m.id} className={tdClass}><span className="text-slate-600 text-xs">🔒</span></td>;
-                        if (!p || p.predictedHomeScore === "") return <td key={m.id} className={tdClass}><span className="text-rose-500/40 text-xs">--</span></td>;
+                        if (!p || p.predictedHomeScore === undefined || p.predictedHomeScore === "") return <td key={m.id} className={tdClass}><span className="text-rose-500/40 text-xs">--</span></td>;
 
                         if (m.isFinished) {
                             const pH = Number(p.predictedHomeScore); const pA = Number(p.predictedAwayScore);
@@ -528,7 +546,7 @@ export default function MatrixPage() {
                          )
                       })()}
 
-                      {/* תאים בונוסים - עכשיו תומכים בחשיפת הפתעות מותאמת אישית! */}
+                      {/* תאים בונוסים */}
                       {activeTab === "BONUS" && bonusQuestions.map(q => {
                         let answerText = "--";
                         const bData = bonusPredictions[u.id];

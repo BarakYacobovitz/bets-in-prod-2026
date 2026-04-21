@@ -8,7 +8,9 @@ import toast from "react-hot-toast";
 import { getFlagUrl } from "../utils/flags";
 import AdminMatchesTab from "@/components/admin/AdminMatchesTab"; 
 import AdminSystemTab from "@/components/admin/AdminSystemTab";
-import AdminMagazineTab from "@/components/admin/AdminMagazineTab"; // הטאב החדש למהדורה!
+import AdminMagazineTab from "@/components/admin/AdminMagazineTab";
+import AdminBonusTab from "@/components/admin/AdminBonusTab";
+import AdminUsersTab from "@/components/admin/AdminUsersTab";
 
 const ADMIN_EMAIL = "bawak.y10@gmail.com"; 
 
@@ -16,9 +18,7 @@ export default function AdminPanel() {
   const [user, setUser] = useState<any>(null);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   
-  // הוספנו את MAGAZINE לסטייט
-  const [activeTab, setActiveTab] = useState<"SYSTEM" | "MAGAZINE" | "USERS" | "MATCHES" | "QUALIFIERS" | "THIRD_PLACE" | "BONUS" | "STATS" | "BACKUP">("SYSTEM");
-  
+  const [activeTab, setActiveTab] = useState<"SYSTEM" | "MAGAZINE" | "USERS" | "MATCHES" | "GENERATOR" | "QUALIFIERS" | "THIRD_PLACE" | "BONUS" | "STATS" | "BACKUP">("SYSTEM");
   const [statsData, setStatsData] = useState<any>(null);
   const [selectedStatMatch, setSelectedStatMatch] = useState<string>("");
   const [selectedStatBonus, setSelectedStatBonus] = useState<string>("");
@@ -36,7 +36,6 @@ export default function AdminPanel() {
   const [realQualifiers, setRealQualifiers] = useState<any>({});
   const [realThirdPlace, setRealThirdPlace] = useState<string[]>(Array(8).fill(""));
   
-  // -- מנגנון הבונוסים החכם: מנצחים, פסולים, מובילים ונעולים --
   const [realBonus, setRealBonus] = useState<any>({}); 
   const [bonusBlacklist, setBonusBlacklist] = useState<any>({}); 
   const [bonusLeading, setBonusLeading] = useState<any>({}); 
@@ -44,10 +43,7 @@ export default function AdminPanel() {
   const [allUserBonusAnswers, setAllUserBonusAnswers] = useState<any[]>([]); 
 
   const [tournamentState, setTournamentState] = useState<number>(0);
-  
-  // שעון עצר מרכזי חדש במקום deadlines מרובים
   const [activeDeadline, setActiveDeadline] = useState<{ stage: string, time: string }>({ stage: "1", time: "" });
-  
   const [usersList, setUsersList] = useState<any[]>([]);
 
   const [bonusQuestions, setBonusQuestions] = useState<any[]>([]); 
@@ -58,11 +54,148 @@ export default function AdminPanel() {
     isSurprise: false, openTime: "", closeTime: "", isProximity: false
   });
   const [tempOption, setTempOption] = useState(""); 
-  
   const fileInputRef = useRef<HTMLInputElement>(null);
-
   const [simStage, setSimStage] = useState<string>("MD1");
   const [groupsList, setGroupsList] = useState<string[]>([]);
+
+  const parseDateTimeLocal = (dtStr: string) => {
+    if (!dtStr) return 0;
+    try {
+      if (dtStr.includes("T")) {
+        const [datePart, timePart] = dtStr.split("T");
+        const [year, month, day] = datePart.split("-").map(Number);
+        const [hour, minute] = timePart.split(":").map(Number);
+        return new Date(year, month - 1, day, hour, minute).getTime();
+      }
+      return new Date(dtStr).getTime();
+    } catch { return 0; }
+  };
+
+  const isMatchInCurrentActivePhase = (m: any, state: number) => {
+    const s = Number(state) || 0;
+    if (m.stage !== "KNOCKOUT") {
+       const md = Number(m.matchday) || 1;
+       if (s === 0 && md === 1) return true;
+       if (s === 1 && md === 2) return true;
+       if (s === 2 && md === 3) return true;
+       return false;
+    } else {
+       if (s === 4 && m.roundName === "32 הגדולות") return true;
+       if (s === 6 && m.roundName === "שמינית גמר") return true;
+       if (s === 8 && m.roundName === "רבע גמר") return true;
+       if (s === 10 && m.roundName === "חצי גמר") return true;
+       if (s === 12 && (m.roundName === "גמר" || m.roundName === "מקום שלישי")) return true;
+       return false;
+    }
+  };
+
+  // 1. פונקציית בדיקה - האם השאלה היא "חובה" לשלב שבו אנחנו נמצאים?
+const isQuestionMandatoryNow = (q: any, state: number) => {
+  const s = Number(state) || 0;
+  
+  // שאלות הפתעה הן חובה רק כשהן פתוחות לפי השעון
+  if (q.isSurprise) {
+    const now = Date.now();
+    return now >= parseDateTimeLocal(q.openTime) && now <= parseDateTimeLocal(q.closeTime);
+  }
+
+  // לפני הטורניר (State 0) - חובה למלא שאלות "טורניר" ו"בתים"
+  if (s === 0) {
+    return q.phase === "TOURNAMENT" || q.phase === "GROUPS";
+  }
+
+  // תוך כדי שלב הבתים (MD1/2/3) - חובה רק שאלות בתים/טורניר שטרם ננעלו
+  if (s >= 1 && s <= 3) {
+    return q.phase === "TOURNAMENT" || q.phase === "GROUPS";
+  }
+
+  // שלבי נוקאאוט - השאלה הופכת לחובה רק כשהשלב שלה מתחיל
+  if (q.phase === "KNOCKOUT") {
+    const rounds: Record<string, number> = { 
+      "32 הגדולות": 4, "שמינית גמר": 6, "רבע גמר": 8, "חצי גמר": 10, "גמר": 12 
+    };
+    const targetState = rounds[q.knockoutRound] || 4;
+    return s === targetState; // היא חובה רק בשלב שבו ממלאים אותה
+  }
+
+  return false;
+};
+
+  // מנוע חישוב התקדמות משודרג ומחמיר!
+  // מנוע חישוב אחוזי התקדמות למשתמש - עכשיו עם פירוט חוסרים מלא!
+  const calculateAllUsersProgress = async (users: any[], currentMatches: any[], questions: any[], currentTournState: number) => {
+    const predictionsMatches = await getDocs(collection(db, "predictions_matches"));
+    const predictionsKnockout = await getDocs(collection(db, "predictions_knockout"));
+    const predictionsBonus = await getDocs(collection(db, "predictions_bonus"));
+    const predictionsQuals = await getDocs(collection(db, "predictions_qualifiers"));
+    const predictionsThird = await getDocs(collection(db, "predictions_third_place"));
+      
+      return users.map(u => {
+      let total = 0;
+      let completed = 0;
+      const missing = { md1: 0, md2: 0, md3: 0, ko: 0, bonus: 0, quals: 0, third: 0 };
+
+      // 1. משחקים - סופרים רק את השלב הפעיל כרגע!
+      const activeMatches = currentMatches.filter(m => isMatchInCurrentActivePhase(m, currentTournState));
+      total += activeMatches.length;
+      
+      const userMatchPreds = [...predictionsMatches.docs, ...predictionsKnockout.docs]
+        .map(d => d.data())
+        .filter(p => p.userId === u.id);
+
+      activeMatches.forEach(m => {
+        const p = userMatchPreds.find(pred => pred.matchId === m.id);
+        if (p && p.predictedHomeScore !== "" && p.predictedAwayScore !== "") {
+           if (m.stage === "KNOCKOUT") {
+              if (p.qualifier && String(p.qualifier).trim() !== "") completed++;
+              else missing.ko++;
+           } else {
+              completed++;
+           }
+        } else {
+           if (m.stage === "KNOCKOUT") missing.ko++;
+           else if (Number(m.matchday) === 1) missing.md1++;
+           else if (Number(m.matchday) === 2) missing.md2++;
+           else if (Number(m.matchday) === 3) missing.md3++;
+        }
+      });
+
+      // 2. בונוסים - כאן השינוי הקריטי! סופרים רק מה ש"חובה כרגע"
+      const mandatoryBonuses = questions.filter(q => isQuestionMandatoryNow(q, currentTournState));
+      total += mandatoryBonuses.length;
+      const userBonus = predictionsBonus.docs.find(d => d.id === u.id)?.data()?.answers || {};
+      
+      mandatoryBonuses.forEach(q => {
+        if (userBonus[q.id] && String(userBonus[q.id]).trim() !== "") {
+          completed++;
+        } else {
+          missing.bonus++;
+        }
+      });
+
+      // 3. עולות מבתים ומקום 3 - חובה רק לפני הטורניר (State 0)
+      if (currentTournState === 0) {
+        const groups = Array.from(new Set(currentMatches.filter(m => m.stage !== "KNOCKOUT").map(m => m.group))).filter(Boolean);
+        total += groups.length + 1;
+
+        const userQuals = predictionsQuals.docs.find(d => d.id === u.id)?.data()?.groups || {};
+        groups.forEach(g => { 
+           if (userQuals[g as string]?.first && userQuals[g as string]?.second) completed++; 
+           else missing.quals++;
+        });
+
+        const userThird = predictionsThird.docs.find(d => d.id === u.id)?.data()?.teams || [];
+        if (userThird.filter((t: string) => t && String(t).trim() !== "").length === 8) completed++;
+        else missing.third++;
+      }
+
+      return { 
+        ...u, 
+        completionRate: total > 0 ? Math.round((completed / total) * 100) : 100, 
+        missingBreakdown: missing 
+      };
+    });
+  };
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
@@ -73,6 +206,7 @@ export default function AdminPanel() {
   }, []);
 
   const fetchAdminData = async () => {
+    setIsCalculating(true);
     try {
       const querySnapshot = await getDocs(collection(db, "matches"));
       const matchesArray: any[] = [];
@@ -116,14 +250,16 @@ export default function AdminPanel() {
       }
 
       const questionsSnap = await getDoc(doc(db, "settings", "bonus_questions"));
-      if (questionsSnap.exists()) setBonusQuestions(questionsSnap.data().questions || []);
+      const fetchedQuestions = questionsSnap.exists() ? (questionsSnap.data().questions || []) : [];
+      setBonusQuestions(fetchedQuestions);
 
       const settingsSnap = await getDoc(doc(db, "settings", "system"));
+      let currentTState = 0;
       if (settingsSnap.exists()) {
-        setTournamentState(settingsSnap.data().tournamentState || 0);
+        currentTState = settingsSnap.data().tournamentState || 0;
+        setTournamentState(currentTState);
       }
 
-      // משיכת השעון המרכזי החדש
       const deadSnap = await getDoc(doc(db, "settings", "deadlines"));
       if (deadSnap.exists() && deadSnap.data().activeDeadline) {
          setActiveDeadline(deadSnap.data().activeDeadline);
@@ -132,8 +268,10 @@ export default function AdminPanel() {
       const usersSnap = await getDocs(collection(db, "users"));
       const usersArray: any[] = [];
       usersSnap.forEach(doc => usersArray.push({ id: doc.id, ...doc.data() }));
-      usersArray.sort((a, b) => (b.totalPoints || 0) - (a.totalPoints || 0));
-      setUsersList(usersArray);
+      
+      const usersWithProgress = await calculateAllUsersProgress(usersArray, matchesArray, fetchedQuestions, currentTState);
+      usersWithProgress.sort((a, b) => (b.totalPoints || 0) - (a.totalPoints || 0));
+      setUsersList(usersWithProgress);
 
       const groups = Array.from(new Set(matchesArray.filter(m => m.group && m.stage !== "KNOCKOUT").map(m => m.group))).sort();
       setGroupsList(groups as string[]);
@@ -141,6 +279,8 @@ export default function AdminPanel() {
     } catch (error) { 
        console.error("שגיאה:", error); 
        toast.error("שגיאה בשליפת נתונים");
+    } finally {
+       setIsCalculating(false);
     }
   };
 
@@ -638,8 +778,10 @@ const handleCalculateScores = async (silentParam: any = false) => {
       const updatedUsersSnap = await getDocs(collection(db, "users"));
       const updatedUsersArray: any[] = [];
       updatedUsersSnap.forEach(doc => updatedUsersArray.push({ id: doc.id, ...doc.data() }));
-      updatedUsersArray.sort((a, b) => (b.totalPoints || 0) - (a.totalPoints || 0));
-      setUsersList(updatedUsersArray);
+      
+      const usersWithProgress = await calculateAllUsersProgress(updatedUsersArray, realMatches, currentBonusQuestions, tournamentState);
+      usersWithProgress.sort((a, b) => (b.totalPoints || 0) - (a.totalPoints || 0));
+      setUsersList(usersWithProgress);
       
       if (!isSilent) {
         toast.success("הניקוד חושב בהצלחה! 🏆");
@@ -807,7 +949,6 @@ const handleCalculateScores = async (silentParam: any = false) => {
     setAutoInsights(shuffled);
   };
 
-  // תוקן: שומר ישירות ל-DB כך שזה יופיע מיד בעורך של המגזין!
   const addInsightToMessage = async (text: string) => {
     try {
       const snap = await getDoc(doc(db, "settings", "dashboard"));
@@ -1450,7 +1591,7 @@ const handleCalculateScores = async (silentParam: any = false) => {
   const renderProgressBar = (label: string, count: number, total: number, colorClass: string, onClickAction: () => void) => {
     const percent = total > 0 ? Math.round((count / total) * 100) : 0;
     return (
-      <div className="mb-4 cursor-pointer group" onClick={onClickAction}>
+      <div key={label} className="mb-4 cursor-pointer group" onClick={onClickAction}>
         <div className="flex justify-between text-sm font-bold text-slate-400 mb-1 group-hover:text-white transition-colors">
           <span className="flex items-center gap-2">
              {getFlagUrl(label) && <img src={getFlagUrl(label)!} className="w-4 h-3 object-cover rounded-sm" alt="flag" />}
@@ -1504,11 +1645,10 @@ const handleCalculateScores = async (silentParam: any = false) => {
           </div>
         </div>
 
-        {/* 🟢 שורת הטאבים הדביקה שהוספנו לה את טאב ה-MAGAZINE 🟢 */}
         <div className="flex flex-wrap gap-2 mb-8 bg-slate-900/80 p-2 rounded-2xl border border-slate-800/50 sticky top-4 z-50 backdrop-blur-md shadow-2xl">
           {[
             { id: "SYSTEM", icon: "🛠️", label: "מערכת" }, 
-            { id: "MAGAZINE", icon: "📰", label: "טור יומי" }, // טאב חדש!
+            { id: "MAGAZINE", icon: "📰", label: "טור יומי" },
             { id: "MATCHES", icon: "⚽", label: "משחקים" }, 
             { id: "QUALIFIERS", icon: "🥇", label: "בתים" }, 
             { id: "THIRD_PLACE", icon: "🥉", label: "8 מעפילות" }, 
@@ -1693,386 +1833,28 @@ const handleCalculateScores = async (silentParam: any = false) => {
           )}
           
           {activeTab === "USERS" && (
-            
-            <div className="space-y-8 max-w-5xl mx-auto">
-              
-              <div className="bg-gradient-to-br from-indigo-900/40 to-slate-800 p-8 rounded-3xl border border-indigo-500/30 shadow-xl">
-                <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4 border-b border-slate-700 pb-4">
-                  <div>
-                    <h2 className="text-2xl font-black text-indigo-400 flex items-center gap-2"><span>🔮</span> מחולל Wall of Fame / Shame</h2>
-                    <p className="text-slate-400 text-sm mt-1">המערכת קוראת את הראדאר ובוחרת ניחושים קיצוניים או קונצנזוסים.</p>
-                  </div>
-                  <button onClick={handleCreateAutoInsights} className="bg-indigo-600 hover:bg-indigo-500 text-white px-6 py-3 rounded-xl font-bold transition-all shadow-md active:scale-95 flex items-center gap-2">
-                    {statsData ? "🔄 רענן תובנות מהראדאר" : "🔍 חלץ תובנות עכשיו"}
-                  </button>
-                </div>
-                
-                {autoInsights.length > 0 ? (
-                  <div className="flex flex-col gap-3">
-                    {autoInsights.map((insight, idx) => (
-                      <div key={idx} className="bg-slate-900/80 border border-slate-700 p-4 rounded-2xl flex justify-between items-center gap-4 group hover:border-indigo-500/50 hover:bg-slate-800 transition-colors shadow-sm">
-                        <span className="text-slate-200 text-sm font-medium leading-relaxed">{insight}</span>
-                        <button onClick={() => addInsightToMessage(insight)} className="bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600 hover:text-white border border-emerald-500/30 px-4 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap opacity-0 group-hover:opacity-100 flex items-center gap-1">
-                          <span>➕</span> הוסף לטור המגזין
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-slate-500 text-sm bg-slate-900/50 p-6 rounded-2xl border border-dashed border-slate-700 text-center">
-                     לחץ על הכפתור כדי לנתח את הסטטיסטיקות ולמצוא את הניחושים הכי מעניינים להיום.
-                  </div>
-                )}
-              </div> 
-
-              <div className="bg-slate-800 p-8 rounded-3xl border border-blue-500/30 shadow-xl mt-8">
-                
-                <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4 border-b border-slate-700 pb-6">
-                  <div>
-                    <h2 className="text-2xl font-black text-white flex items-center gap-2"><span>👥</span> ניהול שחקנים (ותשלומים)</h2>
-                    <p className="text-slate-400 text-sm mt-1">רשימת כל השחקנים במערכת עם שליטה בסטטוס התשלום שלהם.</p>
-                  </div>
-                  <button onClick={() => handleExportPredictions("ALL", "All")} disabled={isCalculating} className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 px-6 rounded-xl transition-all shadow-[0_0_15px_rgba(16,185,129,0.3)] flex items-center gap-2 active:scale-95">
-                    <span>⬇️</span> הורד יומן ניחושים שטוח (CSV)
-                  </button>
-                </div>
-                
-                <div className="bg-purple-900/10 p-5 rounded-2xl border border-purple-500/30 mb-8 flex flex-col xl:flex-row items-start xl:items-center justify-between gap-6 shadow-inner">
-                  <div>
-                    <h3 className="text-purple-400 font-black flex items-center gap-2 mb-1 text-lg"><span>🤖</span> מעבדת סימולציות (הזרקת בוטים)</h3>
-                    <p className="text-slate-400 text-sm">הזרק משתמשים פיקטיביים עם ניחושים אקראיים כדי למלא את הטבלה ולבדוק את האפליקציה.</p>
-                  </div>
-                  <div className="flex flex-col sm:flex-row gap-3 w-full">
-                     <select value={simStage} onChange={(e) => setSimStage(e.target.value)} className="bg-slate-950 text-white p-3 rounded-xl border border-purple-500/50 outline-none font-bold text-sm flex-1 xl:flex-none shadow-sm cursor-pointer">
-                        <option value="BOTS_ONLY">🤖 בוטים בלבד (ללא תוצאות אמת)</option>
-                        <option value="MD1">סמלץ מחזור 1 (תוצאות אמת)</option>
-                        <option value="MD2">סמלץ מחזור 2</option>
-                        <option value="MD3">סמלץ מחזור 3 + עולות</option>
-                        <option value="R32">סמלץ 32 הגדולות</option>
-                        <option value="R16">סמלץ שמינית גמר</option>
-                        <option value="QF">סמלץ רבע גמר</option>
-                        <option value="SF">סמלץ חצי גמר</option>
-                        <option value="FINAL">סמלץ גמר הטורניר</option>
-                        <option value="ALL">סמלץ טורניר שלם (בוטים + הכל)</option>
-                     </select>
-                     <button 
-                       onClick={() => {
-                         if (simStage === "BOTS_ONLY") handleSpawnBotsOnly();
-                         else handleSmartSimulation();
-                       }} 
-                       disabled={isCalculating} 
-                       className="py-3 px-8 bg-purple-600 hover:bg-purple-500 text-white font-black rounded-xl transition-all shadow-lg text-sm whitespace-nowrap active:scale-95"
-                     >
-                       {isCalculating ? "מריץ... ⏳" : "🧪 הפעל"}
-                     </button>
-                  </div>
-                </div>
-
-                <div className="w-full overflow-x-auto bg-slate-950 rounded-2xl border border-slate-700 shadow-inner custom-scrollbar">
-                  <table className="w-full text-right text-slate-300 min-w-[600px]">
-                    <thead className="text-xs uppercase tracking-widest bg-slate-900/80 text-slate-500 border-b border-slate-800">
-                      <tr>
-                        <th className="p-4 font-black">שם משתמש</th>
-                        <th className="p-4 font-black">אימייל</th>
-                        <th className="p-4 text-center font-black">נק'</th>
-                        <th className="p-4 text-center font-black">תשלום</th>
-                        <th className="p-4 text-center font-black">פעולות</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {usersList.length === 0 ? (<tr><td colSpan={5} className="p-12 text-center text-slate-500 font-bold">אין משתמשים במערכת.</td></tr>) : (
-                        usersList.map((u, idx) => (
-                          <tr key={u.id} className="border-b border-slate-800/50 hover:bg-slate-800/50 transition-colors">
-                            <td className="p-4 font-bold text-white flex items-center gap-2 min-w-[220px]">
-                                <span className="text-slate-600 text-xs w-4">{idx + 1}.</span> 
-                                <input 
-                                  type="text" 
-                                  value={u.name || ""} 
-                                  onChange={(e) => setUsersList(usersList.map(user => user.id === u.id ? { ...user, name: e.target.value } : user))}
-                                  className="bg-slate-900 border border-slate-700 text-white px-2 py-1.5 rounded-lg focus:border-blue-500 outline-none text-sm w-full transition-all shadow-inner"
-                                  placeholder="הכנס שם בעברית..."
-                                />
-                                <button 
-                                  onClick={() => handleUpdateUserName(u.id, u.name)}
-                                  className="bg-slate-800 hover:bg-blue-600 text-slate-400 hover:text-white p-1.5 rounded-lg border border-slate-700 shadow-sm transition-all active:scale-95 shrink-0"
-                                  title="שמור שם"
-                                >
-                                  💾
-                                </button>
-                              </td>
-                            <td className="p-4 text-sm text-slate-400 font-mono">{u.email}</td>
-                            <td className="p-4 text-center font-black text-amber-400 text-lg">{u.totalPoints || 0}</td>
-                            
-                            <td className="p-4">
-                              <div className="flex justify-center">
-                                <button onClick={() => handleTogglePayment(u.id, u.hasPaid)} className={`px-4 py-1.5 rounded-lg font-bold text-xs w-24 transition-colors border shadow-sm ${u.hasPaid ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20" : "bg-rose-500/10 text-rose-400 border-rose-500/30 hover:bg-rose-500/20"}`}>
-                                  {u.hasPaid ? "✅ שולם" : "❌ חוב"}
-                                </button>
-                              </div>
-                            </td>
-                            
-                            <td className="p-4">
-                              <div className="flex justify-center gap-2">
-                                <button onClick={() => handleExportPredictions(u.id, u.name || "ללא שם")} className="bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border border-blue-500/30 w-9 h-9 rounded-lg transition-colors flex items-center justify-center text-sm shadow-sm" title="הורד ניחושים אישיים">⬇️</button>
-                                <button onClick={() => handleDeleteUser(u.id, u.name || "ללא שם")} className="bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 w-9 h-9 rounded-lg transition-colors flex items-center justify-center text-sm shadow-sm" title="מחק משתמש לצמיתות">🗑️</button>
-                              </div>
-                            </td>
-                          </tr>
-                        ))
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
-          )}
+            <AdminUsersTab
+             usersList={usersList}
+             setUsersList={setUsersList}
+             handleUpdateUserName={handleUpdateUserName}
+             handleTogglePayment={handleTogglePayment}
+             handleExportPredictions={handleExportPredictions}
+             handleDeleteUser={handleDeleteUser}
+             isCalculating={isCalculating}
+             autoInsights={autoInsights}
+             handleCreateAutoInsights={handleCreateAutoInsights}
+             addInsightToMessage={addInsightToMessage}
+             simStage={simStage}
+             setSimStage={setSimStage}
+             handleSpawnBotsOnly={handleSpawnBotsOnly}
+             handleSmartSimulation={handleSmartSimulation}
+             // הוספנו פרופ לסנכרון ידני!
+             handleRefreshData={fetchAdminData}
+           />
+        )}
 
           {activeTab === "BONUS" && (
-            <div className="space-y-12">
-              
-              <div className="bg-slate-800 p-6 rounded-3xl border border-amber-500/30 shadow-lg transition-all relative">
-                <h2 className="text-2xl font-bold text-amber-400 mb-6 flex items-center gap-2"><span>{editingId ? "✏️" : "⚙️"}</span> {editingId ? "עריכת שאלת בונוס" : "בונה שאלות הבונוס (מפעל)"}</h2>
-                <div className={`bg-slate-900/50 p-6 rounded-xl border transition-colors ${editingId ? "border-amber-500 shadow-[0_0_15px_rgba(245,158,11,0.2)]" : "border-slate-700"}`}>
-                  <div className="flex flex-col md:flex-row gap-4 mb-4">
-                    <div className="flex-grow"><label className="text-slate-400 text-sm mb-1 block">תוכן השאלה</label><input type="text" value={newQuestion.label} onChange={e => setNewQuestion({...newQuestion, label: e.target.value})} className="w-full bg-slate-950 text-white p-3 rounded-lg border border-slate-600 focus:border-amber-500 outline-none" /></div>
-                    <div className="w-full md:w-32"><label className="text-slate-400 text-sm mb-1 block">ניקוד בסיס</label><input type="number" min="0" value={newQuestion.points} onChange={e => setNewQuestion({...newQuestion, points: Number(e.target.value)})} className="w-full bg-slate-950 text-white p-3 rounded-lg text-center text-amber-500 font-bold outline-none" /></div>
-                  </div>
-                  
-                  <div className="flex flex-wrap gap-6 mb-6 p-4 bg-slate-950 rounded-xl border border-slate-700">
-                    <label className="flex items-center gap-2 text-purple-400 font-bold cursor-pointer hover:text-purple-300">
-                       <input type="checkbox" checked={newQuestion.isSurprise} onChange={e => setNewQuestion({...newQuestion, isSurprise: e.target.checked})} className="w-5 h-5 accent-purple-500 cursor-pointer" />
-                       🎁 שאלת הפתעה מתוזמנת
-                    </label>
-                    {newQuestion.answerType === "NUMERIC" && (
-                       <label className="flex items-center gap-2 text-orange-400 font-bold cursor-pointer hover:text-orange-300">
-                          <input type="checkbox" checked={newQuestion.isProximity} onChange={e => setNewQuestion({...newQuestion, isProximity: e.target.checked})} className="w-5 h-5 accent-orange-500 cursor-pointer" />
-                          🤪 "בעל הבית השתגע" (ניקוד לפי קרבה)
-                       </label>
-                    )}
-                  </div>
-
-                  {newQuestion.isSurprise && (
-                     <div className="flex flex-col md:flex-row gap-4 mb-6 p-4 bg-purple-900/20 border border-purple-500/30 rounded-lg animate-fade-in-up">
-                         <div className="flex-1"><label className="text-purple-300 text-xs font-bold mb-1 block">מתי השאלה תופיע למשתמשים?</label><input type="datetime-local" value={newQuestion.openTime} onChange={e => setNewQuestion({...newQuestion, openTime: e.target.value})} className="w-full bg-slate-900 text-white p-3 rounded-lg border border-purple-500/50 outline-none" /></div>
-                         <div className="flex-1"><label className="text-purple-300 text-xs font-bold mb-1 block">מתי השאלה תינעל לעריכה?</label><input type="datetime-local" value={newQuestion.closeTime} onChange={e => setNewQuestion({...newQuestion, closeTime: e.target.value})} className="w-full bg-slate-900 text-white p-3 rounded-lg border border-purple-500/50 outline-none" /></div>
-                     </div>
-                  )}
-
-                  <div className="mb-4">
-                    <label className="text-slate-400 text-sm mb-1 block">סטטוס חי (אופציונלי - מופיע כעדכון לייב למשתמשים)</label>
-                    <input type="text" value={newQuestion.liveStatus || ""} onChange={e => setNewQuestion({...newQuestion, liveStatus: e.target.value})} className="w-full bg-slate-950 text-white p-3 rounded-lg border border-slate-600 focus:border-amber-500 outline-none" placeholder="לדוגמה: מסי (2), אמבפה (1)..." />
-                  </div>
-
-                  <div className="flex flex-col md:flex-row gap-4 mb-4">
-                    <div className="flex-1"><label className="text-slate-400 text-sm mb-1 block">שלב בטורניר</label><select value={newQuestion.phase} onChange={e => setNewQuestion({...newQuestion, phase: e.target.value})} className="w-full bg-slate-950 text-white p-3 rounded-lg"><option value="TOURNAMENT">🏆 כל הטורניר</option><option value="GROUPS">⚽ שלב הבתים</option><option value="KNOCKOUT">🔥 נוק-אאוט</option></select></div>
-                    {newQuestion.phase === "KNOCKOUT" && <div className="flex-1"><label className="text-slate-400 text-sm mb-1 block">סיבוב</label><select value={newQuestion.round} onChange={e => setNewQuestion({...newQuestion, round: e.target.value})} className="w-full bg-slate-950 text-white p-3 rounded-lg"><option value="ALL">כל שלבי הנוקאאוט</option><option value="R32">32 הגדולות</option><option value="R16">שמינית גמר</option><option value="QF">רבע גמר</option><option value="SF">חצי גמר</option><option value="FINAL">גמר</option></select></div>}
-                    <div className="flex-1"><label className="text-slate-400 text-sm mb-1 block">משקל השאלה</label><select value={newQuestion.weight} onChange={e => setNewQuestion({...newQuestion, weight: e.target.value})} className="w-full bg-slate-950 text-white p-3 rounded-lg"><option value="REGULAR">רגילה</option><option value="DOUBLE">כפולה</option><option value="SURPRISE">הפתעה</option></select></div>
-                  </div>
-                  <div className="mb-4">
-                    <label className="text-slate-400 text-sm mb-1 block">סוג התשובה</label>
-                    <select value={newQuestion.answerType} onChange={e => setNewQuestion({...newQuestion, answerType: e.target.value, customOptions: []})} className="w-full bg-slate-950 text-white p-3 rounded-lg"><option value="ALL_TEAMS">🏳️ בחירה מכל הנבחרות</option><option value="TEAM_SUBSET">🎯 בחירה מנבחרות ספציפיות</option><option value="OPEN_TEXT">✍️ טקסט חופשי (מתאים לשחקנים)</option><option value="MULTIPLE_CHOICE">🆚 בחירה מרובה / ראש-בראש</option><option value="NUMERIC">🔢 תשובה מספרית</option></select>
-                  </div>
-                  {newQuestion.answerType !== "NUMERIC" && (
-                    <div className="bg-slate-950/50 p-4 rounded-lg border border-slate-700/50 mb-4">
-                      {newQuestion.answerType === "TEAM_SUBSET" && (<div className="flex flex-wrap gap-2 max-h-24 overflow-y-auto custom-scrollbar mb-3">{allTeams.map((t: any) => <button key={t} onClick={() => { if(!newQuestion.customOptions.includes(t)) setNewQuestion(prev => ({...prev, customOptions: [...prev.customOptions, t]})) }} className="bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs px-2 py-1 rounded">+ {t}</button>)}</div>)}
-                      <div className="flex flex-col sm:flex-row gap-2 mb-4 mt-2 items-center">
-                        <input type="text" value={tempOption} onChange={e => setTempOption(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleAddCustomOption()} placeholder="הוסף אפשרות ידנית..." className="w-full bg-slate-900 text-white p-3 rounded-xl border border-slate-600 outline-none" />
-                        <button onClick={handleAddCustomOption} className="bg-blue-600 hover:bg-blue-500 text-white px-6 py-3 rounded-xl font-bold w-full sm:w-auto whitespace-nowrap">הוסף</button>
-                      </div>
-                      <div className="flex flex-wrap gap-2 items-center">
-                        {newQuestion.customOptions.map((opt, i) => <div key={i} className="flex items-center gap-2 bg-slate-800 border border-slate-600 px-3 py-1 rounded-full text-sm text-white"><span>{opt}</span><button onClick={() => handleRemoveCustomOption(opt)} className="text-rose-400 font-bold hover:text-rose-300">×</button></div>)}
-                        {newQuestion.customOptions.length > 0 && <button onClick={() => setNewQuestion(prev => ({...prev, customOptions: []}))} className="text-xs text-rose-400 hover:text-rose-300 underline mt-1">נקה רשימה</button>}
-                      </div>
-                    </div>
-                  )}
-                  <div className="flex gap-4 mt-2">
-                    <button onClick={handleSaveQuestion} className={`flex-grow h-12 text-white font-bold rounded-lg transition-all ${editingId ? "bg-emerald-600 hover:bg-emerald-500" : "bg-amber-600 hover:bg-amber-500"}`}>{editingId ? "💾 שמור שינויים בשאלה" : "➕ הוסף שאלה למפעל"}</button>
-                    {editingId && <button onClick={handleCancelEdit} className="h-12 px-6 bg-slate-700 hover:bg-slate-600 text-white font-bold rounded-lg transition-all">❌ ביטול</button>}
-                  </div>
-                </div>
-              </div>
-
-              <div className="w-full h-px bg-slate-700 my-8"></div>
-
-              <div className="bg-slate-800 p-8 rounded-3xl border border-slate-700 shadow-xl">
-                <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-                  <h2 className="text-xl md:text-2xl font-bold text-white">🎯 ניהול שאלות והזנת תוצאות אמת</h2>
-                  <div className="flex gap-2 w-full md:w-auto">
-                    <button onClick={handleSaveBonus} className="flex-1 md:flex-none px-4 md:px-6 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl shadow-lg transition-colors text-sm md:text-base">שמור תוצאות ופסילות 💾</button>
-                    <button onClick={handleClearBonus} className="px-4 py-3 bg-rose-600/20 hover:bg-rose-600/30 text-rose-400 border border-rose-500/30 font-bold rounded-xl transition-colors shrink-0" title="אפס את כל התשובות">🗑️</button>
-                  </div>
-                </div>
-
-                <div className="flex overflow-x-auto gap-3 mb-4 pb-2 custom-scrollbar">
-                  {[
-                    { id: "TOURNAMENT", label: "🏆 כל הטורניר" },
-                    { id: "GROUPS", label: "⚽ שלב הבתים" },
-                    { id: "KNOCKOUT", label: "🔥 נוק-אאוט" }
-                  ].map(tab => (
-                    <button 
-                      key={tab.id} 
-                      onClick={() => { setAdminBonusCategory(tab.id); if(tab.id !== "KNOCKOUT") setAdminKnockoutRound("ALL"); }} 
-                      className={`px-6 py-3 rounded-2xl font-bold whitespace-nowrap transition-all border ${
-                        adminBonusCategory === tab.id 
-                          ? "bg-amber-500 text-slate-900 border-amber-400 shadow-lg" 
-                          : "bg-slate-900 text-slate-400 border-slate-800 hover:bg-slate-800 hover:text-amber-400"
-                      }`}
-                    >
-                      {tab.label}
-                    </button>
-                  ))}
-                </div>
-
-                {adminBonusCategory === "KNOCKOUT" && (
-                  <div className="flex overflow-x-auto gap-2 mb-8 pb-2 custom-scrollbar bg-slate-900/50 p-2 rounded-2xl border border-slate-800/50">
-                    {[
-                      { id: "ALL", label: "כללי (כל הנוק-אאוט)" },
-                      { id: "R32", label: "32 הגדולות" },
-                      { id: "R16", label: "שמינית גמר" },
-                      { id: "QF", label: "רבע גמר" },
-                      { id: "SF", label: "חצי גמר" },
-                      { id: "FINAL", label: "גמר" }
-                    ].map(subTab => (
-                      <button
-                        key={subTab.id}
-                        onClick={() => setAdminKnockoutRound(subTab.id)}
-                        className={`px-4 py-2.5 rounded-xl font-bold whitespace-nowrap transition-all text-sm border ${
-                          adminKnockoutRound === subTab.id
-                            ? "bg-purple-600 text-white border-purple-500 shadow-md"
-                            : "bg-slate-800 text-slate-400 border-slate-700 hover:bg-slate-700 hover:text-white"
-                        }`}
-                      >
-                        {subTab.label}
-                      </button>
-                    ))}
-                  </div>
-                )}
-
-                {(() => {
-                  const filteredAdminQuestions = bonusQuestions.filter(q => {
-                    if (q.phase !== adminBonusCategory) return false;
-                    if (adminBonusCategory === "KNOCKOUT") return q.round === adminKnockoutRound;
-                    return true;
-                  });
-
-                  const adminRegularQs = filteredAdminQuestions.filter(q => q.weight === "REGULAR" && !q.isSurprise);
-                  const adminDoubleQs = filteredAdminQuestions.filter(q => q.weight === "DOUBLE" && !q.isSurprise);
-                  const adminSurpriseQs = filteredAdminQuestions.filter(q => q.isSurprise);
-
-                  const renderAdminTruthCard = (q: any) => {
-                    const uniqueAnswersData = getUniqueAnswers(q.id); 
-                    const isLocked = bonusLocked[q.id] || false;
-                    const winners = realBonus[q.id] || [];
-                    const losers = bonusBlacklist[q.id] || [];
-                    const leaders = bonusLeading[q.id] || [];
-
-                    return (
-                      <div key={q.id} className={`p-5 rounded-2xl border border-t-4 flex flex-col justify-between shadow-lg transition-colors ${isLocked ? "bg-rose-950/20 border-rose-500/50 border-t-rose-600" : "bg-slate-900 border-slate-700 border-t-amber-500 hover:border-slate-600"}`}>
-                        <div className="flex justify-between items-start mb-4 gap-4">
-                           <label className="text-white font-bold leading-snug">{q.label}</label>
-                           <div className="flex gap-2 shrink-0">
-                              <button onClick={() => handleEditClick(q)} className="text-blue-400 hover:text-white bg-blue-500/10 hover:bg-blue-600 border border-blue-500/30 px-2 py-1 rounded text-xs font-bold transition-colors">✏️ ערוך</button>
-                              <button onClick={() => handleDeleteQuestion(q.id)} className="text-rose-400 hover:text-white bg-rose-500/10 hover:bg-rose-600 border border-rose-500/30 px-2 py-1 rounded text-xs font-bold transition-colors">🗑️</button>
-                           </div>
-                        </div>
-
-                        {/* סטטוס חי ונעילה */}
-                        <div className="bg-slate-950/50 p-3 rounded-xl border border-slate-800 mb-4 shadow-inner flex flex-col gap-3">
-                           <div>
-                              <label className="text-slate-500 text-xs mb-2 font-bold flex items-center gap-1"><span>📡</span> סטטוס לייב (למשתמשים):</label>
-                              <div className="flex flex-col sm:flex-row gap-2">
-                                <input type="text" id={`live_status_${q.id}`} defaultValue={q.liveStatus || ""} className="flex-grow bg-slate-900 text-slate-300 p-2 rounded-lg border border-slate-700 focus:border-blue-500 outline-none text-sm w-full" placeholder="אמבפה (4), אנגליה דקה 4..." />
-                                <div className="flex gap-2 w-full sm:w-auto shrink-0">
-                                  <button onClick={() => handleQuickLiveStatusSave(q.id)} className="flex-1 sm:flex-none bg-blue-600/20 text-blue-400 hover:bg-blue-600 hover:text-white border border-blue-500/30 px-3 py-2 rounded-lg text-sm font-bold transition-all">לשדר</button>
-                                </div>
-                              </div>
-                           </div>
-                           <button onClick={() => handleToggleBonusLock(q.id)} className={`w-full py-2 rounded-lg font-bold text-xs transition-all border ${isLocked ? "bg-rose-600 hover:bg-rose-500 text-white border-rose-500 shadow-[0_0_10px_rgba(225,29,72,0.3)]" : "bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700 border-slate-700"}`}>
-                              {isLocked ? "🔓 שחרר נעילת שאלה" : "🔒 נעל שאלה סופית (כולם טעו)"}
-                           </button>
-                        </div>
-                        
-                        {/* רשימת ניחושי הקהל המרכזית */}
-                        <div className="mb-4">
-                           <div className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mb-2 border-b border-slate-800 pb-1">ניחושי הקהל:</div>
-                           {uniqueAnswersData.length === 0 ? (
-                              <div className="text-xs text-slate-600 text-center py-2">אף אחד לא ענה עדיין.</div>
-                           ) : (
-                              <div className="flex flex-wrap gap-2 max-h-[150px] overflow-y-auto custom-scrollbar pr-1">
-                                 {uniqueAnswersData.map(([ansStr, count]: any) => {
-                                    const isWinner = winners.includes(ansStr);
-                                    const isLeading = leaders.includes(ansStr);
-                                    const isLoser = losers.includes(ansStr) || (isLocked && !isWinner); 
-
-                                    let badgeColor = "bg-slate-800 text-slate-300 border-slate-700";
-                                    if (isWinner) badgeColor = "bg-emerald-600/20 text-emerald-400 border-emerald-500/50 shadow-[0_0_8px_rgba(16,185,129,0.2)]";
-                                    else if (isLeading) badgeColor = "bg-amber-500/20 text-amber-400 border-amber-500/50 shadow-[0_0_8px_rgba(245,158,11,0.3)] animate-pulse";
-                                    else if (isLoser) badgeColor = "bg-rose-900/40 text-rose-400/50 border-rose-500/20 line-through decoration-rose-500/50";
-
-                                    return (
-                                       <div key={ansStr} className={`flex flex-col items-center gap-1.5 px-2 py-1.5 rounded-lg border text-xs font-bold transition-all ${badgeColor}`}>
-                                          <div className="flex items-center gap-1">
-                                             {getFlagUrl(ansStr) && <img src={getFlagUrl(ansStr)!} className="w-3 h-2 object-cover rounded-sm opacity-80" alt="flag" />}
-                                             <span className="truncate max-w-[100px]" title={ansStr}>{ansStr}</span>
-                                             <span className="text-[9px] opacity-60">({count})</span>
-                                          </div>
-                                          {/* כפתורי השליטה - כעת עם כתר! */}
-                                          {!isLocked && (
-                                             <div className="flex gap-1 border-t border-slate-700/30 pt-1 w-full justify-center">
-                                                <button onClick={() => handleToggleBonusWinner(q.id, ansStr)} title="פגיעה בול!" className={`w-5 h-5 rounded flex items-center justify-center ${isWinner ? 'bg-emerald-500 text-white' : 'bg-slate-700 hover:bg-emerald-500/50 text-slate-400'}`}>✅</button>
-                                                <button onClick={() => handleToggleBonusLeading(q.id, ansStr)} title="מוביל זמני" className={`w-5 h-5 rounded flex items-center justify-center ${isLeading ? 'bg-amber-500 text-white' : 'bg-slate-700 hover:bg-amber-500/50 text-slate-400'}`}>👑</button>
-                                                <button onClick={() => handleToggleBonusBlacklist(q.id, ansStr)} title="פסול תשובה זו" className={`w-5 h-5 rounded flex items-center justify-center ${losers.includes(ansStr) ? 'bg-rose-500 text-white' : 'bg-slate-700 hover:bg-rose-500/50 text-slate-400'}`}>❌</button>
-                                             </div>
-                                          )}
-                                       </div>
-                                    )
-                                 })}
-                              </div>
-                           )}
-                        </div>
-
-                       {/* גיבוי - הוספת תשובה חופשית שאיש לא ענה */}
-                       <div className="mt-auto border-t border-slate-800 pt-3">
-                          <div className="flex flex-col sm:flex-row gap-2">
-                             <input type="text" id={`manual_truth_${q.id}`} className="flex-grow w-full bg-slate-950 text-white p-2 rounded-lg border border-slate-700 focus:border-amber-500 outline-none text-xs" placeholder="הכנס תשובה שלא ברשימה..." onKeyDown={(e) => { if (e.key === 'Enter') { handleToggleBonusWinner(q.id, e.currentTarget.value); e.currentTarget.value = ''; } }} />
-                             <button onClick={() => { const inp = document.getElementById(`manual_truth_${q.id}`) as HTMLInputElement; handleToggleBonusWinner(q.id, inp.value); inp.value = ''; }} className="bg-slate-700 hover:bg-slate-600 text-white w-full sm:w-auto px-3 py-2 rounded-lg text-xs font-bold shrink-0 transition-colors">סמן ✅</button>
-                          </div>
-                       </div>
-
-                      </div>
-                    );
-                  };
-
-                  if (filteredAdminQuestions.length === 0) {
-                    return <div className="text-slate-500 text-center py-16 bg-slate-900/50 rounded-2xl border border-dashed border-slate-700 font-bold text-lg">אין שאלות בקטגוריה זו.</div>;
-                  }
-
-                  return (
-                    <div className="space-y-10 mt-6">
-                       {adminRegularQs.length > 0 && (
-                          <div>
-                            <h3 className="text-xl font-bold text-blue-400 mb-4 border-b border-slate-700 pb-3 flex items-center gap-2"><span>🎯</span> שאלות רגילות</h3>
-                            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">{adminRegularQs.map(renderAdminTruthCard)}</div>
-                          </div>
-                       )}
-                       {adminDoubleQs.length > 0 && (
-                          <div>
-                            <h3 className="text-xl font-bold text-rose-400 mb-4 border-b border-slate-700 pb-3 flex items-center gap-2"><span>🔥</span> שאלות דאבל-בונוס</h3>
-                            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">{adminDoubleQs.map(renderAdminTruthCard)}</div>
-                          </div>
-                       )}
-                       {adminSurpriseQs.length > 0 && (
-                          <div>
-                            <h3 className="text-xl font-bold text-purple-400 mb-4 border-b border-slate-700 pb-3 flex items-center gap-2"><span>🎁</span> שאלות הפתעה</h3>
-                            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">{adminSurpriseQs.map(renderAdminTruthCard)}</div>
-                          </div>
-                       )}
-                    </div>
-                  );
-                })()}
-
-              </div>
-            </div>
+            <AdminBonusTab />
           )}
 
           {activeTab === "QUALIFIERS" && (

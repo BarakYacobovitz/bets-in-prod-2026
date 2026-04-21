@@ -17,6 +17,29 @@ const parseDateTimeLocal = (dtStr: string) => {
   } catch { return 0; }
 };
 
+const TOP_PLAYERS = [
+  "ליונל מסי", "קיליאן אמבפה", "ארלינג האלאנד", "ויניסיוס ג'וניור", 
+  "ג'וד בלינגהאם", "הארי קיין", "קווין דה בריינה", "פיל פודן", 
+  "לאמין ימאל", "רוברט לבנדובסקי", "כריסטיאנו רונאלדו", "ניימאר", 
+  "אנטואן גריזמן", "בוקאיו סאקה", "מוחמד סלאח", "ברנרדו סילבה",
+  "אדוארדו קמבינגה", "רודרי", "ויקטור אוסימהן", "רפאל ליאאו"
+];
+
+const TEAM_EMOJIS: Record<string, string> = {
+  "מקסיקו": "🇲🇽", "דרום אפריקה": "🇿🇦", "קוריאה הדרומית": "🇰🇷", "צ'כיה": "🇨🇿",
+  "קנדה": "🇨🇦", "בוסניה": "🇧🇦", "קטר": "🇶🇦", "שווייץ": "🇨🇭",
+  "ברזיל": "🇧🇷", "מרוקו": "🇲🇦", "האיטי": "🇭🇹", "סקוטלנד": "🏴󠁧󠁢󠁳󠁣󠁴󠁿",
+  "ארה\"ב": "🇺🇸", "פרגוואי": "🇵🇾", "אוסטרליה": "🇦🇺", "טורקיה": "🇹🇷",
+  "גרמניה": "🇩🇪", "קוראסאו": "🇨🇼", "חוף השנהב": "🇨🇮", "אקוודור": "🇪🇨",
+  "הולנד": "🇳🇱", "יפן": "🇯🇵", "שוודיה": "🇸🇪", "תוניסיה": "🇹🇳",
+  "בלגיה": "🇧🇪", "מצרים": "🇪🇬", "איראן": "🇮🇷", "ניו זילנד": "🇳🇿",
+  "ספרד": "🇪🇸", "כף ורדה": "🇨🇻", "סעודיה": "🇸🇦", "אורוגוואי": "🇺🇾",
+  "צרפת": "🇫🇷", "סנגל": "🇸🇳", "עיראק": "🇮🇶", "נורווגיה": "🇳🇴",
+  "ארגנטינה": "🇦🇷", "אלג'יריה": "🇩🇿", "אוסטריה": "🇦🇹", "ירדן": "🇯🇴",
+  "פורטוגל": "🇵🇹", "קונגו": "🇨🇬", "אוזבקיסטן": "🇺🇿", "קולומביה": "🇨🇴",
+  "אנגליה": "🏴󠁧󠁢󠁥󠁮󠁧󠁿", "קרואטיה": "🇭🇷", "גאנה": "🇬🇭", "פנמה": "🇵🇦"
+};
+
 export default function BonusQuestions({ userId, tournamentState: propTournamentState, groups }: any) {
   let extractedTeams: string[] = [];
   if (groups) {
@@ -35,7 +58,10 @@ export default function BonusQuestions({ userId, tournamentState: propTournament
   const allTeams = Array.from(new Set(extractedTeams)).filter(t => t.trim() !== "").sort();
   const [questions, setQuestions] = useState<any[]>([]);
   const [answers, setAnswers] = useState<any>({});
+  
+  const [realBonusData, setRealBonusData] = useState<any>({});
   const [realBonusAnswers, setRealBonusAnswers] = useState<any>({});
+  
   const [tournamentState, setTournamentState] = useState<number>(propTournamentState || 0);
   
   const [bonusCategory, setBonusCategory] = useState<string>("TOURNAMENT");
@@ -45,6 +71,7 @@ export default function BonusQuestions({ userId, tournamentState: propTournament
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
   const [isLoading, setIsLoading] = useState(true);
   const [isRandomizing, setIsRandomizing] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
 
   const [spyModalQuestion, setSpyModalQuestion] = useState<any | null>(null);
   const [spyData, setSpyData] = useState<any[]>([]);
@@ -55,9 +82,19 @@ export default function BonusQuestions({ userId, tournamentState: propTournament
 
   const isLoaded = useRef(false);
   const isUserAction = useRef(false);
-  const hasAutoNavigated = useRef(false); // דגל שמונע קפיצות טורדניות בין טאבים!
+  const hasAutoNavigated = useRef(false); 
 
   const [nowMs, setNowMs] = useState(Date.now());
+  
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const ua = navigator.userAgent;
+      if (/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(ua)) {
+        setIsMobile(true);
+      }
+    }
+  }, []);
+
   useEffect(() => {
     const interval = setInterval(() => setNowMs(Date.now()), 1000);
     return () => clearInterval(interval);
@@ -76,7 +113,10 @@ export default function BonusQuestions({ userId, tournamentState: propTournament
         if (tSnap.exists()) setTournamentState(Number(tSnap.data().tournamentState) || 0);
 
         const rSnap = await getDoc(doc(db, "admin_results", "bonus"));
-        if (rSnap.exists()) setRealBonusAnswers(rSnap.data().answers || {});
+        if (rSnap.exists()) {
+           setRealBonusData(rSnap.data());
+           setRealBonusAnswers(rSnap.data().answers || {});
+        }
 
       } catch (e) { console.error(e); } 
       finally { isLoaded.current = true; setIsLoading(false); }
@@ -84,20 +124,18 @@ export default function BonusQuestions({ userId, tournamentState: propTournament
     if (userId) fetchData();
   }, [userId]);
 
-  // מנגנון ניווט חכם וידידותי למשתמש (קופץ פעם אחת בלבד או כשיש בקשת גלילה)
   useEffect(() => {
     if (questions.length === 0) return;
 
-    // 1. האם המשתמש הגיע דרך קליק על קבלה ספציפית בדאשבורד?
     const targetBonusId = sessionStorage.getItem("scrollToBonus");
     if (targetBonusId) {
       const targetQuestion = questions.find(q => q.id === targetBonusId);
       if (targetQuestion) {
          setBonusCategory(targetQuestion.phase || "TOURNAMENT");
-         if (targetQuestion.phase === "KNOCKOUT") setKnockoutRound(targetQuestion.round || "ALL");
+         if (targetQuestion.phase === "KNOCKOUT") setKnockoutRound(targetQuestion.knockoutRound || "ALL");
          
          if (targetQuestion.isSurprise) setWeightTab("SURPRISE");
-         else if (targetQuestion.weight === "DOUBLE") setWeightTab("DOUBLE");
+         else if (targetQuestion.isDouble) setWeightTab("DOUBLE");
          else setWeightTab("REGULAR");
       }
       setTimeout(() => {
@@ -109,7 +147,6 @@ export default function BonusQuestions({ userId, tournamentState: propTournament
       return;
     }
     
-    // 2. הקפצה אוטומטית לשאלת הפתעה - קורה אך ורק בפעם הראשונה שנכנסים למסך!
     if (!hasAutoNavigated.current) {
        const activeSurprise = questions.find(q => {
           if (!q.isSurprise || !q.openTime || !q.closeTime) return false;
@@ -121,11 +158,11 @@ export default function BonusQuestions({ userId, tournamentState: propTournament
        if (activeSurprise) {
           setBonusCategory(activeSurprise.phase || "TOURNAMENT");
           if (activeSurprise.phase === "KNOCKOUT") {
-             setKnockoutRound(activeSurprise.round || "ALL");
+             setKnockoutRound(activeSurprise.knockoutRound || "ALL");
           }
           setWeightTab("SURPRISE");
        }
-       hasAutoNavigated.current = true; // סימנו שעשינו את הקפיצה, מעכשיו המשתמש חופשי לדפדף איפה שבא לו
+       hasAutoNavigated.current = true;
     }
   }, [questions, answers, nowMs]);
 
@@ -149,7 +186,8 @@ export default function BonusQuestions({ userId, tournamentState: propTournament
   };
 
   const isQuestionLocked = (q: any) => {
-    if (realBonusAnswers[q.id]) return true; 
+    if (realBonusData.locked?.[q.id]) return true; 
+    if (realBonusAnswers[q.id] && realBonusAnswers[q.id].length > 0) return true; 
 
     if (q.isSurprise) {
       if (!q.openTime || !q.closeTime) return false;
@@ -162,11 +200,11 @@ export default function BonusQuestions({ userId, tournamentState: propTournament
     if (state === 0) return false;
     if (q.phase === "TOURNAMENT" || q.phase === "GROUPS") return state >= 1;
     if (q.phase === "KNOCKOUT") {
-      if (q.round === "ALL" || q.round === "R32") return state >= 5;
-      if (q.round === "R16") return state >= 7;
-      if (q.round === "QF") return state >= 9;
-      if (q.round === "SF") return state >= 11;
-      if (q.round === "FINAL") return state >= 13;
+      if (q.knockoutRound === "ALL" || q.knockoutRound === "32 הגדולות") return state >= 5;
+      if (q.knockoutRound === "שמינית גמר") return state >= 7;
+      if (q.knockoutRound === "רבע גמר") return state >= 9;
+      if (q.knockoutRound === "חצי גמר") return state >= 11;
+      if (q.knockoutRound === "גמר" || q.knockoutRound === "מקום שלישי") return state >= 13;
     }
     return false;
   };
@@ -179,48 +217,6 @@ export default function BonusQuestions({ userId, tournamentState: propTournament
     return isCorrect ? q.points : 0;
   };
 
-  const handleRandomizeSingleQuestion = (q: any) => {
-    if (isQuestionLocked(q)) return;
-    let ans = "";
-    if (q.answerType === "ALL_TEAMS") {
-      const opts = [...allTeams, ...(q.customOptions || [])];
-      if (opts.length > 0) ans = opts[Math.floor(Math.random() * opts.length)];
-    } else if (q.answerType === "MULTIPLE_CHOICE" || q.answerType === "TEAM_SUBSET") {
-      const opts = q.customOptions || [];
-      if (opts.length > 0) ans = opts[Math.floor(Math.random() * opts.length)];
-    } else if (q.answerType === "OPEN_TEXT" || q.answerType === "PLAYER") {
-      let opts: string[] = [];
-      if (Array.isArray(q.customOptions) && q.customOptions.length > 0) opts = q.customOptions;
-      else if (typeof q.customOptions === 'string' && q.customOptions.trim() !== "") opts = q.customOptions.split(',').map((s: string) => s.trim());
-      if (opts.length === 0) opts = ["ליונל מסי", "קיליאן אמבפה", "ארלינג האלאנד", "ויניסיוס ג'וניור", "קווין דה בריינה", "ג'וד בלינגהאם", "הארי קיין"];
-      ans = opts[Math.floor(Math.random() * opts.length)];
-    } else if (q.answerType === "NUMERIC") {
-      ans = Math.floor(Math.random() * 20).toString();
-    }
-    
-    if (ans) handleChange(q.id, ans);
-  };
-
-  const filteredQuestions = questions.filter(q => {
-    if (q.phase !== bonusCategory) return false;
-    if (bonusCategory === "KNOCKOUT") return q.round === knockoutRound;
-    return true;
-  });
-
-  const regularQuestions = filteredQuestions.filter(q => q.weight === "REGULAR" && !q.isSurprise);
-  const doubleQuestions = filteredQuestions.filter(q => q.weight === "DOUBLE" && !q.isSurprise);
-  const surpriseQuestions = filteredQuestions.filter(q => q.weight === "SURPRISE" || q.isSurprise);
-
-  const activeQuestionsList = weightTab === "REGULAR" ? regularQuestions : weightTab === "DOUBLE" ? doubleQuestions : surpriseQuestions;
-
-  useEffect(() => {
-    if (activeQuestionsList.length === 0) {
-      if (regularQuestions.length > 0) setWeightTab("REGULAR");
-      else if (doubleQuestions.length > 0) setWeightTab("DOUBLE");
-      else if (surpriseQuestions.length > 0) setWeightTab("SURPRISE");
-    }
-  }, [regularQuestions.length, doubleQuestions.length, surpriseQuestions.length, activeQuestionsList.length]);
-
   const handleRandomizeCategory = async () => {
     if (!confirm("להגריל תשובות אקראיות לכל השאלות הפתוחות בקטגוריה זו?")) return;
     setIsRandomizing(true);
@@ -231,20 +227,24 @@ export default function BonusQuestions({ userId, tournamentState: propTournament
       activeQuestionsList.forEach(q => {
         if (!isQuestionLocked(q)) {
           let ans = "";
-          if (q.answerType === "ALL_TEAMS") {
-            const opts = [...allTeams, ...(q.customOptions || [])];
-            if (opts.length > 0) ans = opts[Math.floor(Math.random() * opts.length)];
-          } else if (q.answerType === "MULTIPLE_CHOICE" || q.answerType === "TEAM_SUBSET") {
-            const opts = q.customOptions || [];
-            if (opts.length > 0) ans = opts[Math.floor(Math.random() * opts.length)];
-          } else if (q.answerType === "OPEN_TEXT" || q.answerType === "PLAYER") {
-            let opts: string[] = [];
-            if (Array.isArray(q.customOptions) && q.customOptions.length > 0) opts = q.customOptions;
-            else if (typeof q.customOptions === 'string' && q.customOptions.trim() !== "") opts = q.customOptions.split(',').map((s: string) => s.trim());
-            if (opts.length === 0) opts = ["ליונל מסי", "קיליאן אמבפה", "ארלינג האלאנד", "ויניסיוס ג'וניור", "קווין דה בריינה", "ג'וד בלינגהאם", "הארי קיין"];
-            ans = opts[Math.floor(Math.random() * opts.length)];
-          } else if (q.answerType === "NUMERIC") {
-            ans = Math.floor(Math.random() * 20).toString();
+          const currentAnswerType = q.answerType || "TEAM";
+
+          if (currentAnswerType === "TEAM") {
+             let opts = q.specificTeams ? q.specificTeams.split(",").map((s:string)=>s.trim()).filter(Boolean) : allTeams;
+             if (opts.length === 0) opts = allTeams;
+             if (q.hasNoneOption) opts.push("אף נבחרת");
+             if (q.hasAllOption) opts.push("כל הנבחרות");
+             ans = opts[Math.floor(Math.random() * opts.length)];
+             
+          } else if (currentAnswerType === "CUSTOM") {
+             const opts = q.possibleOptions ? q.possibleOptions.split(",").map((s:string)=>s.trim()).filter(Boolean) : [];
+             if (opts.length > 0) ans = opts[Math.floor(Math.random() * opts.length)];
+
+          } else if (currentAnswerType === "PLAYER") {
+             ans = TOP_PLAYERS[Math.floor(Math.random() * TOP_PLAYERS.length)];
+
+          } else if (currentAnswerType === "NUMBER_PURE" || currentAnswerType === "NUMBER_MINUTE") {
+             ans = Math.floor(Math.random() * 15 + 1).toString();
           }
           
           if (ans) {
@@ -261,6 +261,28 @@ export default function BonusQuestions({ userId, tournamentState: propTournament
     } catch(e) { console.error(e); } 
     finally { setIsRandomizing(false); }
   };
+
+  const filteredQuestions = questions.filter(q => {
+    if (q.phase !== bonusCategory) return false;
+    if (bonusCategory === "KNOCKOUT") {
+       if (knockoutRound !== "ALL" && q.knockoutRound && q.knockoutRound !== "ALL" && q.knockoutRound !== knockoutRound) return false;
+    }
+    return true;
+  });
+
+  const regularQuestions = filteredQuestions.filter(q => !q.isDouble && !q.isSurprise);
+  const doubleQuestions = filteredQuestions.filter(q => q.isDouble && !q.isSurprise);
+  const surpriseQuestions = filteredQuestions.filter(q => q.isSurprise);
+
+  const activeQuestionsList = weightTab === "REGULAR" ? regularQuestions : weightTab === "DOUBLE" ? doubleQuestions : surpriseQuestions;
+
+  useEffect(() => {
+    if (activeQuestionsList.length === 0) {
+      if (regularQuestions.length > 0) setWeightTab("REGULAR");
+      else if (doubleQuestions.length > 0) setWeightTab("DOUBLE");
+      else if (surpriseQuestions.length > 0) setWeightTab("SURPRISE");
+    }
+  }, [regularQuestions.length, doubleQuestions.length, surpriseQuestions.length, activeQuestionsList.length]);
 
   const handleOpenSpy = async (q: any) => {
     setSpyModalQuestion(q);
@@ -309,6 +331,21 @@ export default function BonusQuestions({ userId, tournamentState: propTournament
     finally { setIsLoadingSpy(false); }
   };
 
+  const availableQuestions = questions.filter(q => {
+    if (q.isSurprise) {
+      const openMs = q.openTime ? parseDateTimeLocal(q.openTime) : 0;
+      if (nowMs < openMs) return false;
+    }
+    if (q.phase === "KNOCKOUT" && tournamentState < 4) {
+      return false;
+    }
+    return true;
+  });
+  
+  const answeredCount = availableQuestions.filter(q => answers[q.id] && String(answers[q.id]).trim() !== "").length;
+  const totalAvailableCount = availableQuestions.length;
+  const progressPercent = totalAvailableCount > 0 ? Math.round((answeredCount / totalAvailableCount) * 100) : 0;
+
   if (isLoading) return <div className="text-center text-blue-400 animate-pulse mt-12 font-bold text-xl">טוען שאלות בונוס... ⚽</div>;
 
   return (
@@ -322,7 +359,32 @@ export default function BonusQuestions({ userId, tournamentState: propTournament
          <p className="text-slate-400 text-sm md:text-base">הזדמנות לאסוף נקודות נוספות. ענה על השאלות לפני שחלון הזמן ננעל!</p>
       </div>
 
-      <div className="flex overflow-x-auto custom-scrollbar gap-3 mb-6 pb-2">
+      {totalAvailableCount > 0 && (
+        <div className="bg-slate-900/50 p-4 rounded-2xl border border-slate-800 shadow-inner">
+           <div className="flex justify-between items-end mb-2">
+             <div className="flex flex-col">
+               <span className="text-slate-400 text-[10px] font-black tracking-widest uppercase">התקדמות בונוסים</span>
+               <span className="text-white font-bold text-sm">ענית על <span className="text-amber-400">{answeredCount}</span> מתוך {totalAvailableCount}</span>
+             </div>
+             <span className="text-amber-400 font-black">{progressPercent}%</span>
+           </div>
+           <div className="w-full h-2.5 bg-slate-950 rounded-full overflow-hidden border border-slate-800 relative">
+             <div 
+               className="h-full bg-gradient-to-l from-amber-400 to-amber-600 rounded-full transition-all duration-500 ease-out relative"
+               style={{ width: `${progressPercent}%` }}
+             >
+                <div className="absolute inset-0 bg-white/20 w-full h-full animate-[shimmer_2s_infinite] skew-x-12"></div>
+             </div>
+           </div>
+           {progressPercent === 100 && (
+             <div className="text-center mt-2.5 text-[11px] text-emerald-400 font-bold animate-pulse">
+               🏆 מדהים! השלמת את כל השאלות שפתוחות כרגע.
+             </div>
+           )}
+        </div>
+      )}
+
+      <div className="flex overflow-x-auto custom-scrollbar gap-3 mb-6 pb-2 mt-2">
          {[
            { id: "TOURNAMENT", label: "🏆 כל הטורניר" },
            { id: "GROUPS", label: "⚽ שלב הבתים" },
@@ -349,11 +411,12 @@ export default function BonusQuestions({ userId, tournamentState: propTournament
         <div className="flex overflow-x-auto gap-2 mb-6 pb-2 custom-scrollbar bg-slate-900/50 p-2 rounded-2xl border border-slate-800/50">
           {[
             { id: "ALL", label: "כללי (כל הנוק-אאוט)" },
-            { id: "R32", label: "32 הגדולות" },
-            { id: "R16", label: "שמינית גמר" },
-            { id: "QF", label: "רבע גמר" },
-            { id: "SF", label: "חצי גמר" },
-            { id: "FINAL", label: "גמר" }
+            { id: "32 הגדולות", label: "32 הגדולות" },
+            { id: "שמינית גמר", label: "שמינית גמר" },
+            { id: "רבע גמר", label: "רבע גמר" },
+            { id: "חצי גמר", label: "חצי גמר" },
+            { id: "גמר", label: "גמר" },
+            { id: "מקום שלישי", label: "מקום שלישי" }
           ].map(subTab => (
             <button
               key={subTab.id}
@@ -422,7 +485,7 @@ export default function BonusQuestions({ userId, tournamentState: propTournament
               if (q.isSurprise) {
                 cardStyle = "bg-purple-900/20 border-purple-500/50";
                 shadowStyle = "shadow-[0_0_15px_rgba(168,85,247,0.15)]";
-              } else if (q.weight === "DOUBLE") {
+              } else if (q.isDouble) {
                 cardStyle = "bg-rose-900/20 border-rose-500/50";
                 shadowStyle = "shadow-[0_0_15px_rgba(225,29,72,0.15)]";
               }
@@ -436,32 +499,33 @@ export default function BonusQuestions({ userId, tournamentState: propTournament
                  cardStyle = "bg-slate-900 border-purple-500/50 opacity-90";
               }
 
+              const currentAnswerType = q.answerType || "TEAM";
+
               return (
                 <div key={q.id} id={`bonus-${q.id}`} className={`${cardStyle} p-6 rounded-3xl border ${shadowStyle} flex flex-col h-full transition-all duration-300`}>
                    
                    <div className="flex justify-between items-start mb-4 gap-4">
                       <div className="flex flex-col gap-1.5">
-                        <span className="text-[10px] font-black text-slate-400 bg-slate-950 px-2 py-1 rounded w-fit border border-slate-800">
-                          קופה: <span className={q.isSurprise ? "text-purple-400" : q.weight==="DOUBLE" ? "text-rose-400" : "text-amber-400"}>{q.points} נק'</span>
-                        </span>
-                        {q.isSurprise && !locked && q.closeTime && !isWaitingToOpen && (
-                           <span className="text-[10px] font-black text-purple-400 bg-purple-900/30 px-2 py-1 rounded w-fit border border-purple-500/30 animate-pulse flex items-center gap-1">
-                              ⏳ יינעל ב: {new Date(parseDateTimeLocal(q.closeTime)).toLocaleString('he-IL', {day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit'})}
+                        
+                        {!isWaitingToOpen && (
+                           <span className="text-[10px] font-black text-slate-400 bg-slate-950 px-2 py-1 rounded w-fit border border-slate-800">
+                             קופה: <span className={q.isDouble ? "text-rose-400" : "text-amber-400"}>{q.points} נק'</span>
                            </span>
                         )}
+                        
                         {isWaitingToOpen && (
                            <span className="text-[10px] font-black text-purple-400 bg-purple-900/50 px-2 py-1 rounded w-fit border border-purple-500/50 flex items-center gap-1">
-                              ⏳ ממתין לחשיפה
+                              🎁 הפתעה בדרך!
                            </span>
                         )}
                       </div>
                       
                       <div className="flex flex-col items-end gap-2">
                         <div className="flex gap-1.5">
-                           {q.isSurprise && <span className="bg-purple-600 w-6 h-6 rounded-full flex items-center justify-center text-xs shadow-md" title="שאלת הפתעה מוגבלת בזמן!">🎁</span>}
-                           {q.weight === "DOUBLE" && !q.isSurprise && <span className="bg-rose-600 w-6 h-6 rounded-full flex items-center justify-center text-xs font-black shadow-md text-white" title="ניקוד כפול!">X2</span>}
+                           {q.isSurprise && !isWaitingToOpen && <span className="bg-purple-600 w-6 h-6 rounded-full flex items-center justify-center text-xs shadow-md" title="שאלת הפתעה!">🎁</span>}
+                           {q.isDouble && !q.isSurprise && <span className="bg-rose-600 w-6 h-6 rounded-full flex items-center justify-center text-xs font-black shadow-md text-white" title="ניקוד כפול!">X2</span>}
                         </div>
-                        {hasTruth && myPoints !== null && (
+                        {hasTruth && myPoints !== null && !isWaitingToOpen && (
                            <span className={`px-2 py-1 rounded text-xs font-black shadow-sm border ${myPoints > 0 ? "bg-emerald-900/40 text-emerald-400 border-emerald-500/50" : "bg-rose-950/50 text-rose-400 border-rose-500/40"}`}>
                              {myPoints > 0 ? `🎯 +${myPoints} נק'` : "0 נק'"}
                            </span>
@@ -470,66 +534,138 @@ export default function BonusQuestions({ userId, tournamentState: propTournament
                    </div>
                    
                    <h3 className="text-white font-bold text-lg md:text-xl leading-snug mb-2">
-                     {isWaitingToOpen ? "שאלת הפתעה סודית! 🤫" : q.label}
+                     {isWaitingToOpen ? "שאלת הפתעה סודית..." : q.label}
                    </h3>
                    
-                   {q.liveStatus && !isWaitingToOpen && (
-                      <div className="text-xs font-bold text-cyan-400 bg-cyan-950/30 p-2 rounded-lg border border-cyan-500/20 mb-4 inline-block w-fit">
-                         <span className="animate-pulse">📡 לייב:</span> {q.liveStatus}
+                   {realBonusData.leading?.[q.id] && !locked && !isWaitingToOpen && (
+                      <div className="text-[10px] font-bold text-amber-400 bg-amber-950/30 px-2.5 py-1.5 rounded-lg border border-amber-500/20 mb-4 inline-flex items-center gap-1.5 w-fit">
+                         <span className="animate-pulse">👑 מובילה כרגע:</span> 
+                         {Array.isArray(realBonusData.leading[q.id]) ? realBonusData.leading[q.id].join(', ') : realBonusData.leading[q.id]}
                       </div>
                    )}
 
                    <div className="mt-auto pt-4 flex-1 flex flex-col justify-end">
                       {isWaitingToOpen ? (
                          <div className="bg-slate-950/80 border border-slate-700 p-5 rounded-xl text-center shadow-inner">
-                            <span className="text-4xl block mb-2 opacity-80 animate-pulse">🎁</span>
+                            <span className="text-4xl block mb-2 opacity-80 animate-bounce">🎁</span>
                             <h4 className="text-purple-400 font-bold mb-1">השאלה תיחשף בקרוב!</h4>
-                            <p className="text-slate-400 text-xs">הכינו את הניחושים שלכם. השאלה תהיה זמינה החל מ- <strong className="text-purple-300">{new Date(openMs).toLocaleString('he-IL', {day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit'})}</strong>.</p>
+                            <p className="text-slate-400 text-xs">הכינו את הניחושים שלכם. שווה לעקוב.</p>
                          </div>
-                      ) : q.answerType === "ALL_TEAMS" || q.answerType === "TEAM_SUBSET" ? (
-                         <div className="relative">
-                            <select
-                               value={answers[q.id] || ""}
-                               onChange={e => handleChange(q.id, e.target.value)}
-                               disabled={locked}
-                               className={`w-full appearance-none px-4 py-3.5 rounded-xl font-bold text-sm outline-none transition-all shadow-inner flex-1 ${locked ? "bg-slate-900/50 text-slate-400 border-slate-700 cursor-not-allowed" : (!answers[q.id] || answers[q.id].trim()==="") ? "bg-slate-950 text-white border-amber-500/80 focus:border-amber-400" : "bg-slate-900 text-white border-slate-600 focus:border-blue-500"}`}
-                            >
-                               <option value="">-- בחר נבחרת --</option>
-                               {(q.answerType === "TEAM_SUBSET" && q.customOptions?.length > 0 ? q.customOptions : allTeams).map((t: string) => (
-                                 <option key={t} value={t}>{t}</option>
-                               ))}
-                            </select>
-                            {answers[q.id] && getFlagUrl(answers[q.id]) && (
-                               <div className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none">
-                                  <img src={getFlagUrl(answers[q.id])!} className="w-5 h-3.5 object-cover rounded-sm shadow-sm" alt="flag" />
+                      ) : currentAnswerType === "TEAM" ? (() => {
+                         const teamOpts = q.specificTeams ? q.specificTeams.split(",").map((s:string)=>s.trim()).filter(Boolean) : [];
+                         const finalOpts = teamOpts.length > 0 ? teamOpts : allTeams;
+                         const extras = [];
+                         if (q.hasNoneOption) extras.push("אף נבחרת");
+                         if (q.hasAllOption) extras.push("כל הנבחרות");
+                         
+                         const totalOptionsCount = finalOpts.length + extras.length;
+                         if (teamOpts.length > 0 && totalOptionsCount <= 8) {
+                            // התיקון לסדר הבועות:
+                            const allOpts = [...extras, ...finalOpts];
+                            return (
+                               <div className="flex flex-col gap-2">
+                                  {allOpts.map((opt: string) => (
+                                     <button
+                                        key={opt}
+                                        onClick={() => !locked && handleChange(q.id, opt)}
+                                        disabled={locked}
+                                        className={`w-full py-3 px-4 rounded-xl font-bold text-sm text-right transition-all flex items-center gap-3 ${answers[q.id] === opt ? "bg-amber-600/20 text-amber-400 border border-amber-500 shadow-md" : "bg-slate-950 text-slate-400 border border-slate-700 hover:bg-slate-800"} ${locked && answers[q.id] !== opt ? "opacity-50 cursor-not-allowed" : ""}`}
+                                     >
+                                        <div className={`w-4 h-4 rounded-full border flex items-center justify-center shrink-0 ${answers[q.id] === opt ? "border-amber-400" : "border-slate-500"}`}>
+                                          {answers[q.id] === opt && <div className="w-2 h-2 bg-amber-400 rounded-full"></div>}
+                                        </div>
+                                        {getFlagUrl(opt) && <img src={getFlagUrl(opt)!} className="w-5 h-3.5 object-cover rounded-sm shadow-sm" alt="flag" />}
+                                        <span className="truncate">{opt}</span>
+                                     </button>
+                                  ))}
                                </div>
-                            )}
-                         </div>
-                      ) : q.answerType === "MULTIPLE_CHOICE" ? (
-                         <div className="flex flex-col gap-2">
-                            {q.customOptions?.map((opt: string) => (
-                               <button
-                                  key={opt}
-                                  onClick={() => !locked && handleChange(q.id, opt)}
+                            );
+                         }
+
+                         return (
+                            <div className="relative">
+                               <select
+                                  value={answers[q.id] || ""}
+                                  onChange={e => handleChange(q.id, e.target.value)}
                                   disabled={locked}
-                                  className={`w-full py-3 px-4 rounded-xl font-bold text-sm text-right transition-all flex items-center gap-3 ${answers[q.id] === opt ? "bg-amber-600/20 text-amber-400 border border-amber-500 shadow-md" : "bg-slate-950 text-slate-400 border border-slate-700 hover:bg-slate-800"} ${locked && answers[q.id] !== opt ? "opacity-50 cursor-not-allowed" : ""}`}
+                                  className={`w-full appearance-none px-4 py-3.5 pr-10 rounded-xl font-bold text-sm outline-none transition-all shadow-inner flex-1 ${locked ? "bg-slate-900/50 text-slate-400 border-slate-700 cursor-not-allowed" : (!answers[q.id] || answers[q.id].trim()==="") ? "bg-slate-950 text-white border-amber-500/80 focus:border-amber-400" : "bg-slate-900 text-white border-slate-600 focus:border-blue-500"}`}
                                >
-                                  <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${answers[q.id] === opt ? "border-amber-400" : "border-slate-500"}`}>
-                                    {answers[q.id] === opt && <div className="w-2 h-2 bg-amber-400 rounded-full"></div>}
+                                  <option value="" className="bg-slate-900">-- בחר נבחרת --</option>
+                                  
+                                  {/* התיקון לסדר הרשימה הנפתחת */}
+                                  {extras.map((t: string) => (
+                                     <option className="bg-slate-900 text-amber-400" key={t} value={t}>
+                                        {isMobile ? (t === "אף נבחרת" ? "🛡️ " : t === "כל הנבחרות" ? "🌍 " : "") : ""}{t}
+                                     </option>
+                                  ))}
+                                  {extras.length > 0 && <option disabled className="bg-slate-900">──────────</option>}
+                                  
+                                  {finalOpts.map((t: string) => (
+                                     <option className="bg-slate-900 text-white" key={t} value={t}>
+                                        {isMobile && TEAM_EMOJIS[t] ? `${TEAM_EMOJIS[t]} ` : ''}{t}
+                                     </option>
+                                  ))}
+                               </select>
+                               {answers[q.id] && getFlagUrl(answers[q.id]) && (
+                                  <div className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none">
+                                     <img src={getFlagUrl(answers[q.id])!} className="w-5 h-3.5 object-cover rounded-sm shadow-sm" alt="flag" />
                                   </div>
-                                  {opt}
-                               </button>
-                            ))}
-                         </div>
-                      ) : q.answerType === "NUMERIC" ? (
+                               )}
+                            </div>
+                         );
+                      })() : currentAnswerType === "CUSTOM" ? (() => {
+                         const opts = q.possibleOptions ? q.possibleOptions.split(",").map((s:string)=>s.trim()).filter(Boolean) : [];
+                         return (
+                            <div className="flex flex-col gap-2">
+                               {opts.map((opt: string) => (
+                                  <button
+                                     key={opt}
+                                     onClick={() => !locked && handleChange(q.id, opt)}
+                                     disabled={locked}
+                                     className={`w-full py-3 px-4 rounded-xl font-bold text-sm text-right transition-all flex items-center gap-3 ${answers[q.id] === opt ? "bg-amber-600/20 text-amber-400 border border-amber-500 shadow-md" : "bg-slate-950 text-slate-400 border border-slate-700 hover:bg-slate-800"} ${locked && answers[q.id] !== opt ? "opacity-50 cursor-not-allowed" : ""}`}
+                                  >
+                                     <div className={`w-4 h-4 rounded-full border flex items-center justify-center shrink-0 ${answers[q.id] === opt ? "border-amber-400" : "border-slate-500"}`}>
+                                       {answers[q.id] === opt && <div className="w-2 h-2 bg-amber-400 rounded-full"></div>}
+                                     </div>
+                                     <span className="truncate">{opt}</span>
+                                  </button>
+                               ))}
+                            </div>
+                         );
+                      })() : currentAnswerType === "NUMBER_PURE" ? (
                          <input
                            type="number"
                            value={answers[q.id] || ""}
                            onChange={e => handleChange(q.id, e.target.value)}
                            disabled={locked}
                            placeholder="הזן מספר..."
-                           className={`w-full px-4 py-3.5 rounded-xl font-bold text-center text-sm outline-none transition-all shadow-inner ${locked ? "bg-slate-900/50 text-slate-400 border-slate-700 cursor-not-allowed" : (!answers[q.id] || answers[q.id].trim()==="") ? "bg-slate-950 text-white border-amber-500/80" : "bg-slate-900 text-white border-slate-600"}`}
+                           className={`w-full px-4 py-3.5 rounded-xl font-bold text-center text-sm outline-none transition-all shadow-inner ${locked ? "bg-slate-900/50 text-slate-400 border-slate-700 cursor-not-allowed" : (!answers[q.id] || answers[q.id].trim()==="") ? "bg-slate-950 text-white border-amber-500/80 focus:border-amber-400" : "bg-slate-900 text-white border-slate-600 focus:border-blue-500"}`}
                          />
+                      ) : currentAnswerType === "NUMBER_MINUTE" ? (
+                         <input
+                           type="text"
+                           value={answers[q.id] || ""}
+                           onChange={e => handleChange(q.id, e.target.value)}
+                           disabled={locked}
+                           placeholder="למשל: 45+3"
+                           dir="ltr"
+                           className={`w-full px-4 py-3.5 rounded-xl font-bold text-center text-sm outline-none transition-all shadow-inner ${locked ? "bg-slate-900/50 text-slate-400 border-slate-700 cursor-not-allowed" : (!answers[q.id] || answers[q.id].trim()==="") ? "bg-slate-950 text-white border-amber-500/80 focus:border-amber-400" : "bg-slate-900 text-white border-slate-600 focus:border-blue-500"}`}
+                         />
+                      ) : currentAnswerType === "PLAYER" ? (
+                         <div className="relative">
+                            <input
+                              type="text"
+                              list={`players-list-${q.id}`}
+                              value={answers[q.id] || ""}
+                              onChange={e => handleChange(q.id, e.target.value)}
+                              disabled={locked}
+                              placeholder="הקלד או בחר שם שחקן..."
+                              className={`w-full px-4 py-3.5 rounded-xl font-bold text-sm outline-none transition-all shadow-inner ${locked ? "bg-slate-900/50 text-slate-400 border-slate-700 cursor-not-allowed" : (!answers[q.id] || answers[q.id].trim()==="") ? "bg-slate-950 text-white border-amber-500/80 focus:border-amber-400" : "bg-slate-900 text-white border-slate-600 focus:border-blue-500"}`}
+                            />
+                            <datalist id={`players-list-${q.id}`}>
+                               {TOP_PLAYERS.map(p => <option key={p} value={p} />)}
+                            </datalist>
+                         </div>
                       ) : (
                          <input
                            type="text"
@@ -537,7 +673,7 @@ export default function BonusQuestions({ userId, tournamentState: propTournament
                            onChange={e => handleChange(q.id, e.target.value)}
                            disabled={locked}
                            placeholder="הקלד תשובה חופשית..."
-                           className={`w-full px-4 py-3.5 rounded-xl font-bold text-sm outline-none transition-all shadow-inner ${locked ? "bg-slate-900/50 text-slate-400 border-slate-700 cursor-not-allowed" : (!answers[q.id] || answers[q.id].trim()==="") ? "bg-slate-950 text-white border-amber-500/80" : "bg-slate-900 text-white border-slate-600"}`}
+                           className={`w-full px-4 py-3.5 rounded-xl font-bold text-sm outline-none transition-all shadow-inner ${locked ? "bg-slate-900/50 text-slate-400 border-slate-700 cursor-not-allowed" : (!answers[q.id] || answers[q.id].trim()==="") ? "bg-slate-950 text-white border-amber-500/80 focus:border-amber-400" : "bg-slate-900 text-white border-slate-600 focus:border-blue-500"}`}
                          />
                       )}
                    </div>

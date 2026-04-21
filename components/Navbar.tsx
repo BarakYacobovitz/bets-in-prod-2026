@@ -31,6 +31,24 @@ const parseDateTimeLocal = (dtStr: string) => {
   } catch { return 0; }
 };
 
+const isMatchOpenForPrediction = (m: any, state: number) => {
+  const s = Number(state) || 0;
+  if (m.stage !== "KNOCKOUT") {
+     const md = Number(m.matchday) || 1;
+     if (md === 1) return s === 0;
+     if (md === 2) return s === 1;
+     if (md === 3) return s === 2;
+     return false;
+  } else {
+     if (m.roundName === "32 הגדולות") return s === 4;
+     if (m.roundName === "שמינית גמר") return s === 6;
+     if (m.roundName === "רבע גמר") return s === 8;
+     if (m.roundName === "חצי גמר") return s === 10;
+     if (m.roundName === "גמר" || m.roundName === "מקום שלישי") return s === 12;
+     return false;
+  }
+};
+
 export default function Navbar() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [userId, setUserId] = useState<string>("");
@@ -82,6 +100,9 @@ export default function Navbar() {
         });
 
         try {
+           const sysSnap = await getDoc(doc(db, "settings", "system"));
+           const currentTState = sysSnap.exists() ? Number(sysSnap.data().tournamentState) || 0 : 0;
+
            const mSnap = await getDocs(collection(db, "matches"));
            const today = new Date();
            let missing = 0;
@@ -99,7 +120,7 @@ export default function Navbar() {
                  const day = dParts[0] || "1";
                  const month = dParts[1] || "1";
                  if (today.getDate() === Number(day) && today.getMonth() === Number(month) - 1) {
-                    if (!userPreds.has(d.id)) missing++;
+                    if (!userPreds.has(d.id) && isMatchOpenForPrediction(m, currentTState)) missing++;
                  }
               }
            });
@@ -108,6 +129,15 @@ export default function Navbar() {
 
       } else {
         setIsLoggedIn(false);
+        setUserId("");
+        setUserEmail("");
+        setUserName("שחקן אורח");
+        setUserPoints(0);
+        setPhotoUrl("");
+        if (unsubUser) {
+           unsubUser();
+           unsubUser = null;
+        }
       }
     });
 
@@ -212,6 +242,27 @@ export default function Navbar() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  // --- מנוע ה-PWA Badge המרכזי שהוספנו! ---
+  useEffect(() => {
+    const totalNotifs = missingMatchesToday + activeSurpriseAlert;
+    
+    // בודק אם הדפדפן/מערכת ההפעלה תומכים ביכולת הזו (בעיקר מובייל וכרום/אדג' בדסקטופ)
+    if (typeof navigator !== 'undefined' && 'setAppBadge' in navigator) {
+      try {
+        if (totalNotifs > 0) {
+          // @ts-ignore - ה-TS לפעמים לא מכיר את ה-API הזה כי הוא יחסית חדש
+          navigator.setAppBadge(totalNotifs).catch((error: any) => console.log("Badge error (expected in some dev environments):", error));
+        } else {
+          // @ts-ignore
+          navigator.clearAppBadge().catch((error: any) => console.log("Badge clear error:", error));
+        }
+      } catch (error) {
+        console.error("שגיאה בעדכון הבועה על האייקון:", error);
+      }
+    }
+  }, [missingMatchesToday, activeSurpriseAlert]);
+  // ----------------------------------------
+
   const handleLogout = async () => {
     await signOut(auth);
     window.location.href = "/";
@@ -229,12 +280,11 @@ export default function Navbar() {
   };
 
   const totalNotifs = missingMatchesToday + activeSurpriseAlert;
-
+  if (!isLoggedIn) return null;
   return (
     <nav className="bg-slate-950/80 backdrop-blur-md border-b border-slate-800 sticky top-0 z-50 text-white shadow-lg" dir="rtl">
       <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
         
-        {/* העיצוב המשוחזר במדויק! טקסט שמאלי מיושר לימין, קו מפריד, ואז לוגו ה-B */}
         <a href="/" className="flex items-center gap-3 md:gap-4 group" dir="ltr">
           <div className="hidden sm:flex flex-col items-end justify-center">
              <div className="font-black text-2xl md:text-[28px] bg-gradient-to-b from-[#fef08a] via-[#fbbf24] to-[#d97706] bg-clip-text text-transparent leading-none tracking-wide">
@@ -252,7 +302,6 @@ export default function Navbar() {
           </div>
         </a>
 
-        {/* השעון */}
         <div className="flex-1 flex justify-center px-2">
           <div className={`flex flex-col items-center justify-center px-4 py-1.5 rounded-xl border transition-colors duration-500 ${isNoMoreBets ? 'bg-rose-950/40 border-rose-500/50 shadow-[0_0_10px_rgba(225,29,72,0.2)]' : 'bg-slate-900 border-slate-700 shadow-inner'}`}>
              <span className="text-[10px] md:text-xs font-bold text-slate-400">
@@ -265,7 +314,6 @@ export default function Navbar() {
           </div>
         </div>
 
-        {/* אזור המשתמש והתראות */}
         {isLoggedIn ? (
           <div className="flex items-center gap-3 md:gap-4">
              
@@ -279,7 +327,7 @@ export default function Navbar() {
                       <div className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2 px-2 border-b border-slate-800 pb-2">התראות המערכת</div>
                       <div className="flex flex-col gap-1">
                          {ptsDiff > 0 && <div className="text-xs font-bold text-emerald-400 bg-emerald-950/30 p-2.5 rounded-xl border border-emerald-500/20 flex items-center gap-2"><span>📈</span> עלית ב-{ptsDiff} נקודות היום!</div>}
-                         {missingMatchesToday > 0 && <div className="text-xs font-bold text-amber-400 bg-amber-950/30 p-2.5 rounded-xl border border-amber-500/20 flex items-center gap-2"><span>⚠️</span> חסר ניחוש ל-{missingMatchesToday} משחקים היום!</div>}
+                         {missingMatchesToday > 0 && <div className="text-xs font-bold text-amber-400 bg-amber-950/30 p-2.5 rounded-xl border border-amber-500/20 flex items-center gap-2"><span>⚠️</span> חסר ניחוש ל-{missingMatchesToday} משחקים פתוחים!</div>}
                          {activeSurpriseAlert > 0 && <div className="text-xs font-bold text-purple-400 bg-purple-950/30 p-2.5 rounded-xl border border-purple-500/20 flex items-center gap-2"><span>🎁</span> יש {activeSurpriseAlert} שאלות הפתעה פתוחות!</div>}
                          {totalNotifs === 0 && ptsDiff <= 0 && <div className="text-xs font-medium text-slate-500 text-center py-4">אין התראות חדשות.</div>}
                       </div>

@@ -5,53 +5,20 @@ import { doc, getDoc, setDoc, collection, query, where, onSnapshot, getDocs } fr
 import { db } from "../app/firebase";
 import { getFlagUrl } from "../app/utils/flags";
 
-const CountdownTimer = ({ targetDateStr }: { targetDateStr: string | undefined }) => {
-  const [timeLeft, setTimeLeft] = useState("מחשב...");
-
-  useEffect(() => {
-    if (!targetDateStr) {
-       setTimeLeft("טרם נקבע מועד");
-       return;
-    }
-    let safeDateStr = targetDateStr;
-    if (safeDateStr.includes('T') && safeDateStr.split(':').length === 2) {
-      safeDateStr += ":00";
-    }
-    const targetDate = new Date(safeDateStr);
-    if (isNaN(targetDate.getTime())) {
-       setTimeLeft("טרם נקבע מועד");
-       return;
-    }
-
-    const updateTimer = () => {
-      const now = new Date();
-      const diff = targetDate.getTime() - now.getTime();
-      if (diff <= 0) {
-        setTimeLeft("הזמן תם! ממתין לנעילה...");
-      } else {
-         const d = Math.floor(diff / (1000 * 60 * 60 * 24));
-         const h = Math.floor((diff / (1000 * 60 * 60)) % 24);
-         const m = Math.floor((diff / 1000 / 60) % 60);
-         const s = Math.floor((diff / 1000) % 60);
-         if (d > 0) setTimeLeft(`בעוד ${d} ימים ו-${h} שעות`);
-         else setTimeLeft(`${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`);
-      }
-    };
-
-    updateTimer(); 
-    const interval = setInterval(updateTimer, 1000);
-    return () => clearInterval(interval);
-  }, [targetDateStr]);
-
-  return <span className="font-mono text-amber-400 tracking-widest">{timeLeft}</span>;
-};
-
 export default function GroupsView({ matches, groups, userId, tournamentState }: any) {
   const groupNames = Object.keys(groups).sort();
-  const [activeGroup, setActiveGroup] = useState(groupNames[0] || "A");
-  const [viewMode, setViewMode] = useState<"MATCHES" | "QUALIFIERS">("MATCHES");
   
-  const [deadlines, setDeadlines] = useState<any>({});
+  // פונקציה חכמה שבודקת אם המשתמש נשלח לבית ספציפי מהדשבורד
+  const getInitialGroup = () => {
+    if (typeof window !== "undefined") {
+      const targetGroup = sessionStorage.getItem("targetGroup");
+      if (targetGroup && groupNames.includes(targetGroup)) return targetGroup;
+    }
+    return groupNames[0] || "A";
+  };
+
+  const [activeGroup, setActiveGroup] = useState(getInitialGroup());
+  const [viewMode, setViewMode] = useState<"MATCHES" | "QUALIFIERS">("MATCHES");
   
   const [qualifiers, setQualifiers] = useState<any>({});
   const [realQualifiers, setRealQualifiers] = useState<any>({}); 
@@ -85,9 +52,6 @@ export default function GroupsView({ matches, groups, userId, tournamentState }:
     
     if (userId) {
       fetchData();
-      const unsubSys = onSnapshot(doc(db, "settings", "system"), (docSnap) => {
-        if (docSnap.exists()) setDeadlines(docSnap.data().deadlines || {});
-      });
       const qMatches = query(collection(db, "predictions_matches"), where("userId", "==", userId));
       const unsubscribe = onSnapshot(qMatches, (snapshot) => {
         const matchPreds: any = {};
@@ -100,7 +64,7 @@ export default function GroupsView({ matches, groups, userId, tournamentState }:
         setUserMatchPredictions(matchPreds);
       });
 
-      return () => { unsubscribe(); unsubSys(); }; 
+      return () => { unsubscribe(); }; 
     }
   }, [userId]);
 
@@ -117,6 +81,32 @@ export default function GroupsView({ matches, groups, userId, tournamentState }:
     }, 800);
     return () => clearTimeout(timer);
   }, [qualifiers, userId]);
+
+  // מנגנון הניווט והגלילה החכם שמגיע מהדשבורד!
+  useEffect(() => {
+    const targetGroup = sessionStorage.getItem("targetGroup");
+    if (targetGroup) {
+       setActiveGroup(targetGroup);
+    }
+    
+    const viewModeTarget = sessionStorage.getItem("groupsViewMode");
+    if (viewModeTarget === "QUALIFIERS" || viewModeTarget === "MATCHES") {
+       setViewMode(viewModeTarget as any);
+       sessionStorage.removeItem("groupsViewMode");
+    }
+
+    const targetMatchId = sessionStorage.getItem("scrollToMatch");
+    if (targetMatchId) {
+      setTimeout(() => {
+        const el = document.getElementById(`match-${targetMatchId}`);
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          sessionStorage.removeItem("scrollToMatch");
+          sessionStorage.removeItem("targetGroup");
+        }
+      }, 500); 
+    }
+  }, []);
 
   const handleQualifierSelect = (groupName: string, selectedTeam: string, place: 'first' | 'second') => {
     isUserAction.current = true;
@@ -298,8 +288,6 @@ export default function GroupsView({ matches, groups, userId, tournamentState }:
     const predictedCount = matchdayMatches.filter(m => userMatchPredictions[m.id]).length;
     const totalCount = matchdayMatches.length;
     const isComplete = predictedCount === totalCount && totalCount > 0;
-    const dlKey = `md${dayIndex}`;
-    const lockTimeStr = deadlines[dlKey];
 
     return (
       <div className="space-y-4 pt-1 mb-6">
@@ -307,11 +295,9 @@ export default function GroupsView({ matches, groups, userId, tournamentState }:
           <div className="flex items-center gap-2">
             <h3 className="text-sm font-bold text-slate-300">{title}</h3>
             {isLocked ? (
-              <span className="bg-rose-500/10 text-rose-400 text-[10px] px-1.5 py-0.5 rounded font-bold border border-rose-500/30">🔒 נעול</span>
+              <span className="bg-rose-500/10 text-rose-400 text-[10px] px-2 py-0.5 rounded font-bold border border-rose-500/30">🔒 נעול לניחושים</span>
             ) : (
-              <span className="text-amber-500 text-[10px] font-bold">
-                ⏳ ננעל: <CountdownTimer targetDateStr={lockTimeStr} />
-              </span>
+              <span className="bg-emerald-500/10 text-emerald-400 text-[10px] px-2 py-0.5 rounded font-bold border border-emerald-500/30">✍️ פתוח לניחושים</span>
             )}
           </div>
           <div className={`text-[10px] font-bold px-2 py-1 rounded-md border transition-colors duration-300 ${isComplete ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30" : "bg-slate-900 text-slate-400 border-slate-700"}`}>
@@ -347,12 +333,13 @@ export default function GroupsView({ matches, groups, userId, tournamentState }:
     return true;
   });
 
+  const currentProgress = getGroupProgress(activeGroup);
+
   return (
     <div className="w-full animate-fade-in-up pb-8">
       
-      {/* כותרת עליונה - בית גדול וסיכום ניקוד! */}
       <div className="flex flex-col items-center mb-1 w-full">
-         <div className="w-full max-w-sm mx-auto bg-slate-900/80 p-2.5 rounded-2xl border border-slate-800 shadow-md backdrop-blur-md flex flex-col gap-2">
+         <div className="w-full max-w-sm mx-auto bg-slate-900/80 p-3 rounded-3xl border border-slate-800 shadow-xl backdrop-blur-md flex flex-col gap-3">
             
             <div className="flex items-center justify-between w-full">
                <button onClick={handlePrevGroup} className="w-10 h-10 flex items-center justify-center rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors border border-slate-700 active:scale-95">
@@ -360,17 +347,10 @@ export default function GroupsView({ matches, groups, userId, tournamentState }:
                </button>
                
                <div className="flex flex-col items-center justify-center flex-1 px-2">
-                  <div className="flex items-center justify-center gap-2 w-full">
-                     <h2 className="text-2xl font-black text-white">בית {activeGroup}</h2>
-                     {getGroupProgress(activeGroup) === 100 ? (
-                        <span className="text-[10px] bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded font-bold border border-emerald-500/30">✓ הושלם</span>
-                     ) : (
-                        <span className="text-[10px] text-slate-400 font-bold bg-slate-950 px-2 py-0.5 rounded border border-slate-800">{getGroupProgress(activeGroup)}%</span>
-                     )}
-                  </div>
+                  <h2 className="text-3xl font-black text-white mb-2">בית {activeGroup}</h2>
                 
                   {(activeMatches.some(m => m.isFinished) || !!(realQualifiers[activeGroup]?.first || realQualifiers[activeGroup]?.second)) && (
-                    <div className="flex gap-2 md:gap-3 text-[11px] md:text-sm font-bold mt-1.5 bg-slate-950/60 px-3 py-2 rounded-xl border border-amber-500/40 items-center justify-center w-full shadow-md flex-wrap">
+                    <div className="flex gap-2 md:gap-3 text-[11px] md:text-sm font-bold mt-1 bg-slate-950/60 px-3 py-2 rounded-xl border border-amber-500/40 items-center justify-center w-full shadow-md flex-wrap">
                        {activeMatches.some(m => m.isFinished) && (
                          <>
                            <span className="text-emerald-400" title="נקודות מפגיעות בול">🎯 +{currentGroupExact * 15}</span>
@@ -397,11 +377,28 @@ export default function GroupsView({ matches, groups, userId, tournamentState }:
                </button>
             </div>
 
+            {/* מד ההתקדמות החדש של הבית */}
+            <div className="w-full bg-slate-950/50 p-3 rounded-xl border border-slate-700/50 shadow-inner mt-1 mb-1">
+               <div className="flex justify-between items-end mb-2">
+                 <div className="flex flex-col text-right">
+                   <span className="text-slate-400 text-[10px] font-black tracking-widest uppercase">סטטוס השלמה</span>
+                   <span className="text-white font-bold text-xs">{currentProgress === 100 ? 'הבית הושלם במלואו!' : 'השלם משחקים ועולות'}</span>
+                 </div>
+                 <span className={`font-black ${currentProgress === 100 ? 'text-emerald-400' : 'text-blue-400'}`}>{currentProgress}%</span>
+               </div>
+               <div className="w-full h-2.5 bg-slate-900 rounded-full overflow-hidden border border-slate-800 relative">
+                 <div
+                   className={`h-full rounded-full transition-all duration-500 ease-out relative ${currentProgress === 100 ? 'bg-gradient-to-l from-emerald-400 to-emerald-600' : 'bg-gradient-to-l from-blue-400 to-cyan-500'}`}
+                   style={{ width: `${currentProgress}%` }}
+                 >
+                    {currentProgress < 100 && <div className="absolute inset-0 bg-white/20 w-full h-full animate-[shimmer_2s_infinite] skew-x-12"></div>}
+                 </div>
+               </div>
+            </div>
+
             <div className="w-full h-px bg-slate-800/50 mt-1"></div>
 
-            {/* כאן התיקון למרכוז הכפתורים! */}
             <div className="relative flex items-center justify-center w-full px-1 mt-1 min-h-[32px]">
-               {/* כפתור ההגרלה בצד ימין */}
                <div className="absolute right-1">
                    {viewMode === "MATCHES" && canRandomizeGroupMatches && (
                       <button 
@@ -423,7 +420,6 @@ export default function GroupsView({ matches, groups, userId, tournamentState }:
                    )}
                </div>
 
-               {/* כפתורי הטאבים ממורכזים באופן מושלם */}
                <div className="flex bg-slate-950 p-1 rounded-xl border border-slate-800 shadow-inner z-10">
                   <button 
                     onClick={() => setViewMode("MATCHES")} 
@@ -585,7 +581,7 @@ export default function GroupsView({ matches, groups, userId, tournamentState }:
 
             <div className="overflow-y-auto custom-scrollbar flex-1 pl-2 md:pl-4 pr-1 pb-2">
               {isLoadingSpy ? (
-                <div className="flex justify-center py-8 text-blue-400 animate-pulse font-bold">טוען ניחושים... ⏳</div>
+                <div className="flex justify-center py-8 text-blue-400 animate-pulse font-black tracking-wide">טוען נתונים מהשטח... ⏳</div>
               ) : filteredSpyData.length === 0 ? (
                 <div className="text-center text-slate-500 py-8">לא נמצאו תוצאות לחיפוש זה.</div>
               ) : (

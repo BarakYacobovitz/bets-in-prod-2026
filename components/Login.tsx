@@ -1,9 +1,9 @@
 "use client";
 import { useState } from "react";
 import { auth, db } from "../app/firebase";
-import { GoogleAuthProvider, signInWithPopup, getAdditionalUserInfo, signOut } from "firebase/auth";
+import { GoogleAuthProvider, signInWithPopup, signOut } from "firebase/auth";
 import { doc, getDoc, setDoc } from "firebase/firestore";
-import toast from "react-hot-toast"; //
+import toast from "react-hot-toast";
 
 export default function Login() {
   const [errorMsg, setErrorMsg] = useState("");
@@ -15,23 +15,20 @@ export default function Login() {
     const provider = new GoogleAuthProvider();
     
     try {
-      // 1. מבצעים התחברות
+      // 1. התחברות לגוגל
       const result = await signInWithPopup(auth, provider);
       const user = result.user;
       
-      // 2. בודקים אם זה משתמש חדש
-      const additionalInfo = getAdditionalUserInfo(result);
-      const isNewUser = additionalInfo?.isNewUser;
-      
+      // 2. בדיקה אמינה מול ה-DB האם זה משתמש חדש
       const userDocRef = doc(db, "users", user.uid);
       const userDocSnap = await getDoc(userDocRef);
-      const isReallyNewUser = isNewUser || !userDocSnap.exists();
+      const isReallyNewUser = !userDocSnap.exists();
 
       // 3. בודקים מה מצב הטורניר
       const sysSnap = await getDoc(doc(db, "settings", "system"));
       const tournamentState = sysSnap.exists() ? (Number(sysSnap.data().tournamentState) || 0) : 0;
 
-      // 4. לוגיקת החסימה וה-Toast החוסם
+      // 4. לוגיקת החסימה (אם הטורניר התחיל וזה יוזר חדש לחלוטין)
       if (isReallyNewUser && tournamentState >= 1) {
         toast.error("המשחקים כבר החלו! ⛔\nלא ניתן להצטרף לליגה לאחר שריקת הפתיחה.", {
           duration: 8000,
@@ -44,14 +41,21 @@ export default function Login() {
         return;
       }
 
-      // 5. רישום משתמש חדש (רק אם הטורניר לא התחיל)
+      // 5. רישום משתמש חדש בצורה מובטחת
       if (isReallyNewUser) {
+        // Fallback חכם לשם: אם אין DisplayName, ניקח את תחילת האימייל
+        const fallbackName = user.displayName || user.email?.split('@')[0] || "שחקן חדש";
+        
         await setDoc(userDocRef, {
-          name: user.displayName || "משתמש ללא שם",
+          name: fallbackName,
           email: user.email,
           totalPoints: 0,
+          knockoutPoints: 0,
+          hasPaid: false,
           createdAt: new Date()
         });
+        
+        console.log("User successfully created in Firestore:", fallbackName);
       }
 
     } catch (error: any) {
@@ -66,21 +70,16 @@ export default function Login() {
 
   return (
     <div className="relative min-h-screen w-full flex items-center justify-center overflow-hidden bg-black" dir="rtl">
+        <video 
+          src="/Preview.mp4" 
+          autoPlay 
+          loop 
+          muted 
+          playsInline 
+          className="absolute inset-0 w-full h-full object-cover z-0 opacity-75 pointer-events-none"
+        />
+        <div className="absolute inset-0 bg-gradient-to-b from-slate-950/50 via-slate-900/30 to-slate-950/60 z-0"></div>
       
-      {/* וידאו רקע מלא - מותאם לייצור ולמובייל */}
-      <video 
-        src="/Preview.mp4" 
-        autoPlay 
-        loop 
-        muted 
-        playsInline 
-        className="absolute inset-0 w-full h-full object-cover z-0 opacity-40 pointer-events-none"
-      />
-
-      {/* שכבת כהות על הוידאו ליצירת עומק */}
-      <div className="absolute inset-0 bg-gradient-to-b from-slate-950/80 via-slate-900/60 to-slate-950/90 z-0"></div>
-
-      {/* קופסת ההתחברות ממורכזת (Glassmorphism) */}
       <div className="relative z-10 bg-slate-900/40 backdrop-blur-md p-8 md:p-12 rounded-[2.5rem] border border-white/10 shadow-[0_0_60px_rgba(0,0,0,0.6)] max-w-md w-full mx-4 text-center flex flex-col items-center animate-fade-in-up">       
         <div className="w-24 h-24 md:w-32 md:h-32 mb-6">
           <img src="/B.svg" alt="Logo" className="w-full h-full object-contain drop-shadow-[0_0_25px_rgba(253,224,71,0.5)]" />
@@ -98,7 +97,6 @@ export default function Login() {
           הליגה הסגורה שלנו יוצאת לדרך. התחבר עם חשבון הגוגל שלך כדי להזין את הניחושים ולהיכנס למגרש.
         </p>
 
-        {/* הצגת הודעת שגיאה במידה והשחקן נחסם */}
         {errorMsg && (
           <div className="w-full bg-rose-950/90 border border-rose-500/50 text-rose-300 text-sm font-bold p-4 rounded-xl mb-6 shadow-lg animate-fade-in-up">
             {errorMsg}
