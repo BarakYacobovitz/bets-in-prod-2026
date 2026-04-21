@@ -2,8 +2,10 @@
 import Link from "next/link";
 import { useEffect, useState, useRef } from "react";
 import { onAuthStateChanged, signOut } from "firebase/auth";
-import { auth, db } from "../app/firebase";
-import { doc, getDoc, collection, query, where, getDocs, onSnapshot } from "firebase/firestore";
+import { doc, getDoc, collection, query, where, getDocs, onSnapshot, updateDoc } from "firebase/firestore";
+import { getToken } from "firebase/messaging";
+import toast from "react-hot-toast";
+import { auth, db, messaging } from "../app/firebase";
 
 const ADMIN_EMAIL = "bawak.y10@gmail.com";
 
@@ -74,19 +76,21 @@ export default function Navbar() {
   const [liveBonusAns, setLiveBonusAns] = useState<any>({});
   const [activeSurpriseAlert, setActiveSurpriseAlert] = useState<number>(0);
 
+  const [notifPermission, setNotifPermission] = useState<string>("default");
+
   useEffect(() => {
     const interval = setInterval(() => setNowMs(Date.now()), 1000);
     return () => clearInterval(interval);
   }, []);
-  const [notifPermission, setNotifPermission] = useState<string>("default");
 
   useEffect(() => {
     if (typeof window !== "undefined" && "Notification" in window) {
-     setNotifPermission(Notification.permission);
-  }
-}, []);
-  useEffect(() => {
+      setNotifPermission(Notification.permission);
+    }
+
     let unsubUser: any;
+    let unsubMatches: any;
+    let unsubKnockout: any;
 
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       if (currentUser) {
@@ -105,47 +109,45 @@ export default function Navbar() {
           }
         });
 
-        try {
-           const sysSnap = await getDoc(doc(db, "settings", "system"));
-           const currentTState = sysSnap.exists() ? Number(sysSnap.data().tournamentState) || 0 : 0;
+        const calculateMissing = async () => {
+          try {
+            const sysSnap = await getDoc(doc(db, "settings", "system"));
+            const currentTState = sysSnap.exists() ? Number(sysSnap.data().tournamentState) || 0 : 0;
 
-           const mSnap = await getDocs(collection(db, "matches"));
-           let missing = 0;
-           
-           const pmSnap = await getDocs(query(collection(db, "predictions_matches"), where("userId", "==", currentUser.uid)));
-           const pkSnap = await getDocs(query(collection(db, "predictions_knockout"), where("userId", "==", currentUser.uid)));
-           
-           // בונים סט חכם של כל המשחקים שהמשתמש *השלים לחלוטין*
-           const userPreds = new Set();
-           [...pmSnap.docs, ...pkSnap.docs].forEach(d => {
-             const data = d.data();
-             // מוודאים שהוזנה תוצאה
-             if (data.predictedHomeScore !== undefined && data.predictedHomeScore !== "" && 
-                 data.predictedAwayScore !== undefined && data.predictedAwayScore !== "") {
-                 // אם זה נוקאאוט - מוודאים שיש גם מעפילה
-                 if (data.stage === "KNOCKOUT") {
-                    if (data.qualifier && String(data.qualifier).trim() !== "") {
-                       userPreds.add(data.matchId);
-                    }
-                 } else {
-                    userPreds.add(data.matchId);
-                 }
-             }
-           });
-           
-           // עוברים על כל המשחקים, ואם המשחק פתוח לניחוש עכשיו והוא לא בסט - הוא חסר!
-           mSnap.docs.forEach(d => {
-              const m = d.data();
-              if (!m.isFinished) {
-                 if (!userPreds.has(d.id) && isMatchOpenForPrediction(m, currentTState)) {
-                    missing++;
-                 }
+            const mSnap = await getDocs(collection(db, "matches"));
+            const pmSnap = await getDocs(query(collection(db, "predictions_matches"), where("userId", "==", currentUser.uid)));
+            const pkSnap = await getDocs(query(collection(db, "predictions_knockout"), where("userId", "==", currentUser.uid)));
+
+            const userPreds = new Set();
+            [...pmSnap.docs, ...pkSnap.docs].forEach(d => {
+              const data = d.data();
+              const hasScores = data.predictedHomeScore !== undefined && data.predictedHomeScore !== "" && 
+                                data.predictedAwayScore !== undefined && data.predictedAwayScore !== "";
+              
+              if (hasScores) {
+                if (data.roundName) { 
+                  if (data.qualifier && String(data.qualifier).trim() !== "") userPreds.add(data.matchId);
+                } else {
+                  userPreds.add(data.matchId);
+                }
               }
-           });
-           
-           setMissingMatchesToday(missing); // שמרתי על שם המשתנה כדי לא לשבור לך את ה-UI למטה
-           
-        } catch(e) { console.error("שגיאה במשיכת התראות משחקים:", e); }
+            });
+
+            let missing = 0;
+            mSnap.docs.forEach(d => {
+              const m = d.data();
+              if (!m.isFinished && !userPreds.has(d.id) && isMatchOpenForPrediction(m, currentTState)) {
+                missing++;
+              }
+            });
+            setMissingMatchesToday(missing);
+          } catch (e) { console.error(e); }
+        };
+
+        unsubMatches = onSnapshot(query(collection(db, "predictions_matches"), where("userId", "==", currentUser.uid)), calculateMissing);
+        unsubKnockout = onSnapshot(query(collection(db, "predictions_knockout"), where("userId", "==", currentUser.uid)), calculateMissing);
+        
+        calculateMissing();
 
       } else {
         setIsLoggedIn(false);
@@ -154,16 +156,17 @@ export default function Navbar() {
         setUserName("שחקן אורח");
         setUserPoints(0);
         setPhotoUrl("");
-        if (unsubUser) {
-           unsubUser();
-           unsubUser = null;
-        }
+        if (unsubUser) unsubUser();
+        if (unsubMatches) unsubMatches();
+        if (unsubKnockout) unsubKnockout();
       }
     });
 
     return () => { 
        unsubscribe(); 
        if (unsubUser) unsubUser();
+       if (unsubMatches) unsubMatches();
+       if (unsubKnockout) unsubKnockout();
     };
   }, []);
 
@@ -207,7 +210,7 @@ export default function Navbar() {
          setNextNameShort(`נעילת ${sName}:`);
          
          if (ad.time) {
-            setTargetTime(new Date(ad.time).getTime());
+            setTargetTime(parseDateTimeLocal(ad.time));
          } else {
             setTargetTime(null);
             setTimeLeft("לא נקבע");
@@ -223,14 +226,9 @@ export default function Navbar() {
   }, []);
 
   useEffect(() => {
-    if (!targetTime) {
-       setIsNoMoreBets(false);
-       return;
-    }
-
+    if (!targetTime) { setIsNoMoreBets(false); return; }
     const updateTimer = () => {
       const diff = targetTime - Date.now();
-
       if (diff <= 0) {
         setTimeLeft("הזמן תם! ננעל.");
         setIsNoMoreBets(true);
@@ -240,15 +238,10 @@ export default function Navbar() {
         const h = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
         const m = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
         const s = Math.floor((diff % (1000 * 60)) / 1000);
-
-        if (d > 0) {
-          setTimeLeft(`${d} ימים, ${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`);
-        } else {
-          setTimeLeft(`${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`);
-        }
+        if (d > 0) setTimeLeft(`${d} ימים, ${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`);
+        else setTimeLeft(`${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`);
       }
     };
-
     updateTimer(); 
     const intervalId = setInterval(updateTimer, 1000);
     return () => clearInterval(intervalId);
@@ -262,26 +255,63 @@ export default function Navbar() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // --- מנוע ה-PWA Badge המרכזי שהוספנו! ---
   useEffect(() => {
     const totalNotifs = missingMatchesToday + activeSurpriseAlert;
-    
-    // בודק אם הדפדפן/מערכת ההפעלה תומכים ביכולת הזו (בעיקר מובייל וכרום/אדג' בדסקטופ)
     if (typeof navigator !== 'undefined' && 'setAppBadge' in navigator) {
       try {
         if (totalNotifs > 0) {
-          // @ts-ignore - ה-TS לפעמים לא מכיר את ה-API הזה כי הוא יחסית חדש
-          navigator.setAppBadge(totalNotifs).catch((error: any) => console.log("Badge error (expected in some dev environments):", error));
+          // @ts-ignore
+          navigator.setAppBadge(totalNotifs).catch(() => {});
         } else {
           // @ts-ignore
-          navigator.clearAppBadge().catch((error: any) => console.log("Badge clear error:", error));
+          navigator.clearAppBadge().catch(() => {});
         }
-      } catch (error) {
-        console.error("שגיאה בעדכון הבועה על האייקון:", error);
-      }
+      } catch (e) {}
     }
   }, [missingMatchesToday, activeSurpriseAlert]);
-  // ----------------------------------------
+
+  const handleRequestNotificationPermission = async () => {
+    if (!("Notification" in window)) {
+      toast.error("הדפדפן לא תומך בהתראות.");
+      return;
+    }
+    try {
+      const permission = await Notification.requestPermission();
+      setNotifPermission(permission);
+      
+      if (permission === "granted") {
+        toast.success("מאשר מכשיר מול השרת... ⏳");
+        
+        const msgInstance = await messaging();
+        if (msgInstance) {
+          const currentToken = await getToken(msgInstance, {
+            // 👇 הדבק כאן את מפתח ה-VAPID האמיתי שלך מה-Firebase Console 👇
+            vapidKey: "BDwmvr6hhuHu4lZg2TLpvfHyftO0h93FEx_q9vEX7HTWgOV3NIR6VC7Jg7jnYM3zvy1zWWf0lE6TGSZ4-yr2Tns"
+          });
+
+          if (currentToken && userId) {
+            await updateDoc(doc(db, "users", userId), {
+              fcmToken: currentToken
+            });
+            toast.success("התראות הופעלו בהצלחה! 📱🔔");
+            
+            const total = missingMatchesToday + activeSurpriseAlert;
+            if ('setAppBadge' in navigator && total > 0) {
+              // @ts-ignore
+              navigator.setAppBadge(total).catch(() => {});
+            }
+          } else {
+            toast.error("לא הצלחתי לייצר קוד התראה למכשיר.");
+          }
+        }
+      } else {
+        toast.error("התראות נחסמו בהגדרות המכשיר.");
+      }
+    } catch (error) {
+      console.error("שגיאה בבקשת התראות:", error);
+      toast.error("שגיאה בהפעלת התראות.");
+    }
+  };
 
   const handleLogout = async () => {
     await signOut(auth);
@@ -301,6 +331,7 @@ export default function Navbar() {
 
   const totalNotifs = missingMatchesToday + activeSurpriseAlert;
   if (!isLoggedIn) return null;
+
   return (
     <nav className="bg-slate-950/80 backdrop-blur-md border-b border-slate-800 sticky top-0 z-50 text-white shadow-lg" dir="rtl">
       <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
@@ -314,11 +345,9 @@ export default function Navbar() {
                 מהמרים בייצור
              </div>
           </div>
-          
           <div className="hidden sm:block w-px h-10 md:h-12 bg-slate-700/80"></div>
-          
           <div className="w-10 h-10 md:w-12 md:h-12 flex-shrink-0 group-hover:scale-110 transition-transform">
-             <img src="/B.svg" alt="Bets in Prod Logo" className="w-full h-full object-contain drop-shadow-lg" />
+             <img src="/B.svg" alt="Logo" className="w-full h-full object-contain drop-shadow-lg" />
           </div>
         </a>
 
@@ -334,9 +363,7 @@ export default function Navbar() {
           </div>
         </div>
 
-        {isLoggedIn ? (
-          <div className="flex items-center gap-3 md:gap-4">
-             
+        <div className="flex items-center gap-3 md:gap-4">
              <div className="relative" ref={notifRef}>
                 <button onClick={() => setShowNotifMenu(!showNotifMenu)} className="relative p-2 bg-slate-900 rounded-full border border-slate-700 hover:bg-slate-800 transition-colors">
                    <span className="text-lg">🔔</span>
@@ -345,9 +372,19 @@ export default function Navbar() {
                 {showNotifMenu && (
                    <div className="absolute top-full left-0 mt-2 w-64 bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl overflow-hidden z-50 animate-fade-in-up p-2">
                       <div className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2 px-2 border-b border-slate-800 pb-2">התראות המערכת</div>
+                      
+                      {notifPermission === "default" && (
+                        <button 
+                          onClick={handleRequestNotificationPermission}
+                          className="w-full text-[11px] font-black text-white bg-blue-600 hover:bg-blue-500 p-2.5 rounded-xl border border-blue-400 shadow-[0_0_10px_rgba(37,99,235,0.4)] flex items-center justify-center gap-2 mb-2 transition-all active:scale-95"
+                        >
+                          <span>🔔</span> הפעל התראות במסך הבית
+                        </button>
+                      )}
+
                       <div className="flex flex-col gap-1">
                          {ptsDiff > 0 && <div className="text-xs font-bold text-emerald-400 bg-emerald-950/30 p-2.5 rounded-xl border border-emerald-500/20 flex items-center gap-2"><span>📈</span> עלית ב-{ptsDiff} נקודות היום!</div>}
-                         {missingMatchesToday > 0 && <div className="text-xs font-bold text-amber-400 bg-amber-950/30 p-2.5 rounded-xl border border-amber-500/20 flex items-center gap-2"><span>⚠️</span> חסר ניחוש ל-{missingMatchesToday} משחקים פתוחים!</div>}
+                         {missingMatchesToday > 0 && <div className="text-xs font-bold text-amber-400 bg-amber-950/30 p-2.5 rounded-xl border border-amber-500/20 flex items-center gap-2"><span>⚠️</span> חסר ניחוש ל-{missingMatchesToday} משימות פתוחות!</div>}
                          {activeSurpriseAlert > 0 && <div className="text-xs font-bold text-purple-400 bg-purple-950/30 p-2.5 rounded-xl border border-purple-500/20 flex items-center gap-2"><span>🎁</span> יש {activeSurpriseAlert} שאלות הפתעה פתוחות!</div>}
                          {totalNotifs === 0 && ptsDiff <= 0 && <div className="text-xs font-medium text-slate-500 text-center py-4">אין התראות חדשות.</div>}
                       </div>
@@ -377,11 +414,7 @@ export default function Navbar() {
                 )}
                 <button onClick={handleLogout} className="text-[10px] bg-slate-800 text-rose-400 font-bold px-2 py-0.5 rounded shadow-sm hover:bg-slate-700 transition-colors">התנתק</button>
              </div>
-             
-          </div>
-        ) : (
-          <div className="text-sm font-bold text-slate-500">התחבר כדי לשחק</div>
-        )}
+        </div>
       </div>
     </nav>
   );

@@ -1,7 +1,8 @@
 import { initializeApp, getApps, getApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
-import { getAuth } from "firebase/auth"; // <--- הוספנו את השורה הזו
-import { GoogleAuthProvider } from "firebase/auth";
+import { getAuth, GoogleAuthProvider } from "firebase/auth";
+import { getMessaging, isSupported } from "firebase/messaging";
+
 export const provider = new GoogleAuthProvider();
 
 const firebaseConfig = {
@@ -16,6 +17,15 @@ const firebaseConfig = {
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 
 export const db = getFirestore(app);
-export const auth = getAuth(app); // <--- הוספנו את השורה הזו כדי שנייצא את שירות ההתחברות
-console.log("My API Key is:", process.env.NEXT_PUBLIC_FIREBASE_API_KEY);
-console.log("My Auth Domain is:", process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN);
+export const auth = getAuth(app);
+
+// ייצוא בטוח של שירות ההודעות (רץ רק בדפדפן הלקוח ולא בשרת SSR)
+export const messaging = async () => {
+  if (typeof window !== "undefined") {
+    const supported = await isSupported();
+    if (supported) {
+      return getMessaging(app);
+    }
+  }
+  return null;
+};
