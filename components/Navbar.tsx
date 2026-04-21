@@ -4,7 +4,6 @@ import { useEffect, useState, useRef } from "react";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { auth, db } from "../app/firebase";
 import { doc, getDoc, collection, query, where, getDocs, onSnapshot } from "firebase/firestore";
-import toast from "react-hot-toast";
 
 const ADMIN_EMAIL = "bawak.y10@gmail.com";
 
@@ -75,21 +74,20 @@ export default function Navbar() {
   const [liveBonusAns, setLiveBonusAns] = useState<any>({});
   const [activeSurpriseAlert, setActiveSurpriseAlert] = useState<number>(0);
 
-  // סטייט למעקב אחרי הרשאות התראה (לצורך הבועה האדומה)
-  const [notifPermission, setNotifPermission] = useState<string>("default");
-
   useEffect(() => {
     const interval = setInterval(() => setNowMs(Date.now()), 1000);
     return () => clearInterval(interval);
   }, []);
+  const [notifPermission, setNotifPermission] = useState<string>("default");
 
   useEffect(() => {
-    // בדיקת סטטוס הרשאות בטעינה
     if (typeof window !== "undefined" && "Notification" in window) {
-      setNotifPermission(Notification.permission);
-    }
-
+     setNotifPermission(Notification.permission);
+  }
+}, []);
+  useEffect(() => {
     let unsubUser: any;
+
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       if (currentUser) {
         setIsLoggedIn(true);
@@ -112,27 +110,41 @@ export default function Navbar() {
            const currentTState = sysSnap.exists() ? Number(sysSnap.data().tournamentState) || 0 : 0;
 
            const mSnap = await getDocs(collection(db, "matches"));
-           const today = new Date();
            let missing = 0;
+           
            const pmSnap = await getDocs(query(collection(db, "predictions_matches"), where("userId", "==", currentUser.uid)));
            const pkSnap = await getDocs(query(collection(db, "predictions_knockout"), where("userId", "==", currentUser.uid)));
-           const userPreds = new Set([...pmSnap.docs.map(d=>d.data().matchId), ...pkSnap.docs.map(d=>d.data().matchId)]);
            
+           // בונים סט חכם של כל המשחקים שהמשתמש *השלים לחלוטין*
+           const userPreds = new Set();
+           [...pmSnap.docs, ...pkSnap.docs].forEach(d => {
+             const data = d.data();
+             // מוודאים שהוזנה תוצאה
+             if (data.predictedHomeScore !== undefined && data.predictedHomeScore !== "" && 
+                 data.predictedAwayScore !== undefined && data.predictedAwayScore !== "") {
+                 // אם זה נוקאאוט - מוודאים שיש גם מעפילה
+                 if (data.stage === "KNOCKOUT") {
+                    if (data.qualifier && String(data.qualifier).trim() !== "") {
+                       userPreds.add(data.matchId);
+                    }
+                 } else {
+                    userPreds.add(data.matchId);
+                 }
+             }
+           });
+           
+           // עוברים על כל המשחקים, ואם המשחק פתוח לניחוש עכשיו והוא לא בסט - הוא חסר!
            mSnap.docs.forEach(d => {
               const m = d.data();
-              const matchDateStr = m.matchDate ? String(m.matchDate) : "";
-              if (!m.isFinished && matchDateStr) {
-                 const parts = matchDateStr.split(" ");
-                 const datePart = parts[0] || "";
-                 const dParts = datePart.split("/");
-                 const day = dParts[0] || "1";
-                 const month = dParts[1] || "1";
-                 if (today.getDate() === Number(day) && today.getMonth() === Number(month) - 1) {
-                    if (!userPreds.has(d.id) && isMatchOpenForPrediction(m, currentTState)) missing++;
+              if (!m.isFinished) {
+                 if (!userPreds.has(d.id) && isMatchOpenForPrediction(m, currentTState)) {
+                    missing++;
                  }
               }
            });
-           setMissingMatchesToday(missing);
+           
+           setMissingMatchesToday(missing); // שמרתי על שם המשתנה כדי לא לשבור לך את ה-UI למטה
+           
         } catch(e) { console.error("שגיאה במשיכת התראות משחקים:", e); }
 
       } else {
@@ -142,7 +154,10 @@ export default function Navbar() {
         setUserName("שחקן אורח");
         setUserPoints(0);
         setPhotoUrl("");
-        if (unsubUser) { unsubUser(); unsubUser = null; }
+        if (unsubUser) {
+           unsubUser();
+           unsubUser = null;
+        }
       }
     });
 
@@ -187,10 +202,12 @@ export default function Navbar() {
       if (snap.exists() && snap.data().activeDeadline) {
          const ad = snap.data().activeDeadline;
          const sName = STAGE_NAMES[ad.stage] || "השלב הבא";
+         
          setNextNameFull(`הניחושים ל-${sName} יינעלו בעוד:`);
          setNextNameShort(`נעילת ${sName}:`);
+         
          if (ad.time) {
-            setTargetTime(parseDateTimeLocal(ad.time)); // שימוש בפונקציה החכמה שלך
+            setTargetTime(new Date(ad.time).getTime());
          } else {
             setTargetTime(null);
             setTimeLeft("לא נקבע");
@@ -206,9 +223,14 @@ export default function Navbar() {
   }, []);
 
   useEffect(() => {
-    if (!targetTime) { setIsNoMoreBets(false); return; }
+    if (!targetTime) {
+       setIsNoMoreBets(false);
+       return;
+    }
+
     const updateTimer = () => {
       const diff = targetTime - Date.now();
+
       if (diff <= 0) {
         setTimeLeft("הזמן תם! ננעל.");
         setIsNoMoreBets(true);
@@ -218,10 +240,15 @@ export default function Navbar() {
         const h = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
         const m = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
         const s = Math.floor((diff % (1000 * 60)) / 1000);
-        if (d > 0) setTimeLeft(`${d} ימים, ${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`);
-        else setTimeLeft(`${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`);
+
+        if (d > 0) {
+          setTimeLeft(`${d} ימים, ${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`);
+        } else {
+          setTimeLeft(`${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`);
+        }
       }
     };
+
     updateTimer(); 
     const intervalId = setInterval(updateTimer, 1000);
     return () => clearInterval(intervalId);
@@ -235,44 +262,26 @@ export default function Navbar() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // --- מנוע ה-PWA Badge המרכזי ---
+  // --- מנוע ה-PWA Badge המרכזי שהוספנו! ---
   useEffect(() => {
     const totalNotifs = missingMatchesToday + activeSurpriseAlert;
+    
+    // בודק אם הדפדפן/מערכת ההפעלה תומכים ביכולת הזו (בעיקר מובייל וכרום/אדג' בדסקטופ)
     if (typeof navigator !== 'undefined' && 'setAppBadge' in navigator) {
       try {
         if (totalNotifs > 0) {
-          // @ts-ignore
-          navigator.setAppBadge(totalNotifs).catch(() => {});
+          // @ts-ignore - ה-TS לפעמים לא מכיר את ה-API הזה כי הוא יחסית חדש
+          navigator.setAppBadge(totalNotifs).catch((error: any) => console.log("Badge error (expected in some dev environments):", error));
         } else {
           // @ts-ignore
-          navigator.clearAppBadge().catch(() => {});
+          navigator.clearAppBadge().catch((error: any) => console.log("Badge clear error:", error));
         }
-      } catch (e) {}
+      } catch (error) {
+        console.error("שגיאה בעדכון הבועה על האייקון:", error);
+      }
     }
   }, [missingMatchesToday, activeSurpriseAlert]);
-
-  const handleRequestNotificationPermission = async () => {
-    if (!("Notification" in window)) {
-      toast.error("הדפדפן לא תומך בהתראות.");
-      return;
-    }
-    try {
-      const permission = await Notification.requestPermission();
-      setOfPermission(permission);
-      if (permission === "granted") {
-        toast.success("מעולה! עכשיו תראה התראות על סמל האפליקציה. 📱");
-        const total = missingMatchesToday + activeSurpriseAlert;
-        if ('setAppBadge' in navigator && total > 0) {
-          // @ts-ignore
-          navigator.setAppBadge(total).catch(() => {});
-        }
-      } else {
-        toast.error("התראות נחסמו בהגדרות המכשיר.");
-      }
-    } catch (error) {
-      console.error("שגיאה בבקשת התראות:", error);
-    }
-  };
+  // ----------------------------------------
 
   const handleLogout = async () => {
     await signOut(auth);
@@ -292,7 +301,6 @@ export default function Navbar() {
 
   const totalNotifs = missingMatchesToday + activeSurpriseAlert;
   if (!isLoggedIn) return null;
-
   return (
     <nav className="bg-slate-950/80 backdrop-blur-md border-b border-slate-800 sticky top-0 z-50 text-white shadow-lg" dir="rtl">
       <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
@@ -306,9 +314,11 @@ export default function Navbar() {
                 מהמרים בייצור
              </div>
           </div>
+          
           <div className="hidden sm:block w-px h-10 md:h-12 bg-slate-700/80"></div>
+          
           <div className="w-10 h-10 md:w-12 md:h-12 flex-shrink-0 group-hover:scale-110 transition-transform">
-             <img src="/B.svg" alt="Logo" className="w-full h-full object-contain drop-shadow-lg" />
+             <img src="/B.svg" alt="Bets in Prod Logo" className="w-full h-full object-contain drop-shadow-lg" />
           </div>
         </a>
 
@@ -324,7 +334,9 @@ export default function Navbar() {
           </div>
         </div>
 
-        <div className="flex items-center gap-3 md:gap-4">
+        {isLoggedIn ? (
+          <div className="flex items-center gap-3 md:gap-4">
+             
              <div className="relative" ref={notifRef}>
                 <button onClick={() => setShowNotifMenu(!showNotifMenu)} className="relative p-2 bg-slate-900 rounded-full border border-slate-700 hover:bg-slate-800 transition-colors">
                    <span className="text-lg">🔔</span>
@@ -333,17 +345,6 @@ export default function Navbar() {
                 {showNotifMenu && (
                    <div className="absolute top-full left-0 mt-2 w-64 bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl overflow-hidden z-50 animate-fade-in-up p-2">
                       <div className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2 px-2 border-b border-slate-800 pb-2">התראות המערכת</div>
-                      
-                      {/* כפתור בקשת הרשאה מיוחד לבועה האדומה */}
-                      {notifPermission === "default" && (
-                        <button 
-                          onClick={handleRequestNotificationPermission}
-                          className="w-full text-[11px] font-black text-white bg-blue-600 hover:bg-blue-500 p-2.5 rounded-xl border border-blue-400 shadow-[0_0_10px_rgba(37,99,235,0.4)] flex items-center justify-center gap-2 mb-2 transition-all active:scale-95"
-                        >
-                          <span>🔔</span> הפעל התראות במסך הבית
-                        </button>
-                      )}
-
                       <div className="flex flex-col gap-1">
                          {ptsDiff > 0 && <div className="text-xs font-bold text-emerald-400 bg-emerald-950/30 p-2.5 rounded-xl border border-emerald-500/20 flex items-center gap-2"><span>📈</span> עלית ב-{ptsDiff} נקודות היום!</div>}
                          {missingMatchesToday > 0 && <div className="text-xs font-bold text-amber-400 bg-amber-950/30 p-2.5 rounded-xl border border-amber-500/20 flex items-center gap-2"><span>⚠️</span> חסר ניחוש ל-{missingMatchesToday} משחקים פתוחים!</div>}
@@ -376,7 +377,11 @@ export default function Navbar() {
                 )}
                 <button onClick={handleLogout} className="text-[10px] bg-slate-800 text-rose-400 font-bold px-2 py-0.5 rounded shadow-sm hover:bg-slate-700 transition-colors">התנתק</button>
              </div>
-        </div>
+             
+          </div>
+        ) : (
+          <div className="text-sm font-bold text-slate-500">התחבר כדי לשחק</div>
+        )}
       </div>
     </nav>
   );
