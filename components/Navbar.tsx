@@ -272,19 +272,26 @@ export default function Navbar() {
   
   useEffect(() => {
   if (typeof window !== "undefined") {
-    const { getMessaging, onMessage } = require("firebase/messaging");
-    const messaging = getMessaging(app);
+    const { onMessage } = require("firebase/messaging");
 
-    const unsubscribe = onMessage(messaging, (payload) => {
-      console.log("Message received in foreground! ", payload);
-      // ה-alert הזה הוא הדיבג הכי חזק שלנו כרגע
-      alert("הודעה הגיעה בזמן שהאפליקציה פתוחה! \nכותרת: " + (payload.notification?.title || "ללא"));
-    });
+    const setupForegroundMessaging = async () => {
+      try {
+        // אנחנו משתמשים ב-messaging שייבאת בשורה 9
+        const msgInstance = await messaging(); 
+        if (msgInstance) {
+          onMessage(msgInstance, (payload) => {
+            console.log("Message received in foreground! ", payload);
+            alert("הודעה הגיעה בזמן שהאפליקציה פתוחה! \nכותרת: " + (payload.notification?.title || "ללא"));
+          });
+        }
+      } catch (err) {
+        console.error("שגיאה בהפעלת מאזין התראות:", err);
+      }
+    };
 
-    return () => unsubscribe(); // ניקוי ה-listener כשהקומפוננטה נסגרת
+    setupForegroundMessaging();
   }
   }, []);
-
   const handleRequestNotificationPermission = async () => {
     if (!("Notification" in window)) {
       toast.error("הדפדפן לא תומך בהתראות.");
