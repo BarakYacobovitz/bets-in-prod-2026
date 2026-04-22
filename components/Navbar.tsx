@@ -269,6 +269,21 @@ export default function Navbar() {
       } catch (e) {}
     }
   }, [missingMatchesToday, activeSurpriseAlert]);
+  
+  useEffect(() => {
+  if (typeof window !== "undefined") {
+    const { getMessaging, onMessage } = require("firebase/messaging");
+    const messaging = getMessaging(app);
+
+    const unsubscribe = onMessage(messaging, (payload) => {
+      console.log("Message received in foreground! ", payload);
+      // ה-alert הזה הוא הדיבג הכי חזק שלנו כרגע
+      alert("הודעה הגיעה בזמן שהאפליקציה פתוחה! \nכותרת: " + (payload.notification?.title || "ללא"));
+    });
+
+    return () => unsubscribe(); // ניקוי ה-listener כשהקומפוננטה נסגרת
+  }
+  }, []);
 
   const handleRequestNotificationPermission = async () => {
     if (!("Notification" in window)) {
@@ -287,6 +302,7 @@ export default function Navbar() {
           const currentToken = await getToken(msgInstance, {
             // 👇 הדבק כאן את מפתח ה-VAPID האמיתי שלך מה-Firebase Console 👇
             vapidKey: "BDwmvr6hhuHu4lZg2TLpvfHyftO0h93FEx_q9vEX7HTWgOV3NIR6VC7Jg7jnYM3zvy1zWWf0lE6TGSZ4-yr2Tns"
+            
           });
 
           if (currentToken && userId) {
