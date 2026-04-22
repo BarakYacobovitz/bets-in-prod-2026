@@ -28,8 +28,8 @@ messaging.onBackgroundMessage((payload) => {
   const notificationTitle = payload.notification?.title || 'Bets in PROD';
   const notificationOptions = {
     body: payload.notification?.body || 'יש לך עדכונים חדשים במערכת!',
-    icon: '/B.svg',
-    badge: '/B.svg',
+    icon: '/icon-192.png',
+    badge: '/icon-192.png',
     dir: 'rtl'
   };
 
