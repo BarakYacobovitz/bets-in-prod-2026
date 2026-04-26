@@ -535,17 +535,51 @@ const isQuestionMandatoryNow = (q: any, state: number) => {
     }
   };
 
-  const handleSaveMatch = async (matchId: string, realHome: number, realAway: number, realQualifier: string = "") => { 
-    setSavingId(matchId); 
-    try { 
-      await updateDoc(doc(db, "matches", matchId), { realHomeScore: realHome, realAwayScore: realAway, realQualifier: realQualifier, isFinished: true }); 
-      setMatches(matches.map(m => m.id === matchId ? { ...m, realHomeScore: realHome, realAwayScore: realAway, realQualifier, isFinished: true } : m)); 
-      setTimeout(() => { setSavingId(null); toast.success("תוצאת משחק נשמרה!"); }, 500); 
-    } catch (error) { 
-      setSavingId(null); 
-      toast.error("שגיאה בשמירת המשחק");
-    } 
-  };
+  const handleSaveMatch = async (matchId: string) => {
+  setSavingId(matchId);
+  try {
+    const matchObj = matches.find(m => m._tempId === matchId);
+    if (!matchObj) return;
+
+    if (matchObj.id) {
+      // עדכון משחק קיים
+      const matchRef = doc(db, "matches", matchObj.id);
+      await updateDoc(matchRef, {
+        homeTeam: matchObj.homeTeam,
+        awayTeam: matchObj.awayTeam,
+        homeScore: matchObj.homeScore,
+        awayScore: matchObj.awayScore,
+        status: matchObj.status,
+        date: matchObj.date, // <--- השורה הזו הייתה חסרה!
+        group: matchObj.group,
+        matchday: matchObj.matchday,
+        broadcastChannel: matchObj.broadcastChannel || "",
+        broadcastUrl: matchObj.broadcastUrl || ""
+      });
+    } else {
+      // יצירת משחק חדש (כאן זה היה קיים, אבל טוב לוודא)
+      const newMatchRef = doc(collection(db, "matches"));
+      await setDoc(newMatchRef, {
+        homeTeam: matchObj.homeTeam,
+        awayTeam: matchObj.awayTeam,
+        homeScore: matchObj.homeScore,
+        awayScore: matchObj.awayScore,
+        status: matchObj.status,
+        date: matchObj.date,
+        group: matchObj.group,
+        matchday: matchObj.matchday,
+        broadcastChannel: matchObj.broadcastChannel || "",
+        broadcastUrl: matchObj.broadcastUrl || ""
+      });
+    }
+    toast.success("המשחק עודכן ב-DB");
+  } catch (e) {
+    console.error("Error saving match:", e);
+    toast.error("שגיאה בשמירה");
+  } finally {
+    setSavingId("");
+  }
+};
 
   const handleClearMatch = async (matchId: string) => { 
     if (!confirm("האם לאפס משחק זה?")) return; 
@@ -731,26 +765,28 @@ const handleCalculateScores = async (silentParam: any = false) => {
             if (truth && userAnswer) {
               const truthArray = Array.isArray(truth) ? truth : [truth]; 
               
-              if (q.isProximity && q.answerType === "NUMERIC") {
-                 const truthNum = Number(truthArray[0]); 
+              if (q.isProximity && q.answerType === "NUMBER_PURE") {
+                 const truthNum = Number(truthArray[0]);
                  const ansNum = Number(userAnswer);
                  if (!isNaN(truthNum) && !isNaN(ansNum)) {
                     const diff = Math.abs(truthNum - ansNum);
                     let proxPts = 0;
-                    if (diff === 0) proxPts = q.points; 
-                    else if (diff <= 5) proxPts = q.points - 10; 
-                    else if (diff <= 10) proxPts = q.points - 20; 
-                    else if (diff <= 15) proxPts = q.points - 30; 
-                    else if (diff <= 20) proxPts = q.points - 40; 
+
+                    // המדרגות בדיוק כפי שמופיעות בחוקי המשחק
+                    if (diff === 0) proxPts = 50; 
+                    else if (diff <= 5) proxPts = 40; 
+                    else if (diff <= 10) proxPts = 30; 
+                    else if (diff <= 15) proxPts = 20; 
+                    else if (diff <= 20) proxPts = 10; 
 
                     if (proxPts > 0) {
                        basePoints += proxPts;
                        bonusPoints += proxPts;
                     }
                  }
-              } 
-              else {
-                 const isCorrect = truthArray.some((t: any) => t.toString().trim().toLowerCase() === userAnswer.toString().trim().toLowerCase());
+              }              else {
+                const normalize = (s: any) => String(s || "").trim().replace(/\s+/g, " "); // מנקה רווחים כפולים ונסתרים
+                const isCorrect = truthArray.some((t: any) => normalize(t) === normalize(userAnswer));
                  if (isCorrect) {
                      basePoints += (Number(q.points) || 0); 
                      bonusPoints += (Number(q.points) || 0);
@@ -1541,17 +1577,17 @@ const handleCalculateScores = async (silentParam: any = false) => {
                      isGraded = true;
                      const truthArray = Array.isArray(truth) ? truth : [truth]; 
                      
-                     if (q.isProximity && q.answerType === "NUMERIC") {
+                     if (q.isProximity && q.answerType === "NUMBER_PURE") {
                         const truthNum = Number(truthArray[0]); 
                         const ansNum = Number(ans);
                         if (!isNaN(truthNum) && !isNaN(ansNum)) {
                            const diff = Math.abs(truthNum - ansNum);
                            let proxPts = 0;
-                           if (diff === 0) proxPts = q.points; 
-                           else if (diff <= 5) proxPts = q.points - 10; 
-                           else if (diff <= 10) proxPts = q.points - 20; 
-                           else if (diff <= 15) proxPts = q.points - 30; 
-                           else if (diff <= 20) proxPts = q.points - 40; 
+                           if (diff === 0) proxPts = 50; 
+                           else if (diff <= 5) proxPts = 40; 
+                           else if (diff <= 10) proxPts = 30; 
+                           else if (diff <= 15) proxPts = 20; 
+                           else if (diff <= 20) proxPts = 10; 
                            if (proxPts > 0) pts = proxPts;
                         }
                      } else {

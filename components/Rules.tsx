@@ -10,8 +10,31 @@ export default function Rules() {
         <h1 className="text-3xl md:text-4xl font-extrabold text-white mb-3 relative z-10 flex items-center gap-3">
           <span>📜</span> חוקים ושיטת ניקוד
         </h1>
-        <p className="text-slate-400 text-lg relative z-10 max-w-3xl">
-          ברוכים הבאים ל-Bets in Prod! כדי למנוע ויכוחים בפינת הקפה, הנה הפירוט המלא של המנוע המתמטי שמאחורי המשחק. הכל מחושב אוטומטית לפי החוקים הבאים.
+        <p className="text-slate-400 text-lg relative z-10 max-w-3xl leading-relaxed">
+          ברוכים הבאים ל-Bets in Prod (בעברית: מהמרים בייצור), משחק הניחושים החברי למונדיאל 2026. 
+          הכלל הראשון הוא שברגע שאתם מצטרפים, אתם מקבלים על עצמכם שהאדמין הוא הפוסק האחרון. גם אם אתם לא מסכימים ב-100% - החלטתו סופית. 
+          <br/><br/>
+          כדי למנוע כאלו ויכוחים מראש, הנה הפירוט המלא של חוקי המשחק שלנו. <strong className="text-blue-400">שימו לב: הכל מחושב באופן אוטומטי לחלוטין</strong> על ידי המנוע של המערכת.
+        </p>
+      </div>
+
+      {/* באנר חובת מילוי - בולט במיוחד */}
+      <div className="bg-gradient-to-r from-amber-900/40 to-amber-600/10 border-2 border-amber-500/50 p-6 md:p-8 rounded-3xl shadow-[0_0_25px_rgba(245,158,11,0.15)] relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-3 h-full bg-amber-500"></div>
+        <h2 className="text-2xl font-black text-amber-400 mb-4 flex items-center gap-2">
+          <span className="animate-pulse">🚨</span> מה חובה למלא עד שריקת הפתיחה?
+        </h2>
+        <p className="text-slate-200 mb-5 text-sm font-medium">
+          עד תחילת המשחק הראשון של הטורניר, עליכם להשלים את ה"באנדל" הבא (לאחר מכן אזורים אלו יינעלו!):
+        </p>
+        <div className="flex flex-wrap gap-3">
+          <span className="bg-amber-500/20 text-amber-300 px-4 py-2.5 rounded-xl font-bold border border-amber-500/30 shadow-sm">🎯 כל משחקי מחזור 1</span>
+          <span className="bg-amber-500/20 text-amber-300 px-4 py-2.5 rounded-xl font-bold border border-amber-500/30 shadow-sm">🥇 עולות משלב הבתים</span>
+          <span className="bg-amber-500/20 text-amber-300 px-4 py-2.5 rounded-xl font-bold border border-amber-500/30 shadow-sm">🥉 8 העולות מהמקום ה-3</span>
+          <span className="bg-amber-500/20 text-amber-300 px-4 py-2.5 rounded-xl font-bold border border-amber-500/30 shadow-sm">🎁 כל שאלות הבונוס לטורניר ולבתים</span>
+        </div>
+        <p className="text-amber-200/60 text-xs mt-5 font-bold">
+          * המלצה: מלאו מראש גם את מחזורים 2 ו-3. תוכלו תמיד לשנות אותם בהמשך עד לדד-ליין המדויק שיופיע בשעון המערכת למעלה.
         </p>
       </div>
 
@@ -60,11 +83,11 @@ export default function Rules() {
               <span className="font-black text-purple-400">+15 נק'</span>
             </div>
             <div className="flex justify-between items-center p-3 bg-slate-900/50 rounded-xl border border-slate-700/50">
-              <span className="text-slate-300 font-medium">נבחרת שעלתה, אך <strong className="text-white">במיקום הפוך</strong> (שמתי ראשונה, סיימה שנייה):</span>
+              <span className="text-slate-300 font-medium">נבחרת שעלתה, אך <strong className="text-white">במיקום הפוך</strong> (שמתי ראשונה, סיימה 2):</span>
               <span className="font-black text-purple-400">+7 נק'</span>
             </div>
             <div className="flex justify-between items-center p-3 bg-slate-900/50 rounded-xl border border-slate-700/50">
-              <span className="text-slate-300 font-medium">עלייה של נבחרת מהרשימה של <strong className="text-white">8 המעפילות מהמקום השלישי</strong>:</span>
+              <span className="text-slate-300 font-medium">עלייה של נבחרת מהרשימה של <strong className="text-white">8 המעפילות מ-3</strong>:</span>
               <span className="font-black text-purple-400">+10 נק'</span>
             </div>
           </div>
@@ -77,7 +100,7 @@ export default function Rules() {
             <span>🔥</span> זהות העולות בנוק-אאוט
           </h2>
           <p className="text-slate-300 mb-6 text-sm">
-            בשלבי הנוק-אאוט, מעבר לניקוד על תוצאת המשחק עצמו ב-120 דקות, אתם מקבלים ניקוד משמעותי על בחירה נכונה של הנבחרת שתעפיל לשלב הבא (גם אם זה בפנדלים). ככל שמתקדמים בשלבים - הניקוד עולה!
+            בשלבי הנוק-אאוט, מעבר לניקוד על תוצאת המשחק עצמו <strong className="bg-orange-500/20 text-orange-300 px-1.5 py-0.5 rounded border border-orange-500/30 underline decoration-orange-500 decoration-2">בסיום 120 דקות</strong>, אתם מקבלים ניקוד משמעותי על בחירה נכונה של הנבחרת שתעפיל לשלב הבא (גם אם זה בפנדלים). ככל שמתקדמים בשלבים - הניקוד עולה!
           </p>
           <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
             <div className="bg-slate-900/50 p-4 rounded-xl border border-slate-700/50 flex flex-col items-center justify-center text-center">
@@ -103,7 +126,7 @@ export default function Rules() {
           </div>
         </div>
 
-        {/* קובייה 4: בונוסים ונעילות (מורחב!) */}
+        {/* קובייה 4: בונוסים ונעילות */}
         <div className="bg-slate-800 p-6 md:p-8 rounded-3xl border border-slate-700 shadow-lg md:col-span-2 flex flex-col lg:flex-row gap-8">
           
           {/* --- עמודה ימנית: הבונוסים לסוגיהם --- */}
@@ -124,33 +147,36 @@ export default function Rules() {
                   <strong className="text-amber-200">סוגי בחירה:</strong> בחלק מהשאלות תתבקשו לבחור נבחרת מרשימה (ולפעמים יופיעו אפשרויות מכשילות כמו "אף נבחרת" או "כל הנבחרות").
                 </li>
                 <li>
-                  <strong className="text-amber-200">שאלות פתוחות:</strong> בשאלות שבהן צריך להזין שם חופשי, תהיו חופשיים לגמרי להקליד בעצמכם כל שם שתרצו.
+                  <strong className="text-amber-200">שאלות פתוחות:</strong> בשאלות שבהן צריך להזין שם חופשי, תהיו חופשיים לגמרי להקליד בעצמכם כל שם שתרצו. אבל שימו לב שאנחנו ממליצים מאוד להיעזר בהשלמה האוטומטית, בכדי שהשחקן שניבאתם באמת ייקלט בצורה תקינה.
+                </li>
+                <li>
+                  <strong className="text-amber-200">שאלות מספריות וניחוש דקה:</strong> שימו לב שיש שאלות מספריות שהן מספר מלא, ויש שאלות של ניחוש דקה שבהן אם אתם חושבים שזה יקרה בתוספת הזמן - תצטרכו לכתוב את הנוסחה, למשל: <span className="font-mono bg-slate-900 px-1 rounded text-white">45+3</span>.
                 </li>
               </ul>
             </div>
 
             <div className="bg-slate-900/50 p-5 rounded-2xl border border-purple-500/30 relative overflow-hidden group">
-               <div className="absolute top-0 left-0 w-32 h-32 bg-purple-500/10 rounded-full blur-3xl pointer-events-none group-hover:scale-150 transition-transform"></div>
-               <h3 className="text-lg font-black text-purple-400 mb-3 flex items-center gap-2 relative z-10"><span>🎁</span> שאלות הפתעה ("Surprise Drop")</h3>
-               <p className="text-slate-300 text-sm leading-relaxed relative z-10">
-                 במהלך הטורניר יצוצו פתאום "שאלות הפתעה". שאלות אלו לא תלויות במחזורים או בשלבי הנוק-אאוט, אלא נפתחות <b>לזמן מוגבל בלבד</b> (שעתיים, חצי יום, וכו'). 
-                 אם נכנסת לאפליקציה וראית סירנה אדומה למעלה, רוץ למלא אותן לפני שהזמן נגמר! מי שפספס - הפסיד את הנקודות.
-               </p>
+              <div className="absolute top-0 left-0 w-32 h-32 bg-purple-500/10 rounded-full blur-3xl pointer-events-none group-hover:scale-150 transition-transform"></div>
+              <h3 className="text-lg font-black text-purple-400 mb-3 flex items-center gap-2 relative z-10"><span>🎁</span> שאלות הפתעה ("Surprise Drop")</h3>
+              <p className="text-slate-300 text-sm leading-relaxed relative z-10">
+                במהלך הטורניר יצוצו פתאום "שאלות הפתעה". שאלות אלו נפתחות <b>לזמן מוגבל בלבד</b> (שעתיים, חצי יום, וכו'). 
+                אם נכנסת לאפליקציה וראית סירנה אדומה למעלה, רוץ למלא אותן לפני שהזמן נגמר! מי שפספס - הפסיד את הנקודות.
+              </p>
             </div>
 
             <div className="bg-slate-900/50 p-5 rounded-2xl border border-orange-500/30 relative overflow-hidden group">
-               <div className="absolute top-0 left-0 w-32 h-32 bg-orange-500/10 rounded-full blur-3xl pointer-events-none group-hover:scale-150 transition-transform"></div>
-               <h3 className="text-lg font-black text-orange-400 mb-3 flex items-center gap-2 relative z-10"><span>🤪</span> "בעל הבית השתגע" (ניקוד לפי קרבה)</h3>
-               <p className="text-slate-300 text-sm leading-relaxed relative z-10 mb-3">
-                 בניגוד לשאלות בונוס רגילות (שבהן מקבלים 0 או 100), בחלק מהשאלות המספריות המערכת תעניק ניקוד על פי הקרבה שלך למספר האמיתי.
-               </p>
-               <ul className="text-sm font-bold text-slate-400 space-y-2 relative z-10 bg-slate-950/50 p-4 rounded-xl border border-slate-700/50">
-                 <li className="flex justify-between items-center"><span className="text-emerald-400">🎯 פגיעה בול</span> <span className="bg-slate-800 px-2 py-1 rounded">50 נק'</span></li>
-                 <li className="flex justify-between items-center"><span className="text-blue-400">✔️ טעות של עד 5 (±)</span> <span className="bg-slate-800 px-2 py-1 rounded">40 נק'</span></li>
-                 <li className="flex justify-between items-center"><span className="text-amber-400">⚠️ טעות של עד 10 (±)</span> <span className="bg-slate-800 px-2 py-1 rounded">30 נק'</span></li>
-                 <li className="flex justify-between items-center"><span className="text-orange-400">📉 טעות של עד 15 (±)</span> <span className="bg-slate-800 px-2 py-1 rounded">20 נק'</span></li>
-                 <li className="flex justify-between items-center"><span className="text-rose-400">❌ טעות של עד 20 (±)</span> <span className="bg-slate-800 px-2 py-1 rounded">10 נק'</span></li>
-               </ul>
+              <div className="absolute top-0 left-0 w-32 h-32 bg-orange-500/10 rounded-full blur-3xl pointer-events-none group-hover:scale-150 transition-transform"></div>
+              <h3 className="text-lg font-black text-orange-400 mb-3 flex items-center gap-2 relative z-10"><span>🤪</span> "בעל הבית השתגע" (ניקוד לפי קרבה)</h3>
+              <p className="text-slate-300 text-sm leading-relaxed relative z-10 mb-3">
+                בניגוד לשאלות בונוס רגילות, בחלק מהשאלות המספריות המערכת תעניק ניקוד מדורג על פי הקרבה שלך למספר האמיתי.
+              </p>
+              <ul className="text-sm font-bold text-slate-400 space-y-2 relative z-10 bg-slate-950/50 p-4 rounded-xl border border-slate-700/50">
+                <li className="flex justify-between items-center"><span className="text-emerald-400">🎯 פגיעה בול</span> <span className="bg-slate-800 px-2 py-1 rounded">50 נק'</span></li>
+                <li className="flex justify-between items-center"><span className="text-blue-400">✔️ טעות של עד 5 (±)</span> <span className="bg-slate-800 px-2 py-1 rounded">40 נק'</span></li>
+                <li className="flex justify-between items-center"><span className="text-amber-400">⚠️ טעות של עד 10 (±)</span> <span className="bg-slate-800 px-2 py-1 rounded">30 נק'</span></li>
+                <li className="flex justify-between items-center"><span className="text-orange-400">📉 טעות של עד 15 (±)</span> <span className="bg-slate-800 px-2 py-1 rounded">20 נק'</span></li>
+                <li className="flex justify-between items-center"><span className="text-rose-400">❌ טעות של עד 20 (±)</span> <span className="bg-slate-800 px-2 py-1 rounded">10 נק'</span></li>
+              </ul>
             </div>
             
           </div>
@@ -163,12 +189,12 @@ export default function Rules() {
           <div className="flex-1 space-y-4">
             <h3 className="text-xl font-bold text-rose-400 mb-4 flex items-center gap-2"><span>🔒</span> זמני נעילה וריגול</h3>
             <p className="text-slate-300 text-sm leading-relaxed">
-              המשחקים ושאלות הבונוס ננעלים אוטומטית לפי שעון המערכת המנוהל על ידי האדמין, בדרך כלל בדיוק בשריקת הפתיחה של המחזור או הטורניר. חלק מהבונוסים יינעלו כבר במשחק הפתיחה, וחלק ייפתחו וינעלו רק בשלבי הנוק-אאוט - שווה לעקוב!
+              המשחקים ושאלות הבונוס ננעלים אוטומטית לפי שעון המערכת. חלק מהבונוסים יינעלו כבר במשחק הפתיחה, וחלק ייפתחו וינעלו רק בשלבי הנוק-אאוט - שווה לעקוב!
             </p>
             <div className="bg-slate-900/50 p-4 rounded-xl border border-slate-700 mt-4">
-              <h4 className="font-bold text-white mb-2 flex items-center gap-2"><span>👁️</span> פיצ'ר הריגול</h4>
+              <h4 className="font-bold text-white mb-2 flex items-center gap-2"><span>👁️</span> פיצ'ר הריגול והשקיפות</h4>
               <p className="text-slate-400 text-sm">
-                ברגע שמשחק, בחירת מעפילה או שאלת בונוס ננעלים לעריכה - הם הופכים להיות חשופים לכולם! תוכלו להיכנס לטבלת המובילים (או ללחוץ על כפתור הריגול בכל כרטיסיה) ולראות בדיוק מה הקולגות שלכם ניחשו במקביל, כדי לדעת בעד מי להיות במשחק.
+                ברגע שמשחק, בחירת מעפילה או שאלת בונוס ננעלים לעריכה - הם הופכים להיות חשופים לכולם! תוכלו להיכנס לטבלת המובילים (או ללחוץ על כפתור הריגול) ולראות בדיוק מה הקולגות שלכם ניחשו במקביל. <strong className="text-white">כמו כן, ניתן לראות טבלה מסכמת של כולם בטבלת גילוי הנאות (שקיפות).</strong>
               </p>
             </div>
           </div>

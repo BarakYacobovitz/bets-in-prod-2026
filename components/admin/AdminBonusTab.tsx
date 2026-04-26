@@ -119,6 +119,7 @@ export default function AdminBonusTab() {
       specificTeams: "",
       possibleOptions: "", 
       isSurprise: false,
+      isProximity: false,
       isDouble: false,
       openTime: "",
       closeTime: ""
@@ -394,6 +395,7 @@ export default function AdminBonusTab() {
                            <option className="bg-slate-900 text-white" value="NUMBER_MINUTE">דקת משחק (תומך גם בתוספת זמן, למשל 45+3)</option>
                            <option className="bg-slate-900 text-white" value="PLAYER">שם שחקן (עם השלמה אוטומטית למשתמש)</option>
                            <option className="bg-slate-900 text-white" value="CUSTOM">בחירה מותאמת (הקלדת אפשרויות ספציפיות)</option>
+
                         </select>
                      </div>
 
@@ -481,6 +483,22 @@ export default function AdminBonusTab() {
                            <input type="datetime-local" value={formData.closeTime} onChange={e => setFormData({...formData, closeTime: e.target.value})} className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-white outline-none focus:border-purple-500 text-xs" dir="ltr" />
                          </div>
                       </div>
+                    )}
+
+                    {/* --- קוד להוספה מתחת לטוגל של שאלת הפתעה ב- AdminBonusTab.tsx --- */}
+                    {currentAnswerType === "NUMBER_PURE" && (
+                      <label className={`flex items-center gap-3 cursor-pointer bg-slate-950 p-3 rounded-xl border transition-colors ${formData.isProximity ? "border-orange-500/50" : "border-slate-800 hover:border-slate-600"}`}>
+                        <input 
+                          type="checkbox" 
+                          checked={formData.isProximity} 
+                          onChange={e => setFormData({...formData, isProximity: e.target.checked, points: e.target.checked ? 50 : 15})} 
+                          className="w-5 h-5 rounded border-slate-600 text-orange-500 focus:ring-orange-500 bg-slate-900" 
+                        />
+                        <div className="flex flex-col">
+                          <span className="text-sm font-black text-orange-400 flex items-center gap-1.5">🤪 בעל הבית השתגע (ניקוד לפי קרבה)</span>
+                          <span className="text-[10px] text-slate-500 mt-0.5">מעניק אוטומטית 50 לבול, 40 לסטייה של 5, 30 ל-10 וכו&apos;. (הניקוד המקסימלי יעודכן ל-50).</span>
+                        </div>
+                      </label>
                     )}
                  </div>
               </div>

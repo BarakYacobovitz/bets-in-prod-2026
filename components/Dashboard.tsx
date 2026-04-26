@@ -5,6 +5,7 @@ import { db } from "../app/firebase";
 import { getFlagUrl } from "../app/utils/flags"; 
 import toast from "react-hot-toast";
 import Link from "next/link";
+import { getPlayerInfo, PLAYERS_DATA } from "../app/utils/players";
 
 const MASCOTS = [
   { id: "trump", name: "דונלד", image: "/donaldIcon.jpg", quotes: ["ניחוש ענק. כולם אומרים שזה הניחוש הכי טוב שהם ראו. פייק ניוז מי שאומר אחרת!", "אנחנו נבנה פער ענק בטבלה, והחברים למשרד ישלמו על זה!", "המונדיאל באמריקה יהיה הכי גדול אי פעם. נקודה. גם הניקוד שלך בסדר.", "אני ניצחתי בטבלת השקיפות, כולם יודעים את זה. גנבו לי נקודות!"] },
@@ -100,6 +101,7 @@ export default function Dashboard({ userId, userName, setActiveTab, setPredictio
   const [liveBonusQs, setLiveBonusQs] = useState<any[]>([]);
   const [liveBonusAns, setLiveBonusAns] = useState<any>({});
   const [activeSurpriseAlert, setActiveSurpriseAlert] = useState<number>(0);
+  
 
   useEffect(() => {
     const interval = setInterval(() => setNowMs(Date.now()), 1000);
@@ -440,10 +442,35 @@ export default function Dashboard({ userId, userName, setActiveTab, setPredictio
 
               const q = bonusQuestions.find((q:any) => q.id === qId);
               if (!q) continue;
-
+              const playerInfo = getPlayerInfo(ansStr);
               if (todayTeams.has(ansStr)) {
-                 targets.push({ team: ansStr, questionLabel: q.label, points: q.points, isSurvival: false });
-              } 
+                  targets.push({ type: "TEAM", team: ansStr, questionLabel: q.label || q.question, points: q.points, isSurvival: false });
+               }
+               else if (playerInfo && todayTeams.has(playerInfo.country)) {
+                     // כאן קורה הקסם: אם זה שחקן והנבחרת שלו משחקת היום - תוסיף אותו כמטרה
+                     targets.push({ 
+                         type: "PLAYER", 
+                         name: playerInfo.name, 
+                         team: playerInfo.country, 
+                         club: playerInfo.club,
+                        league: playerInfo.league,
+                        questionLabel: q.label || q.question 
+                      });
+               }
+               else if (q.answerType === "CUSTOM") {
+                  const relevantPlayer = PLAYERS_DATA.find(p => 
+                        (p.club === ansStr || p.league === ansStr) && todayTeams.has(p.country)
+                   );
+                   if (relevantPlayer) {
+                        targets.push({
+                        type: "CONTEXTUAL_ALERT",
+                        name: relevantPlayer.name,
+                        team: relevantPlayer.country,
+                        context: ansStr, // המועדון או הליגה שהמשתמש בחר
+                        questionLabel: q.label
+                      });
+                      }
+               }
               else if (noneKeywords.includes(ansStr) && todayTeams.size > 0) {
                  targets.push({ team: "אף נבחרת", questionLabel: q.label, points: q.points, isSurvival: true });
               }
@@ -503,16 +530,18 @@ export default function Dashboard({ userId, userName, setActiveTab, setPredictio
         });
 
         if(Object.keys(realBonusAnswers).length > 0) {
-           bonusQuestions.forEach((q:any) => {
-              const truth = realBonusAnswers[q.id]; const uAns = userBonusAnswers[q.id];
-              if(truth && uAns) {
-                 const tArr = Array.isArray(truth) ? truth : [truth];
-                 if(tArr.some((t:any) => t.toString().trim().toLowerCase() === uAns.toString().trim().toLowerCase())) {
-                    feed.push({ id: `b_${q.id}`, qId: q.id, icon: '🎁', title: q.label, desc: `שאלת בונוס (${uAns})`, points: Number(q.points)||0, ts: Infinity });
-                 }
+            bonusQuestions.forEach((q:any) => {
+               const truth = realBonusAnswers[q.id]; const uAns = userBonusAnswers[q.id];
+          if(truth && uAns) {
+               const tArr = Array.isArray(truth) ? truth : [truth];
+              // שימוש בפונקציית הניקוי שלנו למניעת באג אנגליה
+              const normalize = (s: any) => String(s || "").trim().replace(/\s+/g, " ").toLowerCase();
+             if(tArr.some((t:any) => normalize(t) === normalize(uAns))) {
+                 feed.push({ id: `b_${q.id}`, qId: q.id, icon: '🎁', title: q.label, desc: `שאלת בונוס (${uAns})`, points: Number(q.points)||0, ts: Infinity });
               }
-           });
-        }
+          }
+        });
+      }
 
         feed.sort((a,b) => b.ts - a.ts);
         setPointsFeed(feed);
@@ -1258,10 +1287,11 @@ export default function Dashboard({ userId, userName, setActiveTab, setPredictio
                             const locked = checkIsMatchLocked(m, tournamentState);
                             
                             return (
-                              <div className={`w-full relative bg-slate-900 p-6 md:p-8 rounded-3xl border transition-all shadow-xl flex flex-col shrink-0 ${hasPrediction ? "border-blue-500/30" : "border-amber-500/50 shadow-[0_0_20px_rgba(245,158,11,0.15)]"}`}>
-                                 {Number(m.matchday) === 3 && m.stage !== "KNOCKOUT" && (
-                                    <div className="absolute top-0 right-0 bg-gradient-to-r from-rose-600 to-red-500 text-white text-[10px] font-black px-3 py-1.5 rounded-bl-xl rounded-tr-3xl shadow-md border-b border-l border-rose-400/50">🔥 מחזור הכרעה</div>
-                                 )}
+                              <div className={`w-full relative mt-3 md:mt-4 bg-slate-900 p-6 md:p-8 rounded-3xl border transition-all shadow-xl flex flex-col shrink-0 ${hasPrediction ? "border-blue-500/30" : "border-amber-500/50 shadow-[0_0_20px_rgba(245,158,11,0.15)]"}`}>
+                                    {Number(m.matchday) === 3 && m.stage !== "KNOCKOUT" && (
+                                  <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 bg-gradient-to-r from-rose-600 to-red-500 text-white text-[11px] md:text-xs font-black px-5 py-1.5 rounded-full shadow-lg border border-rose-400/50 whitespace-nowrap flex items-center gap-1.5 z-10">                                 <span className="animate-pulse">🔥</span> מחזור הכרעה
+                                 </div>
+                               )}
                                  
                                  <div className="text-blue-400 text-xs font-bold mb-6 flex justify-between items-center">
                                    <span className="bg-slate-950 px-3 py-1 rounded-lg border border-slate-800">🕒 {m.time}</span>
@@ -1320,7 +1350,53 @@ export default function Dashboard({ userId, userName, setActiveTab, setPredictio
                             const target = currentDisplayedBonus;
                             return (
                               <div className="w-full bg-slate-900 p-6 md:p-8 rounded-3xl border border-rose-500/30 shadow-xl flex flex-col text-center shrink-0">
-                                 {target.isSurvival ? (
+                                 {target.type === "PLAYER" ? (
+                              <div className="flex items-center gap-4 bg-slate-800/90 p-4 md:p-5 rounded-2xl border border-blue-500/30 shadow-lg relative overflow-hidden transition-all hover:border-blue-500/50">
+                              <div className="absolute top-0 right-0 w-24 h-full bg-blue-500/10 skew-x-12"></div>
+                              <div className="relative z-10 shrink-0">
+                                    {getFlagUrl(target.team) ? (
+                              <div className="relative">
+                              <img src={getFlagUrl(target.team)!} className="w-14 h-14 object-cover rounded-full border-2 border-slate-600 shadow-md" alt="flag" />
+                              <span className="absolute -bottom-2 -right-2 bg-slate-900 border border-slate-700 rounded-full w-6 h-6 flex items-center justify-center text-xs">🏃‍♂️</span>
+                             </div>
+                         ) : (
+                              <span className="text-4xl drop-shadow-md">🏃‍♂️</span>
+                              )}
+                             </div>
+                             <div className="relative z-10 text-right">
+                                     <h4 className="text-white font-bold text-base md:text-lg leading-tight mb-1">
+                                     דע לך ש<span className="text-blue-400">{target.name}</span> עולה למגרש!
+                                    </h4>
+                                    <p className="text-slate-300 text-xs md:text-sm leading-relaxed">
+                                        משחק היום עם נבחרת <strong className="text-white">{target.team}</strong>. <br/>
+                                        הזדמנות לניקוד בשאלת: <span className="text-amber-400 font-bold">"{target.questionLabel}"</span>.
+                                    </p>
+                                 </div>
+                                 </div>
+                                 ) : target.type === "CONTEXTUAL_ALERT" ? (
+                                   <div className="flex items-center gap-4 bg-slate-800/90 p-5 rounded-2xl border border-amber-500/30 relative overflow-hidden transition-all shadow-lg text-right">
+                                   <div className="absolute top-0 right-0 w-2 h-full bg-amber-500"></div>
+                                   <div className="relative z-10 shrink-0">
+                                   <div className="relative">
+                                   {getFlagUrl(target.team) ? (
+                                   <img src={getFlagUrl(target.team)!} className="w-14 h-14 object-cover rounded-full border-2 border-slate-600 shadow-md" alt="flag" />
+                                 ) : (
+                                   <span className="text-4xl drop-shadow-md">🏃‍♂️</span>
+                                  )}
+                                    <span className="absolute -bottom-2 -right-2 bg-slate-900 border border-slate-700 rounded-full w-7 h-7 flex items-center justify-center text-xs">⭐</span>
+                                  </div>
+                               </div>
+                              <div className="relative z-10 text-right">
+                                 <h4 className="text-white font-bold text-base md:text-lg leading-tight mb-1">
+                                      הזדמנות לנקודות עבור <span className="text-amber-400">{target.context}</span>!
+                                 </h4>
+                                 <p className="text-slate-300 text-xs md:text-sm leading-relaxed">
+                                     היום עולה למגרש <strong className="text-white">{target.name}</strong> שמייצג את {target.context} שסימנת בשאלה: <br/>
+                                 <span className="text-slate-400 italic mt-1 inline-block">"{target.questionLabel}"</span>
+                                </p>
+                               </div>
+                             </div>
+                          ) : target.isSurvival ? (
                                     <>
                                       <div className="text-5xl mb-4 drop-shadow-md">🛡️</div>
                                       <h3 className="text-xl md:text-2xl font-bold text-emerald-400 mb-3">משחק הישרדות!</h3>
@@ -1433,7 +1509,6 @@ export default function Dashboard({ userId, userName, setActiveTab, setPredictio
                 <h3 className="text-xl md:text-2xl font-black text-white flex items-center gap-2">
                    <span>🌍</span> תמונת מצב בתים (LIVE)
                 </h3>
-                <p className="text-slate-400 text-xs md:text-sm mt-1 hidden sm:block">הטבלאות מתעדכנות בזמן אמת. להמחשה מוצג כרגע מונדיאל 2022.</p>
               </div>
               <button onClick={() => setShowRealStandingsModal(false)} className="w-8 h-8 md:w-10 md:h-10 flex items-center justify-center rounded-full bg-slate-800 hover:bg-rose-500/20 hover:text-rose-400 text-slate-400 transition-colors font-black text-lg border border-slate-700">✕</button>
             </div>

@@ -359,7 +359,7 @@ export default function Navbar() {
     <nav className="bg-slate-950/80 backdrop-blur-md border-b border-slate-800 sticky top-0 z-50 text-white shadow-lg" dir="rtl">
       <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
         
-        <a href="/" className="flex items-center gap-3 md:gap-4 group" dir="ltr">
+        <Link href="/" className="flex items-center gap-3 md:gap-4 group" dir="ltr">
           <div className="hidden sm:flex flex-col items-end justify-center">
              <div className="font-black text-2xl md:text-[28px] bg-gradient-to-b from-[#fef08a] via-[#fbbf24] to-[#d97706] bg-clip-text text-transparent leading-none tracking-wide">
                 Bets in PROD
@@ -372,7 +372,7 @@ export default function Navbar() {
           <div className="w-10 h-10 md:w-12 md:h-12 flex-shrink-0 group-hover:scale-110 transition-transform">
              <img src="/B.svg" alt="Logo" className="w-full h-full object-contain drop-shadow-lg" />
           </div>
-        </a>
+        </Link>
 
         <div className="flex-1 flex justify-center px-2">
           <div className={`flex flex-col items-center justify-center px-4 py-1.5 rounded-xl border transition-colors duration-500 ${isNoMoreBets ? 'bg-rose-950/40 border-rose-500/50 shadow-[0_0_10px_rgba(225,29,72,0.2)]' : 'bg-slate-900 border-slate-700 shadow-inner'}`}>
@@ -428,6 +428,11 @@ export default function Navbar() {
              </div>
 
              <div className="flex flex-col gap-1">
+                {/* --- כפתור החוקים החדש הוסף כאן --- */}
+                <Link href="/rules" className="text-[10px] bg-blue-600 text-white font-bold px-2 py-0.5 rounded shadow-sm text-center hover:bg-blue-500 transition-colors cursor-pointer flex items-center justify-center gap-1">
+                  חוקים 📜
+                </Link>
+                
                 {userEmail === ADMIN_EMAIL ? (
                   <Link href="/admin" className="text-[10px] bg-emerald-600 text-white font-bold px-2 py-0.5 rounded shadow-sm text-center hover:bg-emerald-500 transition-colors">אדמין</Link>
                 ) : (

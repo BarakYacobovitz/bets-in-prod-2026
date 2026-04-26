@@ -10,9 +10,10 @@ import BonusQuestions from "../components/BonusQuestions";
 import Dashboard from "../components/Dashboard";
 import Leaderboard from "../components/Leaderboard";
 import Login from "../components/Login";
+import Rules from "../components/Rules";
 
 // החלוקה ההיררכית שלנו
-type MainTab = "DASHBOARD" | "PREDICTIONS" | "LEADERBOARD";
+type MainTab = "DASHBOARD" | "PREDICTIONS" | "LEADERBOARD" | "RULES";
 type PredictionTab = "MATCHES" | "QUALIFIERS" | "THIRD_PLACE" | "BONUS" | "KNOCKOUT";
 
 export default function Home() {
@@ -82,7 +83,7 @@ export default function Home() {
         {/* ========================================== */}
         {/* תפריט ראשי עליון */}
         {/* ========================================== */}
-        <div className="flex bg-slate-900 p-1.5 rounded-2xl border border-slate-800 shadow-lg mb-6 max-w-2xl mx-auto z-40 relative">
+        <div className="flex bg-slate-900 p-1.5 rounded-2xl border border-slate-800 shadow-lg mb-6 max-w-3xl mx-auto z-40 relative">
            <button 
              onClick={() => setActiveTab("DASHBOARD")}
              className={`flex-1 py-3 rounded-xl font-black text-sm transition-all flex items-center justify-center gap-2 ${activeTab === "DASHBOARD" ? "bg-blue-600 text-white shadow-md" : "text-slate-400 hover:text-white hover:bg-slate-800/50"}`}
@@ -101,6 +102,13 @@ export default function Home() {
            >
              <span>🏆</span> טבלת הליגה
            </button>
+           <button 
+             onClick={() => setActiveTab("RULES")}
+             className={`flex-1 min-w-[100px] py-3 rounded-xl font-black text-sm transition-all flex items-center justify-center gap-2 ${activeTab === "RULES" ? "bg-emerald-600 text-white shadow-md" : "text-slate-400 hover:text-white hover:bg-slate-800/50"}`}
+           >
+             <span>📜</span> חוקים
+           </button>
+           
         </div>
 
         {/* ========================================== */}
@@ -147,7 +155,7 @@ export default function Home() {
         <div className="animate-fade-in-up mt-4">
            {activeTab === "DASHBOARD" && <Dashboard userId={user.uid} tournamentState={tournamentState} matches={matches} setActiveTab={setActiveTab} setPredictionTab={setPredictionTab} />}
            {activeTab === "LEADERBOARD" && <Leaderboard currentUserId={user.uid} tournamentState={tournamentState} />}
-           
+           {activeTab === "RULES" && <Rules />}
            {activeTab === "PREDICTIONS" && (
              <>
                {predictionTab === "MATCHES" && <GroupsView matches={matches} groups={groups} userId={user.uid} tournamentState={tournamentState} />}

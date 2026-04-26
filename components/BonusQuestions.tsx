@@ -3,6 +3,8 @@ import { useState, useEffect, useRef } from "react";
 import { doc, getDoc, setDoc, collection, getDocs } from "firebase/firestore";
 import { db } from "../app/firebase";
 import { getFlagUrl } from "../app/utils/flags";
+import AutocompleteInput from "./AutocompleteInput";
+import { TOP_PLAYERS_NAMES } from "../app/utils/players";
 
 const parseDateTimeLocal = (dtStr: string) => {
   if (!dtStr) return 0;
@@ -16,14 +18,6 @@ const parseDateTimeLocal = (dtStr: string) => {
     return new Date(dtStr).getTime();
   } catch { return 0; }
 };
-
-const TOP_PLAYERS = [
-  "ליונל מסי", "קיליאן אמבפה", "ארלינג האלאנד", "ויניסיוס ג'וניור", 
-  "ג'וד בלינגהאם", "הארי קיין", "קווין דה בריינה", "פיל פודן", 
-  "לאמין ימאל", "רוברט לבנדובסקי", "כריסטיאנו רונאלדו", "ניימאר", 
-  "אנטואן גריזמן", "בוקאיו סאקה", "מוחמד סלאח", "ברנרדו סילבה",
-  "אדוארדו קמבינגה", "רודרי", "ויקטור אוסימהן", "רפאל ליאאו"
-];
 
 const TEAM_EMOJIS: Record<string, string> = {
   "מקסיקו": "🇲🇽", "דרום אפריקה": "🇿🇦", "קוריאה הדרומית": "🇰🇷", "צ'כיה": "🇨🇿",
@@ -213,6 +207,20 @@ export default function BonusQuestions({ userId, tournamentState: propTournament
     const truth = realBonusAnswers[q.id];
     if (!truth || !userAnswer) return null;
     const truthArray = Array.isArray(truth) ? truth : [truth];
+    
+  if (q.isProximity && q.answerType === "NUMBER_PURE") {
+    const truthNum = Number(truthArray[0]);
+    const ansNum = Number(userAnswer);
+    if (!isNaN(truthNum) && !isNaN(ansNum)) {
+      const diff = Math.abs(truthNum - ansNum);
+      if (diff === 0) return 50;
+      if (diff <= 5) return 40;
+      if (diff <= 10) return 30;
+      if (diff <= 15) return 20;
+      if (diff <= 20) return 10;
+      return 0;
+    }
+  }
     const isCorrect = truthArray.some((t: string) => t.toString().trim() === userAnswer.toString().trim());
     return isCorrect ? q.points : 0;
   };
@@ -241,7 +249,7 @@ export default function BonusQuestions({ userId, tournamentState: propTournament
              if (opts.length > 0) ans = opts[Math.floor(Math.random() * opts.length)];
 
           } else if (currentAnswerType === "PLAYER") {
-             ans = TOP_PLAYERS[Math.floor(Math.random() * TOP_PLAYERS.length)];
+             ans = TOP_PLAYERS_NAMES[Math.floor(Math.random() * TOP_PLAYERS_NAMES.length)];
 
           } else if (currentAnswerType === "NUMBER_PURE" || currentAnswerType === "NUMBER_MINUTE") {
              ans = Math.floor(Math.random() * 15 + 1).toString();
@@ -508,9 +516,19 @@ export default function BonusQuestions({ userId, tournamentState: propTournament
                       <div className="flex flex-col gap-1.5">
                         
                         {!isWaitingToOpen && (
-                           <span className="text-[10px] font-black text-slate-400 bg-slate-950 px-2 py-1 rounded w-fit border border-slate-800">
-                             קופה: <span className={q.isDouble ? "text-rose-400" : "text-amber-400"}>{q.points} נק'</span>
-                           </span>
+                          <div className="flex gap-2">
+                          <span className="text-[10px] font-black text-slate-400 bg-slate-950 px-2 py-1 rounded w-fit border border-slate-800">
+                               קופה: <span className={q.isDouble ? "text-rose-400" : "text-amber-400"}>
+                               {q.isProximity ? "עד 50" : q.points} נק'
+                               </span>
+                          </span>
+                          {q.isProximity && (
+                          <span className="text-[10px] font-black text-orange-400 bg-orange-950/30 px-2 py-1 rounded w-fit border border-orange-500/50">
+                          🤪 בעל הבית השתגע
+                         </span>
+                         )}
+                       {q.isDouble && <span className="text-[10px] font-black text-rose-400 bg-rose-950/30 px-2 py-1 rounded border border-rose-500/30">🔥 Double</span>}
+                        </div>
                         )}
                         
                         {isWaitingToOpen && (
@@ -560,7 +578,6 @@ export default function BonusQuestions({ userId, tournamentState: propTournament
                          
                          const totalOptionsCount = finalOpts.length + extras.length;
                          if (teamOpts.length > 0 && totalOptionsCount <= 8) {
-                            // התיקון לסדר הבועות:
                             const allOpts = [...extras, ...finalOpts];
                             return (
                                <div className="flex flex-col gap-2">
@@ -591,15 +608,12 @@ export default function BonusQuestions({ userId, tournamentState: propTournament
                                   className={`w-full appearance-none px-4 py-3.5 pr-10 rounded-xl font-bold text-sm outline-none transition-all shadow-inner flex-1 ${locked ? "bg-slate-900/50 text-slate-400 border-slate-700 cursor-not-allowed" : (!answers[q.id] || answers[q.id].trim()==="") ? "bg-slate-950 text-white border-amber-500/80 focus:border-amber-400" : "bg-slate-900 text-white border-slate-600 focus:border-blue-500"}`}
                                >
                                   <option value="" className="bg-slate-900">-- בחר נבחרת --</option>
-                                  
-                                  {/* התיקון לסדר הרשימה הנפתחת */}
                                   {extras.map((t: string) => (
                                      <option className="bg-slate-900 text-amber-400" key={t} value={t}>
                                         {isMobile ? (t === "אף נבחרת" ? "🛡️ " : t === "כל הנבחרות" ? "🌍 " : "") : ""}{t}
                                      </option>
                                   ))}
                                   {extras.length > 0 && <option disabled className="bg-slate-900">──────────</option>}
-                                  
                                   {finalOpts.map((t: string) => (
                                      <option className="bg-slate-900 text-white" key={t} value={t}>
                                         {isMobile && TEAM_EMOJIS[t] ? `${TEAM_EMOJIS[t]} ` : ''}{t}
@@ -652,20 +666,14 @@ export default function BonusQuestions({ userId, tournamentState: propTournament
                            className={`w-full px-4 py-3.5 rounded-xl font-bold text-center text-sm outline-none transition-all shadow-inner ${locked ? "bg-slate-900/50 text-slate-400 border-slate-700 cursor-not-allowed" : (!answers[q.id] || answers[q.id].trim()==="") ? "bg-slate-950 text-white border-amber-500/80 focus:border-amber-400" : "bg-slate-900 text-white border-slate-600 focus:border-blue-500"}`}
                          />
                       ) : currentAnswerType === "PLAYER" ? (
-                         <div className="relative">
-                            <input
-                              type="text"
-                              list={`players-list-${q.id}`}
-                              value={answers[q.id] || ""}
-                              onChange={e => handleChange(q.id, e.target.value)}
-                              disabled={locked}
-                              placeholder="הקלד או בחר שם שחקן..."
-                              className={`w-full px-4 py-3.5 rounded-xl font-bold text-sm outline-none transition-all shadow-inner ${locked ? "bg-slate-900/50 text-slate-400 border-slate-700 cursor-not-allowed" : (!answers[q.id] || answers[q.id].trim()==="") ? "bg-slate-950 text-white border-amber-500/80 focus:border-amber-400" : "bg-slate-900 text-white border-slate-600 focus:border-blue-500"}`}
-                            />
-                            <datalist id={`players-list-${q.id}`}>
-                               {TOP_PLAYERS.map(p => <option key={p} value={p} />)}
-                            </datalist>
-                         </div>
+                         <AutocompleteInput
+                            value={answers[q.id] || ""}
+                            onChange={(val) => handleChange(q.id, val)}
+                            placeholder="הקלד או בחר שם שחקן..."
+                            suggestions={TOP_PLAYERS_NAMES}
+                            disabled={locked}
+                            customClassName={`w-full px-4 py-3.5 rounded-xl font-bold text-sm outline-none transition-all shadow-inner ${locked ? "bg-slate-900/50 text-slate-400 border-slate-700 cursor-not-allowed" : (!answers[q.id] || answers[q.id].trim()==="") ? "bg-slate-950 text-white border-amber-500/80 focus:border-amber-400" : "bg-slate-900 text-white border-slate-600 focus:border-blue-500"}`}
+                         />
                       ) : (
                          <input
                            type="text"
