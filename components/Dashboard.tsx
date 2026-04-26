@@ -454,7 +454,8 @@ export default function Dashboard({ userId, userName, setActiveTab, setPredictio
                          team: playerInfo.country, 
                          club: playerInfo.club,
                         league: playerInfo.league,
-                        questionLabel: q.label || q.question 
+                        questionLabel: q.label || q.question,
+                        points: q.points
                       });
                }
                else if (q.answerType === "CUSTOM") {
@@ -467,7 +468,8 @@ export default function Dashboard({ userId, userName, setActiveTab, setPredictio
                         name: relevantPlayer.name,
                         team: relevantPlayer.country,
                         context: ansStr, // המועדון או הליגה שהמשתמש בחר
-                        questionLabel: q.label
+                        questionLabel: q.label,
+                        points: q.points
                       });
                       }
                }
@@ -1419,7 +1421,7 @@ export default function Dashboard({ userId, userName, setActiveTab, setPredictio
                                  )}
                                  <div className="mt-auto">
                                    <div className={`text-white px-6 py-4 rounded-xl text-lg font-black shadow-md drop-shadow-md w-full ${target.isSurvival ? "bg-gradient-to-r from-emerald-600 to-teal-500" : "bg-gradient-to-r from-rose-600 to-orange-500"}`}>
-                                     קופה אפשרית: +{target.points} נק'
+                                      קופה אפשרית: +{Number(target.points) || 0} נק'
                                    </div>
                                  </div>
                               </div>
