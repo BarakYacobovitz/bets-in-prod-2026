@@ -51,30 +51,31 @@ export default function KnockoutView({ matches, userId, tournamentState }: { mat
     return false;
   };
 
-  const handleRandomizeRound = async () => {
-    if (!confirm(`להגריל תוצאות אקראיות לכל משחקי ${activeRound}?`)) return;
-    setIsRandomizing(true);
-    try {
-       const batchPromises = roundMatches.map(async (m) => {
-          if (!m.isFinished) {
-             const h = Math.floor(Math.random() * 4);
-             const a = Math.floor(Math.random() * 4);
-             let qualifier = "";
-             if (h > a) qualifier = m.homeTeam;
-             else if (a > h) qualifier = m.awayTeam;
-             else qualifier = Math.random() > 0.5 ? m.homeTeam : m.awayTeam;
-
-             const docRef = doc(db, "predictions_knockout", `${userId}_${m.id}`);
-             return setDoc(docRef, { 
-                 userId, matchId: m.id, roundName: m.roundName,
-                 predictedHomeScore: h.toString(), predictedAwayScore: a.toString(),
-                 qualifier, updatedAt: new Date() 
-             }, { merge: true });
-          }
-       });
-       await Promise.all(batchPromises);
-    } catch(e) { console.error(e); }
-    finally { setIsRandomizing(false); }
+  const handleRandomizeRound = () => {
+    toast((t) => (
+      <div className="flex flex-col gap-3 text-right" dir="rtl">
+        <span className="font-bold text-slate-800 text-sm">האם להגריל ניחושים אקראיים לשלב {activeRound}?</span>
+        <div className="flex gap-2">
+          <button onClick={() => {
+            toast.dismiss(t.id);
+            setIsRandomizing(true);
+            setTimeout(() => {
+               const newPreds = { ...knockoutPreds };
+               roundMatches.forEach(m => {
+                  const hScore = Math.floor(Math.random() * 4);
+                  const aScore = Math.floor(Math.random() * 4);
+                  let qual = hScore > aScore ? m.homeTeam : aScore > hScore ? m.awayTeam : (Math.random() > 0.5 ? m.homeTeam : m.awayTeam);
+                  newPreds[m.id] = { predictedHomeScore: hScore, predictedAwayScore: aScore, qualifier: qual };
+               });
+               setKnockoutPreds(newPreds);
+               setIsRandomizing(false);
+               toast.success("🎲 הניחושים הוגרלו!");
+            }, 600);
+          }} className="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition-all">כן, הגרל</button>
+          <button onClick={() => toast.dismiss(t.id)} className="bg-slate-200 hover:bg-slate-300 text-slate-800 px-3 py-1.5 rounded-lg text-xs font-bold transition-all">בטל</button>
+        </div>
+      </div>
+    ), { duration: Infinity });
   };
 
   // =========================================================================

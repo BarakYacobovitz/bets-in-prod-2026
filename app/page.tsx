@@ -30,10 +30,34 @@ export default function Home() {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser);
+    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+      if (currentUser) {
+        // המשתמש התחבר לגוגל, אבל אנחנו לא מכניסים אותו עדיין!
+        // נוודא ש-Login.tsx סיים לייצר לו כרטיסייה ב-Firestore
+        const userDocRef = doc(db, "users", currentUser.uid);
+        let docSnap = await getDoc(userDocRef);
+        let attempts = 0;
+        
+        // לולאת המתנה (Polling) - בודק כל חצי שנייה אם הכרטיסייה כבר נוצרה (עד 5 שניות)
+        while (!docSnap.exists() && attempts < 10) {
+          await new Promise(resolve => setTimeout(resolve, 500));
+          docSnap = await getDoc(userDocRef);
+          attempts++;
+        }
+
+        if (docSnap.exists()) {
+          setUser(currentUser); // הכל מוכן, הנהג יכול להיכנס!
+        } else {
+          // אם עברו 5 שניות ואין כרטיסייה, משהו נכשל. ננתק אותו כדי למנוע באגים.
+          await auth.signOut();
+          setUser(null);
+        }
+      } else {
+        setUser(null);
+      }
       setIsCheckingAuth(false);
     });
+    
     return () => unsubscribe();
   }, []);
 

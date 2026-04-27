@@ -64,12 +64,22 @@ export default function AdminMatchesTab({
     return true;
   });
 
+  // התיקון: קוראים לפונקציה המקורית מ-page.tsx, ושומרים רק על אפקט ה-UI הלוקאלי!
   const onSaveWithFeedback = async (matchId: string, home: number, away: number, qual: string) => {
-     await handleSaveMatch(matchId, home, away, qual);
-     setRecentlySavedIds(prev => [...prev, matchId]);
-     setTimeout(() => {
-        setRecentlySavedIds(prev => prev.filter(id => id !== matchId));
-     }, 3000); 
+     try {
+       // קוראים ללוגיקה המרכזית שהעברת כ-prop מבחוץ
+       await handleSaveMatch(matchId, home, away, qual);
+       
+       // מפעילים רק את אפקט ה-"נשמר!" הירוק והיפה שלנו ל-2 שניות
+       setRecentlySavedIds(prev => [...prev, matchId]);
+       setTimeout(() => {
+          setRecentlySavedIds(prev => prev.filter(id => id !== matchId));
+       }, 2000); 
+       
+       // שים לב: הסרנו את window.location.reload()! המסך יתעדכן לבד בזכות page.tsx
+     } catch (error) {
+       console.error("Error in UI feedback:", error);
+     }
   };
 
   return (
@@ -334,7 +344,7 @@ function AdminGeneratorModal({ onClose }: { onClose: () => void }) {
     setMatches(matches.map(m => m._tempId === id ? { ...m, [field]: val } : m));
   };
 
-  const handleSubmitToDb = async () => {
+  const handleSubmitToDb = () => {
     const invalidMatch = matches.find(m => !m.homeTeam.trim() || !m.awayTeam.trim());
     if (invalidMatch) {
        toast.error("חובה להזין שמות קבוצות לכל המשחקים!");

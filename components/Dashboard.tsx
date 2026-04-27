@@ -8,9 +8,9 @@ import Link from "next/link";
 import { getPlayerInfo, PLAYERS_DATA } from "../app/utils/players";
 
 const MASCOTS = [
-  { id: "trump", name: "דונלד", image: "/donaldIcon.jpg", quotes: ["ניחוש ענק. כולם אומרים שזה הניחוש הכי טוב שהם ראו. פייק ניוז מי שאומר אחרת!", "אנחנו נבנה פער ענק בטבלה, והחברים למשרד ישלמו על זה!", "המונדיאל באמריקה יהיה הכי גדול אי פעם. נקודה. גם הניקוד שלך בסדר.", "אני ניצחתי בטבלת השקיפות, כולם יודעים את זה. גנבו לי נקודות!"] },
-  { id: "mexican", name: "חואן", image: "/maxicanIcon.jpg", quotes: ["איי קראמבה! איזה ניחוש חריף הבאת פה אמיגו! 🌶️", "ואמוס! תביא ירוק במטריצה ויוצאים לפיאסטה עד הבוקר! 🪅", "הכדורגל שלנו במקסיקו הכי שמח, אבל הניחושים שלך... איי איי איי.", "אל תהיה לוקו, תבדוק טוב טוב את הפצועים לפני שאתה שם תוצאה."] },
-  { id: "canadian", name: "בוב", image: "/candianIcon.jpg", quotes: ["סליחה שאני מפריע, אה, אבל נראה לי שהניחוש שלך קצת קפוא. 🍁", "קח קפה, שים סירופ מייפל ובוא נראה קצת סוקר, אה? ☕", "הוקי קרח זה הספורט האמיתי, אבל מונדיאל בקנדה זה גם נחמד, סליחה על ההתלהבות.", "אל תשכח להיות מנומס ליריב שלך כשתעקוף אותו בטבלה, אה?"] }
+  { id: "trump", name: "דונלד", image: "/donaldIcon.png", quotes: ["ניחוש ענק. כולם אומרים שזה הניחוש הכי טוב שהם ראו. פייק ניוז מי שאומר אחרת!", "אנחנו נבנה פער ענק בטבלה, והחברים למשרד ישלמו על זה!", "המונדיאל באמריקה יהיה הכי גדול אי פעם. נקודה. גם הניקוד שלך בסדר.", "אני ניצחתי בטבלת השקיפות, כולם יודעים את זה. גנבו לי נקודות!"] },
+  { id: "mexican", name: "חואן", image: "/maxicanIcon.png", quotes: ["איי קראמבה! איזה ניחוש חריף הבאת פה אמיגו! 🌶️", "ואמוס! תביא ירוק במטריצה ויוצאים לפיאסטה עד הבוקר! 🪅", "הכדורגל שלנו במקסיקו הכי שמח, אבל הניחושים שלך... איי איי איי.", "אל תהיה לוקו, תבדוק טוב טוב את הפצועים לפני שאתה שם תוצאה."] },
+  { id: "canadian", name: "בוב", image: "/candianIcon.png", quotes: ["סליחה שאני מפריע, אה, אבל נראה לי שהניחוש שלך קצת קפוא. 🍁", "קח קפה, שים סירופ מייפל ובוא נראה קצת סוקר, אה? ☕", "הוקי קרח זה הספורט האמיתי, אבל מונדיאל בקנדה זה גם נחמד, סליחה על ההתלהבות.", "אל תשכח להיות מנומס ליריב שלך כשתעקוף אותו בטבלה, אה?"] }
 ];
 
 const parseDateTimeLocal = (dtStr: string) => {
@@ -263,13 +263,24 @@ export default function Dashboard({ userId, userName, setActiveTab, setPredictio
     finally { setIsSavingNemesis(false); }
   };
 
-  const handleClearNemesis = async () => {
-    if (!confirm("בטוח שאתה רוצה לבטל את היריבות?")) return;
-    try {
-      await updateDoc(doc(db, "users", userId), { nemesisId: null });
-      setNemesisInput("");
-    } catch (e) { toast.error("שגיאה בביטול יריב."); }
-  };
+  const handleClearNemesis = () => {
+  toast((t) => (
+    <div className="flex flex-col gap-3 text-right" dir="rtl">
+      <span className="font-bold text-slate-800">בטוח שאתה רוצה לבטל את היריבות?</span>
+      <div className="flex gap-2">
+        <button onClick={async () => {
+          toast.dismiss(t.id);
+          try {
+            await updateDoc(doc(db, "users", userId), { nemesisId: null });
+            setNemesisInput("");
+            toast.success("היריבות בוטלה. שלום חברות!");
+          } catch (e) { toast.error("שגיאה בביטול יריב."); }
+        }} className="bg-rose-500 hover:bg-rose-600 text-white px-3 py-1.5 rounded-lg text-sm font-bold transition-colors">כן, בטל</button>
+        <button onClick={() => toast.dismiss(t.id)} className="bg-slate-200 hover:bg-slate-300 text-slate-800 px-3 py-1.5 rounded-lg text-sm font-bold transition-colors">לא, התחרטתי</button>
+      </div>
+    </div>
+  ), { duration: Infinity });
+};
 
   useEffect(() => {
     if (!userId) return;

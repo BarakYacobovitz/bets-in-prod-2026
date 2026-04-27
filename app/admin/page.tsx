@@ -535,49 +535,34 @@ const isQuestionMandatoryNow = (q: any, state: number) => {
     }
   };
 
-  const handleSaveMatch = async (matchId: string) => {
+  const handleSaveMatch = async (matchId: string, homeScore: number, awayScore: number, qualifier: string) => {
   setSavingId(matchId);
   try {
-    const matchObj = matches.find(m => m._tempId === matchId);
-    if (!matchObj) return;
+    // 1. עדכון במסד הנתונים עם השדות של "תוצאת האמת"
+    await updateDoc(doc(db, "matches", matchId), {
+      realHomeScore: homeScore,
+      realAwayScore: awayScore,
+      realQualifier: qualifier || "",
+      isFinished: true
+    });
 
-    if (matchObj.id) {
-      // עדכון משחק קיים
-      const matchRef = doc(db, "matches", matchObj.id);
-      await updateDoc(matchRef, {
-        homeTeam: matchObj.homeTeam,
-        awayTeam: matchObj.awayTeam,
-        homeScore: matchObj.homeScore,
-        awayScore: matchObj.awayScore,
-        status: matchObj.status,
-        date: matchObj.date, // <--- השורה הזו הייתה חסרה!
-        group: matchObj.group,
-        matchday: matchObj.matchday,
-        broadcastChannel: matchObj.broadcastChannel || "",
-        broadcastUrl: matchObj.broadcastUrl || ""
-      });
-    } else {
-      // יצירת משחק חדש (כאן זה היה קיים, אבל טוב לוודא)
-      const newMatchRef = doc(collection(db, "matches"));
-      await setDoc(newMatchRef, {
-        homeTeam: matchObj.homeTeam,
-        awayTeam: matchObj.awayTeam,
-        homeScore: matchObj.homeScore,
-        awayScore: matchObj.awayScore,
-        status: matchObj.status,
-        date: matchObj.date,
-        group: matchObj.group,
-        matchday: matchObj.matchday,
-        broadcastChannel: matchObj.broadcastChannel || "",
-        broadcastUrl: matchObj.broadcastUrl || ""
-      });
-    }
-    toast.success("המשחק עודכן ב-DB");
-  } catch (e) {
-    console.error("Error saving match:", e);
-    toast.error("שגיאה בשמירה");
+    // 2. עדכון הסטייט הלוקאלי כדי שהמסך יתעדכן מיידית בלי צורך ברענון הדפדפן!
+    setMatches(prevMatches => prevMatches.map(m => 
+      m.id === matchId ? {
+        ...m,
+        realHomeScore: homeScore,
+        realAwayScore: awayScore,
+        realQualifier: qualifier || "",
+        isFinished: true
+      } : m
+    ));
+
+    toast.success("תוצאת האמת נשמרה בהצלחה! ⚽");
+  } catch (error) {
+    console.error("Error saving match:", error);
+    toast.error("שגיאה בשמירת התוצאה.");
   } finally {
-    setSavingId("");
+    setSavingId(null);
   }
 };
 

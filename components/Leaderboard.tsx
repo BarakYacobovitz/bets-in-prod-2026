@@ -223,14 +223,45 @@ export default function Leaderboard() {
     finally { setIsLeagueLoading(false); }
   };
 
-  const handleLeaveLeague = async (leagueId: string, leagueName: string) => {
-    if (!currentUserId) return;
-    if (!confirm(`בטוח שאתה רוצה לצאת מהליגה '${leagueName}'?`)) return;
-    try {
-        await updateDoc(doc(db, "mini_leagues", leagueId), { members: arrayRemove(currentUserId) });
-        if (selectedLeagueId === leagueId) setSelectedLeagueId(null);
-        toast.success("יצאת מהליגה.");
-    } catch(e) { toast.error("שגיאה ביציאה מהליגה."); }
+  const handleLeaveLeague = async () => {
+    toast((t) => (
+      <div className="flex flex-col gap-3 text-right" dir="rtl">
+        <span className="font-bold text-slate-800 text-sm">
+          בטוח שברצונך לעזוב את הליגה? 🥺
+          <br />
+          <span className="text-[10px] text-rose-600 font-normal">
+            *כל הניחושים והניקוד שלך יימחקו לצמיתות ולא ניתן יהיה לשחזרם.
+          </span>
+        </span>
+        <div className="flex gap-2">
+          <button 
+            onClick={async () => {
+              toast.dismiss(t.id);
+              try {
+                // כאן נכנסת הלוגיקה המקורית של המחיקה מה-DB:
+                await updateDoc(doc(db, "users", userId), {
+                  hasPaid: false, // או כל לוגיקת עזיבה שיש לך
+                  inLeague: false 
+                });
+                toast.success("עזבת את הליגה. נתראה בטורניר הבא!");
+                window.location.reload();
+              } catch (e) {
+                toast.error("שגיאה בביצוע הפעולה.");
+              }
+            }} 
+            className="bg-rose-600 hover:bg-rose-700 text-white px-3 py-1.5 rounded-lg text-xs font-black transition-all active:scale-95"
+          >
+            כן, מחק אותי
+          </button>
+          <button 
+            onClick={() => toast.dismiss(t.id)} 
+            className="bg-slate-200 hover:bg-slate-300 text-slate-800 px-3 py-1.5 rounded-lg text-xs font-bold transition-all"
+          >
+            לא, נשארתי!
+          </button>
+        </div>
+      </div>
+    ), { duration: Infinity });
   };
 
   let currentUsers: any[] = [];

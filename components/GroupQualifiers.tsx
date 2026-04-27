@@ -112,31 +112,28 @@ export default function ThirdPlaceQualifiers({ groups, userId, tournamentState =
 
   const isLocked = tournamentState >= 1;
 
-  const handleRandomizeThirdPlace = async () => {
-    if (isLocked) return;
-    if (!confirm("להגריל 8 נבחרות אקראיות מתוך הבתים השונים?")) return;
-    setIsRandomizing(true);
-    isUserAction.current = true;
-    
-    try {
-      const allGroupNames = Object.keys(groups);
-      const shuffledGroups = [...allGroupNames].sort(() => 0.5 - Math.random()).slice(0, 8);
-      
-      const newSelectedTeams: string[] = [];
-      shuffledGroups.forEach(gName => {
-        const teamsInGroup = Array.from(groups[gName] as Set<string>);
-        const availableTeams = teamsInGroup.filter(t => !checkIsAlreadyAdvanced(t));
-        
-        if (availableTeams.length > 0) {
-          newSelectedTeams.push(availableTeams[Math.floor(Math.random() * availableTeams.length)]);
-        } else if (teamsInGroup.length > 0) {
-          newSelectedTeams.push(teamsInGroup[Math.floor(Math.random() * teamsInGroup.length)]);
-        }
-      });
-
-      setSelectedTeams(newSelectedTeams);
-    } catch (e) { console.error(e); } 
-    finally { setIsRandomizing(false); }
+  const handleRandomizeThirdPlace = () => {
+    toast((t) => (
+      <div className="flex flex-col gap-3 text-right" dir="rtl">
+        <span className="font-bold text-slate-800 text-sm">המערכת תבחר עבורך 4 נבחרות אקראיות מתוך הבתים. להמשיך?</span>
+        <div className="flex gap-2">
+          <button onClick={() => {
+            toast.dismiss(t.id);
+            setIsRandomizing(true);
+            setTimeout(() => {
+               const allTeams: string[] = [];
+               Object.values(groups).forEach((g: any) => allTeams.push(...g));
+               const shuffled = allTeams.sort(() => 0.5 - Math.random());
+               const randomFour = shuffled.slice(0, 4);
+               setSelectedTeams(randomFour);
+               setIsRandomizing(false);
+               toast.success("🎲 הוגרלו 4 נבחרות אקראיות!");
+            }, 600);
+          }} className="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition-all active:scale-95">כן, הגרל</button>
+          <button onClick={() => toast.dismiss(t.id)} className="bg-slate-200 hover:bg-slate-300 text-slate-800 px-3 py-1.5 rounded-lg text-xs font-bold transition-all">בטל</button>
+        </div>
+      </div>
+    ), { duration: Infinity });
   };
 
   const calculateUserPoints = (userTeams: string[]) => {

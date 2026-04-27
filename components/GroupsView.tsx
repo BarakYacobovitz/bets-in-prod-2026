@@ -240,34 +240,39 @@ export default function GroupsView({ matches, groups, userId, tournamentState }:
     finally { setIsLoadingSpy(false); }
   };
 
-  const handleRandomizeGroup = async () => {
-    if (!confirm(`להגריל תוצאות אקראיות לכל משחקי בית ${activeGroup}?`)) return;
-    setIsRandomizing(true);
-    try {
-       const batchPromises = activeMatches.map(async (m: any) => {
-          const md = Number(m.matchday) || 1;
-          let locked = false;
-          if (md === 1 && tournamentState >= 1) locked = true;
-          if (md === 2 && tournamentState >= 2) locked = true;
-          if (md === 3 && tournamentState >= 3) locked = true;
-
-          if (!locked && !m.isFinished) {
-             const pHome = Math.floor(Math.random() * 4).toString();
-             const pAway = Math.floor(Math.random() * 4).toString();
-             const docRef = doc(db, "predictions_matches", `${userId}_${m.id}`);
-             return setDoc(docRef, { userId, matchId: m.id, groupId: m.group, predictedHomeScore: pHome, predictedAwayScore: pAway, updatedAt: new Date() }, { merge: true });
-          }
-       });
-       await Promise.all(batchPromises);
-
-       if (!isQualifiersLocked && activeTeams.length >= 2) {
-          const shuffled = [...activeTeams].sort(() => 0.5 - Math.random());
-          const newQuals = { ...qualifiers, [activeGroup]: { first: shuffled[0], second: shuffled[1] } };
-          setQualifiers(newQuals);
-          await setDoc(doc(db, "predictions_qualifiers", userId), { groups: newQuals, updatedAt: new Date() }, { merge: true });
-       }
-    } catch(e) { console.error(e); }
-    finally { setIsRandomizing(false); }
+  const handleRandomizeGroup = () => {
+    toast((t) => (
+      <div className="flex flex-col gap-3 text-right" dir="rtl">
+        <span className="font-bold text-slate-800 text-sm">האם להגריל ניחושים אקראיים לבית {activeGroup}? <br/><span className="text-[10px] font-normal text-rose-500">*פעולה זו תדרוס ניחושים קיימים בבית זה.</span></span>
+        <div className="flex gap-2">
+          <button onClick={() => {
+            toast.dismiss(t.id);
+            const groupTeams = groups[activeGroup] || [];
+            
+            if(viewMode === "MATCHES") {
+               const newPreds = { ...userMatchPredictions };
+               const gMatches = matches.filter((m: any) => m.group === activeGroup);
+               gMatches.forEach((m: any) => {
+                  newPreds[m.id] = { 
+                    home: Math.floor(Math.random() * 4), 
+                    away: Math.floor(Math.random() * 4) 
+                  };
+               });
+               setUserMatchPredictions(newPreds);
+               toast.success(`🎲 הוגרלו תוצאות לבית ${activeGroup}`);
+            } else {
+               const shuffled = [...groupTeams].sort(() => 0.5 - Math.random());
+               setQualifiers({ 
+                 ...qualifiers, 
+                 [activeGroup]: { first: shuffled[0], second: shuffled[1] } 
+               });
+               toast.success(`🎲 הוגרלו עולות לבית ${activeGroup}`);
+            }
+          }} className="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition-all active:scale-95">כן, הגרל</button>
+          <button onClick={() => toast.dismiss(t.id)} className="bg-slate-200 hover:bg-slate-300 text-slate-800 px-3 py-1.5 rounded-lg text-xs font-bold transition-all">בטל</button>
+        </div>
+      </div>
+    ), { duration: Infinity });
   };
 
   const handleRandomizeQualifiers = async () => {

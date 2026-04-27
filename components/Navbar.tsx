@@ -23,13 +23,18 @@ const STAGE_NAMES: Record<string, string> = {
 const parseDateTimeLocal = (dtStr: string) => {
   if (!dtStr) return 0;
   try {
+    // קודם ננסה פיענוח טבעי ואמין של הדפדפן
+    const timestamp = new Date(dtStr).getTime();
+    if (!isNaN(timestamp)) return timestamp;
+
+    // גיבוי למקרה של תאריכים בפורמט T במכשירים בעייתיים
     if (dtStr.includes("T")) {
       const [datePart, timePart] = dtStr.split("T");
       const [year, month, day] = datePart.split("-").map(Number);
       const [hour, minute] = timePart.split(":").map(Number);
-      return new Date(year, month - 1, day, hour, minute).getTime();
+      return new Date(year, month - 1, day, hour, minute || 0).getTime();
     }
-    return new Date(dtStr).getTime();
+    return 0;
   } catch { return 0; }
 };
 
@@ -272,6 +277,7 @@ export default function Navbar() {
   
   useEffect(() => {
   if (typeof window !== "undefined") {
+    try {
     const { onMessage } = require("firebase/messaging");
 
     const setupForegroundMessaging = async () => {
@@ -279,17 +285,24 @@ export default function Navbar() {
         // אנחנו משתמשים ב-messaging שייבאת בשורה 9
         const msgInstance = await messaging(); 
         if (msgInstance) {
-          onMessage(msgInstance, (payload) => {
-            console.log("Message received in foreground! ", payload);
-            alert("הודעה הגיעה בזמן שהאפליקציה פתוחה! \nכותרת: " + (payload.notification?.title || "ללא"));
+          onMessage(msgInstance, (payload: any) => {
+              console.log("Message received in foreground! ", payload);toast(payload.notification?.body || "הודעה חדשה הגיעה!", {
+              icon: '🔔',
+              duration: 5000,
+               style: { background: '#1e293b', color: '#fff', border: '1px solid #334155' }
+          });
+
           });
         }
       } catch (err) {
         console.error("שגיאה בהפעלת מאזין התראות:", err);
       }
     };
-
+    
     setupForegroundMessaging();
+    } catch (e) {
+        console.warn("מודול התראות לא נטען, ממשיך לרנדר את השעון כרגיל.");
+      }
   }
   }, []);
   const handleRequestNotificationPermission = async () => {
