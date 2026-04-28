@@ -5,6 +5,7 @@ import { db } from "../app/firebase";
 import { getFlagUrl } from "../app/utils/flags";
 import AutocompleteInput from "./AutocompleteInput";
 import { TOP_PLAYERS_NAMES, getPlayerInfo } from "../app/utils/players";
+import toast from "react-hot-toast";
 
 const parseDateTimeLocal = (dtStr: string) => {
   if (!dtStr) return 0;
@@ -225,49 +226,110 @@ export default function BonusQuestions({ userId, tournamentState: propTournament
     return isCorrect ? q.points : 0;
   };
 
-  const handleRandomizeCategory = async () => {
-    if (!confirm("להגריל תשובות אקראיות לכל השאלות הפתוחות בקטגוריה זו?")) return;
-    setIsRandomizing(true);
-    try {
-      const newAnswers = { ...answers };
-      let hasChanges = false;
-      
-      activeQuestionsList.forEach(q => {
-        if (!isQuestionLocked(q)) {
-          let ans = "";
-          const currentAnswerType = q.answerType || "TEAM";
+  const handleRandomizeSingle = (q: any) => {
+    if (isQuestionLocked(q)) return;
+    
+    let ans = "";
+    const currentAnswerType = q.answerType || "TEAM";
 
-          if (currentAnswerType === "TEAM") {
-             let opts = q.specificTeams ? q.specificTeams.split(",").map((s:string)=>s.trim()).filter(Boolean) : allTeams;
-             if (opts.length === 0) opts = allTeams;
-             if (q.hasNoneOption) opts.push("אף נבחרת");
-             if (q.hasAllOption) opts.push("כל הנבחרות");
-             ans = opts[Math.floor(Math.random() * opts.length)];
-             
-          } else if (currentAnswerType === "CUSTOM") {
-             const opts = q.possibleOptions ? q.possibleOptions.split(",").map((s:string)=>s.trim()).filter(Boolean) : [];
-             if (opts.length > 0) ans = opts[Math.floor(Math.random() * opts.length)];
+    if (currentAnswerType === "TEAM") {
+       let opts = q.specificTeams ? q.specificTeams.split(",").map((s:string)=>s.trim()).filter(Boolean) : allTeams;
+       if (opts.length === 0) opts = allTeams;
+       if (q.hasNoneOption) opts.push("אף נבחרת");
+       if (q.hasAllOption) opts.push("כל הנבחרות");
+       ans = opts[Math.floor(Math.random() * opts.length)];
+       
+    } else if (currentAnswerType === "CUSTOM") {
+       const opts = q.possibleOptions ? q.possibleOptions.split(",").map((s:string)=>s.trim()).filter(Boolean) : [];
+       if (opts.length > 0) ans = opts[Math.floor(Math.random() * opts.length)];
 
-          } else if (currentAnswerType === "PLAYER") {
-             ans = TOP_PLAYERS_NAMES[Math.floor(Math.random() * TOP_PLAYERS_NAMES.length)];
+    } else if (currentAnswerType === "PLAYER") {
+       ans = TOP_PLAYERS_NAMES[Math.floor(Math.random() * TOP_PLAYERS_NAMES.length)];
 
-          } else if (currentAnswerType === "NUMBER_PURE" || currentAnswerType === "NUMBER_MINUTE") {
-             ans = Math.floor(Math.random() * 15 + 1).toString();
-          }
-          
-          if (ans) {
-            newAnswers[q.id] = ans;
-            hasChanges = true;
-          }
-        }
-      });
+    } else if (currentAnswerType === "NUMBER_PURE" || currentAnswerType === "NUMBER_MINUTE") {
+       ans = Math.floor(Math.random() * 15 + 1).toString();
+    }
+    
+    if (ans) {
+      isUserAction.current = true; // אומר למערכת השמירה האוטומטית לפעול
+      setAnswers((prev: any) => ({ ...prev, [q.id]: ans }));
+      toast.success(`הוגרלה תשובה! 🎲`, { id: `rand_${q.id}` });
+    }
+  };
 
-      if (hasChanges) {
-        setAnswers(newAnswers);
-        await setDoc(doc(db, "predictions_bonus", userId), { answers: newAnswers, updatedAt: new Date() }, { merge: true });
-      }
-    } catch(e) { console.error(e); } 
-    finally { setIsRandomizing(false); }
+  const handleRandomizeCategory = () => {
+    toast((t) => (
+      <div className="flex flex-col gap-3 text-right" dir="rtl">
+        <span className="font-bold text-slate-800 text-sm">
+          האם להגריל תשובות לכל השאלות בטאב זה? <br/>
+          <span className="text-xs text-rose-600 font-bold">(שים לב: פעולה זו תדרוס ניחושים קיימים!)</span>
+        </span>
+        <div className="flex gap-2">
+          <button 
+            onClick={async () => {
+              toast.dismiss(t.id);
+              setIsRandomizing(true);
+              toast.loading("מגריל ושומר במסד הנתונים...", { id: "randomizeBonus" });
+              try {
+                const newAnswers = { ...answers };
+                let hasChanges = false;
+                
+                activeQuestionsList.forEach(q => {
+                  if (!isQuestionLocked(q)) {
+                    let ans = "";
+                    const currentAnswerType = q.answerType || "TEAM";
+
+                    if (currentAnswerType === "TEAM") {
+                       let opts = q.specificTeams ? q.specificTeams.split(",").map((s:string)=>s.trim()).filter(Boolean) : allTeams;
+                       if (opts.length === 0) opts = allTeams;
+                       if (q.hasNoneOption) opts.push("אף נבחרת");
+                       if (q.hasAllOption) opts.push("כל הנבחרות");
+                       ans = opts[Math.floor(Math.random() * opts.length)];
+                       
+                    } else if (currentAnswerType === "CUSTOM") {
+                       const opts = q.possibleOptions ? q.possibleOptions.split(",").map((s:string)=>s.trim()).filter(Boolean) : [];
+                       if (opts.length > 0) ans = opts[Math.floor(Math.random() * opts.length)];
+
+                    } else if (currentAnswerType === "PLAYER") {
+                       ans = TOP_PLAYERS_NAMES[Math.floor(Math.random() * TOP_PLAYERS_NAMES.length)];
+
+                    } else if (currentAnswerType === "NUMBER_PURE" || currentAnswerType === "NUMBER_MINUTE") {
+                       ans = Math.floor(Math.random() * 15 + 1).toString();
+                    }
+                    
+                    if (ans) {
+                      newAnswers[q.id] = ans;
+                      hasChanges = true;
+                    }
+                  }
+                });
+
+                if (hasChanges) {
+                  setAnswers(newAnswers);
+                  await setDoc(doc(db, "predictions_bonus", userId), { answers: newAnswers, updatedAt: new Date() }, { merge: true });
+                  toast.success("הוגרלו ונשמרו תשובות בהצלחה 🎲", { id: "randomizeBonus" });
+                } else {
+                  toast.error("אין שאלות פתוחות להגרלה", { id: "randomizeBonus" });
+                }
+              } catch(e) { 
+                console.error(e); 
+                toast.error("שגיאה בשמירת ההגרלה", { id: "randomizeBonus" });
+              } 
+              finally { setIsRandomizing(false); }
+            }} 
+            className="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold"
+          >
+            כן, דרוס והגרל
+          </button>
+          <button 
+            onClick={() => toast.dismiss(t.id)} 
+            className="bg-slate-200 hover:bg-slate-300 text-slate-800 px-3 py-1.5 rounded-lg text-xs font-bold"
+          >
+            ביטול
+          </button>
+        </div>
+      </div>
+    ), { duration: Infinity });
   };
 
   const filteredQuestions = questions.filter(q => {
@@ -468,7 +530,7 @@ export default function BonusQuestions({ userId, tournamentState: propTournament
          </div>
          {activeQuestionsList.some(q => !isQuestionLocked(q)) && (
             <button onClick={handleRandomizeCategory} disabled={isRandomizing} className="bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-bold py-2 px-3 rounded-lg border border-slate-600 flex items-center gap-1 transition-all shadow-sm disabled:opacity-50 active:scale-95">
-              <span className="text-base">🎲</span> {isRandomizing ? "מגריל..." : "הגרל חסרים בטאב"}
+              <span className="text-base">🎲</span> {isRandomizing ? "מגריל..." : "הגרל הכל בטאב"}
             </button>
          )}
       </div>
@@ -540,6 +602,17 @@ export default function BonusQuestions({ userId, tournamentState: propTournament
                       
                       <div className="flex flex-col items-end gap-2">
                         <div className="flex gap-1.5">
+                           {/* --- כפתור הגרלה לשאלה בודדת --- */}
+                           {!locked && !isWaitingToOpen && (
+                              <button 
+                                onClick={() => handleRandomizeSingle(q)}
+                                className="bg-slate-800 hover:bg-slate-700 text-slate-300 w-6 h-6 rounded-full flex items-center justify-center text-xs shadow-md transition-all active:scale-95 border border-slate-600"
+                                title="הגרל תשובה לשאלה זו"
+                              >
+                                🎲
+                              </button>
+                           )}
+                           
                            {q.isSurprise && !isWaitingToOpen && <span className="bg-purple-600 w-6 h-6 rounded-full flex items-center justify-center text-xs shadow-md" title="שאלת הפתעה!">🎁</span>}
                            {q.isDouble && !q.isSurprise && <span className="bg-rose-600 w-6 h-6 rounded-full flex items-center justify-center text-xs font-black shadow-md text-white" title="ניקוד כפול!">X2</span>}
                         </div>
@@ -600,33 +673,25 @@ export default function BonusQuestions({ userId, tournamentState: propTournament
                          }
 
                          return (
-                            <div className="relative">
-                               <select
-                                  value={answers[q.id] || ""}
-                                  onChange={e => handleChange(q.id, e.target.value)}
-                                  disabled={locked}
-                                  className={`w-full appearance-none px-4 py-3.5 pr-10 rounded-xl font-bold text-sm outline-none transition-all shadow-inner flex-1 ${locked ? "bg-slate-900/50 text-slate-400 border-slate-700 cursor-not-allowed" : (!answers[q.id] || answers[q.id].trim()==="") ? "bg-slate-950 text-white border-amber-500/80 focus:border-amber-400" : "bg-slate-900 text-white border-slate-600 focus:border-blue-500"}`}
-                               >
-                                  <option value="" className="bg-slate-900">-- בחר נבחרת --</option>
-                                  {extras.map((t: string) => (
-                                     <option className="bg-slate-900 text-amber-400" key={t} value={t}>
-                                        {isMobile ? (t === "אף נבחרת" ? "🛡️ " : t === "כל הנבחרות" ? "🌍 " : "") : ""}{t}
-                                     </option>
-                                  ))}
-                                  {extras.length > 0 && <option disabled className="bg-slate-900">──────────</option>}
-                                  {finalOpts.map((t: string) => (
-                                     <option className="bg-slate-900 text-white" key={t} value={t}>
-                                        {isMobile && TEAM_EMOJIS[t] ? `${TEAM_EMOJIS[t]} ` : ''}{t}
-                                     </option>
-                                  ))}
-                               </select>
-                               {answers[q.id] && getFlagUrl(answers[q.id]) && (
-                                  <div className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none">
-                                     <img src={getFlagUrl(answers[q.id])!} className="w-5 h-3.5 object-cover rounded-sm shadow-sm" alt="flag" />
-                                  </div>
-                               )}
-                            </div>
-                         );
+   <div className="relative">
+      <AutocompleteInput
+         value={answers[q.id] || ""}
+         onChange={(val: string) => handleChange(q.id, val)}
+         placeholder="בחר או הקלד נבחרת..."
+         suggestions={[...extras, ...finalOpts]}
+         disabled={locked}
+         showAllOnFocus={true} // גורם לכל הרשימה להיפתח בלחיצה
+         getFlag={(val) => getFlagUrl(val)}
+         customClassName={`w-full px-4 py-3.5 pl-10 rounded-xl font-bold text-sm outline-none transition-all shadow-inner ${locked ? "bg-slate-900/50 text-slate-400 border-slate-700 cursor-not-allowed" : (!answers[q.id] || answers[q.id].trim()==="") ? "bg-slate-950 text-white border-amber-500/80 focus:border-amber-400" : "bg-slate-900 text-white border-slate-600 focus:border-blue-500"}`}
+      />
+      {/* הצגת הדגל שנבחר בצד שמאל של השדה */}
+      {answers[q.id] && getFlagUrl(answers[q.id]) && (
+         <div className="absolute left-8 top-1/2 -translate-y-1/2 pointer-events-none">
+            <img src={getFlagUrl(answers[q.id])!} className="w-5 h-3.5 object-cover rounded-sm shadow-sm" alt="flag" />
+         </div>
+      )}
+   </div>
+);
                       })() : currentAnswerType === "CUSTOM" ? (() => {
                          const opts = q.possibleOptions ? q.possibleOptions.split(",").map((s:string)=>s.trim()).filter(Boolean) : [];
                          return (
@@ -665,16 +730,33 @@ export default function BonusQuestions({ userId, tournamentState: propTournament
                            dir="ltr"
                            className={`w-full px-4 py-3.5 rounded-xl font-bold text-center text-sm outline-none transition-all shadow-inner ${locked ? "bg-slate-900/50 text-slate-400 border-slate-700 cursor-not-allowed" : (!answers[q.id] || answers[q.id].trim()==="") ? "bg-slate-950 text-white border-amber-500/80 focus:border-amber-400" : "bg-slate-900 text-white border-slate-600 focus:border-blue-500"}`}
                          />
-                      ) : currentAnswerType === "PLAYER" ? (
-                         <AutocompleteInput
-                            value={answers[q.id] || ""}
-                            onChange={(val) => handleChange(q.id, val)}
-                            placeholder="הקלד או בחר שם שחקן..."
-                            suggestions={TOP_PLAYERS_NAMES}
-                            disabled={locked}
-                            customClassName={`w-full px-4 py-3.5 rounded-xl font-bold text-sm outline-none transition-all shadow-inner ${locked ? "bg-slate-900/50 text-slate-400 border-slate-700 cursor-not-allowed" : (!answers[q.id] || answers[q.id].trim()==="") ? "bg-slate-950 text-white border-amber-500/80 focus:border-amber-400" : "bg-slate-900 text-white border-slate-600 focus:border-blue-500"}`}
-                         />
-                      ) : (
+                      ) : currentAnswerType === "PLAYER" ? (() => {
+   const pInfo = getPlayerInfo(answers[q.id]);
+   return (
+      <div className="relative">
+         <AutocompleteInput
+            value={answers[q.id] || ""}
+            onChange={(val: string) => handleChange(q.id, val)}
+            placeholder="הקלד או בחר שם שחקן..."
+            suggestions={TOP_PLAYERS_NAMES}
+            disabled={locked}
+            getFlag={(val) => {
+               const info = getPlayerInfo(val);
+               return info ? getFlagUrl(info.country) : null;
+            }}
+            getSubtitle={(val) => getPlayerInfo(val)?.country} // מציג את המדינה בסוגריים
+            customClassName={`w-full px-4 py-3.5 rounded-xl font-bold text-sm outline-none transition-all shadow-inner ${locked ? "bg-slate-900/50 text-slate-400 border-slate-700 cursor-not-allowed" : (!answers[q.id] || answers[q.id].trim()==="") ? "bg-slate-950 text-white border-amber-500/80 focus:border-amber-400" : "bg-slate-900 text-white border-slate-600 focus:border-blue-500"}`}
+         />
+         {/* ה-Badge שמופיע בתוך השדה כששחקן נבחר */}
+         {pInfo && (
+            <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none flex items-center gap-1.5 text-[10px] sm:text-xs font-bold text-slate-200 bg-slate-800 px-2.5 py-1 rounded-lg border border-slate-600 shadow-md animate-fade-in-up">
+               {getFlagUrl(pInfo.country) && <img src={getFlagUrl(pInfo.country)!} className="w-4 h-3 object-cover rounded-sm shadow-sm" alt="flag" />}
+               {pInfo.country}
+            </div>
+         )}
+      </div>
+   );
+})() : (
                          <input
                            type="text"
                            value={answers[q.id] || ""}

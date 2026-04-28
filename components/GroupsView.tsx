@@ -4,6 +4,8 @@ import MatchCard from "./MatchCard";
 import { doc, getDoc, setDoc, collection, query, where, onSnapshot, getDocs } from "firebase/firestore";
 import { db } from "../app/firebase";
 import { getFlagUrl } from "../app/utils/flags";
+import toast from "react-hot-toast";
+
 
 export default function GroupsView({ matches, groups, userId, tournamentState }: any) {
   const groupNames = Object.keys(groups).sort();
@@ -243,33 +245,62 @@ export default function GroupsView({ matches, groups, userId, tournamentState }:
   const handleRandomizeGroup = () => {
     toast((t) => (
       <div className="flex flex-col gap-3 text-right" dir="rtl">
-        <span className="font-bold text-slate-800 text-sm">האם להגריל ניחושים אקראיים לבית {activeGroup}? <br/><span className="text-[10px] font-normal text-rose-500">*פעולה זו תדרוס ניחושים קיימים בבית זה.</span></span>
+        <span className="font-bold text-slate-800 text-sm">
+          האם להגריל ניחושים אקראיים לבית {activeGroup}? <br/>
+        </span>
+        
         <div className="flex gap-2">
-          <button onClick={() => {
-            toast.dismiss(t.id);
-            const groupTeams = groups[activeGroup] || [];
-            
-            if(viewMode === "MATCHES") {
-               const newPreds = { ...userMatchPredictions };
-               const gMatches = matches.filter((m: any) => m.group === activeGroup);
-               gMatches.forEach((m: any) => {
-                  newPreds[m.id] = { 
-                    home: Math.floor(Math.random() * 4), 
-                    away: Math.floor(Math.random() * 4) 
-                  };
-               });
-               setUserMatchPredictions(newPreds);
-               toast.success(`🎲 הוגרלו תוצאות לבית ${activeGroup}`);
-            } else {
-               const shuffled = [...groupTeams].sort(() => 0.5 - Math.random());
-               setQualifiers({ 
-                 ...qualifiers, 
-                 [activeGroup]: { first: shuffled[0], second: shuffled[1] } 
-               });
-               toast.success(`🎲 הוגרלו עולות לבית ${activeGroup}`);
-            }
-          }} className="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition-all active:scale-95">כן, הגרל</button>
-          <button onClick={() => toast.dismiss(t.id)} className="bg-slate-200 hover:bg-slate-300 text-slate-800 px-3 py-1.5 rounded-lg text-xs font-bold transition-all">בטל</button>
+          <button 
+            onClick={async () => {
+              toast.dismiss(t.id);
+              const groupTeams = groups[activeGroup] || [];
+
+              if (viewMode === "MATCHES") {
+                toast.loading("מגריל ושומר במסד הנתונים...", { id: "randomize" });
+                try {
+                  const gMatches = matches.filter((m: any) => m.group === activeGroup);
+                  const promises = gMatches.map((m: any) => {
+                    const home = Math.floor(Math.random() * 4).toString();
+                    const away = Math.floor(Math.random() * 4).toString();
+                    
+                    // שמירה ישירה לפיירבייס לכל משחק שהוגרל
+                    return setDoc(doc(db, "predictions_matches", `${userId}_${m.id}`), {
+                      userId: userId,
+                      matchId: m.id,
+                      predictedHomeScore: home,
+                      predictedAwayScore: away,
+                      updatedAt: new Date()
+                    }, { merge: true });
+                  });
+
+                  await Promise.all(promises);
+                  toast.success(`הוגרלו ונשמרו תוצאות לבית ${activeGroup} 🎲`, { id: "randomize" });
+                } catch (e) {
+                  console.error(e);
+                  toast.error("שגיאה בשמירת ההגרלה", { id: "randomize" });
+                }
+              } else {
+                // דיווח שמדובר בפעולת משתמש כדי להפעיל את ה-useEffect של השמירה
+                isUserAction.current = true; 
+                const shuffled = [...groupTeams].sort(() => 0.5 - Math.random());
+                setQualifiers({
+                  ...qualifiers,
+                  [activeGroup]: { first: shuffled[0], second: shuffled[1] }
+                });
+                toast.success(`הוגרלו עולות לבית ${activeGroup} 🎲`);
+              }
+            }} 
+            className="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold"
+          >
+            כן, הגרל
+          </button>
+          
+          <button 
+            onClick={() => toast.dismiss(t.id)} 
+            className="bg-slate-200 hover:bg-slate-300 text-slate-800 px-3 py-1.5 rounded-lg text-xs font-bold"
+          >
+            ביטול
+          </button>
         </div>
       </div>
     ), { duration: Infinity });
