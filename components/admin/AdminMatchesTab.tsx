@@ -344,7 +344,7 @@ function AdminGeneratorModal({ onClose }: { onClose: () => void }) {
     setMatches(matches.map(m => m._tempId === id ? { ...m, [field]: val } : m));
   };
 
-  const handleSubmitToDb = () => {
+  const handleSubmitToDb = async () => {
     const invalidMatch = matches.find(m => !m.homeTeam.trim() || !m.awayTeam.trim());
     if (invalidMatch) {
        toast.error("חובה להזין שמות קבוצות לכל המשחקים!");

@@ -20,22 +20,40 @@ const STAGE_NAMES: Record<string, string> = {
   "ko2": "הגמר הגדול"
 };
 
-const parseDateTimeLocal = (dtStr: string) => {
+const parseDateTimeLocal = (dtStr: any) => {
   if (!dtStr) return 0;
   try {
-    // קודם ננסה פיענוח טבעי ואמין של הדפדפן
-    const timestamp = new Date(dtStr).getTime();
-    if (!isNaN(timestamp)) return timestamp;
-
-    // גיבוי למקרה של תאריכים בפורמט T במכשירים בעייתיים
-    if (dtStr.includes("T")) {
-      const [datePart, timePart] = dtStr.split("T");
-      const [year, month, day] = datePart.split("-").map(Number);
-      const [hour, minute] = timePart.split(":").map(Number);
-      return new Date(year, month - 1, day, hour, minute || 0).getTime();
+    // 1. האם זה אובייקט Timestamp רשמי של Firebase? (זה החשוד המרכזי שמעלים לך את השעון)
+    if (typeof dtStr === "object" && typeof dtStr.toDate === "function") {
+      return dtStr.toDate().getTime();
     }
+    // גיבוי ל-Timestamp של פיירבייס שמגיע כ-JSON שטוח
+    if (typeof dtStr === "object" && dtStr.seconds) {
+      return dtStr.seconds * 1000;
+    }
+
+    // 2. האם זה כבר מספר?
+    if (typeof dtStr === "number") return dtStr;
+    
+    const str = String(dtStr).trim();
+
+    // 3. טיפול בפורמט הישראלי שנשמר בחלק מהאדמינים (DD/MM/YYYY)
+    if (str.includes("/")) {
+      const [datePart, timePart] = str.split(" ");
+      const [day, month, year] = datePart.split("/");
+      const [hour, minute] = (timePart || "00:00").split(":");
+      return new Date(Number(year), Number(month) - 1, Number(day), Number(hour), Number(minute)).getTime();
+    }
+
+    // 4. תיקון קריטי למכשירי אפל (Safari) - ממיר רווח ל-T הסטנדרטי
+    const safeStr = str.includes("T") ? str : str.replace(" ", "T");
+    const timestamp = new Date(safeStr).getTime();
+    
+    return isNaN(timestamp) ? 0 : timestamp;
+  } catch (e) {
+    console.error("Date Parse Error:", e);
     return 0;
-  } catch { return 0; }
+  }
 };
 
 const isMatchOpenForPrediction = (m: any, state: number) => {
@@ -206,6 +224,9 @@ export default function Navbar() {
   }, [liveBonusQs, liveBonusAns, nowMs]);
 
   useEffect(() => {
+    // התיקון: אל תאזין אם אין משתמש מחובר
+    if (!userId) return; 
+
     const unsub = onSnapshot(doc(db, "settings", "deadlines"), (snap) => {
       if (snap.exists() && snap.data().activeDeadline) {
          const ad = snap.data().activeDeadline;
@@ -228,7 +249,7 @@ export default function Navbar() {
       }
     });
     return () => unsub();
-  }, []);
+  }, [userId]); // הוספנו את userId לכאן כדי שההאזנה תתחדש בלוגין!
 
   useEffect(() => {
     if (!targetTime) { setIsNoMoreBets(false); return; }
@@ -388,15 +409,17 @@ export default function Navbar() {
         </Link>
 
         <div className="flex-1 flex justify-center px-2">
-          <div className={`flex flex-col items-center justify-center px-4 py-1.5 rounded-xl border transition-colors duration-500 ${isNoMoreBets ? 'bg-rose-950/40 border-rose-500/50 shadow-[0_0_10px_rgba(225,29,72,0.2)]' : 'bg-slate-900 border-slate-700 shadow-inner'}`}>
-             <span className="text-[10px] md:text-xs font-bold text-slate-400">
-               <span className="hidden md:inline">{nextNameFull}</span>
-               <span className="inline md:hidden">{nextNameShort}</span>
-             </span>
-             <span className={`text-sm md:text-lg font-black font-mono tracking-wider ${isNoMoreBets ? 'text-rose-400 animate-pulse' : 'text-amber-400'}`}>
-               {timeLeft}
-             </span>
-          </div>
+          {targetTime ? (
+            <div className={`flex flex-col items-center justify-center px-4 py-1.5 rounded-xl border transition-colors duration-500 ${isNoMoreBets ? 'bg-rose-950/40 border-rose-500/50 shadow-[0_0_10px_rgba(225,29,72,0.2)]' : 'bg-slate-900 border-slate-700 shadow-inner'}`}>
+               <span className="text-[10px] md:text-xs font-bold text-slate-400">
+                 <span className="hidden md:inline">{nextNameFull}</span>
+                 <span className="inline md:hidden">{nextNameShort}</span>
+               </span>
+               <span className={`text-sm md:text-lg font-black font-mono tracking-wider ${isNoMoreBets ? 'text-rose-400 animate-pulse' : 'text-amber-400'}`}>
+                 {timeLeft}
+               </span>
+            </div>
+          ) : null}
         </div>
 
         <div className="flex items-center gap-3 md:gap-4">

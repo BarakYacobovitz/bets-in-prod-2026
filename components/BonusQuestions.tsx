@@ -4,7 +4,7 @@ import { doc, getDoc, setDoc, collection, getDocs } from "firebase/firestore";
 import { db } from "../app/firebase";
 import { getFlagUrl } from "../app/utils/flags";
 import AutocompleteInput from "./AutocompleteInput";
-import { TOP_PLAYERS_NAMES } from "../app/utils/players";
+import { TOP_PLAYERS_NAMES, getPlayerInfo } from "../app/utils/players";
 
 const parseDateTimeLocal = (dtStr: string) => {
   if (!dtStr) return 0;
@@ -690,21 +690,26 @@ export default function BonusQuestions({ userId, tournamentState: propTournament
                      <div className="mt-4 bg-slate-950/80 p-2.5 rounded-xl border border-slate-700 text-center shadow-inner flex flex-col items-center">
                        <span className="text-[9px] text-slate-500 block mb-1.5 font-black uppercase tracking-wider">אמת בפועל:</span>
                        <div className="text-emerald-400 font-bold text-sm flex flex-wrap justify-center gap-1.5">
-                         {Array.isArray(realBonusAnswers[q.id]) 
-                           ? realBonusAnswers[q.id].map((ans:string, i:number) => (
-                               <span key={i} className="flex items-center gap-1.5 bg-emerald-900/20 px-2 py-1 rounded-md border border-emerald-500/20">
-                                 {getFlagUrl(ans) && <img src={getFlagUrl(ans)!} className="w-3.5 h-2.5 object-cover rounded-sm" alt="flag" />}
-                                 {ans}
-                               </span>
-                             ))
-                           : (
-                               <span className="flex items-center gap-1.5 bg-emerald-900/20 px-3 py-1 rounded-md border border-emerald-500/20 text-sm">
-                                 {getFlagUrl(realBonusAnswers[q.id]) && <img src={getFlagUrl(realBonusAnswers[q.id])!} className="w-4 h-3 object-cover rounded-sm" alt="flag" />}
-                                 {realBonusAnswers[q.id]}
-                               </span>
-                             )
-                         }
-                       </div>
+  {Array.isArray(realBonusAnswers[q.id]) 
+    ? realBonusAnswers[q.id].map((ans:string, i:number) => {
+        const pInfo = currentAnswerType === "PLAYER" ? getPlayerInfo(ans) : null;
+        return (
+        <span key={i} className="flex items-center gap-1.5 bg-emerald-900/20 px-2 py-1 rounded-md border border-emerald-500/20">
+          {getFlagUrl(ans) && <img src={getFlagUrl(ans)!} className="w-3.5 h-2.5 object-cover rounded-sm" alt="flag" />}
+          <span>{ans} {pInfo && <span className="text-emerald-500/70 text-[10px] pr-1">({pInfo.country})</span>}</span>
+        </span>
+      )})
+    : (() => {
+        const ans = realBonusAnswers[q.id];
+        const pInfo = currentAnswerType === "PLAYER" ? getPlayerInfo(ans) : null;
+        return (
+        <span className="flex items-center gap-1.5 bg-emerald-900/20 px-3 py-1 rounded-md border border-emerald-500/20 text-sm">
+          {getFlagUrl(ans) && <img src={getFlagUrl(ans)!} className="w-4 h-3 object-cover rounded-sm" alt="flag" />}
+          <span>{ans} {pInfo && <span className="text-emerald-500/70 text-xs pr-1">({pInfo.country})</span>}</span>
+        </span>
+      )})()
+  }
+</div>
                      </div>
                    )}
                    
@@ -733,21 +738,27 @@ export default function BonusQuestions({ userId, tournamentState: propTournament
                  <div className="text-xs md:text-sm bg-emerald-900/20 text-emerald-400 px-4 py-2 rounded-xl border border-emerald-500/30 inline-block font-black tracking-wide">
                    תשובת אמת: 
                    <div className="flex flex-wrap justify-center gap-1.5 mt-1.5">
-                     {Array.isArray(realBonusAnswers[spyModalQuestion.id]) 
-                        ? realBonusAnswers[spyModalQuestion.id].map((ans: string, i: number, arr: any[]) => (
-                            <span key={i} className="flex items-center gap-1">
-                              {getFlagUrl(ans) && <img src={getFlagUrl(ans)!} className="w-4 h-3 object-cover rounded-sm" alt="flag" />}
-                              {ans}{i < arr.length - 1 ? " / " : ""}
-                            </span>
-                          ))
-                        : (
-                          <span className="flex items-center gap-1.5">
-                            {getFlagUrl(realBonusAnswers[spyModalQuestion.id]) && <img src={getFlagUrl(realBonusAnswers[spyModalQuestion.id])!} className="w-4 h-3 object-cover rounded-sm shadow-sm" alt="flag" />}
-                            {realBonusAnswers[spyModalQuestion.id]}
-                          </span>
-                        )
-                     }
-                   </div>
+  {Array.isArray(realBonusAnswers[spyModalQuestion.id]) 
+     ? realBonusAnswers[spyModalQuestion.id].map((ans: string, i: number, arr: any[]) => {
+         const pInfo = spyModalQuestion.answerType === "PLAYER" ? getPlayerInfo(ans) : null;
+         return (
+         <span key={i} className="flex items-center gap-1">
+           {getFlagUrl(ans) && <img src={getFlagUrl(ans)!} className="w-4 h-3 object-cover rounded-sm" alt="flag" />}
+           <span>{ans} {pInfo && <span className="text-emerald-500/70 text-[10px] pr-1">({pInfo.country})</span>}</span>
+           {i < arr.length - 1 ? " / " : ""}
+         </span>
+       )})
+     : (() => {
+         const ans = realBonusAnswers[spyModalQuestion.id];
+         const pInfo = spyModalQuestion.answerType === "PLAYER" ? getPlayerInfo(ans) : null;
+         return (
+         <span className="flex items-center gap-1.5">
+           {getFlagUrl(ans) && <img src={getFlagUrl(ans)!} className="w-4 h-3 object-cover rounded-sm shadow-sm" alt="flag" />}
+           <span>{ans} {pInfo && <span className="text-emerald-500/70 text-xs pr-1">({pInfo.country})</span>}</span>
+         </span>
+       )})()
+  }
+</div>
                  </div>
               )}
             </div>
@@ -809,9 +820,16 @@ export default function BonusQuestions({ userId, tournamentState: propTournament
                         </div>
                         <div className="flex justify-between items-center bg-slate-950/40 px-2.5 py-2 rounded-lg border border-slate-700/50 shadow-inner">
                            <div className={`font-bold text-[11px] sm:text-xs flex items-center gap-1.5 ${data.points && data.points > 0 ? "text-emerald-400" : "text-slate-300"}`}>
-                             {getFlagUrl(data.answer) ? <img src={getFlagUrl(data.answer)!} className="w-4 h-3 object-cover rounded-sm shadow-sm" alt="flag" /> : <span className="text-sm">📝</span>}
-                             <span className="truncate max-w-[150px] sm:max-w-[200px]">{data.answer}</span>
-                           </div>
+  {getFlagUrl(data.answer) ? <img src={getFlagUrl(data.answer)!} className="w-4 h-3 object-cover rounded-sm shadow-sm" alt="flag" /> : <span className="text-sm">📝</span>}
+  <span className="truncate max-w-[150px] sm:max-w-[200px]">
+    {data.answer}
+    {spyModalQuestion.answerType === "PLAYER" && getPlayerInfo(data.answer) && (
+      <span className={`pr-1 text-[10px] ${data.points && data.points > 0 ? "text-emerald-600" : "text-slate-500"}`}>
+        ({getPlayerInfo(data.answer)?.country})
+      </span>
+    )}
+  </span>
+</div>
                            {realBonusAnswers[spyModalQuestion.id] && (
                              <div className={`text-[10px] font-black px-1.5 py-0.5 rounded border ${data.points && data.points > 0 ? "bg-emerald-900/40 text-emerald-400 border-emerald-500/40" : "bg-rose-950/50 text-rose-400 border-rose-500/40"}`}>
                                {data.points && data.points > 0 ? `+${data.points}` : "0 נק'"}
