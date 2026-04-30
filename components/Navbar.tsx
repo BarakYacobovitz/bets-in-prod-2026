@@ -23,21 +23,12 @@ const STAGE_NAMES: Record<string, string> = {
 const parseDateTimeLocal = (dtStr: any) => {
   if (!dtStr) return 0;
   try {
-    // 1. האם זה אובייקט Timestamp רשמי של Firebase? (זה החשוד המרכזי שמעלים לך את השעון)
-    if (typeof dtStr === "object" && typeof dtStr.toDate === "function") {
-      return dtStr.toDate().getTime();
-    }
-    // גיבוי ל-Timestamp של פיירבייס שמגיע כ-JSON שטוח
-    if (typeof dtStr === "object" && dtStr.seconds) {
-      return dtStr.seconds * 1000;
-    }
-
-    // 2. האם זה כבר מספר?
+    if (typeof dtStr === "object" && typeof dtStr.toDate === "function") return dtStr.toDate().getTime();
+    if (typeof dtStr === "object" && dtStr.seconds) return dtStr.seconds * 1000;
     if (typeof dtStr === "number") return dtStr;
     
     const str = String(dtStr).trim();
 
-    // 3. טיפול בפורמט הישראלי שנשמר בחלק מהאדמינים (DD/MM/YYYY)
     if (str.includes("/")) {
       const [datePart, timePart] = str.split(" ");
       const [day, month, year] = datePart.split("/");
@@ -45,15 +36,11 @@ const parseDateTimeLocal = (dtStr: any) => {
       return new Date(Number(year), Number(month) - 1, Number(day), Number(hour), Number(minute)).getTime();
     }
 
-    // 4. תיקון קריטי למכשירי אפל (Safari) - ממיר רווח ל-T הסטנדרטי
     const safeStr = str.includes("T") ? str : str.replace(" ", "T");
     const timestamp = new Date(safeStr).getTime();
     
     return isNaN(timestamp) ? 0 : timestamp;
-  } catch (e) {
-    console.error("Date Parse Error:", e);
-    return 0;
-  }
+  } catch (e) { return 0; }
 };
 
 const isMatchOpenForPrediction = (m: any, state: number) => {
@@ -74,6 +61,33 @@ const isMatchOpenForPrediction = (m: any, state: number) => {
   }
 };
 
+const isQuestionMandatoryNow = (q: any, state: number) => {
+  const s = Number(state) || 0;
+  
+  // 1. שאלות הפתעה
+  if (q.isSurprise) {
+    const now = Date.now();
+    return now >= parseDateTimeLocal(q.openTime) && now <= parseDateTimeLocal(q.closeTime);
+  }
+  
+  // 2. שלב הבתים - דורש שאלות של הטורניר ושל הבתים
+  if (s === 0 || (s >= 1 && s <= 3)) return q.phase === "TOURNAMENT" || q.phase === "GROUPS";
+  
+  // 3. שלב הנוקאאוט
+  if (q.phase === "KNOCKOUT") {
+    // בדיקה חדשה: אם זו שאלה "כללית" לנוקאאוט (בלי שלב מוגדר), היא חובה רק בסטייט 4 (32 הגדולות)
+    if (!q.knockoutRound || q.knockoutRound === "") {
+        return s === 4; 
+    }
+    
+    // אם זו שאלת בונוס לשלב ספציפי (למשל "שמינית גמר"), היא חובה רק בסטייט הספציפי שלה
+    const rounds: Record<string, number> = { "32 הגדולות": 4, "שמינית גמר": 6, "רבע גמר": 8, "חצי גמר": 10, "גמר": 12 };
+    return s === rounds[q.knockoutRound];
+  }
+  
+  return false;
+};
+
 export default function Navbar() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [userId, setUserId] = useState<string>("");
@@ -83,13 +97,14 @@ export default function Navbar() {
   const [photoUrl, setPhotoUrl] = useState<string>("");
 
   const [targetTime, setTargetTime] = useState<number | null>(null);
-  const [timeLeft, setTimeLeft] = useState("--:--:--");
+  const [timeUnits, setTimeUnits] = useState<{ d: string, h: string, m: string, s: string } | null>(null);
   const [nextNameFull, setNextNameFull] = useState("טרם נקבע");
   const [nextNameShort, setNextNameShort] = useState("לא נקבע");
   const [isNoMoreBets, setIsNoMoreBets] = useState(false);
   
   const [ptsDiff, setPtsDiff] = useState(0);
-  const [missingMatchesToday, setMissingMatchesToday] = useState(0);
+  const [missingNormalTasks, setMissingNormalTasks] = useState(0);
+  const [requiredNormalTasks, setRequiredNormalTasks] = useState(0);
   
   const [showNotifMenu, setShowNotifMenu] = useState(false);
   const notifRef = useRef<HTMLDivElement>(null);
@@ -98,23 +113,23 @@ export default function Navbar() {
   const [liveBonusQs, setLiveBonusQs] = useState<any[]>([]);
   const [liveBonusAns, setLiveBonusAns] = useState<any>({});
   const [activeSurpriseAlert, setActiveSurpriseAlert] = useState<number>(0);
+  const [openSurpriseTotal, setOpenSurpriseTotal] = useState<number>(0);
 
   const [notifPermission, setNotifPermission] = useState<string>("default");
 
+  // 1. שעון פנימי שמתקתק כל שנייה עבור שאלות ההפתעה והשעון המרכזי
   useEffect(() => {
     const interval = setInterval(() => setNowMs(Date.now()), 1000);
     return () => clearInterval(interval);
   }, []);
 
+  // 2. האזנה למשתמש מחובר
   useEffect(() => {
     if (typeof window !== "undefined" && "Notification" in window) {
       setNotifPermission(Notification.permission);
     }
 
     let unsubUser: any;
-    let unsubMatches: any;
-    let unsubKnockout: any;
-
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       if (currentUser) {
         setIsLoggedIn(true);
@@ -131,47 +146,6 @@ export default function Navbar() {
             setPtsDiff((data.totalPoints || 0) - prev);
           }
         });
-
-        const calculateMissing = async () => {
-          try {
-            const sysSnap = await getDoc(doc(db, "settings", "system"));
-            const currentTState = sysSnap.exists() ? Number(sysSnap.data().tournamentState) || 0 : 0;
-
-            const mSnap = await getDocs(collection(db, "matches"));
-            const pmSnap = await getDocs(query(collection(db, "predictions_matches"), where("userId", "==", currentUser.uid)));
-            const pkSnap = await getDocs(query(collection(db, "predictions_knockout"), where("userId", "==", currentUser.uid)));
-
-            const userPreds = new Set();
-            [...pmSnap.docs, ...pkSnap.docs].forEach(d => {
-              const data = d.data();
-              const hasScores = data.predictedHomeScore !== undefined && data.predictedHomeScore !== "" && 
-                                data.predictedAwayScore !== undefined && data.predictedAwayScore !== "";
-              
-              if (hasScores) {
-                if (data.roundName) { 
-                  if (data.qualifier && String(data.qualifier).trim() !== "") userPreds.add(data.matchId);
-                } else {
-                  userPreds.add(data.matchId);
-                }
-              }
-            });
-
-            let missing = 0;
-            mSnap.docs.forEach(d => {
-              const m = d.data();
-              if (!m.isFinished && !userPreds.has(d.id) && isMatchOpenForPrediction(m, currentTState)) {
-                missing++;
-              }
-            });
-            setMissingMatchesToday(missing);
-          } catch (e) { console.error(e); }
-        };
-
-        unsubMatches = onSnapshot(query(collection(db, "predictions_matches"), where("userId", "==", currentUser.uid)), calculateMissing);
-        unsubKnockout = onSnapshot(query(collection(db, "predictions_knockout"), where("userId", "==", currentUser.uid)), calculateMissing);
-        
-        calculateMissing();
-
       } else {
         setIsLoggedIn(false);
         setUserId("");
@@ -180,51 +154,155 @@ export default function Navbar() {
         setUserPoints(0);
         setPhotoUrl("");
         if (unsubUser) unsubUser();
-        if (unsubMatches) unsubMatches();
-        if (unsubKnockout) unsubKnockout();
       }
     });
 
     return () => { 
        unsubscribe(); 
        if (unsubUser) unsubUser();
-       if (unsubMatches) unsubMatches();
-       if (unsubKnockout) unsubKnockout();
     };
   }, []);
 
+  // 3. מנוע האזנה חי למשימות הרגילות (משחקים, בתים, מקום 3 ובונוסים קבועים)
   useEffect(() => {
-     const unsub1 = onSnapshot(doc(db, "settings", "bonus_questions"), (snap) => {
-        if(snap.exists()) setLiveBonusQs(snap.data().questions || []);
-     });
-     return () => unsub1();
-  }, []);
+    if (!userId) {
+      setRequiredNormalTasks(0);
+      setMissingNormalTasks(0);
+      setLiveBonusQs([]);
+      setLiveBonusAns({});
+      return;
+    }
 
-  useEffect(() => {
-     if(!userId) return;
-     const unsub2 = onSnapshot(doc(db, "predictions_bonus", userId), (snap) => {
-        if(snap.exists()) setLiveBonusAns(snap.data().answers || {});
-     });
-     return () => unsub2();
+    let currentTState = 0;
+    let matchesData: any[] = [];
+    let pmData: any[] = [];
+    let pkData: any[] = [];
+    let pqData: any = {};
+    let ptData: any = [];
+    let bqData: any[] = [];
+    let pbData: any = {};
+
+    const doCalc = () => {
+      let required = 0;
+      let missing = 0;
+
+      // חישוב משחקים פתוחים
+      const userPreds = new Set();
+      [...pmData, ...pkData].forEach(d => {
+        const hasScores = d.predictedHomeScore !== undefined && d.predictedHomeScore !== "" && 
+                          d.predictedAwayScore !== undefined && d.predictedAwayScore !== "";
+        if (hasScores) {
+          if (d.roundName) { 
+            if (d.qualifier && String(d.qualifier).trim() !== "") userPreds.add(d.matchId);
+          } else {
+            userPreds.add(d.matchId);
+          }
+        }
+      });
+
+      matchesData.forEach((m: any) => {
+        if (isMatchOpenForPrediction(m, currentTState)) {
+           required++;
+           if (!m.isFinished && !userPreds.has(m.id)) missing++;
+        }
+      });
+
+      // חישוב בונוסים קבועים בלבד
+      bqData.forEach((q: any) => {
+        if (!q.isSurprise && isQuestionMandatoryNow(q, currentTState)) {
+          required++;
+          if (!pbData[q.id] || String(pbData[q.id]).trim() === "") missing++;
+        }
+      });
+
+      // חישוב שלב הבתים ומקום שלישי
+      if (currentTState === 0) {
+         const groups = Array.from(new Set(matchesData.filter((m: any) => m.stage !== "KNOCKOUT").map((m: any) => m.group))).filter(Boolean);
+         required += groups.length; 
+
+         groups.forEach((g: any) => {
+            if (!pqData[g]?.first || !pqData[g]?.second) missing++;
+         });
+
+         required += 1;
+         if (ptData.filter((t: any) => t && String(t).trim() !== "").length < 8) missing++;
+      }
+
+      setMissingNormalTasks(missing);
+      setRequiredNormalTasks(required);
+    };
+
+    // כל מאזין פה מבטיח שטבעת האחוזים קופצת ישר כשמשהו משתנה!
+    const unsubSys = onSnapshot(doc(db, "settings", "system"), (snap) => {
+      currentTState = snap.exists() ? Number(snap.data().tournamentState) || 0 : 0;
+      doCalc();
+    });
+
+    const unsubMatches = onSnapshot(collection(db, "matches"), (snap) => {
+      matchesData = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      doCalc();
+    });
+
+    const unsubPM = onSnapshot(query(collection(db, "predictions_matches"), where("userId", "==", userId)), (snap) => {
+      pmData = snap.docs.map(d => d.data());
+      doCalc();
+    });
+
+    const unsubPK = onSnapshot(query(collection(db, "predictions_knockout"), where("userId", "==", userId)), (snap) => {
+      pkData = snap.docs.map(d => d.data());
+      doCalc();
+    });
+
+    const unsubPQ = onSnapshot(doc(db, "predictions_qualifiers", userId), (snap) => {
+      pqData = snap.exists() ? snap.data().groups || {} : {};
+      doCalc();
+    });
+
+    const unsubPT = onSnapshot(doc(db, "predictions_third_place", userId), (snap) => {
+      ptData = snap.exists() ? snap.data().teams || [] : [];
+      doCalc();
+    });
+
+    const unsubBQ = onSnapshot(doc(db, "settings", "bonus_questions"), (snap) => {
+      const q = snap.exists() ? snap.data().questions || [] : [];
+      bqData = q;
+      setLiveBonusQs(q);
+      doCalc();
+    });
+
+    const unsubPB = onSnapshot(doc(db, "predictions_bonus", userId), (snap) => {
+      const a = snap.exists() ? snap.data().answers || {} : {};
+      pbData = a;
+      setLiveBonusAns(a);
+      doCalc();
+    });
+
+    return () => {
+      unsubSys(); unsubMatches(); unsubPM(); unsubPK(); unsubPQ(); unsubPT(); unsubBQ(); unsubPB();
+    };
   }, [userId]);
 
+  // 4. חישוב חי לשאלות הפתעה שפתוחות כרגע לפי השעון
   useEffect(() => {
      let surpriseCount = 0;
+     let openTotal = 0;
      liveBonusQs.forEach((q: any) => {
         if (q.isSurprise && q.openTime && q.closeTime) {
            const openMs = parseDateTimeLocal(q.openTime);
            const closeMs = parseDateTimeLocal(q.closeTime);
            if (nowMs >= openMs && nowMs <= closeMs) {
+              openTotal++;
               const ans = liveBonusAns[q.id];
               if (!ans || String(ans).trim() === "") surpriseCount++;
            }
         }
      });
      setActiveSurpriseAlert(surpriseCount);
+     setOpenSurpriseTotal(openTotal);
   }, [liveBonusQs, liveBonusAns, nowMs]);
 
+  // 5. שעון העצר המרכזי
   useEffect(() => {
-    // התיקון: אל תאזין אם אין משתמש מחובר
     if (!userId) return; 
 
     const unsub = onSnapshot(doc(db, "settings", "deadlines"), (snap) => {
@@ -232,31 +310,31 @@ export default function Navbar() {
          const ad = snap.data().activeDeadline;
          const sName = STAGE_NAMES[ad.stage] || "השלב הבא";
          
-         setNextNameFull(`הניחושים ל-${sName} יינעלו בעוד:`);
-         setNextNameShort(`נעילת ${sName}:`);
+         setNextNameFull(`נעילת ${sName}`); 
+         setNextNameShort(`נעילת ${sName}`);
          
          if (ad.time) {
             setTargetTime(parseDateTimeLocal(ad.time));
          } else {
             setTargetTime(null);
-            setTimeLeft("לא נקבע");
+            setTimeUnits(null);
          }
       } else {
          setTargetTime(null);
          setNextNameFull("לא הוגדר שעון פעיל");
-         setNextNameShort("אין נעילה קרובה");
-         setTimeLeft("--:--:--");
+         setNextNameShort("אין נעילה");
+         setTimeUnits(null);
       }
     });
     return () => unsub();
-  }, [userId]); // הוספנו את userId לכאן כדי שההאזנה תתחדש בלוגין!
+  }, [userId]);
 
   useEffect(() => {
-    if (!targetTime) { setIsNoMoreBets(false); return; }
+    if (!targetTime) { setIsNoMoreBets(false); setTimeUnits(null); return; }
     const updateTimer = () => {
       const diff = targetTime - Date.now();
       if (diff <= 0) {
-        setTimeLeft("הזמן תם! ננעל.");
+        setTimeUnits(null);
         setIsNoMoreBets(true);
       } else {
         setIsNoMoreBets(false);
@@ -264,8 +342,13 @@ export default function Navbar() {
         const h = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
         const m = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
         const s = Math.floor((diff % (1000 * 60)) / 1000);
-        if (d > 0) setTimeLeft(`${d} ימים, ${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`);
-        else setTimeLeft(`${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`);
+        
+        setTimeUnits({
+           d: d > 0 ? d.toString() : "",
+           h: h.toString().padStart(2, '0'),
+           m: m.toString().padStart(2, '0'),
+           s: s.toString().padStart(2, '0')
+        });
       }
     };
     updateTimer(); 
@@ -281,8 +364,12 @@ export default function Navbar() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  // שילוב המשימות הרגילות ושאלות ההפתעה לקבלת סך כל המשימות
+  const totalRequiredTasks = requiredNormalTasks + openSurpriseTotal;
+  const missingMatchesToday = missingNormalTasks + activeSurpriseAlert;
+  const totalNotifs = missingMatchesToday;
+
   useEffect(() => {
-    const totalNotifs = missingMatchesToday + activeSurpriseAlert;
     if (typeof navigator !== 'undefined' && 'setAppBadge' in navigator) {
       try {
         if (totalNotifs > 0) {
@@ -294,7 +381,7 @@ export default function Navbar() {
         }
       } catch (e) {}
     }
-  }, [missingMatchesToday, activeSurpriseAlert]);
+  }, [totalNotifs]);
   
   useEffect(() => {
   if (typeof window !== "undefined") {
@@ -303,16 +390,15 @@ export default function Navbar() {
 
     const setupForegroundMessaging = async () => {
       try {
-        // אנחנו משתמשים ב-messaging שייבאת בשורה 9
         const msgInstance = await messaging(); 
         if (msgInstance) {
           onMessage(msgInstance, (payload: any) => {
-              console.log("Message received in foreground! ", payload);toast(payload.notification?.body || "הודעה חדשה הגיעה!", {
-              icon: '🔔',
-              duration: 5000,
-               style: { background: '#1e293b', color: '#fff', border: '1px solid #334155' }
-          });
-
+              console.log("Message received in foreground! ", payload);
+              toast(payload.notification?.body || "הודעה חדשה הגיעה!", {
+                 icon: '🔔',
+                 duration: 5000,
+                 style: { background: '#1e293b', color: '#fff', border: '1px solid #334155' }
+              });
           });
         }
       } catch (err) {
@@ -326,6 +412,7 @@ export default function Navbar() {
       }
   }
   }, []);
+
   const handleRequestNotificationPermission = async () => {
     if (!("Notification" in window)) {
       toast.error("הדפדפן לא תומך בהתראות.");
@@ -341,9 +428,7 @@ export default function Navbar() {
         const msgInstance = await messaging();
         if (msgInstance) {
           const currentToken = await getToken(msgInstance, {
-            // 👇 הדבק כאן את מפתח ה-VAPID האמיתי שלך מה-Firebase Console 👇
             vapidKey: "BDwmvr6hhuHu4lZg2TLpvfHyftO0h93FEx_q9vEX7HTWgOV3NIR6VC7Jg7jnYM3zvy1zWWf0lE6TGSZ4-yr2Tns"
-            
           });
 
           if (currentToken && userId) {
@@ -352,10 +437,9 @@ export default function Navbar() {
             });
             toast.success("התראות הופעלו בהצלחה! 📱🔔");
             
-            const total = missingMatchesToday + activeSurpriseAlert;
-            if ('setAppBadge' in navigator && total > 0) {
+            if ('setAppBadge' in navigator && totalNotifs > 0) {
               // @ts-ignore
-              navigator.setAppBadge(total).catch(() => {});
+              navigator.setAppBadge(totalNotifs).catch(() => {});
             }
           } else {
             toast.error("לא הצלחתי לייצר קוד התראה למכשיר.");
@@ -385,15 +469,34 @@ export default function Navbar() {
        window.location.href = "/";
     }
   };
+  const navigateToRules = (e: any) => {
+    e.preventDefault();
+    if (window.location.pathname === '/') {
+       const event = new CustomEvent("changeTab", { detail: "RULES" });
+       window.dispatchEvent(event);
+    } else {
+       sessionStorage.setItem("startupTab", "RULES");
+       window.location.href = "/";
+    }
+  };
+  const navigateToDashboard = (e: any) => {
+    e.preventDefault();
+    if (window.location.pathname === '/') {
+       const event = new CustomEvent("changeTab", { detail: "DASHBOARD" });
+       window.dispatchEvent(event);
+    } else {
+       sessionStorage.setItem("startupTab", "DASHBOARD");
+       window.location.href = "/";
+    }
+  };
 
-  const totalNotifs = missingMatchesToday + activeSurpriseAlert;
   if (!isLoggedIn) return null;
 
   return (
     <nav className="bg-slate-950/80 backdrop-blur-md border-b border-slate-800 sticky top-0 z-50 text-white shadow-lg" dir="rtl">
-      <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
+      <div className="max-w-6xl mx-auto px-2 md:px-4 py-2 md:py-3 flex items-center justify-between">
         
-        <Link href="/" className="flex items-center gap-3 md:gap-4 group" dir="ltr">
+        <a href="/" onClick={navigateToDashboard} className="flex items-center gap-2 md:gap-4 group shrink-0" dir="ltr">
           <div className="hidden sm:flex flex-col items-end justify-center">
              <div className="font-black text-2xl md:text-[28px] bg-gradient-to-b from-[#fef08a] via-[#fbbf24] to-[#d97706] bg-clip-text text-transparent leading-none tracking-wide">
                 Bets in PROD
@@ -403,30 +506,78 @@ export default function Navbar() {
              </div>
           </div>
           <div className="hidden sm:block w-px h-10 md:h-12 bg-slate-700/80"></div>
-          <div className="w-10 h-10 md:w-12 md:h-12 flex-shrink-0 group-hover:scale-110 transition-transform">
+          <div className="w-8 h-8 md:w-12 md:h-12 flex-shrink-0 group-hover:scale-110 transition-transform">
              <img src="/B.svg" alt="Logo" className="w-full h-full object-contain drop-shadow-lg" />
           </div>
-        </Link>
+        </a>
 
-        <div className="flex-1 flex justify-center px-2">
+        {/* מרכז המסך: השעון ומד האחוזים צמודים */}
+        <div className="flex-1 flex justify-center items-center gap-3 md:gap-6 px-1 md:px-2">
+          
+          {totalRequiredTasks > 0 && (() => {
+              const progressPercent = Math.round(((totalRequiredTasks - missingMatchesToday) / totalRequiredTasks) * 100);
+              const ringColor = progressPercent === 100 ? 'text-emerald-500' : progressPercent >= 50 ? 'text-amber-500' : 'text-rose-500';
+              const textColor = progressPercent === 100 ? 'text-emerald-400' : progressPercent >= 50 ? 'text-amber-400' : 'text-rose-400';
+              const dashArray = 100.53; 
+              const dashOffset = dashArray - (progressPercent / 100) * dashArray;
+              const needsAttention = progressPercent < 50;
+
+              return (
+                 <div className="flex flex-col items-center justify-center cursor-default shrink-0" title={`${totalRequiredTasks - missingMatchesToday} מתוך ${totalRequiredTasks} הושלמו`}>
+                    <div className={`relative w-10 h-10 md:w-14 md:h-14 flex items-center justify-center drop-shadow-md transition-transform ${needsAttention ? 'animate-pulse drop-shadow-[0_0_8px_rgba(225,29,72,0.6)]' : 'group-hover:scale-105'}`}>
+                       <svg className="absolute w-full h-full transform -rotate-90" viewBox="0 0 40 40">
+                          <circle cx="20" cy="20" r="16" stroke="currentColor" strokeWidth="3.5" fill="transparent" className="text-slate-800" />
+                          <circle cx="20" cy="20" r="16" stroke="currentColor" strokeWidth="3.5" fill="transparent"
+                            strokeDasharray={dashArray}
+                            strokeDashoffset={dashOffset}
+                            strokeLinecap="round"
+                            className={`${ringColor} transition-all duration-1000 ease-out`}
+                          />
+                       </svg>
+                       <span className={`text-[9px] md:text-xs font-black ${textColor}`}>
+                          {progressPercent}%
+                       </span>
+                    </div>
+                    <span className="text-[7px] md:text-[9px] text-slate-400 font-bold -mt-0.5 tracking-wider">הושלמו</span>
+                 </div>
+              );
+          })()}
+
           {targetTime ? (
-            <div className={`flex flex-col items-center justify-center px-4 py-1.5 rounded-xl border transition-colors duration-500 ${isNoMoreBets ? 'bg-rose-950/40 border-rose-500/50 shadow-[0_0_10px_rgba(225,29,72,0.2)]' : 'bg-slate-900 border-slate-700 shadow-inner'}`}>
-               <span className="text-[10px] md:text-xs font-bold text-slate-400">
+            <div className={`flex flex-col items-center justify-center px-3 py-1.5 md:px-5 md:py-2 rounded-xl border transition-colors duration-500 shrink-0 ${isNoMoreBets ? 'bg-rose-950/40 border-rose-500/50 shadow-[0_0_10px_rgba(225,29,72,0.2)]' : 'bg-[#0f1115] border-slate-700/60 shadow-[inset_0_4px_10px_rgba(0,0,0,0.6)]'}`}>
+               <span className="text-[8px] md:text-[10px] font-bold text-slate-500 mb-1 uppercase tracking-widest">
                  <span className="hidden md:inline">{nextNameFull}</span>
                  <span className="inline md:hidden">{nextNameShort}</span>
                </span>
-               <span className={`text-sm md:text-lg font-black font-mono tracking-wider ${isNoMoreBets ? 'text-rose-400 animate-pulse' : 'text-amber-400'}`}>
-                 {timeLeft}
-               </span>
+               
+               {isNoMoreBets ? (
+                 <span className="text-xs md:text-base font-black text-rose-500 animate-pulse tracking-widest">
+                   ננעל! 🔒
+                 </span>
+               ) : timeUnits ? (
+                 <div className="flex items-center gap-1 md:gap-1.5 text-sm md:text-xl font-mono font-black text-amber-500 drop-shadow-[0_0_5px_rgba(245,158,11,0.4)]" dir="ltr">
+                   {timeUnits.d && timeUnits.d !== "0" && (
+                     <>
+                       <span>{timeUnits.d.padStart(2, '0')}</span>
+                       <span className="opacity-40 animate-pulse">:</span>
+                     </>
+                   )}
+                   <span>{timeUnits.h}</span>
+                   <span className="opacity-40 animate-pulse">:</span>
+                   <span>{timeUnits.m}</span>
+                   <span className="opacity-40 animate-pulse">:</span>
+                   <span>{timeUnits.s}</span>
+                 </div>
+               ) : null}
             </div>
           ) : null}
         </div>
 
-        <div className="flex items-center gap-3 md:gap-4">
+        <div className="flex items-center gap-1.5 md:gap-3 shrink-0">
              <div className="relative" ref={notifRef}>
-                <button onClick={() => setShowNotifMenu(!showNotifMenu)} className="relative p-2 bg-slate-900 rounded-full border border-slate-700 hover:bg-slate-800 transition-colors">
-                   <span className="text-lg">🔔</span>
-                   {totalNotifs > 0 && <span className="absolute -top-1 -right-1 w-4 h-4 bg-rose-500 rounded-full text-[9px] font-black flex items-center justify-center border border-slate-900 animate-pulse">{totalNotifs}</span>}
+                <button onClick={() => setShowNotifMenu(!showNotifMenu)} className="relative p-1.5 md:p-2 bg-slate-900 rounded-full border border-slate-700 hover:bg-slate-800 transition-colors">
+                   <span className="text-sm md:text-lg">🔔</span>
+                   {totalNotifs > 0 && <span className="absolute -top-1 -right-1 w-3.5 h-3.5 md:w-4 md:h-4 bg-rose-500 rounded-full text-[8px] md:text-[9px] font-black flex items-center justify-center border border-slate-900 animate-pulse">{totalNotifs}</span>}
                 </button>
                 {showNotifMenu && (
                    <div className="absolute top-full left-0 mt-2 w-64 bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl overflow-hidden z-50 animate-fade-in-up p-2">
@@ -443,7 +594,7 @@ export default function Navbar() {
 
                       <div className="flex flex-col gap-1">
                          {ptsDiff > 0 && <div className="text-xs font-bold text-emerald-400 bg-emerald-950/30 p-2.5 rounded-xl border border-emerald-500/20 flex items-center gap-2"><span>📈</span> עלית ב-{ptsDiff} נקודות היום!</div>}
-                         {missingMatchesToday > 0 && <div className="text-xs font-bold text-amber-400 bg-amber-950/30 p-2.5 rounded-xl border border-amber-500/20 flex items-center gap-2"><span>⚠️</span> חסר ניחוש ל-{missingMatchesToday} משימות פתוחות!</div>}
+                         {missingNormalTasks > 0 && <div className="text-xs font-bold text-amber-400 bg-amber-950/30 p-2.5 rounded-xl border border-amber-500/20 flex items-center gap-2"><span>⚠️</span> חסר ניחוש ל-{missingNormalTasks} משימות קבועות!</div>}
                          {activeSurpriseAlert > 0 && <div className="text-xs font-bold text-purple-400 bg-purple-950/30 p-2.5 rounded-xl border border-purple-500/20 flex items-center gap-2"><span>🎁</span> יש {activeSurpriseAlert} שאלות הפתעה פתוחות!</div>}
                          {totalNotifs === 0 && ptsDiff <= 0 && <div className="text-xs font-medium text-slate-500 text-center py-4">אין התראות חדשות.</div>}
                       </div>
@@ -451,11 +602,11 @@ export default function Navbar() {
                 )}
              </div>
 
-             <div className="flex items-center gap-2 bg-slate-900 border border-slate-700 p-1 pl-2 md:p-1.5 md:pl-4 rounded-full shadow-inner">
+             <div className="flex items-center gap-2 bg-slate-900 border border-slate-700 p-1 pl-1.5 md:p-1.5 md:pl-4 rounded-full shadow-inner">
                 {photoUrl ? (
-                  <img src={photoUrl} alt="Profile" className="w-7 h-7 md:w-9 md:h-9 rounded-full border border-slate-600 object-cover" />
+                  <img src={photoUrl} alt="Profile" className="w-6 h-6 md:w-9 md:h-9 rounded-full border border-slate-600 object-cover" />
                 ) : (
-                  <div className="w-7 h-7 md:w-9 md:h-9 rounded-full bg-blue-600 flex items-center justify-center text-sm">⚽</div>
+                  <div className="w-6 h-6 md:w-9 md:h-9 rounded-full bg-blue-600 flex items-center justify-center text-xs md:text-sm">⚽</div>
                 )}
                 <div className="text-right hidden md:flex flex-col justify-center">
                   <div className="text-slate-200 font-bold text-sm truncate max-w-[100px]">{userName}</div>
@@ -463,20 +614,19 @@ export default function Navbar() {
                 </div>
              </div>
 
-             <div className="flex flex-col gap-1">
-                {/* --- כפתור החוקים החדש הוסף כאן --- */}
-                <Link href="/rules" className="text-[10px] bg-blue-600 text-white font-bold px-2 py-0.5 rounded shadow-sm text-center hover:bg-blue-500 transition-colors cursor-pointer flex items-center justify-center gap-1">
+             <div className="flex flex-col gap-1 mr-0.5 md:mr-1">
+                <a href="/" onClick={navigateToRules} className="text-[8px] md:text-[10px] bg-blue-600 text-white font-bold px-1.5 py-0.5 md:px-2 md:py-0.5 rounded shadow-sm text-center hover:bg-blue-500 transition-colors cursor-pointer flex items-center justify-center gap-1">
                   חוקים 📜
-                </Link>
+                </a>
                 
                 {userEmail === ADMIN_EMAIL ? (
-                  <Link href="/admin" className="text-[10px] bg-emerald-600 text-white font-bold px-2 py-0.5 rounded shadow-sm text-center hover:bg-emerald-500 transition-colors">אדמין</Link>
+                  <Link href="/admin" className="text-[8px] md:text-[10px] bg-emerald-600 text-white font-bold px-1.5 py-0.5 md:px-2 md:py-0.5 rounded shadow-sm text-center hover:bg-emerald-500 transition-colors">אדמין</Link>
                 ) : (
-                  <a href="/" onClick={navigateToLeaderboard} className="text-[10px] bg-amber-600 text-slate-900 font-black px-2 py-0.5 rounded shadow-sm text-center hover:bg-amber-500 transition-colors cursor-pointer flex items-center justify-center gap-1">
-                    לוח תוצאות 🏆
+                  <a href="/" onClick={navigateToLeaderboard} className="text-[8px] md:text-[10px] bg-amber-600 text-slate-900 font-black px-1.5 py-0.5 md:px-2 md:py-0.5 rounded shadow-sm text-center hover:bg-amber-500 transition-colors cursor-pointer flex items-center justify-center gap-1">
+                    טבלה 🏆
                   </a>
                 )}
-                <button onClick={handleLogout} className="text-[10px] bg-slate-800 text-rose-400 font-bold px-2 py-0.5 rounded shadow-sm hover:bg-slate-700 transition-colors">התנתק</button>
+                <button onClick={handleLogout} className="text-[8px] md:text-[10px] bg-slate-800 text-rose-400 font-bold px-1.5 py-0.5 md:px-2 md:py-0.5 rounded shadow-sm hover:bg-slate-700 transition-colors">התנתק</button>
              </div>
         </div>
       </div>

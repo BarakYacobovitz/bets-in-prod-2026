@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { doc, getDoc, collection, onSnapshot, getDocs, query, where, updateDoc } from "firebase/firestore";
 import { db } from "../app/firebase";
 import { getFlagUrl } from "../app/utils/flags"; 
@@ -101,7 +101,9 @@ export default function Dashboard({ userId, userName, setActiveTab, setPredictio
   const [liveBonusQs, setLiveBonusQs] = useState<any[]>([]);
   const [liveBonusAns, setLiveBonusAns] = useState<any>({});
   const [activeSurpriseAlert, setActiveSurpriseAlert] = useState<number>(0);
-  
+
+  // הריפרנס שיעזור לנו למנוע מהטאבים לקפוץ כל 30 שניות
+  const isBannerInit = useRef(false);
 
   useEffect(() => {
     const interval = setInterval(() => setNowMs(Date.now()), 1000);
@@ -111,7 +113,8 @@ export default function Dashboard({ userId, userName, setActiveTab, setPredictio
   useEffect(() => {
     const unsubDeadlines = onSnapshot(doc(db, "settings", "deadlines"), (snap) => {
       if (snap.exists() && snap.data().activeDeadline?.time) {
-        setActiveDeadlineTime(parseDateTimeLocal(snap.data().activeDeadline.time)); // ✅ בום. מתוקן.      } else {
+        setActiveDeadlineTime(parseDateTimeLocal(snap.data().activeDeadline.time)); 
+      } else {
         setActiveDeadlineTime(null);
       }
     });
@@ -148,7 +151,6 @@ export default function Dashboard({ userId, userName, setActiveTab, setPredictio
      setActiveSurpriseAlert(surpriseCount);
   }, [liveBonusQs, liveBonusAns, nowMs]);
 
-  // הפונקציה האבודה שהחזרנו!
   const checkIsMatchLocked = (m: any, state: number) => {
     const s = Number(state) || 0;
     if (m.stage !== "KNOCKOUT") {
@@ -458,7 +460,6 @@ export default function Dashboard({ userId, userName, setActiveTab, setPredictio
                   targets.push({ type: "TEAM", team: ansStr, questionLabel: q.label || q.question, points: q.points, isSurvival: false });
                }
                else if (playerInfo && todayTeams.has(playerInfo.country)) {
-                     // כאן קורה הקסם: אם זה שחקן והנבחרת שלו משחקת היום - תוסיף אותו כמטרה
                      targets.push({ 
                          type: "PLAYER", 
                          name: playerInfo.name, 
@@ -478,7 +479,7 @@ export default function Dashboard({ userId, userName, setActiveTab, setPredictio
                         type: "CONTEXTUAL_ALERT",
                         name: relevantPlayer.name,
                         team: relevantPlayer.country,
-                        context: ansStr, // המועדון או הליגה שהמשתמש בחר
+                        context: ansStr, 
                         questionLabel: q.label,
                         points: q.points
                       });
@@ -492,9 +493,22 @@ export default function Dashboard({ userId, userName, setActiveTab, setPredictio
         
         setTodayMatches(tMatches);
         setTodayTargets(targets);
-        if (tMatches.length > 0) setActiveBannerMode("MATCHES");
-        else if (targets.length > 0) setActiveBannerMode("BONUS");
-        else setActiveBannerMode("RADAR");
+        
+        // תיקון קפיצת הטאבים (UI Fix)
+        if (!isBannerInit.current) {
+            if (tMatches.length > 0) setActiveBannerMode("MATCHES");
+            else if (targets.length > 0) setActiveBannerMode("BONUS");
+            else setActiveBannerMode("RADAR");
+            isBannerInit.current = true;
+        } else {
+            setActiveBannerMode(prev => {
+                if (prev === "MATCHES" && tMatches.length === 0) return targets.length > 0 ? "BONUS" : "RADAR";
+                if (prev === "BONUS" && targets.length === 0) return tMatches.length > 0 ? "MATCHES" : "RADAR";
+                return prev;
+            });
+            setTodayMatchIndex(prev => tMatches.length === 0 ? 0 : Math.min(prev, tMatches.length - 1));
+            setTodayBonusIndex(prev => targets.length === 0 ? 0 : Math.min(prev, targets.length - 1));
+        }
 
         pmSnap.forEach(d => {
           const data = d.data(); const match = matches.find((m:any) => m.id === data.matchId);
@@ -547,7 +561,6 @@ export default function Dashboard({ userId, userName, setActiveTab, setPredictio
                const truth = realBonusAnswers[q.id]; const uAns = userBonusAnswers[q.id];
           if(truth && uAns) {
                const tArr = Array.isArray(truth) ? truth : [truth];
-              // שימוש בפונקציית הניקוי שלנו למניעת באג אנגליה
               const normalize = (s: any) => String(s || "").trim().replace(/\s+/g, " ").toLowerCase();
              if(tArr.some((t:any) => normalize(t) === normalize(uAns))) {
                  feed.push({ id: `b_${q.id}`, qId: q.id, icon: '🎁', title: q.label, desc: `שאלת בונוס (${uAns})`, points: Number(q.points)||0, ts: Infinity });
@@ -773,6 +786,7 @@ export default function Dashboard({ userId, userName, setActiveTab, setPredictio
   };
 
   return (
+    
     <div className="w-full space-y-8 animate-fade-in-up pb-8 relative">
       
       <style dangerouslySetInnerHTML={{__html: `
@@ -788,8 +802,99 @@ export default function Dashboard({ userId, userName, setActiveTab, setPredictio
           animation: eyeBlink 4s infinite;
           transform-origin: center;
         }
+
+        /* ⬇️ האנימציות שעודכנו לירידה איטית ודרמטית ⬇️ */
+        @keyframes lowerJumbotron {
+          0% { transform: translateY(-100vh); opacity: 0; }
+          60% { transform: translateY(-40%); opacity: 1; }
+          80% { transform: translateY(-52%); }
+          100% { transform: translateY(-50%); }
+        }
+        .animate-jumbotron-right {
+          /* שונה ל-3.5 שניות */
+          animation: lowerJumbotron 3.5s cubic-bezier(0.25, 1, 0.5, 1) forwards; 
+        }
+        .animate-jumbotron-left {
+          /* שונה ל-3.5 שניות עם דיליי (השהייה) של 0.8 שניות */
+          animation: lowerJumbotron 3.5s cubic-bezier(0.25, 1, 0.5, 1) 0.8s both; 
+        }
       `}} />
 
+{/* ========================================================= */}
+      {/* עיצוב איצטדיון: מסכי ענק (Jumbotrons) + דגלי מארחות */}
+      {/* ========================================================= */}
+      
+      {/* מסך ימני */}
+      <div className="hidden xl:flex fixed right-[1%] 2xl:right-[3%] top-1/2 z-0 flex-col items-center opacity-60 hover:opacity-100 transition-opacity duration-500 pointer-events-none drop-shadow-[0_20px_30px_rgba(0,0,0,0.8)] animate-jumbotron-right">
+         {/* כבלים / זרוע תלייה */}
+         <div className="w-2 h-16 bg-gradient-to-b from-slate-900 to-slate-700 shadow-inner"></div>
+         <div className="w-[180px] 2xl:w-[240px] h-3 bg-slate-800 rounded-t-md border-t-2 border-slate-600"></div>
+         
+         {/* גוף המסך */}
+         <div className="w-[160px] 2xl:w-[220px] rounded-b-2xl bg-slate-950 border-4 md:border-[6px] border-slate-800 p-2 shadow-inner relative z-10">
+           <div className="absolute top-4 left-4 z-20 flex items-center gap-1.5 bg-black/80 px-2 py-0.5 rounded text-[8px] 2xl:text-[10px] font-black text-rose-500 tracking-widest border border-rose-500/30">
+             <span className="w-1.5 h-1.5 bg-rose-500 rounded-full animate-pulse"></span> LIVE
+           </div>
+
+           <div className="relative w-full h-[240px] 2xl:h-[340px] bg-black rounded-sm overflow-hidden border border-slate-700/80 shadow-[inset_0_0_20px_rgba(0,0,0,1)]">
+              <video src="/worldcup.mp4" autoPlay loop muted playsInline className="w-full h-full object-cover opacity-90 contrast-125 saturate-150" />
+              <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0IiBoZWlnaHQ9IjQiPgo8cmVjdCB3aWR0aD0iNCIgaGVpZ2h0PSI0IiBmaWxsPSIjZmZmIiBmaWxsLW9wYWNpdHk9IjAuMDUiLz4KPC9zdmc+')] mix-blend-overlay"></div>
+              <div className="absolute inset-0 shadow-[inset_0_0_15px_rgba(0,0,0,0.8)]"></div>
+           </div>
+
+           <div className="w-full flex justify-center gap-3 mt-2 mb-1">
+              <div className="w-2 h-0.5 bg-blue-500/50 rounded shadow-[0_0_5px_rgba(59,130,246,0.8)]"></div>
+              <div className="w-2 h-0.5 bg-amber-500/50 rounded shadow-[0_0_5px_rgba(245,158,11,0.8)]"></div>
+           </div>
+         </div>
+
+         {/* דגלונים תלויים - משתמש בתמונות רשת אמיתיות (getFlagUrl) */}
+         <div className="flex gap-3 2xl:gap-4 justify-center -mt-1 relative z-0">
+            {["ארה\"ב", "מקסיקו", "קנדה"].map((country) => (
+               <div key={country} className="w-8 h-12 2xl:w-10 2xl:h-14 bg-slate-900 shadow-xl relative overflow-hidden border-x border-b border-slate-700/80" style={{ clipPath: 'polygon(0 0, 100% 0, 100% 75%, 50% 100%, 0 75%)' }}>
+                  <img src={getFlagUrl(country)!} className="absolute inset-0 w-full h-full object-cover opacity-90 contrast-125 saturate-150" alt={country} />
+                  <div className="absolute inset-0 shadow-[inset_0_0_10px_rgba(0,0,0,0.8)]"></div>
+               </div>
+            ))}
+         </div>
+      </div>
+
+      {/* מסך שמאלי (העתק מראה עם השהייה של 0.3s) */}
+      <div className="hidden xl:flex fixed left-[1%] 2xl:left-[3%] top-1/2 z-0 flex-col items-center opacity-60 hover:opacity-100 transition-opacity duration-500 pointer-events-none drop-shadow-[0_20px_30px_rgba(0,0,0,0.8)] animate-jumbotron-left">
+         {/* כבלים / זרוע תלייה */}
+         <div className="w-2 h-16 bg-gradient-to-b from-slate-900 to-slate-700 shadow-inner"></div>
+         <div className="w-[180px] 2xl:w-[240px] h-3 bg-slate-800 rounded-t-md border-t-2 border-slate-600"></div>
+         
+         {/* גוף המסך */}
+         <div className="w-[160px] 2xl:w-[220px] rounded-b-2xl bg-slate-950 border-4 md:border-[6px] border-slate-800 p-2 shadow-inner relative z-10">
+           <div className="absolute top-4 left-4 z-20 flex items-center gap-1.5 bg-black/80 px-2 py-0.5 rounded text-[8px] 2xl:text-[10px] font-black text-rose-500 tracking-widest border border-rose-500/30">
+             <span className="w-1.5 h-1.5 bg-rose-500 rounded-full animate-pulse"></span> LIVE
+           </div>
+
+           <div className="relative w-full h-[240px] 2xl:h-[340px] bg-black rounded-sm overflow-hidden border border-slate-700/80 shadow-[inset_0_0_20px_rgba(0,0,0,1)]">
+              <video src="/worldcup.mp4" autoPlay loop muted playsInline className="w-full h-full object-cover opacity-90 contrast-125 saturate-150" />
+              <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0IiBoZWlnaHQ9IjQiPgo8cmVjdCB3aWR0aD0iNCIgaGVpZ2h0PSI0IiBmaWxsPSIjZmZmIiBmaWxsLW9wYWNpdHk9IjAuMDUiLz4KPC9zdmc+')] mix-blend-overlay"></div>
+              <div className="absolute inset-0 shadow-[inset_0_0_15px_rgba(0,0,0,0.8)]"></div>
+           </div>
+
+           <div className="w-full flex justify-center gap-3 mt-2 mb-1">
+              <div className="w-2 h-0.5 bg-blue-500/50 rounded shadow-[0_0_5px_rgba(59,130,246,0.8)]"></div>
+              <div className="w-2 h-0.5 bg-amber-500/50 rounded shadow-[0_0_5px_rgba(245,158,11,0.8)]"></div>
+           </div>
+         </div>
+
+         {/* דגלונים תלויים - משתמש בתמונות רשת אמיתיות (getFlagUrl) */}
+         <div className="flex gap-3 2xl:gap-4 justify-center -mt-1 relative z-0">
+            {["ארה\"ב", "מקסיקו", "קנדה"].map((country) => (
+               <div key={country} className="w-8 h-12 2xl:w-10 2xl:h-14 bg-slate-900 shadow-xl relative overflow-hidden border-x border-b border-slate-700/80" style={{ clipPath: 'polygon(0 0, 100% 0, 100% 75%, 50% 100%, 0 75%)' }}>
+                  <img src={getFlagUrl(country)!} className="absolute inset-0 w-full h-full object-cover opacity-90 contrast-125 saturate-150" alt={country} />
+                  <div className="absolute inset-0 shadow-[inset_0_0_10px_rgba(0,0,0,0.8)]"></div>
+               </div>
+            ))}
+         </div>
+      </div>
+      {/* ========================================================= */}
+      {/* ========================================================= */}
       {/* 🎈 קמעות פופ-אפ */}
       <div className={`fixed bottom-4 left-4 md:left-8 z-[100] transition-all duration-700 transform ${showMascot ? 'translate-y-0 opacity-100' : 'translate-y-32 opacity-0 pointer-events-none'} flex items-end gap-3`} dir="ltr">
          <div className="bg-slate-50 text-slate-900 p-4 rounded-2xl rounded-bl-none shadow-[0_10px_25px_rgba(0,0,0,0.5)] max-w-[220px] md:max-w-[280px] relative border-2 border-slate-300" dir="rtl">
@@ -801,7 +906,7 @@ export default function Dashboard({ userId, userName, setActiveTab, setPredictio
          </div>
       </div>
 
-      {/* 🚨 אזהרת דדליין ומשימות חסרות - חכמה ומקיפה! */}
+      {/* 🚨 אזהרת דדליין ומשימות חסרות */}
       {missingTasksList.length > 0 && (
          <div className={`${bannerStyle} p-6 rounded-3xl border relative overflow-hidden transition-all duration-500`}>
             <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0IiBoZWlnaHQ9IjQiPgo8cmVjdCB3aWR0aD0iNCIgaGVpZ2h0PSI0IiBmaWxsPSIjZmZmIiBmaWxsLW9wYWNpdHk9IjAuMSIvPgo8L3N2Zz4=')] opacity-30"></div>
@@ -827,7 +932,7 @@ export default function Dashboard({ userId, userName, setActiveTab, setPredictio
          </div>
       )}
 
-      {/* 🎁 באנר שאלת הפתעה מתוקן */}
+      {/* 🎁 באנר שאלת הפתעה */}
       {activeSurpriseAlert > 0 && (
          <div className="bg-gradient-to-r from-purple-600 via-pink-600 to-purple-600 p-6 rounded-3xl border border-purple-300 shadow-[0_0_40px_rgba(168,85,247,0.6)] relative overflow-hidden animate-pulse">
             <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0IiBoZWlnaHQ9IjQiPgo8cmVjdCB3aWR0aD0iNCIgaGVpZ2h0PSI0IiBmaWxsPSIjZmZmIiBmaWxsLW9wYWNpdHk9IjAuMSIvPgo8L3N2Zz4=')] opacity-30"></div>
@@ -847,7 +952,7 @@ export default function Dashboard({ userId, userName, setActiveTab, setPredictio
          </div>
       )}
 
-      {/* 1. מרכז השליטה האישי המפוצל */}
+      {/* מרכז השליטה האישי המפוצל */}
       <div className="flex md:grid md:grid-cols-2 items-stretch overflow-x-auto snap-x snap-mandatory md:overflow-visible gap-4 md:gap-8 pb-4 md:pb-0 custom-scrollbar -mx-4 px-4 md:mx-0 md:px-0">
          
          <div className="w-[90%] md:w-auto shrink-0 snap-center rounded-3xl p-6 shadow-2xl relative overflow-hidden bg-slate-900 border border-slate-700 flex flex-col min-h-full">
@@ -1134,7 +1239,7 @@ export default function Dashboard({ userId, userName, setActiveTab, setPredictio
 
       </div>
 
-      <div className="bg-slate-900 rounded-3xl border border-slate-700 shadow-xl flex flex-col lg:h-[600px] overflow-hidden">
+      <div className="bg-slate-900 rounded-3xl border border-slate-700 shadow-xl flex flex-col lg:h-[600px] overflow-hidden relative z-10">
          <div className="flex lg:hidden bg-slate-950 border-b border-slate-700 shrink-0">
             <button onClick={() => setTimelineTab("TODAY")} className={`flex-1 py-4 text-sm font-bold transition-all ${timelineTab === "TODAY" ? "bg-slate-800 text-white border-b-2 border-blue-500" : "text-slate-500 hover:bg-slate-900"}`}>📅 צפוי היום</button>
             <button onClick={() => setTimelineTab("YESTERDAY")} className={`flex-1 py-4 text-sm font-bold transition-all ${timelineTab === "YESTERDAY" ? "bg-slate-800 text-white border-b-2 border-emerald-500" : "text-slate-500 hover:bg-slate-900"}`}>🧾 היה אתמול</button>
@@ -1199,17 +1304,17 @@ export default function Dashboard({ userId, userName, setActiveTab, setPredictio
                <div className="hidden lg:flex bg-slate-900/80 px-6 h-20 border-b border-slate-700 justify-between items-center z-10 shadow-sm shrink-0">
                  <h2 className="text-xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-cyan-400 flex items-center gap-2"><span>📅</span> מה צפוי היום?</h2>
                  <div className="flex bg-slate-950 p-1.5 rounded-xl border border-slate-700/50 shadow-inner">
-                   {todayMatches.length > 0 && <button onClick={() => { setActiveBannerMode("MATCHES"); setTodayMatchIndex(0); }} className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${isMatchesMode ? "bg-gradient-to-r from-blue-600 to-cyan-600 text-white shadow-md" : "text-slate-400 hover:text-white hover:bg-slate-800"}`}>⚽ להיום</button>}
+                   {todayMatches.length > 0 && <button onClick={() => { setActiveBannerMode("MATCHES"); setTodayMatchIndex(0); }} className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${isMatchesMode ? "bg-gradient-to-r from-blue-600 to-cyan-600 text-white shadow-md" : "text-slate-400 hover:text-white hover:bg-slate-800"}`}>⚽ משחקים</button>}
                    {todayTargets.length > 0 && <button onClick={() => { setActiveBannerMode("BONUS"); setTodayBonusIndex(0); }} className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${activeBannerMode === "BONUS" ? "bg-gradient-to-r from-rose-600 to-amber-600 text-white shadow-md" : "text-slate-400 hover:text-white hover:bg-slate-800"}`}>🎯 מטרות</button>}
-                   <button onClick={() => setActiveBannerMode("RADAR")} className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1 ${activeBannerMode === "RADAR" ? "bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-md" : "text-slate-400 hover:text-white hover:bg-slate-800"}`}>📡 ראדאר</button>
+                   <button onClick={() => setActiveBannerMode("RADAR")} className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1 ${activeBannerMode === "RADAR" ? "bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-md" : "text-slate-400 hover:text-white hover:bg-slate-800"}`}>🎁 קופת הבונוסים</button>
                  </div>
                </div>
 
                <div className="flex lg:hidden bg-slate-950 px-4 py-3 border-b border-slate-800 shrink-0 justify-center w-full">
                   <div className="flex bg-slate-900 p-1.5 rounded-xl border border-slate-700/50 shadow-inner w-full max-w-sm">
-                    {todayMatches.length > 0 && <button onClick={() => { setActiveBannerMode("MATCHES"); setTodayMatchIndex(0); }} className={`flex-1 px-2 py-2 rounded-lg text-xs font-bold transition-all ${isMatchesMode ? "bg-gradient-to-r from-blue-600 to-cyan-600 text-white shadow-md" : "text-slate-400 hover:text-white hover:bg-slate-800"}`}>⚽ להיום</button>}
+                    {todayMatches.length > 0 && <button onClick={() => { setActiveBannerMode("MATCHES"); setTodayMatchIndex(0); }} className={`flex-1 px-2 py-2 rounded-lg text-xs font-bold transition-all ${isMatchesMode ? "bg-gradient-to-r from-blue-600 to-cyan-600 text-white shadow-md" : "text-slate-400 hover:text-white hover:bg-slate-800"}`}>⚽ משחקים</button>}
                     {todayTargets.length > 0 && <button onClick={() => { setActiveBannerMode("BONUS"); setTodayBonusIndex(0); }} className={`flex-1 px-2 py-2 rounded-lg text-xs font-bold transition-all ${activeBannerMode === "BONUS" ? "bg-gradient-to-r from-rose-600 to-amber-600 text-white shadow-md" : "text-slate-400 hover:text-white hover:bg-slate-800"}`}>🎯 מטרות</button>}
-                    <button onClick={() => setActiveBannerMode("RADAR")} className={`flex-1 px-2 py-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1 ${activeBannerMode === "RADAR" ? "bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-md" : "text-slate-400 hover:text-white hover:bg-slate-800"}`}>📡 ראדאר מלא</button>
+                    <button onClick={() => setActiveBannerMode("RADAR")} className={`flex-1 px-2 py-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1 ${activeBannerMode === "RADAR" ? "bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-md" : "text-slate-400 hover:text-white hover:bg-slate-800"}`}>🎁 בונוסים</button>
                   </div>
                </div>
 
@@ -1219,7 +1324,7 @@ export default function Dashboard({ userId, userName, setActiveTab, setPredictio
                       <div className="text-5xl mb-4 opacity-50">😴</div>
                       <h3 className="text-xl font-bold text-slate-300 mb-2">שקט היום על הדשא</h3>
                       <p className="text-slate-500 text-sm max-w-sm mx-auto">אין משחקים או נבחרות מהבונוסים שלך שמשחקות היום.</p>
-                      <button onClick={() => setActiveBannerMode("RADAR")} className="mt-4 text-purple-400 font-bold underline hover:text-purple-300">פתח את ראדאר הבונוסים המלא</button>
+                      <button onClick={() => setActiveBannerMode("RADAR")} className="mt-4 text-purple-400 font-bold underline hover:text-purple-300">פתח את קופת הבונוסים המלאה</button>
                     </div>
                   ) : activeBannerMode === "RADAR" ? (
                     <div className="w-full max-w-md mx-auto flex flex-col h-full animate-fade-in-up">

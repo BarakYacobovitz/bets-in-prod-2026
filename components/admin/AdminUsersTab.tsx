@@ -17,6 +17,7 @@ interface AdminUsersTabProps {
   handleSpawnBotsOnly: () => void;
   handleSmartSimulation: () => void;
   handleRefreshData: () => void; // הפונקציה החדשה לסנכרון הרענון!
+  handleExportUserBackup: (userId: string, userName: string) => void; // 
 }
 
 export default function AdminUsersTab({
@@ -34,7 +35,8 @@ export default function AdminUsersTab({
   setSimStage,
   handleSpawnBotsOnly,
   handleSmartSimulation,
-  handleRefreshData
+  handleRefreshData,
+  handleExportUserBackup
 }: AdminUsersTabProps) {
     
 // פונקציה משודרגת שבונה הודעה לפי החוסרים הספציפיים
@@ -273,12 +275,23 @@ export default function AdminUsersTab({
                             ⬇️
                           </button>
                           <button
+                            onClick={() => handleExportUserBackup(u.id, u.name || "ללא שם")}
+                            className="bg-teal-500/10 hover:bg-teal-500 text-teal-400 hover:text-white border border-teal-500/30 w-9 h-9 rounded-lg transition-all flex items-center justify-center group relative"
+                            title="גבה משתמש לקובץ גיבוי (JSON)"
+                          >
+                            <span className="text-lg">💾</span>
+                            <div className="absolute bottom-full mb-2 right-0 bg-slate-900 text-white text-[10px] px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap border border-slate-700 z-10 pointer-events-none">
+                                הורד קובץ שחזור
+                              </div>
+                          </button>                          
+                          <button
                             onClick={() => handleDeleteUser(u.id, u.name || "ללא שם")}
                             className="bg-rose-500/10 hover:bg-rose-500 text-rose-400 hover:text-white border border-rose-500/30 w-9 h-9 rounded-lg transition-all flex items-center justify-center"
                             title="מחק משתמש"
                           >
                             🗑️
                           </button>
+
                         </div>
                       </td>
                     </tr>

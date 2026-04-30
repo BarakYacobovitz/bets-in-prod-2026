@@ -89,37 +89,38 @@ export default function AdminPanel() {
     }
   };
 
-  // 1. פונקציית בדיקה - האם השאלה היא "חובה" לשלב שבו אנחנו נמצאים?
-const isQuestionMandatoryNow = (q: any, state: number) => {
-  const s = Number(state) || 0;
-  
-  // שאלות הפתעה הן חובה רק כשהן פתוחות לפי השעון
-  if (q.isSurprise) {
-    const now = Date.now();
-    return now >= parseDateTimeLocal(q.openTime) && now <= parseDateTimeLocal(q.closeTime);
-  }
+// 1. פונקציית בדיקה - האם השאלה היא "חובה" לשלב שבו אנחנו נמצאים?
+  const isQuestionMandatoryNow = (q: any, state: number) => {
+    const s = Number(state) || 0;
+    
+    if (q.isSurprise) {
+      const now = Date.now();
+      return now >= parseDateTimeLocal(q.openTime) && now <= parseDateTimeLocal(q.closeTime);
+    }
 
-  // לפני הטורניר (State 0) - חובה למלא שאלות "טורניר" ו"בתים"
-  if (s === 0) {
-    return q.phase === "TOURNAMENT" || q.phase === "GROUPS";
-  }
+    if (s === 0) {
+      return q.phase === "TOURNAMENT" || q.phase === "GROUPS";
+    }
 
-  // תוך כדי שלב הבתים (MD1/2/3) - חובה רק שאלות בתים/טורניר שטרם ננעלו
-  if (s >= 1 && s <= 3) {
-    return q.phase === "TOURNAMENT" || q.phase === "GROUPS";
-  }
+    if (s >= 1 && s <= 3) {
+      return q.phase === "TOURNAMENT" || q.phase === "GROUPS";
+    }
 
-  // שלבי נוקאאוט - השאלה הופכת לחובה רק כשהשלב שלה מתחיל
-  if (q.phase === "KNOCKOUT") {
-    const rounds: Record<string, number> = { 
-      "32 הגדולות": 4, "שמינית גמר": 6, "רבע גמר": 8, "חצי גמר": 10, "גמר": 12 
-    };
-    const targetState = rounds[q.knockoutRound] || 4;
-    return s === targetState; // היא חובה רק בשלב שבו ממלאים אותה
-  }
+    if (q.phase === "KNOCKOUT") {
+      // התיקון: תמיכה בשאלות נוקאאוט כלליות ("ALL") שיופיעו כחובה רק בסטייט 4
+      if (!q.knockoutRound || q.knockoutRound === "ALL") {
+          return s === 4;
+      }
+      
+      const rounds: Record<string, number> = { 
+        "32 הגדולות": 4, "שמינית גמר": 6, "רבע גמר": 8, "חצי גמר": 10, "גמר": 12 
+      };
+      const targetState = rounds[q.knockoutRound] || 4;
+      return s === targetState; 
+    }
 
-  return false;
-};
+    return false;
+  };
 
   // מנוע חישוב התקדמות משודרג ומחמיר!
   // מנוע חישוב אחוזי התקדמות למשתמש - עכשיו עם פירוט חוסרים מלא!
@@ -287,7 +288,7 @@ const isQuestionMandatoryNow = (q: any, state: number) => {
   useEffect(() => {
     if (user && user.email === ADMIN_EMAIL) fetchAdminData();
   }, [user]);
-
+  
   const groupTeams: any = {};
   matches.forEach(m => {
     if (!groupTeams[m.group] && m.stage !== "KNOCKOUT") groupTeams[m.group] = new Set();
@@ -1291,15 +1292,46 @@ const handleCalculateScores = async (silentParam: any = false) => {
     reader.onload = async (event) => {
       try {
         const backup = JSON.parse(event.target?.result as string);
-        if (!confirm("⚠️ אזהרה חמורה: פעולה זו תדרוס את כל הנתונים הקיימים במערכת עם הנתונים שבקובץ. האם להמשיך?")) return;
-        setIsCalculating(true);
         
+        // --- 1. איתור משתמשים שעלולים להימחק ---
+        const currentUsersSnap = await getDocs(collection(db, "users"));
+        const currentUsersIds = currentUsersSnap.docs.map(d => d.id);
+        const backupUsersIds = backup.users ? Object.keys(backup.users) : [];
+        
+        // מי נמצא עכשיו במערכת, אבל לא נמצא בקובץ הגיבוי?
+        const newUsersAtRisk = currentUsersSnap.docs
+           .filter(d => !backupUsersIds.includes(d.id))
+           .map(d => (d.data() as any).name || d.id);
+
+        let warningMessage = "⚠️ אזהרה חמורה: פעולה זו תמחק את *כל* הנתונים ותדרוס אותם עם הגיבוי.\n\n";
+        
+        if (newUsersAtRisk.length > 0) {
+           warningMessage += `🚨 שים לב! מצאנו ${newUsersAtRisk.length} משתמשים שנרשמו *אחרי* שהגיבוי הזה נוצר.\nהם (והניחושים שלהם) יימחקו לחלוטין אם תמשיך!\n\nהמשתמשים בסכנה:\n${newUsersAtRisk.join(", ")}\n\n`;
+        }
+
+        warningMessage += "האם אתה בטוח שברצונך לבצע שחזור מלא?";
+        if (!confirm(warningMessage)) return;
+
+        setIsCalculating(true);
+        toast.loading("מוחק נתונים ישנים ומשחזר מקובץ... ⏳", { duration: 5000 });
+        
+        // --- 2. מחיקה מלאה של הקולקשנים כדי למנוע "שאריות" ---
+        const collectionsToRestore = Object.keys(backup);
+        for (const collName of collectionsToRestore) {
+           const snap = await getDocs(collection(db, collName));
+           for (const d of snap.docs) {
+              await deleteDoc(doc(db, collName, d.id));
+           }
+        }
+
+        // --- 3. הזרקת הנתונים מהגיבוי למסד ---
         for (const [collName, docs] of Object.entries(backup)) {
           for (const [docId, data] of Object.entries(docs as any)) {
             await setDoc(doc(db, collName, docId), data);
           }
         }
-        toast.success("✅ שחזור מסד הנתונים הסתיים בהצלחה! מרענן דף...");
+        
+        toast.success("✅ שחזור מסד הנתונים הסתיים בהצלחה! מרענן דף...", { duration: 5000 });
         setTimeout(() => window.location.reload(), 2000);
       } catch (err) { 
         console.error(err); 
@@ -1609,6 +1641,78 @@ const handleCalculateScores = async (silentParam: any = false) => {
     }
   };
   
+  const handleExportUserBackup = async (userId: string, userName: string) => {
+    setIsCalculating(true);
+    toast.loading("מכין קובץ גיבוי אישי...", { id: "userExport" });
+    try {
+      const userBackup: any = { userId, userName, data: {} };
+      const collections = ['users', 'predictions_matches', 'predictions_knockout', 'predictions_qualifiers', 'predictions_third_place', 'predictions_bonus'];
+
+      for (const coll of collections) {
+        if (coll === 'predictions_matches' || coll === 'predictions_knockout') {
+          const q = query(collection(db, coll), where("userId", "==", userId));
+          const snap = await getDocs(q);
+          userBackup.data[coll] = {};
+          snap.forEach(d => { userBackup.data[coll][d.id] = d.data(); });
+        } else {
+          const docRef = doc(db, coll, userId);
+          const snap = await getDoc(docRef);
+          if (snap.exists()) {
+            userBackup.data[coll] = { [userId]: snap.data() };
+          }
+        }
+      }
+
+      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(userBackup));
+      const downloadAnchorNode = document.createElement('a');
+      downloadAnchorNode.setAttribute("href", dataStr);
+      downloadAnchorNode.setAttribute("download", `user_backup_${userName}_${new Date().toISOString().split('T')[0]}.json`);
+      document.body.appendChild(downloadAnchorNode);
+      downloadAnchorNode.click();
+      downloadAnchorNode.remove();
+
+      toast.success("גיבוי משתמש ירד בהצלחה!", { id: "userExport" });
+    } catch (e) {
+      console.error(e);
+      toast.error("שגיאה בגיבוי המשתמש", { id: "userExport" });
+    } finally {
+      setIsCalculating(false);
+    }
+  };
+
+  const handleImportUserBackup = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      try {
+        const userBackup = JSON.parse(event.target?.result as string);
+        if (!userBackup.userId || !userBackup.data) throw new Error("Invalid file format");
+
+        if (!confirm(`האם לשחזר את הנתונים של המשתמש "${userBackup.userName}"? פעולה זו תדרוס את הניחושים והנתונים שלו בלבד.`)) return;
+
+        setIsCalculating(true);
+        toast.loading("משחזר נתוני משתמש... ⏳", { id: "userImport" });
+
+        for (const [collName, docs] of Object.entries(userBackup.data)) {
+          for (const [docId, data] of Object.entries(docs as any)) {
+            await setDoc(doc(db, collName, docId), data);
+          }
+        }
+
+        toast.success(`✅ שחזור המשתמש ${userBackup.userName} הסתיים בהצלחה!`, { id: "userImport" });
+        fetchAdminData(); 
+      } catch (err) {
+        console.error(err);
+        toast.error("שגיאה בפענוח קובץ השחזור. ודא שזהו גיבוי משתמש תקין.", { id: "userImport" });
+      } finally {
+        setIsCalculating(false);
+        if (e.target) e.target.value = ""; 
+      }
+    };
+    reader.readAsText(file);
+  }; 
+
   const renderProgressBar = (label: string, count: number, total: number, colorClass: string, onClickAction: () => void) => {
     const percent = total > 0 ? Math.round((count / total) * 100) : 0;
     return (
@@ -1705,6 +1809,13 @@ const handleCalculateScores = async (silentParam: any = false) => {
                 <p className="text-slate-400 mb-6 text-sm leading-relaxed">העלה קובץ גיבוי (JSON) ששמרת בעבר באמצעות המערכת. <br/><strong className="text-rose-300">שים לב:</strong> פעולה זו תדרוס לחלוטין את הנתונים הקיימים במערכת עם הנתונים שבקובץ!</p>
                 <input type="file" accept=".json" id="import-backup" className="hidden" onChange={handleImportBackup} />
                 <label htmlFor="import-backup" className="cursor-pointer bg-rose-600 hover:bg-rose-500 text-white font-bold py-3.5 px-6 rounded-xl transition-all shadow-lg inline-block w-full md:w-auto text-center text-lg">{isCalculating ? "קורא קובץ ומשחזר... ⏳" : "📤 העלה קובץ שחזור"}</label>
+              </div>
+              <div className="bg-gradient-to-br from-slate-800 to-slate-900 p-8 rounded-3xl border border-teal-500/30 shadow-xl mt-8 relative overflow-hidden">
+                <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-teal-500 to-emerald-400"></div>
+                <h2 className="text-2xl font-bold text-teal-400 mb-2 flex items-center gap-2"><span>🧑‍💻</span> שחזור משתמש ספציפי (Import User)</h2>
+                <p className="text-slate-400 mb-6 text-sm leading-relaxed">העלה קובץ גיבוי של משתמש בודד שהורדת דרך טאב המשתמשים. <br/><strong className="text-teal-300">שים לב:</strong> פעולה זו תעדכן ותשחזר רק את הניחושים של משתמש זה מבלי לפגוע בשאר המערכת.</p>
+                <input type="file" accept=".json" id="import-user-backup" className="hidden" onChange={handleImportUserBackup} />
+                <label htmlFor="import-user-backup" className="cursor-pointer bg-teal-600 hover:bg-teal-500 text-white font-bold py-3.5 px-6 rounded-xl transition-all shadow-lg inline-block w-full md:w-auto text-center text-lg">{isCalculating ? "משחזר משתמש... ⏳" : "📤 העלה קובץ שחזור משתמש"}</label>
               </div>
             </div>
           )}
@@ -1871,6 +1982,7 @@ const handleCalculateScores = async (silentParam: any = false) => {
              handleSmartSimulation={handleSmartSimulation}
              // הוספנו פרופ לסנכרון ידני!
              handleRefreshData={fetchAdminData}
+             handleExportUserBackup={handleExportUserBackup}
            />
         )}
 

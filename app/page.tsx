@@ -96,6 +96,27 @@ export default function Home() {
     fetchData();
   }, [user]);
 
+  // האזנה לאירועי ניווט חיצוניים (כמו מה-Navbar)
+  useEffect(() => {
+    const handleTabChange = (e: any) => {
+      if (e.detail) {
+        setActiveTab(e.detail);
+        // אם מנווטים לטאב כלשהו, נוודא שאנחנו גוללים למעלה שיהיה נוח
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+    };
+
+    window.addEventListener("changeTab", handleTabChange);
+
+    // בדיקה: האם הגענו לדף ויש לנו טאב שמור ב-SessionStorage? (למשל כי עשינו ריענון)
+    const startupTab = sessionStorage.getItem("startupTab");
+    if (startupTab) {
+      setActiveTab(startupTab as MainTab);
+      sessionStorage.removeItem("startupTab");
+    }
+
+    return () => window.removeEventListener("changeTab", handleTabChange);
+  }, []);
   if (isCheckingAuth) return <div className="min-h-screen bg-slate-950 flex items-center justify-center text-blue-400 font-bold">טוען נתונים...</div>;
   if (!user) return <Login />;
   if (isLoading) return <div className="min-h-screen bg-slate-950 flex items-center justify-center text-blue-400 font-bold">מכין את המגרש... ⚽</div>;
