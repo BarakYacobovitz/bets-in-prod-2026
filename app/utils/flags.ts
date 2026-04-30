@@ -43,7 +43,7 @@ const flagMap: Record<string, string> = {
   "ערב הסעודית": "https://flagcdn.com/w40/sa.png",
   "אורוגוואי": "https://flagcdn.com/w40/uy.png",
   "סנגל": "https://flagcdn.com/w40/sn.png",
-  "נורווגיה": "https://flagcdn.com/w40/no.png",
+  "נורבגיה": "https://flagcdn.com/w40/no.png",
   "אלג'יריה": "https://flagcdn.com/w40/dz.png",
   "אוסטריה": "https://flagcdn.com/w40/at.png",
   "ירדן": "https://flagcdn.com/w40/jo.png",

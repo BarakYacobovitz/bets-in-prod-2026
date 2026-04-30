@@ -116,7 +116,7 @@ export default function Login() {
         loop 
         muted 
         playsInline 
-        className="absolute inset-0 w-full h-full object-cover object-[35%_center] md:object-center z-0 opacity-60 pointer-events-none"
+        className="absolute inset-0 w-full h-full object-cover object-[35%_center] md:object-center z-0 brightness-125 opacity-85 pointer-events-none"
       />
       
       <div className="absolute inset-0 z-10 bg-gradient-to-b from-slate-950/80 via-slate-900/50 to-slate-950/95 md:from-slate-950/50 md:via-slate-900/30 md:to-slate-950/60" />
