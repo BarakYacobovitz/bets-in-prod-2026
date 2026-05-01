@@ -671,8 +671,6 @@ const handleCalculateScores = async (silentParam: any = false) => {
       const allUserThirdSnap = await getDocs(collection(db, "predictions_third_place")); 
       const allUserThirds = allUserThirdSnap.docs.map(doc => ({ userId: doc.id, teams: doc.data().teams || [] }));
 
-      const qualifierPointsMap: any = { "32 הגדולות": 5, "שמינית גמר": 10, "רבע גמר": 15, "חצי גמר": 20, "גמר": 25 };
-
       for (const currentUser of allUsers) {
         let basePoints = 0; 
         let knockoutPoints = 0; 
@@ -1485,8 +1483,7 @@ const handleCalculateScores = async (silentParam: any = false) => {
       const ptData = ptSnap.docs.map(d => ({id: d.id, ...d.data()}));
       const pbData = pbSnap.docs.map(d => ({id: d.id, ...d.data()}));
 
-      const qualifierPointsMap: any = { "32 הגדולות": 5, "שמינית גמר": 10, "רבע גמר": 15, "חצי גמר": 20, "גמר": 25 };
-
+      const qualifierPointsMap: any = { "32 הגדולות": 5, "שמינית גמר": 10, "רבע גמר": 15, "חצי גמר": 20, "גמר": 25, "מקום שלישי": 10 };
       for (const u of usersToExport) {
          const uName = (u as any).name || "Unknown";
          const escapeCSV = (str: string) => `"${String(str).replace(/"/g, '""')}"`;

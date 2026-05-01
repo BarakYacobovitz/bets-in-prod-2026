@@ -1,0 +1,66 @@
+[
+  {
+    "id": "ko16_1",
+    "homeTeam": "ארגנטינה",
+    "awayTeam": "קולומביה",
+    "matchDate": "04/07/2026 17:00",
+    "stage": "KNOCKOUT",
+    "roundName": "שמינית גמר"
+  },
+  {
+    "id": "ko16_2",
+    "homeTeam": "אנגליה",
+    "awayTeam": "איטליה",
+    "matchDate": "04/07/2026 21:00",
+    "stage": "KNOCKOUT",
+    "roundName": "שמינית גמר"
+  },
+  {
+    "id": "ko16_3",
+    "homeTeam": "צרפת",
+    "awayTeam": "ארה\"ב",
+    "matchDate": "05/07/2026 17:00",
+    "stage": "KNOCKOUT",
+    "roundName": "שמינית גמר"
+  },
+  {
+    "id": "ko16_4",
+    "homeTeam": "ספרד",
+    "awayTeam": "יפן",
+    "matchDate": "05/07/2026 21:00",
+    "stage": "KNOCKOUT",
+    "roundName": "שמינית גמר"
+  },
+  {
+    "id": "ko16_5",
+    "homeTeam": "ברזיל",
+    "awayTeam": "אורוגוואי",
+    "matchDate": "06/07/2026 17:00",
+    "stage": "KNOCKOUT",
+    "roundName": "שמינית גמר"
+  },
+  {
+    "id": "ko16_6",
+    "homeTeam": "פורטוגל",
+    "awayTeam": "מרוקו",
+    "matchDate": "06/07/2026 21:00",
+    "stage": "KNOCKOUT",
+    "roundName": "שמינית גמר"
+  },
+  {
+    "id": "ko16_7",
+    "homeTeam": "גרמניה",
+    "awayTeam": "קרואטיה",
+    "matchDate": "07/07/2026 17:00",
+    "stage": "KNOCKOUT",
+    "roundName": "שמינית גמר"
+  },
+  {
+    "id": "ko16_8",
+    "homeTeam": "הולנד",
+    "awayTeam": "בלגיה",
+    "matchDate": "07/07/2026 21:00",
+    "stage": "KNOCKOUT",
+    "roundName": "שמינית גמר"
+  }
+]

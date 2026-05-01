@@ -132,8 +132,7 @@ export default function MatchCard({ match, userId, tournamentState = 0 }: { matc
     else if (match.roundName === "שמינית גמר") { if (currentState < 6) isHidden = true; if (currentState >= 7) isManualLocked = true; } 
     else if (match.roundName === "רבע גמר") { if (currentState < 8) isHidden = true; if (currentState >= 9) isManualLocked = true; } 
     else if (match.roundName === "חצי גמר") { if (currentState < 10) isHidden = true; if (currentState >= 11) isManualLocked = true; } 
-    else if (match.roundName === "גמר") { if (currentState < 12) isHidden = true; if (currentState >= 13) isManualLocked = true; }
-  }
+else if (match.roundName === "גמר" || match.roundName === "מקום שלישי") { if (currentState < 12) isHidden = true; if (currentState >= 13) isManualLocked = true; }  }
 
   const isLocked = isManualLocked || match.isFinished;
   const isMissingPrediction = !isLocked && (homeScore === "" || awayScore === "" || (match.stage === "KNOCKOUT" && qualifier === ""));
@@ -149,13 +148,25 @@ export default function MatchCard({ match, userId, tournamentState = 0 }: { matc
     return `${match.matchDate.split(" ")[0]} ב-${timeString}`;
   };
 
-  const calculateMatchPoints = (predH: string, predA: string, predQ: string) => {
+const calculateMatchPoints = (predH: string, predA: string, predQ: string) => {
     if (!match.isFinished || predH === "" || predA === "") return null;
-    let pts = 0; const rH = Number(match.realHomeScore); const rA = Number(match.realAwayScore); const pH = Number(predH); const pA = Number(predA);
-    if (Math.sign(pH - pA) === Math.sign(rH - rA)) { pts += 5; if (pH === rH && pA === rA) pts += 10; }
-    if (match.stage === "KNOCKOUT" && predQ === match.realQualifier && predQ !== "") {
-      const qMap: any = { "32 הגדולות": 5, "שמינית גמר": 10, "רבע גמר": 15, "חצי גמר": 20, "גמר": 25 }; pts += (qMap[match.roundName] || 0);
+    
+    let pts = 0; 
+    const rH = Number(match.realHomeScore); 
+    const rA = Number(match.realAwayScore); 
+    const pH = Number(predH); 
+    const pA = Number(predA);
+    
+    if (Math.sign(pH - pA) === Math.sign(rH - rA)) { 
+      pts += 5; 
+      if (pH === rH && pA === rA) pts += 10; 
     }
+    
+    if (match.stage === "KNOCKOUT" && predQ === match.realQualifier && predQ !== "") {
+        const qMap: any = { "32 הגדולות": 5, "שמינית גמר": 10, "רבע גמר": 15, "חצי גמר": 20, "גמר": 25, "מקום שלישי": 10 };
+        pts += (qMap[match.roundName] || 0);
+    } // <--- הסוגר עבר לכאן!
+    
     return pts;
   };
 

@@ -199,7 +199,8 @@ export default function BonusQuestions({ userId, tournamentState: propTournament
       if (q.knockoutRound === "שמינית גמר") return state >= 7;
       if (q.knockoutRound === "רבע גמר") return state >= 9;
       if (q.knockoutRound === "חצי גמר") return state >= 11;
-      if (q.knockoutRound === "גמר" || q.knockoutRound === "מקום שלישי") return state >= 13;
+      // הסרנו מכאן את מקום שלישי
+      if (q.knockoutRound === "גמר") return state >= 13;
     }
     return false;
   };
@@ -251,7 +252,7 @@ export default function BonusQuestions({ userId, tournamentState: propTournament
     }
     
     if (ans) {
-      isUserAction.current = true; // אומר למערכת השמירה האוטומטית לפעול
+      isUserAction.current = true;
       setAnswers((prev: any) => ({ ...prev, [q.id]: ans }));
       toast.success(`הוגרלה תשובה! 🎲`, { id: `rand_${q.id}` });
     }
@@ -485,8 +486,7 @@ export default function BonusQuestions({ userId, tournamentState: propTournament
             { id: "שמינית גמר", label: "שמינית גמר" },
             { id: "רבע גמר", label: "רבע גמר" },
             { id: "חצי גמר", label: "חצי גמר" },
-            { id: "גמר", label: "גמר" },
-            { id: "מקום שלישי", label: "מקום שלישי" }
+            { id: "גמר", label: "גמר" }
           ].map(subTab => (
             <button
               key={subTab.id}
@@ -680,11 +680,10 @@ export default function BonusQuestions({ userId, tournamentState: propTournament
          placeholder="בחר או הקלד נבחרת..."
          suggestions={[...extras, ...finalOpts]}
          disabled={locked}
-         showAllOnFocus={true} // גורם לכל הרשימה להיפתח בלחיצה
+         showAllOnFocus={true}
          getFlag={(val) => getFlagUrl(val)}
          customClassName={`w-full px-4 py-3.5 pl-10 rounded-xl font-bold text-sm outline-none transition-all shadow-inner ${locked ? "bg-slate-900/50 text-slate-400 border-slate-700 cursor-not-allowed" : (!answers[q.id] || answers[q.id].trim()==="") ? "bg-slate-950 text-white border-amber-500/80 focus:border-amber-400" : "bg-slate-900 text-white border-slate-600 focus:border-blue-500"}`}
       />
-      {/* הצגת הדגל שנבחר בצד שמאל של השדה */}
       {answers[q.id] && getFlagUrl(answers[q.id]) && (
          <div className="absolute left-8 top-1/2 -translate-y-1/2 pointer-events-none">
             <img src={getFlagUrl(answers[q.id])!} className="w-5 h-3.5 object-cover rounded-sm shadow-sm" alt="flag" />

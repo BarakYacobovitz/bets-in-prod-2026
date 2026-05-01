@@ -6,6 +6,20 @@ import { auth, db } from "../app/firebase";
 import { getFlagUrl } from "../app/utils/flags"; 
 import toast from "react-hot-toast";
 
+// פונקציית עזר לחישובי זמנים לשאלות הפתעה
+const parseDateTimeLocal = (dtStr: string) => {
+  if (!dtStr) return 0;
+  try {
+    if (dtStr.includes("T")) {
+      const [datePart, timePart] = dtStr.split("T");
+      const [year, month, day] = datePart.split("-").map(Number);
+      const [hour, minute] = timePart.split(":").map(Number);
+      return new Date(year, month - 1, day, hour, minute).getTime();
+    }
+    return new Date(dtStr).getTime();
+  } catch { return 0; }
+};
+
 // רכיב קונפטי עצמאי שיופעל רק עבור המקום הראשון! 🎊
 const Confetti = () => {
   const [pieces, setPieces] = useState<any[]>([]);
@@ -223,41 +237,34 @@ export default function Leaderboard() {
     finally { setIsLeagueLoading(false); }
   };
 
-  const handleLeaveLeague = async () => {
+  const handleLeaveLeague = async (leagueId: string, leagueName: string) => {
     toast((t) => (
       <div className="flex flex-col gap-3 text-right" dir="rtl">
         <span className="font-bold text-slate-800 text-sm">
-          בטוח שברצונך לעזוב את הליגה? 🥺
-          <br />
-          <span className="text-[10px] text-rose-600 font-normal">
-            *כל הניחושים והניקוד שלך יימחקו לצמיתות ולא ניתן יהיה לשחזרם.
-          </span>
+          בטוח שברצונך לעזוב את הליגה '{leagueName}'?
         </span>
         <div className="flex gap-2">
           <button 
             onClick={async () => {
               toast.dismiss(t.id);
               try {
-                // כאן נכנסת הלוגיקה המקורית של המחיקה מה-DB:
-                await updateDoc(doc(db, "users", userId), {
-                  hasPaid: false, // או כל לוגיקת עזיבה שיש לך
-                  inLeague: false 
-                });
-                toast.success("עזבת את הליגה. נתראה בטורניר הבא!");
-                window.location.reload();
+                await updateDoc(doc(db, "mini_leagues", leagueId), { members: arrayRemove(currentUserId) });
+                toast.success("עזבת את הליגה.");
+                setSelectedLeagueId(null);
+                setActiveBoard("GENERAL");
               } catch (e) {
                 toast.error("שגיאה בביצוע הפעולה.");
               }
             }} 
             className="bg-rose-600 hover:bg-rose-700 text-white px-3 py-1.5 rounded-lg text-xs font-black transition-all active:scale-95"
           >
-            כן, מחק אותי
+            כן, עזוב
           </button>
           <button 
             onClick={() => toast.dismiss(t.id)} 
             className="bg-slate-200 hover:bg-slate-300 text-slate-800 px-3 py-1.5 rounded-lg text-xs font-bold transition-all"
           >
-            לא, נשארתי!
+            ביטול
           </button>
         </div>
       </div>
@@ -377,17 +384,27 @@ export default function Leaderboard() {
       if (match.roundName === "שמינית גמר" && s >= 7) return true;
       if (match.roundName === "רבע גמר" && s >= 9) return true;
       if (match.roundName === "חצי גמר" && s >= 11) return true;
-      if (match.roundName === "גמר" && s >= 13) return true;
+      if ((match.roundName === "גמר" || match.roundName === "מקום שלישי") && s >= 13) return true;
       return false;
     }
   };
 
   const isBonusLocked = (q: any, state: number) => {
+    if (q.isSurprise) {
+       if (!q.openTime || !q.closeTime) return false;
+       return Date.now() > parseDateTimeLocal(q.closeTime); 
+    }
     const s = Number(state) || 0;
     if (s === 0) return false;
     if (q.phase === "TOURNAMENT" || q.phase === "GROUPS") return s >= 1;
     if (q.phase === "KNOCKOUT") {
-      return (q.round === "ALL" || q.round === "R32") ? s >= 5 : (q.round === "R16") ? s >= 7 : (q.round === "QF") ? s >= 9 : (q.round === "SF") ? s >= 11 : s >= 13;
+      const kr = q.knockoutRound || "ALL";
+      if (kr === "ALL" || kr === "32 הגדולות") return s >= 5;
+      if (kr === "שמינית גמר") return s >= 7;
+      if (kr === "רבע גמר") return s >= 9;
+      if (kr === "חצי גמר") return s >= 11;
+      // בונוסים מתייחסים עכשיו נטו לגמר (אין אופציית מקום 3 בבונוסים)
+      if (kr === "גמר") return s >= 13;
     }
     return false;
   };
@@ -397,7 +414,7 @@ export default function Leaderboard() {
     let pts = 0; const rH = Number(match.realHomeScore); const rA = Number(match.realAwayScore); const pH = Number(predH); const pA = Number(predA);
     if (Math.sign(pH - pA) === Math.sign(rH - rA)) { pts += 5; if (pH === rH && pA === rA) pts += 10; }
     if (match.stage === "KNOCKOUT" && predQ === match.realQualifier && predQ !== "") {
-      const qMap: any = { "32 הגדולות": 5, "שמינית גמר": 10, "רבע גמר": 15, "חצי גמר": 20, "גמר": 25 }; pts += (qMap[match.roundName] || 0);
+      const qMap: any = { "32 הגדולות": 5, "שמינית גמר": 10, "רבע גמר": 15, "חצי גמר": 20, "גמר": 25, "מקום שלישי": 10 }; pts += (qMap[match.roundName] || 0);
     }
     return pts;
   };
@@ -450,8 +467,8 @@ export default function Leaderboard() {
     setSpyBonusKnockoutRound("ALL");
     
     let stats = { exactC: 0, exactP: 0, dirC: 0, dirP: 0, koC: 0, koP: 0, bonusC: 0, bonusP: 0, groupC: 0, groupP: 0, thirdC: 0, thirdP: 0 };
-    const qMap: any = { "32 הגדולות": 5, "שמינית גמר": 10, "רבע גמר": 15, "חצי גמר": 20, "גמר": 25 };
-
+    const qMap: any = { "32 הגדולות": 5, "שמינית גמר": 10, "רבע גמר": 15, "חצי גמר": 20, "גמר": 25, "מקום שלישי": 10 };
+    
     try {
       const gatheredMatches: any[] = [];
       const qGroups = query(collection(db, "predictions_matches"), where("userId", "==", userToSpy.id));
@@ -539,8 +556,10 @@ export default function Leaderboard() {
       if (spyMatchTab === "R32") return m.stage === "KNOCKOUT" && m.roundName === "32 הגדולות";
       if (spyMatchTab === "R16") return m.stage === "KNOCKOUT" && m.roundName === "שמינית גמר";
       if (spyMatchTab === "QF") return m.stage === "KNOCKOUT" && m.roundName === "רבע גמר";
-      if (spyMatchTab === "SF") return m.stage === "KNOCKOUT" && (m.roundName === "חצי גמר" || m.roundName === "מקום שלישי");
-      if (spyMatchTab === "FINAL") return m.stage === "KNOCKOUT" && m.roundName === "גמר";
+      // פה דייקנו רק את חצי גמר
+      if (spyMatchTab === "SF") return m.stage === "KNOCKOUT" && m.roundName === "חצי גמר";
+      // ופה המשחק של מקום 3 מופיע יחד עם הגמר!
+      if (spyMatchTab === "FINAL") return m.stage === "KNOCKOUT" && (m.roundName === "גמר" || m.roundName === "מקום שלישי");
       return true;
     });
   };
@@ -549,7 +568,10 @@ export default function Leaderboard() {
     return spyBonusPredictions.filter(bPred => {
       const q = bPred.question;
       if (q.phase !== spyBonusCategory) return false;
-      if (spyBonusCategory === "KNOCKOUT" && q.round !== spyBonusKnockoutRound) return false;
+      if (spyBonusCategory === "KNOCKOUT") {
+         const kr = q.knockoutRound || "ALL";
+         if (kr !== spyBonusKnockoutRound) return false;
+      }
       return true;
     });
   };
@@ -693,7 +715,7 @@ export default function Leaderboard() {
 
                    <div className="text-amber-400 font-black mb-3 text-center truncate w-full px-1 text-base md:text-lg">
                      {podiumFirst.name?.split(' ')[0]}
-                   </div>
+                     </div>
                    <div className={`w-full bg-gradient-to-t from-amber-600 to-amber-400 h-36 md:h-44 rounded-t-lg shadow-[0_0_30px_rgba(251,191,36,0.4)] relative flex flex-col items-center justify-start pt-2 pb-3 border-t-2 ${podiumFirst.id === myNemesisId ? 'border-rose-500 shadow-[0_0_20px_rgba(225,29,72,0.8)]' : 'border-amber-200'}`}>
                      <span className="text-5xl drop-shadow-lg mt-1 mb-auto">🥇</span>
                      <div className="flex flex-col items-center w-full">
@@ -1145,11 +1167,11 @@ export default function Leaderboard() {
                             if (tab.id === "KNOCKOUT") {
                               const available = [
                                 { id: "ALL", label: "כללי", minState: 0 },
-                                { id: "R32", label: "32 הגדולות", minState: 5 },
-                                { id: "R16", label: "שמינית גמר", minState: 7 },
-                                { id: "QF", label: "רבע גמר", minState: 9 },
-                                { id: "SF", label: "חצי גמר", minState: 11 },
-                                { id: "FINAL", label: "גמר", minState: 13 }
+                                { id: "32 הגדולות", label: "32 הגדולות", minState: 5 },
+                                { id: "שמינית גמר", label: "שמינית גמר", minState: 7 },
+                                { id: "רבע גמר", label: "רבע גמר", minState: 9 },
+                                { id: "חצי גמר", label: "חצי גמר", minState: 11 },
+                                { id: "גמר", label: "גמר", minState: 13 }
                               ].filter(t => tournamentState >= t.minState);
                               if (available.length > 0) setSpyBonusKnockoutRound(available[available.length - 1].id);
                             }
@@ -1169,11 +1191,11 @@ export default function Leaderboard() {
                       <div className="flex overflow-x-auto gap-2 mb-4 pb-2 custom-scrollbar bg-slate-900/50 p-2 rounded-2xl border border-slate-800/50 shrink-0">
                         {[
                           { id: "ALL", label: "כללי", minState: 0 },
-                          { id: "R32", label: "32 הגדולות", minState: 5 },
-                          { id: "R16", label: "שמינית גמר", minState: 7 },
-                          { id: "QF", label: "רבע גמר", minState: 9 },
-                          { id: "SF", label: "חצי גמר", minState: 11 },
-                          { id: "FINAL", label: "גמר", minState: 13 }
+                          { id: "32 הגדולות", label: "32 הגדולות", minState: 5 },
+                          { id: "שמינית גמר", label: "שמינית גמר", minState: 7 },
+                          { id: "רבע גמר", label: "רבע גמר", minState: 9 },
+                          { id: "חצי גמר", label: "חצי גמר", minState: 11 },
+                          { id: "גמר", label: "גמר", minState: 13 }
                         ].filter(t => tournamentState >= t.minState).map(subTab => (
                           <button
                             key={subTab.id}

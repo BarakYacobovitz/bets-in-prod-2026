@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from "react";
 import MatchCard from "./MatchCard";
 import { doc, setDoc, collection, query, where, onSnapshot } from "firebase/firestore";
+import Image from "next/image"; // ייבוא תמונה של Next.js לשילוב הגביע
 import { db } from "../app/firebase";
 import { getFlagUrl } from "../app/utils/flags"; 
 import toast from "react-hot-toast";
@@ -18,7 +19,11 @@ export default function KnockoutView({ matches, userId, tournamentState }: { mat
 
   const [knockoutPreds, setKnockoutPreds] = useState<any>({});
 
-  const roundMatches = matches.filter(m => m.roundName === activeRound);
+  // איחוד המקום ה-3 לרשימה של הגמר בטאב ה-LIST
+  const roundMatches = matches.filter(m => {
+     if (activeRound === "גמר") return m.roundName === "גמר" || m.roundName === "מקום שלישי";
+     return m.roundName === activeRound;
+  });
 
   useEffect(() => {
     if (!userId) return;
@@ -38,7 +43,7 @@ export default function KnockoutView({ matches, userId, tournamentState }: { mat
     if (round === "שמינית גמר" && tournamentState < 6) return true;
     if (round === "רבע גמר" && tournamentState < 8) return true;
     if (round === "חצי גמר" && tournamentState < 10) return true;
-    if (round === "גמר" && tournamentState < 12) return true;
+    if ((round === "גמר" || round === "מקום שלישי") && tournamentState < 12) return true;
     return false;
   };
   
@@ -47,7 +52,7 @@ export default function KnockoutView({ matches, userId, tournamentState }: { mat
     if (round === "שמינית גמר" && tournamentState >= 7) return true;
     if (round === "רבע גמר" && tournamentState >= 9) return true;
     if (round === "חצי גמר" && tournamentState >= 11) return true;
-    if (round === "גמר" && tournamentState >= 13) return true;
+    if ((round === "גמר" || round === "מקום שלישי") && tournamentState >= 13) return true;
     return false;
   };
 
@@ -78,9 +83,6 @@ export default function KnockoutView({ matches, userId, tournamentState }: { mat
     ), { duration: Infinity });
   };
 
-  // =========================================================================
-  // לוגיקת העץ: בניית הנתיב והתמגנטות
-  // =========================================================================
   const expectedCounts: Record<string, number> = { "32 הגדולות": 16, "שמינית גמר": 8, "רבע גמר": 4, "חצי גמר": 2, "גמר": 1 };
   const firstRealRoundIdx = rounds.findIndex(r => matches.some(m => m.roundName === r));
   const roundsToRender = firstRealRoundIdx !== -1 ? rounds.slice(firstRealRoundIdx) : [];
@@ -156,36 +158,53 @@ export default function KnockoutView({ matches, userId, tournamentState }: { mat
                 setBracketModalMatch(node.originalMatch);
             }
         }}
-        className={`w-36 sm:w-44 border-2 rounded-xl p-1.5 flex flex-col gap-0.5 shadow-lg relative z-10 transition-all h-fit max-w-[11rem] ${
-            isDummy || hidden 
-              ? "bg-slate-800/40 border-slate-700/50 border-dashed cursor-not-allowed opacity-80 hover:opacity-100" 
-              : locked 
-                  ? "bg-slate-800 border-slate-700 opacity-95 cursor-pointer" 
-                  : "bg-slate-800 border-slate-700 hover:border-purple-500 cursor-pointer hover:-translate-y-1 hover:shadow-[0_0_15px_rgba(168,85,247,0.3)] group"
+        className={`border-2 rounded-xl p-1.5 flex flex-col gap-0.5 shadow-lg relative z-10 transition-all h-fit ${
+            isFinal ? "w-48 sm:w-56" : "w-36 sm:w-44"
+        } ${
+            isFinal 
+               ? "shadow-[0_0_40px_rgba(251,191,36,0.6)] border-amber-400 bg-slate-900 ring-4 ring-amber-500/30 animate-pulse-slow" 
+               : isDummy || hidden 
+                  ? "bg-slate-800/40 border-slate-700/50 border-dashed cursor-not-allowed opacity-80 hover:opacity-100" 
+                  : locked 
+                      ? "bg-slate-800 border-slate-700 opacity-95 cursor-pointer" 
+                      : "bg-slate-800 border-slate-700 hover:border-purple-500 cursor-pointer hover:-translate-y-1 hover:shadow-[0_0_15px_rgba(168,85,247,0.3)] group"
         }`}
       >
-          {isFinal && <div className="absolute -top-5 left-1/2 -translate-x-1/2 text-2xl drop-shadow-xl z-10">🏆</div>}
+          {/* שתילת גביע העולם האמיתי מעל הגמר */}
+          {isFinal && (
+             <div className="absolute -top-16 left-1/2 -translate-x-1/2 w-16 h-20 drop-shadow-[0_0_15px_rgba(251,191,36,0.9)] z-20">
+                 <Image src="/world-cup.png" alt="FIFA World Cup" width={100} height={120} className="w-full h-full object-contain" priority />
+             </div>
+          )}
           
           {!isDummy && !hidden && locked && <div className="absolute -top-2 -right-2 text-[10px] bg-slate-950 border border-slate-700 text-slate-400 px-1.5 py-0.5 rounded-md z-10">🔒</div>}
           {canEdit && <div className="absolute -top-2 -right-2 text-[10px] bg-purple-600 border border-purple-500 text-white px-1.5 py-0.5 rounded-md z-10 opacity-0 group-hover:opacity-100 transition-opacity shadow-sm">ערוך</div>}
           {(isDummy || hidden) && <div className="absolute -top-2 -right-2 text-[9px] bg-slate-800 border border-slate-600 text-slate-400 px-1.5 py-0.5 rounded-md z-10 tracking-widest uppercase">{hidden ? "נעול" : "תחזית"}</div>}
           
-          <div className={`flex justify-between items-center text-xs sm:text-sm font-bold px-1.5 py-1 rounded transition-colors ${isHomeQual ? "bg-emerald-500/20 text-emerald-400" : "text-slate-200"}`}>
+          <div className={`flex justify-between items-center text-xs sm:text-sm font-bold px-1.5 py-1 rounded transition-colors ${
+              isFinal ? "text-lg py-2" : ""
+          } ${
+              isHomeQual ? (isFinal ? "bg-amber-400 text-slate-950" : "bg-emerald-500/20 text-emerald-400") : "text-slate-200"
+          }`}>
              <div className="flex items-center gap-1.5 truncate">
                {getFlagUrl(node.projectedHome) ? <img src={getFlagUrl(node.projectedHome)!} className="w-4 h-3 object-cover rounded-sm" alt="flag" /> : <span className="text-[10px]">🏳️</span>}
                <span className="truncate">{node.projectedHome || "TBD"}</span>
              </div>
-             {hScore !== undefined && !isDummy && <span className="font-black ml-1 text-slate-400">{hScore}</span>}
+             {hScore !== undefined && !isDummy && <span className={`font-black ml-1 ${isFinal ? 'text-2xl text-white' : 'text-slate-400'}`}>{hScore}</span>}
           </div>
           
-          <div className="w-full h-px bg-slate-700/50 my-0.5"></div>
+          <div className={`w-full h-px ${isFinal ? 'bg-amber-600/30' : 'bg-slate-700/50'} my-0.5`}></div>
           
-          <div className={`flex justify-between items-center text-xs sm:text-sm font-bold px-1.5 py-1 rounded transition-colors ${isAwayQual ? "bg-emerald-500/20 text-emerald-400" : "text-slate-200"}`}>
+          <div className={`flex justify-between items-center text-xs sm:text-sm font-bold px-1.5 py-1 rounded transition-colors ${
+              isFinal ? "text-lg py-2" : ""
+          } ${
+              isAwayQual ? (isFinal ? "bg-amber-400 text-slate-950" : "bg-emerald-500/20 text-emerald-400") : "text-slate-200"
+          }`}>
              <div className="flex items-center gap-1.5 truncate">
                {getFlagUrl(node.projectedAway) ? <img src={getFlagUrl(node.projectedAway)!} className="w-4 h-3 object-cover rounded-sm" alt="flag" /> : <span className="text-[10px]">🏳️</span>}
                <span className="truncate">{node.projectedAway || "TBD"}</span>
              </div>
-             {aScore !== undefined && !isDummy && <span className="font-black ml-1 text-slate-400">{aScore}</span>}
+             {aScore !== undefined && !isDummy && <span className={`font-black ml-1 ${isFinal ? 'text-2xl text-white' : 'text-slate-400'}`}>{aScore}</span>}
           </div>
       </div>
     );
@@ -196,19 +215,49 @@ export default function KnockoutView({ matches, userId, tournamentState }: { mat
       if (!nodes || nodes.length === 0) return null;
       const count = expectedCounts[roundName];
 
+      let thirdPlaceNode = null;
+      if (isFinal) {
+         const real3rd = matches.find(m => m.roundName === "מקום שלישי");
+         thirdPlaceNode = {
+             id: real3rd ? real3rd.id : `dummy_3rd`,
+             isDummy: !real3rd,
+             roundName: "מקום שלישי",
+             projectedHome: real3rd ? real3rd.homeTeam : "",
+             projectedAway: real3rd ? real3rd.awayTeam : "",
+             isFinished: real3rd ? real3rd.isFinished : false,
+             realHomeScore: real3rd ? real3rd.realHomeScore : undefined,
+             realAwayScore: real3rd ? real3rd.realAwayScore : undefined,
+             originalMatch: real3rd 
+         };
+      }
+
       return (
-         <div className="relative h-full w-40 sm:w-48 shrink-0 py-8">
-             <div className={`absolute top-0 w-full text-center font-black uppercase tracking-widest ${isFinal ? 'text-amber-500 text-lg drop-shadow-md' : 'text-slate-500 text-xs'}`}>{roundName}</div>
+         <div className={`relative h-full shrink-0 py-8 ${isFinal ? 'w-52 sm:w-60' : 'w-40 sm:w-48'}`}>
+             <div className={`absolute top-0 w-full text-center font-black uppercase tracking-widest ${
+                 isFinal ? 'text-2xl md:text-3xl text-transparent bg-clip-text bg-gradient-to-r from-amber-400 to-amber-200 drop-shadow-[0_0_15px_rgba(251,191,36,0.5)]' : 'text-slate-500 text-xs'
+             }`}>
+                {roundName}
+             </div>
              
-             <div className="grid h-full w-full" style={{ gridTemplateRows: `repeat(${count}, minmax(0, 1fr))` }}>
+             <div className={`grid w-full ${isFinal ? 'h-[70%]' : 'h-full'}`} style={{ gridTemplateRows: `repeat(${count}, minmax(0, 1fr))` }}>
                  {nodes.map((node) => (
                      <div key={node.id} className="flex items-center justify-center relative px-2 sm:px-4 w-full h-full">
-                         {!isFirst && <div className="absolute right-0 w-2 sm:w-4 border-t-2 border-slate-600 top-1/2 -z-10"></div>}
+                         {!isFirst && <div className={`absolute right-0 border-slate-600 top-1/2 -z-10 ${isFinal ? 'w-1 sm:w-2 border-t-2' : 'w-2 sm:w-4 border-t-2'}`}></div>}
                          {renderBracketNode(node, isFinal)}
                          {!isFinal && <div className="absolute left-0 w-2 sm:w-4 border-t-2 border-slate-600 top-1/2 -z-10"></div>}
                      </div>
                  ))}
              </div>
+
+             {/* המקום ה-3 ממוקם בתוך הטור של הגמר, צמוד אליו מלמטה ובקו אחד עם קווי החצי גמר */}
+             {isFinal && (
+                 <div className="absolute top-1/2 left-0 w-full flex flex-col items-center px-2 sm:px-4 z-20 translate-y-[8.5rem] animate-fade-in delay-500">
+                     <div className="text-[10px] text-orange-400 font-black mb-2 tracking-widest uppercase border-b-2 border-orange-500/50 pb-1 flex items-center gap-2">
+                         <span className="text-xl">🥉</span> מקום 3-4
+                     </div>
+                     {renderBracketNode(thirdPlaceNode, false)}
+                 </div>
+             )}
          </div>
       );
   };
@@ -227,7 +276,7 @@ export default function KnockoutView({ matches, userId, tournamentState }: { mat
       );
   };
 
-  const dynamicHeight = roundsToRender.includes("32 הגדולות") ? "h-[1600px] md:h-[1800px]" : "h-[800px] md:h-[900px]";
+  const dynamicHeight = roundsToRender.includes("32 הגדולות") ? "h-[1600px] md:h-[1800px]" : "h-[800px] md:h-[1000px]";
 
   if (matches.length === 0) {
     return (
@@ -242,7 +291,16 @@ export default function KnockoutView({ matches, userId, tournamentState }: { mat
   return (
     <div className="w-full animate-fade-in-up pb-8">
       
-      {/* כותרת קומפקטית עם גרדיאנט ומתגים */}
+      <style dangerouslySetInnerHTML={{__html: `
+        @keyframes pulseSlow {
+           0%, 100% { opacity: 1; filter: brightness(1.1); transform: scale(1); }
+           50% { opacity: 0.95; filter: brightness(1.0); transform: scale(0.99); }
+        }
+        .animate-pulse-slow {
+           animation: pulseSlow 4s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+      `}} />
+      
       <div className="sticky top-[72px] md:top-[88px] z-40 bg-slate-950/85 backdrop-blur-xl p-4 md:p-5 rounded-3xl border border-slate-700 shadow-[0_10px_30px_rgba(0,0,0,0.6)] mb-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 transition-all">
          <h2 className="text-xl md:text-2xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-400 flex items-center gap-2">
             <span>🔥</span> שלבי הנוק-אאוט
@@ -264,9 +322,6 @@ export default function KnockoutView({ matches, userId, tournamentState }: { mat
          </div>
       </div>
 
-      {/* ========================================= */}
-      {/* תצוגת עץ טורניר (Bracket) */}
-      {/* ========================================= */}
       {viewMode === "BRACKET" && (
          <div className="bg-slate-900 rounded-3xl border border-purple-500/30 shadow-2xl p-4 md:p-6 relative overflow-hidden">
             <div className="absolute top-0 right-0 w-full h-full bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-purple-900/20 via-slate-900 to-slate-900 pointer-events-none z-0"></div>
@@ -296,13 +351,8 @@ export default function KnockoutView({ matches, userId, tournamentState }: { mat
          </div>
       )}
 
-      {/* ========================================= */}
-      {/* תצוגת רשימה (רגיל) - עריכה מהירה */}
-      {/* ========================================= */}
       {viewMode === "LIST" && (
         <div className="flex flex-col animate-fade-in-up">
-          
-          {/* סרגל ניווט שלבים אופקי ויוקרתי (החליף את הרשימה הצידית האנכית) */}
           <div className="flex overflow-x-auto gap-2 mb-6 pb-2 custom-scrollbar bg-slate-900/50 p-2 rounded-2xl border border-slate-800/50">
             {rounds.map(round => {
               const hidden = isRoundHidden(round);
@@ -353,7 +403,6 @@ export default function KnockoutView({ matches, userId, tournamentState }: { mat
             ) : (
               <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
                 {roundMatches.map(match => (
-                  // ה-MatchCard כבר מכיל את הריגול החדש שעשינו!
                   <MatchCard key={match.id} match={match} userId={userId} tournamentState={tournamentState} />
                 ))}
               </div>
@@ -362,9 +411,6 @@ export default function KnockoutView({ matches, userId, tournamentState }: { mat
         </div>
       )}
 
-      {/* ========================================= */}
-      {/* מודל קופץ להזנת משחק מתוך העץ */}
-      {/* ========================================= */}
       {bracketModalMatch && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm animate-fade-in-up" dir="rtl">
           <div className="relative w-full max-w-lg">

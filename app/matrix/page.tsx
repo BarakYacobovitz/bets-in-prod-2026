@@ -21,7 +21,7 @@ const checkIsMatchLocked = (m: any, state: number) => {
     if (m.roundName === "שמינית גמר" && s >= 7) return true;
     if (m.roundName === "רבע גמר" && s >= 9) return true;
     if (m.roundName === "חצי גמר" && s >= 11) return true;
-    if (m.roundName === "גמר" && s >= 13) return true;
+    if ((m.roundName === "גמר" || m.roundName === "מקום שלישי") && s >= 13) return true;
     return false;
   }
 };
@@ -72,10 +72,12 @@ export default function MatrixPage() {
   useEffect(() => {
     const fetchAllData = async () => {
       try {
-        const [uSnap, mSnap, pSnap, bpSnap, qSnap, tpSnap, bqDoc, aqDoc, atDoc, abDoc, sysDoc] = await Promise.all([
+        // הוספנו כאן את הקריאה ל-predictions_knockout !
+        const [uSnap, mSnap, pSnap, pkSnap, bpSnap, qSnap, tpSnap, bqDoc, aqDoc, atDoc, abDoc, sysDoc] = await Promise.all([
           getDocs(collection(db, "users")),
           getDocs(collection(db, "matches")),
           getDocs(collection(db, "predictions_matches")),
+          getDocs(collection(db, "predictions_knockout")), // <-- זה החלק שהיה חסר!
           getDocs(collection(db, "predictions_bonus")),
           getDocs(collection(db, "predictions_qualifiers")),
           getDocs(collection(db, "predictions_third_place")),
@@ -104,14 +106,27 @@ export default function MatrixPage() {
         });
         setMatches(mList);
 
+        // --- חיבור הניחושים של שלב הבתים ושל הנוק-אאוט למשתנה אחד! ---
         const preds: any = {};
+        
+        // 1. קריאת ניחושי הבתים
         pSnap.forEach(d => {
           const data = d.data();
           const uid = data.userId || d.id;
           if (!preds[uid]) preds[uid] = {};
           preds[uid][data.matchId] = data; 
         });
+        
+        // 2. קריאת ניחושי הנוקאאוט והוספה לאותו אובייקט
+        pkSnap.forEach(d => {
+          const data = d.data();
+          const uid = data.userId || d.id;
+          if (!preds[uid]) preds[uid] = {};
+          preds[uid][data.matchId] = data; 
+        });
+        
         setPredictions(preds);
+        // --------------------------------------------------------
 
         if (bqDoc.exists() && bqDoc.data().questions) {
             setBonusQuestions(bqDoc.data().questions);
@@ -374,10 +389,15 @@ export default function MatrixPage() {
                                  <div className="flex flex-col items-center w-8"><img src={getFlagUrl(m.awayTeam)} className="w-5 h-4 object-cover rounded-sm mb-1 shadow-sm" /><span className="text-[9px] font-black text-slate-200 truncate w-full text-center">{m.awayTeam.substring(0,3)}</span></div>
                               </div>
                               {m.isFinished && (
-                                <div className="text-[10px] text-emerald-400 font-black bg-emerald-900/30 px-2 py-0.5 rounded border border-emerald-500/20 mt-1 flex items-center justify-center gap-1 w-full">
-                                  <span className="w-3 text-center">{m.realHomeScore}</span><span className="text-emerald-500/50">-</span><span className="w-3 text-center">{m.realAwayScore}</span>
+                                <div className="text-[10px] text-emerald-400 font-black bg-emerald-900/30 px-2 py-0.5 rounded border border-emerald-500/20 mt-1 flex flex-col items-center justify-center gap-0.5 w-full">
+                                  <div className="flex items-center justify-center gap-1">
+                                    <span className="w-3 text-center">{m.realHomeScore}</span><span className="text-emerald-500/50">-</span><span className="w-3 text-center">{m.realAwayScore}</span>
+                                  </div>
+                                  {m.stage === "KNOCKOUT" && m.realQualifier && (
+                                     <span className="text-[8px] bg-emerald-800/40 px-1 rounded text-emerald-300">עולה: {m.realQualifier}</span>
+                                  )}
                                 </div>
-                              )}
+                              )} 
                            </div>
                         </th>
                      ))}
@@ -466,8 +486,24 @@ export default function MatrixPage() {
 
                         return (
                           <td key={m.id} className={tdClass}>
-                            <div className="flex items-center justify-center gap-1.5 w-full">
-                               <span className="w-3 text-center">{p.predictedHomeScore}</span><span className="opacity-40">-</span><span className="w-3 text-center">{p.predictedAwayScore}</span>
+                            <div className="flex flex-col items-center justify-center gap-1 w-full">
+                               <div className="flex items-center justify-center gap-1.5">
+                                 <span className="w-3 text-center">{p.predictedHomeScore}</span><span className="opacity-40">-</span><span className="w-3 text-center">{p.predictedAwayScore}</span>
+                               </div>
+                               
+                               {/* תוספת המעפילה לנוקאאוט */}
+                               {m.stage === "KNOCKOUT" && p.qualifier && (
+                                 <div className={`text-[8.5px] flex items-center gap-1 px-1.5 py-0.5 rounded shadow-sm border ${
+                                     m.isFinished 
+                                       ? (p.qualifier === m.realQualifier 
+                                           ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30' 
+                                           : 'bg-rose-500/20 text-rose-400 border-rose-500/30 line-through decoration-rose-500/50 opacity-75') 
+                                       : 'bg-purple-900/30 text-purple-300 border-purple-500/30'
+                                 }`}>
+                                   {getFlagUrl(p.qualifier) && <img src={getFlagUrl(p.qualifier)!} className="w-3 h-2 object-cover rounded-[1px] shadow-sm" alt="" />}
+                                   <span className="truncate max-w-[35px] leading-none" title={p.qualifier}>{p.qualifier}</span>
+                                 </div>
+                               )}
                             </div>
                           </td>
                         );

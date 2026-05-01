@@ -4,7 +4,7 @@ import { doc, getDoc, setDoc, collection, getDocs } from "firebase/firestore";
 import { db } from "../../app/firebase";
 import toast from "react-hot-toast";
 
-const KO_ROUNDS = ["32 הגדולות", "שמינית גמר", "רבע גמר", "חצי גמר", "גמר", "מקום שלישי"];
+const KO_ROUNDS = ["32 הגדולות", "שמינית גמר", "רבע גמר", "חצי גמר", "גמר"];
 
 const ALL_TEAMS = [
   "מקסיקו", "דרום אפריקה", "קוריאה הדרומית", "צ'כיה", "קנדה", "בוסניה", "קטר", "שווייץ",

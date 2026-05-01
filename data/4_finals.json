@@ -1,0 +1,18 @@
+[
+  {
+    "id": "ko2_1",
+    "homeTeam": "צרפת",
+    "awayTeam": "גרמניה",
+    "matchDate": "18/07/2026 21:00",
+    "stage": "KNOCKOUT",
+    "roundName": "מקום שלישי"
+  },
+  {
+    "id": "ko2_2",
+    "homeTeam": "ארגנטינה",
+    "awayTeam": "ברזיל",
+    "matchDate": "19/07/2026 21:00",
+    "stage": "KNOCKOUT",
+    "roundName": "גמר"
+  }
+]

@@ -1,0 +1,18 @@
+[
+  {
+    "id": "ko4_1",
+    "homeTeam": "ארגנטינה",
+    "awayTeam": "צרפת",
+    "matchDate": "14/07/2026 21:00",
+    "stage": "KNOCKOUT",
+    "roundName": "חצי גמר"
+  },
+  {
+    "id": "ko4_2",
+    "homeTeam": "ברזיל",
+    "awayTeam": "גרמניה",
+    "matchDate": "15/07/2026 21:00",
+    "stage": "KNOCKOUT",
+    "roundName": "חצי גמר"
+  }
+]

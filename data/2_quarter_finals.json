@@ -1,0 +1,34 @@
+[
+  {
+    "id": "ko8_1",
+    "homeTeam": "ארגנטינה",
+    "awayTeam": "אנגליה",
+    "matchDate": "09/07/2026 21:00",
+    "stage": "KNOCKOUT",
+    "roundName": "רבע גמר"
+  },
+  {
+    "id": "ko8_2",
+    "homeTeam": "צרפת",
+    "awayTeam": "ספרד",
+    "matchDate": "10/07/2026 17:00",
+    "stage": "KNOCKOUT",
+    "roundName": "רבע גמר"
+  },
+  {
+    "id": "ko8_3",
+    "homeTeam": "ברזיל",
+    "awayTeam": "פורטוגל",
+    "matchDate": "10/07/2026 21:00",
+    "stage": "KNOCKOUT",
+    "roundName": "רבע גמר"
+  },
+  {
+    "id": "ko8_4",
+    "homeTeam": "גרמניה",
+    "awayTeam": "הולנד",
+    "matchDate": "11/07/2026 17:00",
+    "stage": "KNOCKOUT",
+    "roundName": "רבע גמר"
+  }
+]

@@ -102,6 +102,7 @@ export default function Rules() {
           <p className="text-slate-300 mb-6 text-sm">
             בשלבי הנוק-אאוט, מעבר לניקוד על תוצאת המשחק עצמו <strong className="bg-orange-500/20 text-orange-300 px-1.5 py-0.5 rounded border border-orange-500/30 underline decoration-orange-500 decoration-2">בסיום 120 דקות</strong>, אתם מקבלים ניקוד משמעותי על בחירה נכונה של הנבחרת שתעפיל לשלב הבא (גם אם זה בפנדלים). ככל שמתקדמים בשלבים - הניקוד עולה!
           </p>
+          
           <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
             <div className="bg-slate-900/50 p-4 rounded-xl border border-slate-700/50 flex flex-col items-center justify-center text-center">
               <span className="text-slate-400 text-xs font-bold mb-2">שלב ה-32</span>
@@ -124,6 +125,9 @@ export default function Rules() {
               <span className="text-2xl font-black text-amber-500">+25</span>
             </div>
           </div>
+          <p className="text-[10px] text-slate-500 italic">
+              * ניחוש המנצחת במשחק על המקום ה-3 מזכה ב-10 נקודות (בדומה לשלב שמינית הגמר).
+            </p>
         </div>
 
         {/* קובייה 4: בונוסים ונעילות */}
