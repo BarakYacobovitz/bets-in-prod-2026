@@ -614,19 +614,15 @@ export default function Navbar() {
                 </div>
              </div>
 
-             <div className="flex flex-col gap-1 mr-0.5 md:mr-1">
-                <a href="/" onClick={navigateToRules} className="text-[8px] md:text-[10px] bg-blue-600 text-white font-bold px-1.5 py-0.5 md:px-2 md:py-0.5 rounded shadow-sm text-center hover:bg-blue-500 transition-colors cursor-pointer flex items-center justify-center gap-1">
-                  חוקים 📜
-                </a>
-                
-                {userEmail === ADMIN_EMAIL ? (
-                  <Link href="/admin" className="text-[8px] md:text-[10px] bg-emerald-600 text-white font-bold px-1.5 py-0.5 md:px-2 md:py-0.5 rounded shadow-sm text-center hover:bg-emerald-500 transition-colors">אדמין</Link>
-                ) : (
-                  <a href="/" onClick={navigateToLeaderboard} className="text-[8px] md:text-[10px] bg-amber-600 text-slate-900 font-black px-1.5 py-0.5 md:px-2 md:py-0.5 rounded shadow-sm text-center hover:bg-amber-500 transition-colors cursor-pointer flex items-center justify-center gap-1">
-                    טבלה 🏆
-                  </a>
+             <div className="flex flex-col justify-center gap-1.5 mr-2 md:mr-3">
+                {userEmail === ADMIN_EMAIL && (
+                  <Link href="/admin" className="text-[10px] md:text-xs bg-emerald-600 text-white font-bold px-3 py-1 md:px-4 md:py-1.5 rounded-lg shadow-sm text-center hover:bg-emerald-500 transition-colors tracking-wide">
+                    אדמין
+                  </Link>
                 )}
-                <button onClick={handleLogout} className="text-[8px] md:text-[10px] bg-slate-800 text-rose-400 font-bold px-1.5 py-0.5 md:px-2 md:py-0.5 rounded shadow-sm hover:bg-slate-700 transition-colors">התנתק</button>
+                <button onClick={handleLogout} className="text-[10px] md:text-xs bg-slate-800 border border-slate-700 text-rose-400 font-bold px-3 py-1 md:px-4 md:py-1.5 rounded-lg shadow-sm hover:bg-slate-700 hover:text-rose-300 transition-colors tracking-wide">
+                  התנתק
+                </button>
              </div>
         </div>
       </div>

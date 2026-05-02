@@ -41,3 +41,12 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+/* העלמת פס הגלילה למחלקת custom-scrollbar */
+.custom-scrollbar {
+  -ms-overflow-style: none;  /* תמיכה ב-IE ו-Edge */
+  scrollbar-width: none;  /* תמיכה ב-Firefox */
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  display: none; /* תמיכה ב-Chrome, Safari, Opera */
+}
