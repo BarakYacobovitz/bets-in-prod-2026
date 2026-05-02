@@ -328,12 +328,44 @@ export default function MatrixPage() {
          </div>
       </div>
 
-      <div className="flex bg-slate-900/50 p-1.5 rounded-2xl border border-slate-800 mb-6 max-w-md mx-auto shadow-inner">
-        {(["MATCHES", "QUALIFIERS", "BONUS"] as TabType[]).map(tab => (
-          <button key={tab} onClick={() => setActiveTab(tab)} className={`flex-1 py-3 rounded-xl font-black text-xs transition-all ${activeTab === tab ? "bg-blue-600 text-white shadow-lg scale-105" : "text-slate-500 hover:text-slate-300"}`}>
-            {tab === "MATCHES" ? "⚽ משחקים" : tab === "QUALIFIERS" ? "🌍 מעפילות" : "⭐ בונוסים"}
-          </button>
-        ))}
+{/* ========================================== */}
+      {/* טאבים ראשיים של מטריצת גילוי נאות - משימה 4 */}
+      {/* ========================================== */}
+      <div className="flex overflow-x-auto custom-scrollbar gap-2 mb-6 pb-2 bg-slate-900/50 p-2 rounded-2xl border border-slate-800 max-w-2xl mx-auto md:justify-center">
+        
+        {/* משחקים - כחול (Blue) */}
+        <button 
+          onClick={() => setActiveTab("MATCHES")} 
+          className={`flex flex-1 items-center justify-center gap-2 min-w-[120px] px-4 py-3 rounded-xl font-black whitespace-nowrap transition-all text-sm ${activeTab === "MATCHES" ? "bg-blue-600 text-white shadow-lg shadow-blue-500/20" : "text-slate-400 hover:bg-slate-800 hover:text-blue-400"}`}
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
+            <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /><polyline points="9 22 9 12 15 12 15 22" />
+          </svg>
+          משחקים
+        </button>
+
+        {/* מעפילות - טורקיז (Teal) */}
+        <button 
+          onClick={() => setActiveTab("QUALIFIERS")} 
+          className={`flex flex-1 items-center justify-center gap-2 min-w-[120px] px-4 py-3 rounded-xl font-black whitespace-nowrap transition-all text-sm ${activeTab === "QUALIFIERS" ? "bg-teal-600 text-white shadow-lg shadow-teal-500/20" : "text-slate-400 hover:bg-slate-800 hover:text-teal-400"}`}
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
+            <circle cx="12" cy="15" r="5" /><path d="M8.21 13.89L7 3h2l1 5h4l1-5h2l-1.21 10.89" />
+          </svg>
+          מעפילות
+        </button>
+
+        {/* בונוסים - זהב (Amber) */}
+        <button 
+          onClick={() => setActiveTab("BONUS")} 
+          className={`flex flex-1 items-center justify-center gap-2 min-w-[120px] px-4 py-3 rounded-xl font-black whitespace-nowrap transition-all text-sm ${activeTab === "BONUS" ? "bg-amber-500 text-slate-900 shadow-lg shadow-amber-500/20" : "text-slate-400 hover:bg-slate-800 hover:text-amber-400"}`}
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
+            <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+          </svg>
+          בונוסים
+        </button>
+
       </div>
 
       <div className="flex flex-wrap gap-3 mb-6 bg-slate-900/30 p-4 rounded-2xl border border-slate-800/50 items-end">

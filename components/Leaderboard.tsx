@@ -601,17 +601,47 @@ export default function Leaderboard() {
       
       {isFirstPlace && <Confetti />}
 
-      {/* טאבים ראשיים של הטבלה */}
-      <div className="flex flex-wrap gap-2 mb-4 bg-slate-900/50 p-2 rounded-2xl border border-slate-800">
-        <button onClick={() => setActiveBoard("GENERAL")} className={`flex-1 min-w-[120px] py-3 rounded-xl font-black transition-all ${activeBoard === "GENERAL" ? "bg-amber-600 text-slate-900 shadow-lg shadow-amber-500/20" : "text-slate-500 hover:bg-slate-800 hover:text-slate-300"}`}>🏆 דירוג כללי</button>
+{/* ========================================== */}
+      {/* טאבים ראשיים של הטבלה - משימה 2 מהבקלוג */}
+      {/* ========================================== */}
+      <div className="flex overflow-x-auto gap-2 mb-4 pb-2 custom-scrollbar bg-slate-900/50 p-2 rounded-2xl border border-slate-800 max-w-4xl mx-auto md:justify-center">
         
+        {/* דירוג כללי - תמיד זהב (Amber) כדי שיתכתב עם בונוסים/מקום 1 */}
+        <button 
+          onClick={() => setActiveBoard("GENERAL")} 
+          className={`px-6 py-3 rounded-xl font-black whitespace-nowrap transition-all text-sm flex items-center justify-center gap-2 ${activeBoard === "GENERAL" ? "bg-amber-500 text-slate-900 shadow-lg shadow-amber-500/20" : "text-slate-400 hover:bg-slate-800 hover:text-amber-400"}`}
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
+            <path d="M22 20H2" /><path d="M8 20V8h8v12" /><path d="M16 20v-8h6v8" /><path d="M2 20v-4h6v4" />
+          </svg>
+          דירוג כללי
+        </button>
+        
+        {/* נוק-אאוט - תמיד ורוד (Pink) בדיוק כמו בתפריט הניחושים */}
         {tournamentState >= 4 && (
-          <button onClick={() => setActiveBoard("KNOCKOUT")} className={`flex-1 min-w-[120px] py-3 rounded-xl font-black transition-all ${activeBoard === "KNOCKOUT" ? "bg-emerald-600 text-white shadow-lg shadow-emerald-500/20" : "text-slate-500 hover:bg-slate-800 hover:text-slate-300"}`}>🔥 נוק-אאוט</button>
+          <button 
+            onClick={() => setActiveBoard("KNOCKOUT")} 
+            className={`px-6 py-3 rounded-xl font-black whitespace-nowrap transition-all text-sm flex items-center justify-center gap-2 ${activeBoard === "KNOCKOUT" ? "bg-pink-600 text-white shadow-lg shadow-pink-500/20" : "text-slate-400 hover:bg-slate-800 hover:text-pink-400"}`}
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
+              <path d="M14.5 17.5L3 6V3h3l11.5 11.5" /><path d="M13 19l6-6" /><path d="M16 16l4 4" /><path d="M19 21l2-2" /><path d="M6.5 12.5L3 16v3h3l3.5-3.5" /><path d="M21 3v3l-3.5 3.5" /><path d="M18 5l-4 4" />
+            </svg>
+            נוק-אאוט
+          </button>
         )}
 
-        <button onClick={() => setActiveBoard("LEAGUES")} className={`flex-1 min-w-[120px] py-3 rounded-xl font-black transition-all ${activeBoard === "LEAGUES" ? "bg-blue-600 text-white shadow-lg shadow-blue-500/20" : "text-slate-500 hover:bg-slate-800 hover:text-slate-300"}`}>🏟️ ליגות פרטיות</button>
+        {/* ליגות פרטיות - תמיד כחול (Blue) */}
+        <button 
+          onClick={() => setActiveBoard("LEAGUES")} 
+          className={`px-6 py-3 rounded-xl font-black whitespace-nowrap transition-all text-sm flex items-center justify-center gap-2 ${activeBoard === "LEAGUES" ? "bg-blue-600 text-white shadow-lg shadow-blue-500/20" : "text-slate-400 hover:bg-slate-800 hover:text-blue-400"}`}
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
+            <rect width="18" height="11" x="3" y="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" />
+          </svg>
+          ליגות פרטיות
+        </button>
+        
       </div>
-
       {/* פאנל ניהול ובחירת ליגות פרטיות */}
       {activeBoard === "LEAGUES" && (
         <div className="mb-6 animate-fade-in-up">

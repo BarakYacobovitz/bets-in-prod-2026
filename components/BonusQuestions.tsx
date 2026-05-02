@@ -455,31 +455,50 @@ export default function BonusQuestions({ userId, tournamentState: propTournament
         </div>
       )}
 
-      <div className="flex overflow-x-auto custom-scrollbar gap-3 mb-6 pb-2 mt-2">
-         {[
-           { id: "TOURNAMENT", label: "🏆 כל הטורניר" },
-           { id: "GROUPS", label: "⚽ שלב הבתים" },
-           { id: "KNOCKOUT", label: "🔥 נוק-אאוט" }
-         ].map(tab => {
-           if (tab.id === "KNOCKOUT" && tournamentState < 4) return null;
-           return (
-             <button 
-               key={tab.id} 
-               onClick={() => { setBonusCategory(tab.id); if(tab.id !== "KNOCKOUT") setKnockoutRound("ALL"); }} 
-               className={`px-6 py-3 rounded-2xl font-bold whitespace-nowrap transition-all border shadow-sm ${
-                 bonusCategory === tab.id 
-                   ? "bg-amber-500 text-slate-900 border-amber-400" 
-                   : "bg-slate-900 text-slate-400 border-slate-800 hover:bg-slate-800 hover:text-amber-400"
-               }`}
-             >
-               {tab.label}
-             </button>
-           );
-         })}
+      {/* ========================================== */}
+      {/* טאבים ראשיים של שאלות בונוס - משימה 3 */}
+      {/* ========================================== */}
+      <div className="flex overflow-x-auto custom-scrollbar gap-2 mb-6 pb-2 mt-2 bg-slate-900/50 p-2 rounded-2xl border border-slate-800 max-w-3xl mx-auto md:justify-center">
+         
+         {/* כל הטורניר - זהב (Amber) */}
+         <button 
+           onClick={() => { setBonusCategory("TOURNAMENT"); setKnockoutRound("ALL"); }} 
+           className={`flex flex-1 items-center justify-center gap-2 min-w-[120px] px-4 py-3 rounded-xl font-black whitespace-nowrap transition-all text-sm ${bonusCategory === "TOURNAMENT" ? "bg-amber-500 text-slate-900 shadow-lg shadow-amber-500/20" : "text-slate-400 hover:bg-slate-800 hover:text-amber-400"}`}
+         >
+           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
+             <path d="M22 20H2" /><path d="M8 20V8h8v12" /><path d="M16 20v-8h6v8" /><path d="M2 20v-4h6v4" />
+           </svg>
+           כל הטורניר
+         </button>
+
+         {/* שלב הבתים - כחול (Blue) */}
+         <button 
+           onClick={() => { setBonusCategory("GROUPS"); setKnockoutRound("ALL"); }} 
+           className={`flex flex-1 items-center justify-center gap-2 min-w-[120px] px-4 py-3 rounded-xl font-black whitespace-nowrap transition-all text-sm ${bonusCategory === "GROUPS" ? "bg-blue-600 text-white shadow-lg shadow-blue-500/20" : "text-slate-400 hover:bg-slate-800 hover:text-blue-400"}`}
+         >
+           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
+             <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /><polyline points="9 22 9 12 15 12 15 22" />
+           </svg>
+           שלב הבתים
+         </button>
+
+         {/* נוק-אאוט - ורוד (Pink) - מוסתר לפני שלב 4 */}
+         {tournamentState >= 4 && (
+           <button 
+             onClick={() => setBonusCategory("KNOCKOUT")} 
+             className={`flex flex-1 items-center justify-center gap-2 min-w-[120px] px-4 py-3 rounded-xl font-black whitespace-nowrap transition-all text-sm ${bonusCategory === "KNOCKOUT" ? "bg-pink-600 text-white shadow-lg shadow-pink-500/20" : "text-slate-400 hover:bg-slate-800 hover:text-pink-400"}`}
+           >
+             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
+               <path d="M14.5 17.5L3 6V3h3l11.5 11.5" /><path d="M13 19l6-6" /><path d="M16 16l4 4" /><path d="M19 21l2-2" /><path d="M6.5 12.5L3 16v3h3l3.5-3.5" /><path d="M21 3v3l-3.5 3.5" /><path d="M18 5l-4 4" />
+             </svg>
+             נוק-אאוט
+           </button>
+         )}
       </div>
 
+      {/* תת-תפריט סבבי נוק-אאוט */}
       {bonusCategory === "KNOCKOUT" && (
-        <div className="flex overflow-x-auto gap-2 mb-6 pb-2 custom-scrollbar bg-slate-900/50 p-2 rounded-2xl border border-slate-800/50">
+        <div className="flex overflow-x-auto gap-2 mb-6 pb-2 custom-scrollbar bg-slate-900/50 p-2 rounded-2xl border border-slate-800 max-w-4xl mx-auto md:justify-center">
           {[
             { id: "ALL", label: "כללי (כל הנוק-אאוט)" },
             { id: "32 הגדולות", label: "32 הגדולות" },
@@ -491,10 +510,10 @@ export default function BonusQuestions({ userId, tournamentState: propTournament
             <button
               key={subTab.id}
               onClick={() => setKnockoutRound(subTab.id)}
-              className={`px-4 py-2.5 rounded-xl font-bold whitespace-nowrap transition-all text-sm border ${
+              className={`px-4 py-2.5 rounded-xl font-bold whitespace-nowrap transition-all text-sm flex items-center justify-center ${
                 knockoutRound === subTab.id
-                  ? "bg-purple-600 text-white border-purple-500 shadow-md"
-                  : "bg-slate-800 text-slate-400 border-slate-700 hover:bg-slate-700 hover:text-white"
+                  ? "bg-pink-600 text-white shadow-lg shadow-pink-500/20"
+                  : "text-slate-400 hover:bg-slate-800 hover:text-pink-400"
               }`}
             >
               {subTab.label}

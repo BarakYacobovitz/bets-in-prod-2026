@@ -424,7 +424,39 @@ export default function KnockoutView({ matches, userId, tournamentState }: { mat
           </div>
         </div>
       )}
-
+      {/* Footer עם קרדיט לאייקון - מעוצב בסגנון טשטוש זכוכית */}
+      <footer className="mt-12 mx-auto max-w-2xl w-full" dir="ltr">
+        <div className="bg-slate-900/60 backdrop-blur-sm p-4 rounded-2xl border border-slate-800 shadow-inner flex flex-col sm:flex-row items-center justify-center gap-3 text-center sm:text-left transition-all">
+          
+          {/* אייקון קטן של הגביע */}
+          <div className="text-2xl drop-shadow-[0_0_10px_rgba(251,191,36,0.5)]">🏆</div>
+          
+          {/* טקסט הקרדיט עם לינקים מעוצבים */}
+          <p className="text-slate-500 text-xs font-medium leading-relaxed">
+            World cup icons provided by{' '}
+            <a 
+              href="https://www.flaticon.com/free-icons/world-cup" 
+              title="world cup icons"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-amber-400 hover:text-amber-300 font-bold underline decoration-amber-500/30 decoration-dashed underline-offset-2 transition-colors"
+            >
+              Flaticon
+            </a>
+            . Created by{' '}
+            <a 
+              href="https://www.flaticon.com/authors/bankseengern" 
+              title="BankSeeNgern - Flaticon"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-amber-400 hover:text-amber-300 font-bold underline decoration-amber-500/30 decoration-dashed underline-offset-2 transition-colors"
+            >
+              BankSeeNgern
+            </a>
+            .
+          </p>
+        </div>
+      </footer>
     </div>
   );
 }
