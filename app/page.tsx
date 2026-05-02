@@ -134,61 +134,61 @@ export default function Home() {
     <div className="min-h-screen bg-slate-950 pt-08 pb-12 px-4 font-sans" dir="rtl">
       <div className="max-w-5xl mx-auto">
         
+{/* ========================================== */}
+        {/* תפריט ראשי עליון - גרסה קומפקטית ללא גלילה */}
         {/* ========================================== */}
-        {/* תפריט ראשי עליון */}
-        {/* ========================================== */}
-        <div className="flex bg-slate-900 p-1.5 rounded-2xl border border-slate-800 shadow-lg mb-6 max-w-3xl mx-auto z-40 relative">
+        <div className="flex bg-slate-900 p-1.5 rounded-2xl border border-slate-800 shadow-lg mb-6 max-w-3xl mx-auto z-40 relative md:justify-center gap-1">
+           
            <button 
              onClick={() => setActiveTab("DASHBOARD")}
-             className={`flex-1 py-3 rounded-xl font-black text-sm transition-all flex items-center justify-center gap-2 ${activeTab === "DASHBOARD" ? "bg-blue-600 text-white shadow-md" : "text-slate-400 hover:text-blue-400 hover:bg-blue-500/10"}`}
+             className={`flex-1 py-3 px-1 rounded-xl font-black whitespace-nowrap text-[11px] sm:text-sm transition-all flex items-center justify-center gap-1.5 ${activeTab === "DASHBOARD" ? "bg-blue-600 text-white shadow-md" : "text-slate-400 hover:text-blue-400 hover:bg-blue-500/10"}`}
            >
-             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
+             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4 sm:w-5 sm:h-5 shrink-0">
                <path d="M3.34 16a10 10 0 1 1 17.32 0" />
                <path d="m12 14 4-4" />
              </svg>
-             דאשבורד
+             <span>דשבורד</span>
            </button>
 
            <button 
              onClick={() => setActiveTab("PREDICTIONS")}
-             className={`flex-1 py-3 rounded-xl font-black text-sm transition-all flex items-center justify-center gap-2 ${activeTab === "PREDICTIONS" ? "bg-purple-600 text-white shadow-md" : "text-slate-400 hover:text-purple-400 hover:bg-purple-500/10"}`}
+             className={`flex-1 py-3 px-1 rounded-xl font-black whitespace-nowrap text-[11px] sm:text-sm transition-all flex items-center justify-center gap-1.5 ${activeTab === "PREDICTIONS" ? "bg-purple-600 text-white shadow-md" : "text-slate-400 hover:text-purple-400 hover:bg-purple-500/10"}`}
            >
-             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
+             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4 sm:w-5 sm:h-5 shrink-0">
                <path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z" />
                <path d="m15 5 4 4" />
              </svg>
-             אזור הניחושים
+             <span>ניחושים</span>
            </button>
 
            <button 
              onClick={() => setActiveTab("LEADERBOARD")}
-             className={`flex-1 py-3 rounded-xl font-black text-sm transition-all flex items-center justify-center gap-2 ${activeTab === "LEADERBOARD" ? "bg-amber-500 text-slate-900 shadow-md" : "text-slate-400 hover:text-amber-400 hover:bg-amber-500/10"}`} 
+             className={`flex-1 py-3 px-1 rounded-xl font-black whitespace-nowrap text-[11px] sm:text-sm transition-all flex items-center justify-center gap-1.5 ${activeTab === "LEADERBOARD" ? "bg-amber-500 text-slate-900 shadow-md" : "text-slate-400 hover:text-amber-400 hover:bg-amber-500/10"}`} 
            >
-             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
+             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4 sm:w-5 sm:h-5 shrink-0">
                <path d="M22 20H2" />
                <path d="M8 20V8h8v12" />
                <path d="M16 20v-8h6v8" />
                <path d="M2 20v-4h6v4" />
              </svg>
-             טבלת הליגה
+             <span>דירוג</span>
            </button>
 
            <button 
              onClick={() => setActiveTab("RULES")}
-             className={`flex-1 min-w-[100px] py-3 rounded-xl font-black text-sm transition-all flex items-center justify-center gap-2 ${activeTab === "RULES" ? "bg-emerald-600 text-white shadow-md" : "text-slate-400 hover:text-emerald-400 hover:bg-emerald-500/10"}`}
+             className={`flex-1 py-3 px-1 rounded-xl font-black whitespace-nowrap text-[11px] sm:text-sm transition-all flex items-center justify-center gap-1.5 ${activeTab === "RULES" ? "bg-emerald-600 text-white shadow-md" : "text-slate-400 hover:text-emerald-400 hover:bg-emerald-500/10"}`}
            >
-             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
+             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4 sm:w-5 sm:h-5 shrink-0">
                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
                <polyline points="14 2 14 8 20 8" />
                <line x1="16" x2="8" y1="13" y2="13" />
                <line x1="16" x2="8" y1="17" y2="17" />
                <polyline points="10 9 9 9 8 9" />
              </svg>
-             חוקים
+             <span>חוקים</span>
            </button>
         </div>
-
-        {/* ========================================== */}
+{/* ========================================== */}
 {/* תפריט ניחושים דינמי - משימה 1 מהבקלוג */}
 {/* ========================================== */}
 {activeTab === "PREDICTIONS" && (
