@@ -336,210 +336,361 @@ export default function BonusQuestions({ userId, tournamentState: propTournament
   const filteredQuestions = questions.filter(q => {
     if (q.phase !== bonusCategory) return false;
     if (bonusCategory === "KNOCKOUT") {
-       if (knockoutRound !== "ALL" && q.knockoutRound && q.knockoutRound !== "ALL" && q.knockoutRound !== knockoutRound) return false;
+       // הגדרה קשיחה: שאלות ללא הגדרת שלב ייחשבו כ"כללי", ואנחנו דורשים התאמה מוחלטת לטאב שנבחר
+       const qRound = q.knockoutRound || "ALL";
+       if (qRound !== knockoutRound) return false;
     }
     return true;
   });
-
-  const regularQuestions = filteredQuestions.filter(q => !q.isDouble && !q.isSurprise);
+const regularQuestions = filteredQuestions.filter(q => !q.isDouble && !q.isSurprise);
   const doubleQuestions = filteredQuestions.filter(q => q.isDouble && !q.isSurprise);
   const surpriseQuestions = filteredQuestions.filter(q => q.isSurprise);
 
-  const activeQuestionsList = weightTab === "REGULAR" ? regularQuestions : weightTab === "DOUBLE" ? doubleQuestions : surpriseQuestions;
+  // פונקציית עזר שמרנדרת כרטיסיית שאלה בודדת - עברה "דיאטה" קלה כדי לחסוך מקום בגלילה
+  const renderQuestionCard = (q: any) => {
+    const locked = isQuestionLocked(q);
+    const hasTruth = !!realBonusAnswers[q.id];
+    const myPoints = checkAnswerPoints(q, answers[q.id]);
+    
+    const openMs = q.openTime ? parseDateTimeLocal(q.openTime) : 0;
+    const isWaitingToOpen = q.isSurprise && nowMs < openMs;
 
-  useEffect(() => {
-    if (activeQuestionsList.length === 0) {
-      if (regularQuestions.length > 0) setWeightTab("REGULAR");
-      else if (doubleQuestions.length > 0) setWeightTab("DOUBLE");
-      else if (surpriseQuestions.length > 0) setWeightTab("SURPRISE");
+    let cardStyle = "bg-slate-900 border-slate-700";
+    let shadowStyle = "shadow-md";
+    
+    if (q.isSurprise) {
+      cardStyle = "bg-purple-900/20 border-purple-500/50";
+      shadowStyle = "shadow-[0_0_15px_rgba(168,85,247,0.15)]";
+    } else if (q.isDouble) {
+      cardStyle = "bg-rose-900/20 border-rose-500/50";
+      shadowStyle = "shadow-[0_0_15px_rgba(225,29,72,0.15)]";
     }
-  }, [regularQuestions.length, doubleQuestions.length, surpriseQuestions.length, activeQuestionsList.length]);
+    
+    if (locked) {
+       cardStyle = "bg-slate-900 border-slate-700 opacity-80 grayscale-[20%]";
+       shadowStyle = "shadow-sm";
+    }
+    
+    if (isWaitingToOpen) {
+       cardStyle = "bg-slate-900 border-purple-500/50 opacity-90";
+    }
 
-  const handleOpenSpy = async (q: any) => {
-    setSpyModalQuestion(q);
-    setSpySearchQuery("");
-    setSpyFilter("ALL");
-    setIsLoadingSpy(true);
-    try {
-      const usersSnap = await getDocs(collection(db, "users"));
-      const allUsers: any[] = [];
-      usersSnap.forEach(doc => allUsers.push({ id: doc.id, ...doc.data() }));
+    const currentAnswerType = q.answerType || "TEAM";
 
-      allUsers.sort((a, b) => (Number(b.totalPoints) || 0) - (Number(a.totalPoints) || 0));
-      let currentRank = 1;
-      const usersMap: any = {};
-      allUsers.forEach((u, i) => {
-        if (i > 0 && (Number(u.totalPoints) || 0) < (Number(allUsers[i - 1].totalPoints) || 0)) {
-          currentRank = i + 1;
-        }
-        usersMap[u.id] = {
-          name: u.name || "שחקן לא ידוע",
-          totalPoints: Number(u.totalPoints) || 0,
-          rank: currentRank
-        }; 
-      });
+    return (
+      <div key={q.id} id={`bonus-${q.id}`} className={`${cardStyle} p-4 md:p-5 rounded-2xl border ${shadowStyle} flex flex-col h-full transition-all duration-300`}>
+         
+         <div className="flex justify-between items-start mb-3 gap-3">
+            <div className="flex flex-col gap-1.5">
+              {!isWaitingToOpen && (
+                <div className="flex flex-wrap gap-1.5">
+                <span className="text-[10px] font-black text-slate-400 bg-slate-950 px-2 py-0.5 rounded w-fit border border-slate-800">
+                     קופה: <span className={q.isDouble ? "text-rose-400" : "text-amber-400"}>
+                     {q.isProximity ? "עד 50" : q.points} נק'
+                     </span>
+                </span>
+                {q.isProximity && (
+                <span className="text-[10px] font-black text-orange-400 bg-orange-950/30 px-2 py-0.5 rounded w-fit border border-orange-500/50">
+                🤪 בעל הבית השתגע
+               </span>
+               )}
+             {q.isDouble && <span className="text-[10px] font-black text-rose-400 bg-rose-950/30 px-2 py-0.5 rounded border border-rose-500/30">🔥 Double</span>}
+              </div>
+              )}
+              
+              {isWaitingToOpen && (
+                 <span className="text-[10px] font-black text-purple-400 bg-purple-900/50 px-2 py-0.5 rounded w-fit border border-purple-500/50 flex items-center gap-1">
+                    🎁 הפתעה בדרך!
+                 </span>
+              )}
+            </div>
+            
+            <div className="flex flex-col items-end gap-1.5 shrink-0">
+              <div className="flex gap-1.5">
+                 {!locked && !isWaitingToOpen && (
+                    <button 
+                      onClick={() => handleRandomizeSingle(q)}
+                      className="bg-slate-800 hover:bg-slate-700 text-slate-300 w-6 h-6 rounded-full flex items-center justify-center text-xs shadow-md transition-all active:scale-95 border border-slate-600"
+                      title="הגרל תשובה לשאלה זו"
+                    >
+                      🎲
+                    </button>
+                 )}
+                 {q.isSurprise && !isWaitingToOpen && <span className="bg-purple-600 w-6 h-6 rounded-full flex items-center justify-center text-[10px] shadow-md" title="שאלת הפתעה!">🎁</span>}
+                 {q.isDouble && !q.isSurprise && <span className="bg-rose-600 w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black shadow-md text-white" title="ניקוד כפול!">X2</span>}
+              </div>
+              {hasTruth && myPoints !== null && !isWaitingToOpen && (
+                 <span className={`px-2 py-0.5 rounded text-[10px] font-black shadow-sm border ${myPoints > 0 ? "bg-emerald-900/40 text-emerald-400 border-emerald-500/50" : "bg-rose-950/50 text-rose-400 border-rose-500/40"}`}>
+                   {myPoints > 0 ? `🎯 +${myPoints} נק'` : "0 נק'"}
+                 </span>
+              )}
+            </div>
+         </div>
+         
+         <h3 className="text-white font-bold text-base md:text-lg leading-snug mb-2">
+           {isWaitingToOpen ? "שאלת הפתעה סודית..." : q.label}
+         </h3>
+         
+         {realBonusData.leading?.[q.id] && !locked && !isWaitingToOpen && (
+            <div className="text-[10px] font-bold text-amber-400 bg-amber-950/30 px-2 py-1 rounded-lg border border-amber-500/20 mb-3 inline-flex items-center gap-1.5 w-fit">
+               <span className="animate-pulse">👑 מובילה כרגע:</span> 
+               {Array.isArray(realBonusData.leading[q.id]) ? realBonusData.leading[q.id].join(', ') : realBonusData.leading[q.id]}
+            </div>
+         )}
 
-      const allBonusSnap = await getDocs(collection(db, "predictions_bonus"));
-      const gathered: any[] = [];
-      allBonusSnap.forEach(doc => {
-        const data = doc.data();
-        const ans = data.answers?.[q.id];
-        if (ans) {
-          const userIdDoc = doc.id;
-          gathered.push({
-            userId: userIdDoc,
-            userName: usersMap[userIdDoc]?.name || "משתמש",
-            userTotalPoints: usersMap[userIdDoc]?.totalPoints || 0,
-            userRank: usersMap[userIdDoc]?.rank || 999,
-            answer: ans,
-            points: checkAnswerPoints(q, ans)
-          });
-        }
-      });
-      gathered.sort((a, b) => b.userTotalPoints - a.userTotalPoints);
-      setSpyData(gathered);
-    } catch (e) { console.error(e); } 
-    finally { setIsLoadingSpy(false); }
+         <div className="mt-auto pt-3 flex-1 flex flex-col justify-end">
+            {isWaitingToOpen ? (
+               <div className="bg-slate-950/80 border border-slate-700 p-4 rounded-xl text-center shadow-inner">
+                  <span className="text-3xl block mb-2 opacity-80 animate-bounce">🎁</span>
+                  <h4 className="text-purple-400 font-bold text-sm mb-1">השאלה תיחשף בקרוב!</h4>
+                  <p className="text-slate-400 text-[10px]">הכינו את הניחושים שלכם.</p>
+               </div>
+            ) : currentAnswerType === "TEAM" ? (() => {
+               const teamOpts = q.specificTeams ? q.specificTeams.split(",").map((s:string)=>s.trim()).filter(Boolean) : [];
+               const finalOpts = teamOpts.length > 0 ? teamOpts : allTeams;
+               const extras = [];
+               if (q.hasNoneOption) extras.push("אף נבחרת");
+               if (q.hasAllOption) extras.push("כל הנבחרות");
+               
+               const totalOptionsCount = finalOpts.length + extras.length;
+               if (teamOpts.length > 0 && totalOptionsCount <= 8) {
+                  const allOpts = [...extras, ...finalOpts];
+                  return (
+                     <div className="flex flex-col gap-1.5">
+                        {allOpts.map((opt: string) => (
+                           <button
+                              key={opt}
+                              onClick={() => !locked && handleChange(q.id, opt)}
+                              disabled={locked}
+                              className={`w-full py-2.5 px-3 rounded-xl font-bold text-sm text-right transition-all flex items-center gap-3 ${answers[q.id] === opt ? "bg-amber-600/20 text-amber-400 border border-amber-500 shadow-md" : "bg-slate-950 text-slate-400 border border-slate-700 hover:bg-slate-800"} ${locked && answers[q.id] !== opt ? "opacity-50 cursor-not-allowed" : ""}`}
+                           >
+                              <div className={`w-3.5 h-3.5 rounded-full border flex items-center justify-center shrink-0 ${answers[q.id] === opt ? "border-amber-400" : "border-slate-500"}`}>
+                                {answers[q.id] === opt && <div className="w-1.5 h-1.5 bg-amber-400 rounded-full"></div>}
+                              </div>
+                              {getFlagUrl(opt) && <img src={getFlagUrl(opt)!} className="w-5 h-3.5 object-cover rounded-sm shadow-sm" alt="flag" />}
+                              <span className="truncate">{opt}</span>
+                           </button>
+                        ))}
+                     </div>
+                  );
+               }
+
+               return (
+                  <div className="relative">
+                     <AutocompleteInput
+                        value={answers[q.id] || ""}
+                        onChange={(val: string) => handleChange(q.id, val)}
+                        placeholder="בחר או הקלד נבחרת..."
+                        suggestions={[...extras, ...finalOpts]}
+                        disabled={locked}
+                        showAllOnFocus={true}
+                        getFlag={(val) => getFlagUrl(val)}
+                        customClassName={`w-full px-4 py-3 pl-10 rounded-xl font-bold text-sm outline-none transition-all shadow-inner ${locked ? "bg-slate-900/50 text-slate-400 border-slate-700 cursor-not-allowed" : (!answers[q.id] || answers[q.id].trim()==="") ? "bg-slate-950 text-white border-amber-500/80 focus:border-amber-400" : "bg-slate-900 text-white border-slate-600 focus:border-blue-500"}`}
+                     />
+                     {answers[q.id] && getFlagUrl(answers[q.id]) && (
+                        <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                           <img src={getFlagUrl(answers[q.id])!} className="w-5 h-3.5 object-cover rounded-sm shadow-sm" alt="flag" />
+                        </div>
+                     )}
+                  </div>
+               );
+            })() : currentAnswerType === "CUSTOM" ? (() => {
+               const opts = q.possibleOptions ? q.possibleOptions.split(",").map((s:string)=>s.trim()).filter(Boolean) : [];
+               return (
+                  <div className="flex flex-col gap-1.5">
+                     {opts.map((opt: string) => (
+                        <button
+                           key={opt}
+                           onClick={() => !locked && handleChange(q.id, opt)}
+                           disabled={locked}
+                           className={`w-full py-2.5 px-3 rounded-xl font-bold text-sm text-right transition-all flex items-center gap-3 ${answers[q.id] === opt ? "bg-amber-600/20 text-amber-400 border border-amber-500 shadow-md" : "bg-slate-950 text-slate-400 border border-slate-700 hover:bg-slate-800"} ${locked && answers[q.id] !== opt ? "opacity-50 cursor-not-allowed" : ""}`}
+                        >
+                           <div className={`w-3.5 h-3.5 rounded-full border flex items-center justify-center shrink-0 ${answers[q.id] === opt ? "border-amber-400" : "border-slate-500"}`}>
+                             {answers[q.id] === opt && <div className="w-1.5 h-1.5 bg-amber-400 rounded-full"></div>}
+                           </div>
+                           <span className="truncate">{opt}</span>
+                        </button>
+                     ))}
+                  </div>
+               );
+            })() : currentAnswerType === "NUMBER_PURE" ? (
+               <input
+                 type="number"
+                 value={answers[q.id] || ""}
+                 onChange={e => handleChange(q.id, e.target.value)}
+                 disabled={locked}
+                 placeholder="הזן מספר..."
+                 className={`w-full px-4 py-3 rounded-xl font-bold text-center text-sm outline-none transition-all shadow-inner ${locked ? "bg-slate-900/50 text-slate-400 border-slate-700 cursor-not-allowed" : (!answers[q.id] || answers[q.id].trim()==="") ? "bg-slate-950 text-white border-amber-500/80 focus:border-amber-400" : "bg-slate-900 text-white border-slate-600 focus:border-blue-500"}`}
+               />
+            ) : currentAnswerType === "NUMBER_MINUTE" ? (
+               <input
+                 type="text"
+                 value={answers[q.id] || ""}
+                 onChange={e => handleChange(q.id, e.target.value)}
+                 disabled={locked}
+                 placeholder="למשל: 45+3"
+                 dir="ltr"
+                 className={`w-full px-4 py-3 rounded-xl font-bold text-center text-sm outline-none transition-all shadow-inner ${locked ? "bg-slate-900/50 text-slate-400 border-slate-700 cursor-not-allowed" : (!answers[q.id] || answers[q.id].trim()==="") ? "bg-slate-950 text-white border-amber-500/80 focus:border-amber-400" : "bg-slate-900 text-white border-slate-600 focus:border-blue-500"}`}
+               />
+            ) : currentAnswerType === "PLAYER" ? (() => {
+               const pInfo = getPlayerInfo(answers[q.id]);
+               return (
+                  <div className="relative">
+                     <AutocompleteInput
+                        value={answers[q.id] || ""}
+                        onChange={(val: string) => handleChange(q.id, val)}
+                        placeholder="הקלד או בחר שם שחקן..."
+                        suggestions={TOP_PLAYERS_NAMES}
+                        disabled={locked}
+                        getFlag={(val) => {
+                           const info = getPlayerInfo(val);
+                           return info ? getFlagUrl(info.country) : null;
+                        }}
+                        getSubtitle={(val) => getPlayerInfo(val)?.country}
+                        customClassName={`w-full px-4 py-3 rounded-xl font-bold text-sm outline-none transition-all shadow-inner ${locked ? "bg-slate-900/50 text-slate-400 border-slate-700 cursor-not-allowed" : (!answers[q.id] || answers[q.id].trim()==="") ? "bg-slate-950 text-white border-amber-500/80 focus:border-amber-400" : "bg-slate-900 text-white border-slate-600 focus:border-blue-500"}`}
+                     />
+                     {pInfo && (
+                        <div className="absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none flex items-center gap-1.5 text-[9px] sm:text-[10px] font-bold text-slate-200 bg-slate-800 px-2 py-0.5 rounded-lg border border-slate-600 shadow-md">
+                           {getFlagUrl(pInfo.country) && <img src={getFlagUrl(pInfo.country)!} className="w-3.5 h-2.5 object-cover rounded-sm shadow-sm" alt="flag" />}
+                           {pInfo.country}
+                        </div>
+                     )}
+                  </div>
+               );
+            })() : (
+               <input
+                 type="text"
+                 value={answers[q.id] || ""}
+                 onChange={e => handleChange(q.id, e.target.value)}
+                 disabled={locked}
+                 placeholder="הקלד תשובה חופשית..."
+                 className={`w-full px-4 py-3 rounded-xl font-bold text-sm outline-none transition-all shadow-inner ${locked ? "bg-slate-900/50 text-slate-400 border-slate-700 cursor-not-allowed" : (!answers[q.id] || answers[q.id].trim()==="") ? "bg-slate-950 text-white border-amber-500/80 focus:border-amber-400" : "bg-slate-900 text-white border-slate-600 focus:border-blue-500"}`}
+               />
+            )}
+         </div>
+
+         {hasTruth && !isWaitingToOpen && (
+           <div className="mt-3 bg-slate-950/80 p-2 rounded-xl border border-slate-700 text-center shadow-inner flex flex-col items-center">
+             <span className="text-[9px] text-slate-500 block mb-1 font-black uppercase tracking-wider">אמת בפועל:</span>
+             <div className="text-emerald-400 font-bold text-xs flex flex-wrap justify-center gap-1">
+                {Array.isArray(realBonusAnswers[q.id]) 
+                  ? realBonusAnswers[q.id].map((ans:string, i:number) => {
+                      const pInfo = currentAnswerType === "PLAYER" ? getPlayerInfo(ans) : null;
+                      return (
+                      <span key={i} className="flex items-center gap-1 bg-emerald-900/20 px-2 py-0.5 rounded-md border border-emerald-500/20">
+                        {getFlagUrl(ans) && <img src={getFlagUrl(ans)!} className="w-3 h-2 object-cover rounded-sm" alt="flag" />}
+                        <span>{ans} {pInfo && <span className="text-emerald-500/70 text-[9px] pr-1">({pInfo.country})</span>}</span>
+                      </span>
+                    )})
+                  : (() => {
+                      const ans = realBonusAnswers[q.id];
+                      const pInfo = currentAnswerType === "PLAYER" ? getPlayerInfo(ans) : null;
+                      return (
+                      <span className="flex items-center gap-1 bg-emerald-900/20 px-2.5 py-0.5 rounded-md border border-emerald-500/20">
+                        {getFlagUrl(ans) && <img src={getFlagUrl(ans)!} className="w-3.5 h-2.5 object-cover rounded-sm" alt="flag" />}
+                        <span>{ans} {pInfo && <span className="text-emerald-500/70 text-[10px] pr-1">({pInfo.country})</span>}</span>
+                      </span>
+                    )})()
+                }
+             </div>
+           </div>
+         )}
+         
+         {locked && !hasTruth && !isWaitingToOpen && (
+           <button onClick={() => handleOpenSpy(q)} className="mt-3 w-full py-2 rounded-xl font-black text-xs transition-all border flex items-center justify-center gap-1.5 bg-slate-900 text-slate-400 hover:text-white border-slate-700 hover:bg-slate-800 shadow-sm active:scale-95">
+             <span className="text-sm">🕵️‍♂️</span> הצג ניחושי חברים
+           </button>
+         )}
+      </div>
+    );
   };
 
-  const availableQuestions = questions.filter(q => {
-    if (q.isSurprise) {
-      const openMs = q.openTime ? parseDateTimeLocal(q.openTime) : 0;
-      if (nowMs < openMs) return false;
-    }
-    if (q.phase === "KNOCKOUT" && tournamentState < 4) {
-      return false;
-    }
-    return true;
-  });
-  
-  const answeredCount = availableQuestions.filter(q => answers[q.id] && String(answers[q.id]).trim() !== "").length;
-  const totalAvailableCount = availableQuestions.length;
-  const progressPercent = totalAvailableCount > 0 ? Math.round((answeredCount / totalAvailableCount) * 100) : 0;
-
-  if (isLoading) return <div className="text-center text-blue-400 animate-pulse mt-12 font-bold text-xl">טוען שאלות בונוס... ⚽</div>;
-
   return (
-    <div className="space-y-6 max-w-4xl mx-auto w-full animate-fade-in-up pb-20">
-      
-      <div className="bg-gradient-to-br from-amber-900/40 to-slate-900 p-6 md:p-8 rounded-3xl border border-amber-500/30 shadow-xl relative overflow-hidden">
-         <div className="absolute -top-10 -left-10 w-40 h-40 bg-amber-500/10 rounded-full blur-3xl pointer-events-none"></div>
-         <h2 className="text-2xl md:text-3xl font-black text-amber-400 mb-2 flex items-center gap-3">
-            <span className="drop-shadow-md">⭐</span> שאלות בונוס
-         </h2>
-         <p className="text-slate-400 text-sm md:text-base">הזדמנות לאסוף נקודות נוספות. ענה על השאלות לפני שחלון הזמן ננעל!</p>
-      </div>
-
-      {totalAvailableCount > 0 && (
-        <div className="bg-slate-900/50 p-4 rounded-2xl border border-slate-800 shadow-inner">
-           <div className="flex justify-between items-end mb-2">
-             <div className="flex flex-col">
-               <span className="text-slate-400 text-[10px] font-black tracking-widest uppercase">התקדמות בונוסים</span>
-               <span className="text-white font-bold text-sm">ענית על <span className="text-amber-400">{answeredCount}</span> מתוך {totalAvailableCount}</span>
-             </div>
-             <span className="text-amber-400 font-black">{progressPercent}%</span>
-           </div>
-           <div className="w-full h-2.5 bg-slate-950 rounded-full overflow-hidden border border-slate-800 relative">
-             <div 
-               className="h-full bg-gradient-to-l from-amber-400 to-amber-600 rounded-full transition-all duration-500 ease-out relative"
-               style={{ width: `${progressPercent}%` }}
-             >
-                <div className="absolute inset-0 bg-white/20 w-full h-full animate-[shimmer_2s_infinite] skew-x-12"></div>
-             </div>
-           </div>
-           {progressPercent === 100 && (
-             <div className="text-center mt-2.5 text-[11px] text-emerald-400 font-bold animate-pulse">
-               🏆 מדהים! השלמת את כל השאלות שפתוחות כרגע.
-             </div>
-           )}
-        </div>
-      )}
-
-      {/* ========================================== */}
-      {/* טאבים ראשיים של שאלות בונוס - משימה 3 */}
+    <>
+{/* ========================================== */}
+      {/* 1. טאבים ראשיים - חכמים (עם אייקונים וקטוריים) */}
       {/* ========================================== */}
       <div className="flex overflow-x-auto custom-scrollbar gap-2 mb-6 pb-2 mt-2 bg-slate-900/50 p-2 rounded-2xl border border-slate-800 max-w-3xl mx-auto md:justify-center">
          
-         {/* כל הטורניר - זהב (Amber) */}
          <button 
            onClick={() => { setBonusCategory("TOURNAMENT"); setKnockoutRound("ALL"); }} 
            className={`flex flex-1 items-center justify-center gap-2 min-w-[120px] px-4 py-3 rounded-xl font-black whitespace-nowrap transition-all text-sm ${bonusCategory === "TOURNAMENT" ? "bg-amber-500 text-slate-900 shadow-lg shadow-amber-500/20" : "text-slate-400 hover:bg-slate-800 hover:text-amber-400"}`}
          >
-           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
-             <path d="M22 20H2" /><path d="M8 20V8h8v12" /><path d="M16 20v-8h6v8" /><path d="M2 20v-4h6v4" />
+           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
+             <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/>
            </svg>
-           כל הטורניר
+           <span>כל הטורניר</span>
+           {tournamentState >= 1 && (
+             <span className="opacity-70 bg-slate-950/20 p-1 rounded-md mr-1 border border-slate-900/10">
+               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-3 h-3"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+             </span>
+           )}
          </button>
 
-         {/* שלב הבתים - כחול (Blue) */}
          <button 
            onClick={() => { setBonusCategory("GROUPS"); setKnockoutRound("ALL"); }} 
            className={`flex flex-1 items-center justify-center gap-2 min-w-[120px] px-4 py-3 rounded-xl font-black whitespace-nowrap transition-all text-sm ${bonusCategory === "GROUPS" ? "bg-blue-600 text-white shadow-lg shadow-blue-500/20" : "text-slate-400 hover:bg-slate-800 hover:text-blue-400"}`}
          >
-           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
-             <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /><polyline points="9 22 9 12 15 12 15 22" />
+           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
+             <rect width="7" height="7" x="3" y="3" rx="1"/><rect width="7" height="7" x="14" y="3" rx="1"/><rect width="7" height="7" x="14" y="14" rx="1"/><rect width="7" height="7" x="3" y="14" rx="1"/>
            </svg>
-           שלב הבתים
+           <span>שלב הבתים</span>
+           {tournamentState >= 1 && (
+             <span className="opacity-70 bg-slate-950/20 p-1 rounded-md mr-1 border border-slate-900/10">
+               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-3 h-3"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+             </span>
+           )}
          </button>
 
-         {/* נוק-אאוט - ורוד (Pink) - מוסתר לפני שלב 4 */}
          {tournamentState >= 4 && (
            <button 
              onClick={() => setBonusCategory("KNOCKOUT")} 
              className={`flex flex-1 items-center justify-center gap-2 min-w-[120px] px-4 py-3 rounded-xl font-black whitespace-nowrap transition-all text-sm ${bonusCategory === "KNOCKOUT" ? "bg-pink-600 text-white shadow-lg shadow-pink-500/20" : "text-slate-400 hover:bg-slate-800 hover:text-pink-400"}`}
            >
-             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
-               <path d="M14.5 17.5L3 6V3h3l11.5 11.5" /><path d="M13 19l6-6" /><path d="M16 16l4 4" /><path d="M19 21l2-2" /><path d="M6.5 12.5L3 16v3h3l3.5-3.5" /><path d="M21 3v3l-3.5 3.5" /><path d="M18 5l-4 4" />
+             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
+               <polyline points="14.5 17.5 3 6 3 3 6 3 17.5 14.5"/><line x1="13" x2="19" y1="19" y2="13"/><line x1="16" x2="20" y1="16" y2="20"/><line x1="19" x2="21" y1="21" y2="19"/><polyline points="14.5 6.5 18 3 21 3 21 6 17.5 9.5"/><line x1="5" x2="9" y1="14" y2="18"/><line x1="7" x2="4" y1="17" y2="20"/><line x1="3" x2="5" y1="19" y2="21"/>
              </svg>
-             נוק-אאוט
+             <span>נוק-אאוט</span>
            </button>
          )}
       </div>
 
-      {/* תת-תפריט סבבי נוק-אאוט */}
+      {/* ========================================== */}
+      {/* 2. תת-תפריט סבבי נוק-אאוט */}
+      {/* ========================================== */}
       {bonusCategory === "KNOCKOUT" && (
         <div className="flex overflow-x-auto gap-2 mb-6 pb-2 custom-scrollbar bg-slate-900/50 p-2 rounded-2xl border border-slate-800 max-w-4xl mx-auto md:justify-center">
           {[
-            { id: "ALL", label: "כללי (כל הנוק-אאוט)" },
-            { id: "32 הגדולות", label: "32 הגדולות" },
-            { id: "שמינית גמר", label: "שמינית גמר" },
-            { id: "רבע גמר", label: "רבע גמר" },
-            { id: "חצי גמר", label: "חצי גמר" },
-            { id: "גמר", label: "גמר" }
-          ].map(subTab => (
-            <button
-              key={subTab.id}
-              onClick={() => setKnockoutRound(subTab.id)}
-              className={`px-4 py-2.5 rounded-xl font-bold whitespace-nowrap transition-all text-sm flex items-center justify-center ${
-                knockoutRound === subTab.id
-                  ? "bg-pink-600 text-white shadow-lg shadow-pink-500/20"
-                  : "text-slate-400 hover:bg-slate-800 hover:text-pink-400"
-              }`}
-            >
-              {subTab.label}
-            </button>
-          ))}
-        </div>
-      )}
+            { id: "ALL", label: "כללי", visible: 4, locked: 5 },
+            { id: "32 הגדולות", label: "32 הגדולות", visible: 4, locked: 5 },
+            { id: "שמינית גמר", label: "שמינית גמר", visible: 6, locked: 7 },
+            { id: "רבע גמר", label: "רבע גמר", visible: 8, locked: 9 },
+            { id: "חצי גמר", label: "חצי גמר", visible: 10, locked: 11 },
+            { id: "גמר", label: "גמר", visible: 12, locked: 13 }
+          ].map(subTab => {
+            if (tournamentState < subTab.visible) return null;
+            const isLocked = tournamentState >= subTab.locked;
 
-      {filteredQuestions.length > 0 && (
-         <div className="flex flex-wrap justify-center gap-2 mb-6 md:mb-8 bg-slate-900/60 p-1.5 rounded-2xl border border-slate-800/80 w-fit mx-auto shadow-inner backdrop-blur-sm">
-            {regularQuestions.length > 0 && (
-               <button onClick={() => setWeightTab("REGULAR")} className={`px-4 py-2 rounded-xl text-xs md:text-sm font-black transition-all flex items-center gap-2 ${weightTab === "REGULAR" ? "bg-blue-600 text-white shadow-md border border-blue-500/50" : "text-slate-400 hover:text-white border border-transparent hover:bg-slate-800"}`}>
-                 <span>🎯</span> רגילות <span className={`px-1.5 py-0.5 rounded-md text-[9px] ${weightTab === "REGULAR" ? "bg-blue-900/50" : "bg-slate-800"}`}>{regularQuestions.length}</span>
-               </button>
-            )}
-            {doubleQuestions.length > 0 && (
-               <button onClick={() => setWeightTab("DOUBLE")} className={`px-4 py-2 rounded-xl text-xs md:text-sm font-black transition-all flex items-center gap-2 ${weightTab === "DOUBLE" ? "bg-rose-600 text-white shadow-md border border-rose-500/50" : "text-slate-400 hover:text-white border border-transparent hover:bg-slate-800"}`}>
-                 <span>🔥</span> דאבל <span className={`px-1.5 py-0.5 rounded-md text-[9px] ${weightTab === "DOUBLE" ? "bg-rose-900/50" : "bg-slate-800"}`}>{doubleQuestions.length}</span>
-               </button>
-            )}
-            {surpriseQuestions.length > 0 && (
-               <button onClick={() => setWeightTab("SURPRISE")} className={`px-4 py-2 rounded-xl text-xs md:text-sm font-black transition-all flex items-center gap-2 ${weightTab === "SURPRISE" ? "bg-purple-600 text-white shadow-md border border-purple-500/50" : "text-slate-400 hover:text-white border border-transparent hover:bg-slate-800"}`}>
-                 <span>🎁</span> הפתעות <span className={`px-1.5 py-0.5 rounded-md text-[9px] ${weightTab === "SURPRISE" ? "bg-purple-900/50" : "bg-slate-800"}`}>{surpriseQuestions.length}</span>
-               </button>
-            )}
-         </div>
+            return (
+              <button
+                key={subTab.id}
+                onClick={() => setKnockoutRound(subTab.id)}
+                className={`px-4 py-2.5 rounded-xl font-bold whitespace-nowrap transition-all text-sm flex items-center justify-center gap-2 ${
+                  knockoutRound === subTab.id
+                    ? "bg-pink-600 text-white shadow-lg shadow-pink-500/20"
+                    : "text-slate-400 hover:bg-slate-800 hover:text-pink-400"
+                }`}
+              >
+                <span>{subTab.label}</span>
+                {isLocked && (
+                  <span className="opacity-70 bg-slate-950/30 p-1 rounded-md border border-slate-900/20">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-3 h-3"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
       )}
 
       <div className="flex justify-between items-center mb-4">
@@ -547,283 +698,146 @@ export default function BonusQuestions({ userId, tournamentState: propTournament
             {saveStatus === "saving" && <span className="text-amber-400 text-xs animate-pulse font-bold tracking-widest">⏳ שומר...</span>}
             {saveStatus === "saved" && <span className="text-emerald-400 text-xs font-bold tracking-widest">✓ נשמר</span>}
          </div>
-         {activeQuestionsList.some(q => !isQuestionLocked(q)) && (
-            <button onClick={handleRandomizeCategory} disabled={isRandomizing} className="bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-bold py-2 px-3 rounded-lg border border-slate-600 flex items-center gap-1 transition-all shadow-sm disabled:opacity-50 active:scale-95">
-              <span className="text-base">🎲</span> {isRandomizing ? "מגריל..." : "הגרל הכל בטאב"}
+         
+         {/* כפתור הגרלה - עכשיו מגריל את כל השאלות שמוצגות בעמוד! */}
+         {filteredQuestions.some(q => !isQuestionLocked(q)) && (
+            <button 
+              onClick={() => {
+                // העתקנו את לוגיקת ההגרלה לפה כדי שתעבוד על filteredQuestions
+                toast((t) => (
+                  <div className="flex flex-col gap-3 text-right" dir="rtl">
+                    <span className="font-bold text-slate-800 text-sm">
+                      האם להגריל תשובות לכל השאלות הפתוחות בקטגוריה זו? <br/>
+                      <span className="text-xs text-rose-600 font-bold">(שים לב: פעולה זו תדרוס ניחושים קיימים!)</span>
+                    </span>
+                    <div className="flex gap-2">
+                      <button 
+                        onClick={async () => {
+                          toast.dismiss(t.id);
+                          setIsRandomizing(true);
+                          toast.loading("מגריל ושומר...", { id: "randomizeBonus" });
+                          try {
+                            const newAnswers = { ...answers };
+                            let hasChanges = false;
+                            
+                            filteredQuestions.forEach(q => {
+                              if (!isQuestionLocked(q)) {
+                                let ans = "";
+                                const currentAnswerType = q.answerType || "TEAM";
+                                if (currentAnswerType === "TEAM") {
+                                   let opts = q.specificTeams ? q.specificTeams.split(",").map((s:string)=>s.trim()).filter(Boolean) : allTeams;
+                                   if (opts.length === 0) opts = allTeams;
+                                   if (q.hasNoneOption) opts.push("אף נבחרת");
+                                   if (q.hasAllOption) opts.push("כל הנבחרות");
+                                   ans = opts[Math.floor(Math.random() * opts.length)];
+                                } else if (currentAnswerType === "CUSTOM") {
+                                   const opts = q.possibleOptions ? q.possibleOptions.split(",").map((s:string)=>s.trim()).filter(Boolean) : [];
+                                   if (opts.length > 0) ans = opts[Math.floor(Math.random() * opts.length)];
+                                } else if (currentAnswerType === "PLAYER") {
+                                   ans = TOP_PLAYERS_NAMES[Math.floor(Math.random() * TOP_PLAYERS_NAMES.length)];
+                                } else if (currentAnswerType === "NUMBER_PURE" || currentAnswerType === "NUMBER_MINUTE") {
+                                   ans = Math.floor(Math.random() * 15 + 1).toString();
+                                }
+                                if (ans) { newAnswers[q.id] = ans; hasChanges = true; }
+                              }
+                            });
+            
+                            if (hasChanges) {
+                              setAnswers(newAnswers);
+                              await setDoc(doc(db, "predictions_bonus", userId), { answers: newAnswers, updatedAt: new Date() }, { merge: true });
+                              toast.success("הוגרלו ונשמרו תשובות 🎲", { id: "randomizeBonus" });
+                            } else {
+                              toast.error("אין שאלות פתוחות להגרלה", { id: "randomizeBonus" });
+                            }
+                          } catch(e) { 
+                            toast.error("שגיאה בשמירת ההגרלה", { id: "randomizeBonus" });
+                          } finally { setIsRandomizing(false); }
+                        }} 
+                        className="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold"
+                      >
+                        כן, דרוס והגרל הכל
+                      </button>
+                      <button onClick={() => toast.dismiss(t.id)} className="bg-slate-200 hover:bg-slate-300 text-slate-800 px-3 py-1.5 rounded-lg text-xs font-bold">ביטול</button>
+                    </div>
+                  </div>
+                ), { duration: Infinity });
+              }} 
+              disabled={isRandomizing} 
+              className="bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-[11px] font-bold py-1.5 px-3 rounded-lg border border-slate-600 flex items-center gap-1.5 transition-all shadow-sm disabled:opacity-50 active:scale-95"
+            >
+              <span className="text-sm">🎲</span> {isRandomizing ? "מגריל..." : "הגרל הכל בעמוד זה"}
             </button>
          )}
       </div>
 
-      {activeQuestionsList.length === 0 ? (
+      {filteredQuestions.length === 0 ? (
          <div className="text-center py-16 bg-slate-900/50 rounded-3xl border border-dashed border-slate-700 text-slate-500 font-bold text-lg">
             אין שאלות בקטגוריה זו.
          </div>
       ) : (
-         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {activeQuestionsList.map((q) => {
-              const locked = isQuestionLocked(q);
-              const hasTruth = !!realBonusAnswers[q.id];
-              const myPoints = checkAnswerPoints(q, answers[q.id]);
-              
-              const openMs = q.openTime ? parseDateTimeLocal(q.openTime) : 0;
-              const isWaitingToOpen = q.isSurprise && nowMs < openMs;
+         /* ========================================== */
+         /* ה-Timeline UI החדש!                        */
+         /* ========================================== */
+         <div className="relative border-r-[3px] border-slate-800/80 pr-5 md:pr-8 mr-1 md:mr-2 space-y-10">
+            
+            {regularQuestions.length > 0 && (
+               <div className="relative">
+                  {/* העיגול (Node) של ה-Timeline */}
+                  <div className="absolute -right-[27px] md:-right-[39px] top-1.5 w-4 h-4 bg-blue-500 rounded-full ring-4 ring-slate-950 shadow-[0_0_10px_rgba(59,130,246,0.5)] z-10"></div>
+                  
+                  <div className="mb-4">
+                     <h3 className="text-lg md:text-xl font-black text-blue-400 flex items-center gap-2">
+                       <span>🎯</span> שאלות רגילות
+                     </h3>
+                     <p className="text-slate-400 text-xs font-medium mt-1">שאלות הלחם והחמאה של הטורניר.</p>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                     {regularQuestions.map(q => renderQuestionCard(q))}
+                  </div>
+               </div>
+            )}
 
-              let cardStyle = "bg-slate-900 border-slate-700";
-              let shadowStyle = "shadow-lg";
-              
-              if (q.isSurprise) {
-                cardStyle = "bg-purple-900/20 border-purple-500/50";
-                shadowStyle = "shadow-[0_0_15px_rgba(168,85,247,0.15)]";
-              } else if (q.isDouble) {
-                cardStyle = "bg-rose-900/20 border-rose-500/50";
-                shadowStyle = "shadow-[0_0_15px_rgba(225,29,72,0.15)]";
-              }
-              
-              if (locked) {
-                 cardStyle = "bg-slate-900 border-slate-700 opacity-80 grayscale-[20%]";
-                 shadowStyle = "shadow-sm";
-              }
-              
-              if (isWaitingToOpen) {
-                 cardStyle = "bg-slate-900 border-purple-500/50 opacity-90";
-              }
+            {doubleQuestions.length > 0 && (
+               <div className="relative">
+                  {/* העיגול הפועם של דאבל */}
+                  <div className="absolute -right-[27px] md:-right-[39px] top-1.5 w-4 h-4 bg-rose-500 rounded-full ring-4 ring-slate-950 shadow-[0_0_15px_rgba(225,29,72,0.8)] z-10">
+                     <div className="absolute inset-0 rounded-full bg-rose-400 animate-ping opacity-75"></div>
+                  </div>
+                  
+                  <div className="mb-4">
+                     <h3 className="text-lg md:text-xl font-black text-rose-400 flex items-center gap-2 drop-shadow-md">
+                       <span>🔥</span> שאלות דאבל (Double)
+                     </h3>
+                     <p className="text-slate-400 text-xs font-medium mt-1">סיכון כפול, תגמול כפול. זה הזמן להמר בגדול!</p>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                     {doubleQuestions.map(q => renderQuestionCard(q))}
+                  </div>
+               </div>
+            )}
 
-              const currentAnswerType = q.answerType || "TEAM";
+            {surpriseQuestions.length > 0 && (
+               <div className="relative">
+                  {/* העיגול המסתורי של הפתעות */}
+                  <div className="absolute -right-[27px] md:-right-[39px] top-1.5 w-4 h-4 bg-purple-500 rounded-full ring-4 ring-slate-950 shadow-[0_0_15px_rgba(168,85,247,0.8)] z-10"></div>
+                  
+                  <div className="mb-4">
+                     <h3 className="text-lg md:text-xl font-black text-purple-400 flex items-center gap-2 drop-shadow-md">
+                       <span>🎁</span> שאלות הפתעה
+                     </h3>
+                     <p className="text-slate-400 text-xs font-medium mt-1">שאלות סודיות שנפתחות לזמן מוגבל בלבד. ענה מהר לפני שיינעלו!</p>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                     {surpriseQuestions.map(q => renderQuestionCard(q))}
+                  </div>
+               </div>
+            )}
 
-              return (
-                <div key={q.id} id={`bonus-${q.id}`} className={`${cardStyle} p-6 rounded-3xl border ${shadowStyle} flex flex-col h-full transition-all duration-300`}>
-                   
-                   <div className="flex justify-between items-start mb-4 gap-4">
-                      <div className="flex flex-col gap-1.5">
-                        
-                        {!isWaitingToOpen && (
-                          <div className="flex gap-2">
-                          <span className="text-[10px] font-black text-slate-400 bg-slate-950 px-2 py-1 rounded w-fit border border-slate-800">
-                               קופה: <span className={q.isDouble ? "text-rose-400" : "text-amber-400"}>
-                               {q.isProximity ? "עד 50" : q.points} נק'
-                               </span>
-                          </span>
-                          {q.isProximity && (
-                          <span className="text-[10px] font-black text-orange-400 bg-orange-950/30 px-2 py-1 rounded w-fit border border-orange-500/50">
-                          🤪 בעל הבית השתגע
-                         </span>
-                         )}
-                       {q.isDouble && <span className="text-[10px] font-black text-rose-400 bg-rose-950/30 px-2 py-1 rounded border border-rose-500/30">🔥 Double</span>}
-                        </div>
-                        )}
-                        
-                        {isWaitingToOpen && (
-                           <span className="text-[10px] font-black text-purple-400 bg-purple-900/50 px-2 py-1 rounded w-fit border border-purple-500/50 flex items-center gap-1">
-                              🎁 הפתעה בדרך!
-                           </span>
-                        )}
-                      </div>
-                      
-                      <div className="flex flex-col items-end gap-2">
-                        <div className="flex gap-1.5">
-                           {/* --- כפתור הגרלה לשאלה בודדת --- */}
-                           {!locked && !isWaitingToOpen && (
-                              <button 
-                                onClick={() => handleRandomizeSingle(q)}
-                                className="bg-slate-800 hover:bg-slate-700 text-slate-300 w-6 h-6 rounded-full flex items-center justify-center text-xs shadow-md transition-all active:scale-95 border border-slate-600"
-                                title="הגרל תשובה לשאלה זו"
-                              >
-                                🎲
-                              </button>
-                           )}
-                           
-                           {q.isSurprise && !isWaitingToOpen && <span className="bg-purple-600 w-6 h-6 rounded-full flex items-center justify-center text-xs shadow-md" title="שאלת הפתעה!">🎁</span>}
-                           {q.isDouble && !q.isSurprise && <span className="bg-rose-600 w-6 h-6 rounded-full flex items-center justify-center text-xs font-black shadow-md text-white" title="ניקוד כפול!">X2</span>}
-                        </div>
-                        {hasTruth && myPoints !== null && !isWaitingToOpen && (
-                           <span className={`px-2 py-1 rounded text-xs font-black shadow-sm border ${myPoints > 0 ? "bg-emerald-900/40 text-emerald-400 border-emerald-500/50" : "bg-rose-950/50 text-rose-400 border-rose-500/40"}`}>
-                             {myPoints > 0 ? `🎯 +${myPoints} נק'` : "0 נק'"}
-                           </span>
-                        )}
-                      </div>
-                   </div>
-                   
-                   <h3 className="text-white font-bold text-lg md:text-xl leading-snug mb-2">
-                     {isWaitingToOpen ? "שאלת הפתעה סודית..." : q.label}
-                   </h3>
-                   
-                   {realBonusData.leading?.[q.id] && !locked && !isWaitingToOpen && (
-                      <div className="text-[10px] font-bold text-amber-400 bg-amber-950/30 px-2.5 py-1.5 rounded-lg border border-amber-500/20 mb-4 inline-flex items-center gap-1.5 w-fit">
-                         <span className="animate-pulse">👑 מובילה כרגע:</span> 
-                         {Array.isArray(realBonusData.leading[q.id]) ? realBonusData.leading[q.id].join(', ') : realBonusData.leading[q.id]}
-                      </div>
-                   )}
-
-                   <div className="mt-auto pt-4 flex-1 flex flex-col justify-end">
-                      {isWaitingToOpen ? (
-                         <div className="bg-slate-950/80 border border-slate-700 p-5 rounded-xl text-center shadow-inner">
-                            <span className="text-4xl block mb-2 opacity-80 animate-bounce">🎁</span>
-                            <h4 className="text-purple-400 font-bold mb-1">השאלה תיחשף בקרוב!</h4>
-                            <p className="text-slate-400 text-xs">הכינו את הניחושים שלכם. שווה לעקוב.</p>
-                         </div>
-                      ) : currentAnswerType === "TEAM" ? (() => {
-                         const teamOpts = q.specificTeams ? q.specificTeams.split(",").map((s:string)=>s.trim()).filter(Boolean) : [];
-                         const finalOpts = teamOpts.length > 0 ? teamOpts : allTeams;
-                         const extras = [];
-                         if (q.hasNoneOption) extras.push("אף נבחרת");
-                         if (q.hasAllOption) extras.push("כל הנבחרות");
-                         
-                         const totalOptionsCount = finalOpts.length + extras.length;
-                         if (teamOpts.length > 0 && totalOptionsCount <= 8) {
-                            const allOpts = [...extras, ...finalOpts];
-                            return (
-                               <div className="flex flex-col gap-2">
-                                  {allOpts.map((opt: string) => (
-                                     <button
-                                        key={opt}
-                                        onClick={() => !locked && handleChange(q.id, opt)}
-                                        disabled={locked}
-                                        className={`w-full py-3 px-4 rounded-xl font-bold text-sm text-right transition-all flex items-center gap-3 ${answers[q.id] === opt ? "bg-amber-600/20 text-amber-400 border border-amber-500 shadow-md" : "bg-slate-950 text-slate-400 border border-slate-700 hover:bg-slate-800"} ${locked && answers[q.id] !== opt ? "opacity-50 cursor-not-allowed" : ""}`}
-                                     >
-                                        <div className={`w-4 h-4 rounded-full border flex items-center justify-center shrink-0 ${answers[q.id] === opt ? "border-amber-400" : "border-slate-500"}`}>
-                                          {answers[q.id] === opt && <div className="w-2 h-2 bg-amber-400 rounded-full"></div>}
-                                        </div>
-                                        {getFlagUrl(opt) && <img src={getFlagUrl(opt)!} className="w-5 h-3.5 object-cover rounded-sm shadow-sm" alt="flag" />}
-                                        <span className="truncate">{opt}</span>
-                                     </button>
-                                  ))}
-                               </div>
-                            );
-                         }
-
-                         return (
-   <div className="relative">
-      <AutocompleteInput
-         value={answers[q.id] || ""}
-         onChange={(val: string) => handleChange(q.id, val)}
-         placeholder="בחר או הקלד נבחרת..."
-         suggestions={[...extras, ...finalOpts]}
-         disabled={locked}
-         showAllOnFocus={true}
-         getFlag={(val) => getFlagUrl(val)}
-         customClassName={`w-full px-4 py-3.5 pl-10 rounded-xl font-bold text-sm outline-none transition-all shadow-inner ${locked ? "bg-slate-900/50 text-slate-400 border-slate-700 cursor-not-allowed" : (!answers[q.id] || answers[q.id].trim()==="") ? "bg-slate-950 text-white border-amber-500/80 focus:border-amber-400" : "bg-slate-900 text-white border-slate-600 focus:border-blue-500"}`}
-      />
-      {answers[q.id] && getFlagUrl(answers[q.id]) && (
-         <div className="absolute left-8 top-1/2 -translate-y-1/2 pointer-events-none">
-            <img src={getFlagUrl(answers[q.id])!} className="w-5 h-3.5 object-cover rounded-sm shadow-sm" alt="flag" />
          </div>
       )}
-   </div>
-);
-                      })() : currentAnswerType === "CUSTOM" ? (() => {
-                         const opts = q.possibleOptions ? q.possibleOptions.split(",").map((s:string)=>s.trim()).filter(Boolean) : [];
-                         return (
-                            <div className="flex flex-col gap-2">
-                               {opts.map((opt: string) => (
-                                  <button
-                                     key={opt}
-                                     onClick={() => !locked && handleChange(q.id, opt)}
-                                     disabled={locked}
-                                     className={`w-full py-3 px-4 rounded-xl font-bold text-sm text-right transition-all flex items-center gap-3 ${answers[q.id] === opt ? "bg-amber-600/20 text-amber-400 border border-amber-500 shadow-md" : "bg-slate-950 text-slate-400 border border-slate-700 hover:bg-slate-800"} ${locked && answers[q.id] !== opt ? "opacity-50 cursor-not-allowed" : ""}`}
-                                  >
-                                     <div className={`w-4 h-4 rounded-full border flex items-center justify-center shrink-0 ${answers[q.id] === opt ? "border-amber-400" : "border-slate-500"}`}>
-                                       {answers[q.id] === opt && <div className="w-2 h-2 bg-amber-400 rounded-full"></div>}
-                                     </div>
-                                     <span className="truncate">{opt}</span>
-                                  </button>
-                               ))}
-                            </div>
-                         );
-                      })() : currentAnswerType === "NUMBER_PURE" ? (
-                         <input
-                           type="number"
-                           value={answers[q.id] || ""}
-                           onChange={e => handleChange(q.id, e.target.value)}
-                           disabled={locked}
-                           placeholder="הזן מספר..."
-                           className={`w-full px-4 py-3.5 rounded-xl font-bold text-center text-sm outline-none transition-all shadow-inner ${locked ? "bg-slate-900/50 text-slate-400 border-slate-700 cursor-not-allowed" : (!answers[q.id] || answers[q.id].trim()==="") ? "bg-slate-950 text-white border-amber-500/80 focus:border-amber-400" : "bg-slate-900 text-white border-slate-600 focus:border-blue-500"}`}
-                         />
-                      ) : currentAnswerType === "NUMBER_MINUTE" ? (
-                         <input
-                           type="text"
-                           value={answers[q.id] || ""}
-                           onChange={e => handleChange(q.id, e.target.value)}
-                           disabled={locked}
-                           placeholder="למשל: 45+3"
-                           dir="ltr"
-                           className={`w-full px-4 py-3.5 rounded-xl font-bold text-center text-sm outline-none transition-all shadow-inner ${locked ? "bg-slate-900/50 text-slate-400 border-slate-700 cursor-not-allowed" : (!answers[q.id] || answers[q.id].trim()==="") ? "bg-slate-950 text-white border-amber-500/80 focus:border-amber-400" : "bg-slate-900 text-white border-slate-600 focus:border-blue-500"}`}
-                         />
-                      ) : currentAnswerType === "PLAYER" ? (() => {
-   const pInfo = getPlayerInfo(answers[q.id]);
-   return (
-      <div className="relative">
-         <AutocompleteInput
-            value={answers[q.id] || ""}
-            onChange={(val: string) => handleChange(q.id, val)}
-            placeholder="הקלד או בחר שם שחקן..."
-            suggestions={TOP_PLAYERS_NAMES}
-            disabled={locked}
-            getFlag={(val) => {
-               const info = getPlayerInfo(val);
-               return info ? getFlagUrl(info.country) : null;
-            }}
-            getSubtitle={(val) => getPlayerInfo(val)?.country} // מציג את המדינה בסוגריים
-            customClassName={`w-full px-4 py-3.5 rounded-xl font-bold text-sm outline-none transition-all shadow-inner ${locked ? "bg-slate-900/50 text-slate-400 border-slate-700 cursor-not-allowed" : (!answers[q.id] || answers[q.id].trim()==="") ? "bg-slate-950 text-white border-amber-500/80 focus:border-amber-400" : "bg-slate-900 text-white border-slate-600 focus:border-blue-500"}`}
-         />
-         {/* ה-Badge שמופיע בתוך השדה כששחקן נבחר */}
-         {pInfo && (
-            <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none flex items-center gap-1.5 text-[10px] sm:text-xs font-bold text-slate-200 bg-slate-800 px-2.5 py-1 rounded-lg border border-slate-600 shadow-md animate-fade-in-up">
-               {getFlagUrl(pInfo.country) && <img src={getFlagUrl(pInfo.country)!} className="w-4 h-3 object-cover rounded-sm shadow-sm" alt="flag" />}
-               {pInfo.country}
-            </div>
-         )}
-      </div>
-   );
-})() : (
-                         <input
-                           type="text"
-                           value={answers[q.id] || ""}
-                           onChange={e => handleChange(q.id, e.target.value)}
-                           disabled={locked}
-                           placeholder="הקלד תשובה חופשית..."
-                           className={`w-full px-4 py-3.5 rounded-xl font-bold text-sm outline-none transition-all shadow-inner ${locked ? "bg-slate-900/50 text-slate-400 border-slate-700 cursor-not-allowed" : (!answers[q.id] || answers[q.id].trim()==="") ? "bg-slate-950 text-white border-amber-500/80 focus:border-amber-400" : "bg-slate-900 text-white border-slate-600 focus:border-blue-500"}`}
-                         />
-                      )}
-                   </div>
-
-                   {hasTruth && !isWaitingToOpen && (
-                     <div className="mt-4 bg-slate-950/80 p-2.5 rounded-xl border border-slate-700 text-center shadow-inner flex flex-col items-center">
-                       <span className="text-[9px] text-slate-500 block mb-1.5 font-black uppercase tracking-wider">אמת בפועל:</span>
-                       <div className="text-emerald-400 font-bold text-sm flex flex-wrap justify-center gap-1.5">
-  {Array.isArray(realBonusAnswers[q.id]) 
-    ? realBonusAnswers[q.id].map((ans:string, i:number) => {
-        const pInfo = currentAnswerType === "PLAYER" ? getPlayerInfo(ans) : null;
-        return (
-        <span key={i} className="flex items-center gap-1.5 bg-emerald-900/20 px-2 py-1 rounded-md border border-emerald-500/20">
-          {getFlagUrl(ans) && <img src={getFlagUrl(ans)!} className="w-3.5 h-2.5 object-cover rounded-sm" alt="flag" />}
-          <span>{ans} {pInfo && <span className="text-emerald-500/70 text-[10px] pr-1">({pInfo.country})</span>}</span>
-        </span>
-      )})
-    : (() => {
-        const ans = realBonusAnswers[q.id];
-        const pInfo = currentAnswerType === "PLAYER" ? getPlayerInfo(ans) : null;
-        return (
-        <span className="flex items-center gap-1.5 bg-emerald-900/20 px-3 py-1 rounded-md border border-emerald-500/20 text-sm">
-          {getFlagUrl(ans) && <img src={getFlagUrl(ans)!} className="w-4 h-3 object-cover rounded-sm" alt="flag" />}
-          <span>{ans} {pInfo && <span className="text-emerald-500/70 text-xs pr-1">({pInfo.country})</span>}</span>
-        </span>
-      )})()
-  }
-</div>
-                     </div>
-                   )}
-                   
-                   {locked && !hasTruth && !isWaitingToOpen && (
-                     <button onClick={() => handleOpenSpy(q)} className="mt-4 w-full py-2.5 rounded-xl font-black text-[13px] transition-all border flex items-center justify-center gap-2 bg-slate-900 text-slate-400 hover:text-white border-slate-700 hover:bg-slate-800 hover:border-slate-500 shadow-sm active:scale-95">
-                       <span className="text-base">🕵️‍♂️</span> הצג ניחושי חברים
-                     </button>
-                   )}
-                </div>
-              );
-            })}
-         </div>
-      )}
-
       {spyModalQuestion && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-md animate-fade-in-up" dir="rtl">
           <div className="bg-gradient-to-b from-slate-800 to-slate-900 border border-slate-700 p-5 md:p-6 rounded-3xl w-full max-w-md md:max-w-[600px] md:min-w-[400px] min-h-[500px] h-[85vh] md:h-[650px] md:max-h-[90vh] flex flex-col shadow-2xl relative overflow-hidden md:resize">            
@@ -838,27 +852,27 @@ export default function BonusQuestions({ userId, tournamentState: propTournament
                  <div className="text-xs md:text-sm bg-emerald-900/20 text-emerald-400 px-4 py-2 rounded-xl border border-emerald-500/30 inline-block font-black tracking-wide">
                    תשובת אמת: 
                    <div className="flex flex-wrap justify-center gap-1.5 mt-1.5">
-  {Array.isArray(realBonusAnswers[spyModalQuestion.id]) 
-     ? realBonusAnswers[spyModalQuestion.id].map((ans: string, i: number, arr: any[]) => {
-         const pInfo = spyModalQuestion.answerType === "PLAYER" ? getPlayerInfo(ans) : null;
-         return (
-         <span key={i} className="flex items-center gap-1">
-           {getFlagUrl(ans) && <img src={getFlagUrl(ans)!} className="w-4 h-3 object-cover rounded-sm" alt="flag" />}
-           <span>{ans} {pInfo && <span className="text-emerald-500/70 text-[10px] pr-1">({pInfo.country})</span>}</span>
-           {i < arr.length - 1 ? " / " : ""}
-         </span>
-       )})
-     : (() => {
-         const ans = realBonusAnswers[spyModalQuestion.id];
-         const pInfo = spyModalQuestion.answerType === "PLAYER" ? getPlayerInfo(ans) : null;
-         return (
-         <span className="flex items-center gap-1.5">
-           {getFlagUrl(ans) && <img src={getFlagUrl(ans)!} className="w-4 h-3 object-cover rounded-sm shadow-sm" alt="flag" />}
-           <span>{ans} {pInfo && <span className="text-emerald-500/70 text-xs pr-1">({pInfo.country})</span>}</span>
-         </span>
-       )})()
-  }
-</div>
+                    {Array.isArray(realBonusAnswers[spyModalQuestion.id]) 
+                      ? realBonusAnswers[spyModalQuestion.id].map((ans: string, i: number, arr: any[]) => {
+                          const pInfo = spyModalQuestion.answerType === "PLAYER" ? getPlayerInfo(ans) : null;
+                          return (
+                          <span key={i} className="flex items-center gap-1">
+                            {getFlagUrl(ans) && <img src={getFlagUrl(ans)!} className="w-4 h-3 object-cover rounded-sm" alt="flag" />}
+                            <span>{ans} {pInfo && <span className="text-emerald-500/70 text-[10px] pr-1">({pInfo.country})</span>}</span>
+                            {i < arr.length - 1 ? " / " : ""}
+                          </span>
+                        )})
+                      : (() => {
+                          const ans = realBonusAnswers[spyModalQuestion.id];
+                          const pInfo = spyModalQuestion.answerType === "PLAYER" ? getPlayerInfo(ans) : null;
+                          return (
+                          <span className="flex items-center gap-1.5">
+                            {getFlagUrl(ans) && <img src={getFlagUrl(ans)!} className="w-4 h-3 object-cover rounded-sm shadow-sm" alt="flag" />}
+                            <span>{ans} {pInfo && <span className="text-emerald-500/70 text-xs pr-1">({pInfo.country})</span>}</span>
+                          </span>
+                        )})()
+                    }
+                  </div>
                  </div>
               )}
             </div>
@@ -920,16 +934,16 @@ export default function BonusQuestions({ userId, tournamentState: propTournament
                         </div>
                         <div className="flex justify-between items-center bg-slate-950/40 px-2.5 py-2 rounded-lg border border-slate-700/50 shadow-inner">
                            <div className={`font-bold text-[11px] sm:text-xs flex items-center gap-1.5 ${data.points && data.points > 0 ? "text-emerald-400" : "text-slate-300"}`}>
-  {getFlagUrl(data.answer) ? <img src={getFlagUrl(data.answer)!} className="w-4 h-3 object-cover rounded-sm shadow-sm" alt="flag" /> : <span className="text-sm">📝</span>}
-  <span className="truncate max-w-[150px] sm:max-w-[200px]">
-    {data.answer}
-    {spyModalQuestion.answerType === "PLAYER" && getPlayerInfo(data.answer) && (
-      <span className={`pr-1 text-[10px] ${data.points && data.points > 0 ? "text-emerald-600" : "text-slate-500"}`}>
-        ({getPlayerInfo(data.answer)?.country})
-      </span>
-    )}
-  </span>
-</div>
+                            {getFlagUrl(data.answer) ? <img src={getFlagUrl(data.answer)!} className="w-4 h-3 object-cover rounded-sm shadow-sm" alt="flag" /> : <span className="text-sm">📝</span>}
+                            <span className="truncate max-w-[150px] sm:max-w-[200px]">
+                              {data.answer}
+                              {spyModalQuestion.answerType === "PLAYER" && getPlayerInfo(data.answer) && (
+                                <span className={`pr-1 text-[10px] ${data.points && data.points > 0 ? "text-emerald-600" : "text-slate-500"}`}>
+                                  ({getPlayerInfo(data.answer)?.country})
+                                </span>
+                              )}
+                            </span>
+                          </div>
                            {realBonusAnswers[spyModalQuestion.id] && (
                              <div className={`text-[10px] font-black px-1.5 py-0.5 rounded border ${data.points && data.points > 0 ? "bg-emerald-900/40 text-emerald-400 border-emerald-500/40" : "bg-rose-950/50 text-rose-400 border-rose-500/40"}`}>
                                {data.points && data.points > 0 ? `+${data.points}` : "0 נק'"}
@@ -945,6 +959,6 @@ export default function BonusQuestions({ userId, tournamentState: propTournament
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 }

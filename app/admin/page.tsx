@@ -669,131 +669,142 @@ const handleCalculateScores = async (silentParam: any = false) => {
       const allUserBonuses = allUserBonusSnap.docs.map(doc => ({ userId: doc.id, answers: doc.data().answers || {} }));
       
       const allUserThirdSnap = await getDocs(collection(db, "predictions_third_place")); 
-      const allUserThirds = allUserThirdSnap.docs.map(doc => ({ userId: doc.id, teams: doc.data().teams || [] }));
+              const allUserThirds = allUserThirdSnap.docs.map(doc => ({ userId: doc.id, teams: doc.data().teams || [] }));
 
-      for (const currentUser of allUsers) {
-        let basePoints = 0; 
-        let knockoutPoints = 0; 
-        let matchesPoints = 0;
-        let groupPoints = 0;
-        let thirdPlacePoints = 0;
-        let bonusPoints = 0;
-        const uid = currentUser.id;
+              // ✨ הגדרת המחירון לשלבי הנוקאאוט (היה חסר וגרם לקריסות)
+        const qualifierPointsMap: any = { "32 הגדולות": 5, "שמינית גמר": 10, "רבע גמר": 15, "חצי גמר": 20, "גמר": 25, "מקום שלישי": 10 };
 
-        const userGroupMatches = allUserMatches.filter(m => m.userId === uid);
-        userGroupMatches.forEach(userMatch => {
-          const realMatch = realMatches.find(m => m.id === userMatch.matchId);
-          // @ts-ignore
-          if (realMatch && realMatch.isFinished && realMatch.stage !== "KNOCKOUT") {
-            const predH = Number(userMatch.predictedHomeScore); const predA = Number(userMatch.predictedAwayScore);
-            const realH = Number(realMatch.realHomeScore); const realA = Number(realMatch.realAwayScore);
-            if (!isNaN(predH) && !isNaN(predA) && !isNaN(realH) && !isNaN(realA)) {
-              if (Math.sign(predH - predA) === Math.sign(realH - realA)) { 
-                basePoints += 5; 
-                matchesPoints += 5;
-                if (predH === realH && predA === realA) {
-                   basePoints += 10; 
-                   matchesPoints += 10;
+        for (const currentUser of allUsers) {
+          let basePoints = 0;       // ניקוד שלב הבתים והטורניר
+          let knockoutPoints = 0;   // ניקוד שלב הנוקאאוט (משחקים + בונוסים של נוקאאוט)
+          let matchesPoints = 0;
+          let groupPoints = 0;
+          let thirdPlacePoints = 0;
+          let bonusPoints = 0;
+          const uid = currentUser.id;
+
+          // 1. חישוב משחקי שלב הבתים
+          const userGroupMatches = allUserMatches.filter(m => m.userId === uid);
+          userGroupMatches.forEach(userMatch => {
+            const realMatch = realMatches.find(m => m.id === userMatch.matchId);
+            // @ts-ignore
+            if (realMatch && realMatch.isFinished && realMatch.stage !== "KNOCKOUT") {
+              const predH = Number(userMatch.predictedHomeScore); const predA = Number(userMatch.predictedAwayScore);
+              const realH = Number(realMatch.realHomeScore); const realA = Number(realMatch.realAwayScore);
+              if (!isNaN(predH) && !isNaN(predA) && !isNaN(realH) && !isNaN(realA)) {
+                if (Math.sign(predH - predA) === Math.sign(realH - realA)) { 
+                  basePoints += 5; 
+                  matchesPoints += 5;
+                  if (predH === realH && predA === realA) {
+                     basePoints += 10; 
+                     matchesPoints += 10;
+                  }
                 }
               }
             }
-          }
-        });
+          });
 
-        const userQualData = allUserQuals.find(q => q.userId === uid);
-        if (userQualData && userQualData.groups) {
-          for (const [groupName, preds] of Object.entries<any>(userQualData.groups)) {
-            const realGroup = realQuals[groupName];
-            if (realGroup) {
-              if (preds.first === realGroup.first && preds.first !== "") { basePoints += 15; groupPoints += 15; }
-              else if (preds.first === realGroup.second && preds.first !== "") { basePoints += 7; groupPoints += 7; }
-              
-              if (preds.second === realGroup.second && preds.second !== "") { basePoints += 15; groupPoints += 15; }
-              else if (preds.second === realGroup.first && preds.second !== "") { basePoints += 7; groupPoints += 7; }
+          // 2. חישוב מעפילות מהבתים
+          const userQualData = allUserQuals.find(q => q.userId === uid);
+          if (userQualData && userQualData.groups) {
+            for (const [groupName, preds] of Object.entries<any>(userQualData.groups)) {
+              const realGroup = realQuals[groupName];
+              if (realGroup) {
+                if (preds.first === realGroup.first && preds.first !== "") { basePoints += 15; groupPoints += 15; }
+                else if (preds.first === realGroup.second && preds.first !== "") { basePoints += 7; groupPoints += 7; }
+                
+                if (preds.second === realGroup.second && preds.second !== "") { basePoints += 15; groupPoints += 15; }
+                else if (preds.second === realGroup.first && preds.second !== "") { basePoints += 7; groupPoints += 7; }
+              }
             }
           }
-        }
 
-        const userThirdData = allUserThirds.find(t => t.userId === uid);
-        if (userThirdData) {
-          userThirdData.teams.forEach((team: string) => { 
-              if (realThird.includes(team) && team !== "") {
-                  basePoints += 10; 
-                  thirdPlacePoints += 10;
+          // 3. חישוב 8 המעפילות מהמקום ה-3
+          const userThirdData = allUserThirds.find(t => t.userId === uid);
+          if (userThirdData) {
+            userThirdData.teams.forEach((team: string) => { 
+                if (realThird.includes(team) && team !== "") {
+                    basePoints += 10; 
+                    thirdPlacePoints += 10;
+                }
+            });
+          }
+
+          // 4. חישוב משחקי נוקאאוט (נוסף ישירות ל-knockoutPoints)
+          const userKnockoutMatches = allUserKnockouts.filter(m => m.userId === uid);
+          userKnockoutMatches.forEach(koMatch => {
+            const realMatch = realMatches.find(m => m.id === koMatch.matchId);
+            if (realMatch && realMatch.isFinished && realMatch.stage === "KNOCKOUT") {
+              const predH = Number(koMatch.predictedHomeScore); const predA = Number(koMatch.predictedAwayScore);
+              const realH = Number(realMatch.realHomeScore); const realA = Number(realMatch.realAwayScore);
+              if (!isNaN(predH) && !isNaN(predA) && !isNaN(realH) && !isNaN(realA)) {
+                if (Math.sign(predH - predA) === Math.sign(realH - realA)) { 
+                  knockoutPoints += 5; 
+                  if (predH === realH && predA === realA) knockoutPoints += 10; 
+                }
+              }
+              const pointsForQualifying = qualifierPointsMap[koMatch.roundName] || 0;
+              if (koMatch.qualifier === realMatch.realQualifier && koMatch.qualifier !== "") knockoutPoints += pointsForQualifying;
+            }
+          });
+
+          // 5. חישוב שאלות בונוס (עם הפרדה לטבלת נוקאאוט)
+          const userBonusData = allUserBonuses.find(b => b.userId === uid);
+          if (userBonusData) {
+            const userBonus = userBonusData.answers;
+            currentBonusQuestions.forEach((q: any) => {
+              const truth = realBonusAns[q.id]; 
+              const userAnswer = userBonus[q.id];
+              
+              if (truth !== undefined && truth !== null && userAnswer !== undefined && userAnswer !== null && userAnswer !== "") {
+                const truthArray = Array.isArray(truth) ? truth : [truth]; 
+                let pointsForThisQuestion = 0;
+                
+                if (q.isProximity && q.answerType === "NUMBER_PURE") {
+                   const truthNum = Number(truthArray[0]);
+                   const ansNum = Number(userAnswer);
+                   if (!isNaN(truthNum) && !isNaN(ansNum)) {
+                      const diff = Math.abs(truthNum - ansNum);
+                      if (diff === 0) pointsForThisQuestion = 50; 
+                      else if (diff <= 5) pointsForThisQuestion = 40; 
+                      else if (diff <= 10) pointsForThisQuestion = 30; 
+                      else if (diff <= 15) pointsForThisQuestion = 20; 
+                      else if (diff <= 20) pointsForThisQuestion = 10; 
+                   }
+                } else {
+                  const normalize = (s: any) => String(s || "").trim().replace(/\s+/g, " ").toLowerCase();
+                  const isCorrect = truthArray.some((t: any) => normalize(t) === normalize(userAnswer));
+                  if (isCorrect) pointsForThisQuestion = (Number(q.points) || 0);
+                }
+
+                if (pointsForThisQuestion > 0) {
+                  bonusPoints += pointsForThisQuestion;
+                  // ✨ התיקון הקריטי: אם הבונוס שייך לנוקאאוט, הוא נספר בטבלת הנוקאאוט
+                  if (q.phase === "KNOCKOUT") {
+                     knockoutPoints += pointsForThisQuestion;
+                  } else {
+                     basePoints += pointsForThisQuestion;
+                  }
+                }
+              }
+            });
+          }
+
+          // סיכום סופי: totalPoints הוא תמיד הסכום של שניהם
+          const finalTotal = basePoints + knockoutPoints;
+          
+          await updateDoc(doc(db, "users", uid), { 
+              totalPoints: finalTotal, 
+              knockoutPoints: knockoutPoints, // עכשיו כולל גם בונוסים של נוקאאוט!
+              breakdown: {
+                  matches: matchesPoints,
+                  groups: groupPoints,
+                  thirdPlace: thirdPlacePoints,
+                  bonuses: bonusPoints,
+                  knockout: knockoutPoints
               }
           });
         }
-
-        const userKnockoutMatches = allUserKnockouts.filter(m => m.userId === uid);
-        userKnockoutMatches.forEach(koMatch => {
-          const realMatch = realMatches.find(m => m.id === koMatch.matchId);
-          if (realMatch && realMatch.isFinished && realMatch.stage === "KNOCKOUT") {
-            const predH = Number(koMatch.predictedHomeScore); const predA = Number(koMatch.predictedAwayScore);
-            const realH = Number(realMatch.realHomeScore); const realA = Number(realMatch.realAwayScore);
-            if (!isNaN(predH) && !isNaN(predA) && !isNaN(realH) && !isNaN(realA)) {
-              if (Math.sign(predH - predA) === Math.sign(realH - realA)) { 
-                knockoutPoints += 5; 
-                if (predH === realH && predA === realA) knockoutPoints += 10; 
-              }
-            }
-            const pointsForQualifying = qualifierPointsMap[koMatch.roundName] || 0;
-            if (koMatch.qualifier === realMatch.realQualifier && koMatch.qualifier !== "") knockoutPoints += pointsForQualifying;
-          }
-        });
-
-        const userBonusData = allUserBonuses.find(b => b.userId === uid);
-        if (userBonusData) {
-          const userBonus = userBonusData.answers;
-          currentBonusQuestions.forEach((q: any) => {
-            const truth = realBonusAns[q.id]; const userAnswer = userBonus[q.id];
-            if (truth && userAnswer) {
-              const truthArray = Array.isArray(truth) ? truth : [truth]; 
-              
-              if (q.isProximity && q.answerType === "NUMBER_PURE") {
-                 const truthNum = Number(truthArray[0]);
-                 const ansNum = Number(userAnswer);
-                 if (!isNaN(truthNum) && !isNaN(ansNum)) {
-                    const diff = Math.abs(truthNum - ansNum);
-                    let proxPts = 0;
-
-                    // המדרגות בדיוק כפי שמופיעות בחוקי המשחק
-                    if (diff === 0) proxPts = 50; 
-                    else if (diff <= 5) proxPts = 40; 
-                    else if (diff <= 10) proxPts = 30; 
-                    else if (diff <= 15) proxPts = 20; 
-                    else if (diff <= 20) proxPts = 10; 
-
-                    if (proxPts > 0) {
-                       basePoints += proxPts;
-                       bonusPoints += proxPts;
-                    }
-                 }
-              }              else {
-                const normalize = (s: any) => String(s || "").trim().replace(/\s+/g, " "); // מנקה רווחים כפולים ונסתרים
-                const isCorrect = truthArray.some((t: any) => normalize(t) === normalize(userAnswer));
-                 if (isCorrect) {
-                     basePoints += (Number(q.points) || 0); 
-                     bonusPoints += (Number(q.points) || 0);
-                 }
-              }
-            }
-          });
-        }
-
-        const finalTotal = basePoints + knockoutPoints;
-        
-        await updateDoc(doc(db, "users", uid), { 
-            totalPoints: finalTotal, 
-            knockoutPoints: knockoutPoints,
-            breakdown: {
-                matches: matchesPoints,
-                groups: groupPoints,
-                thirdPlace: thirdPlacePoints,
-                bonuses: bonusPoints,
-                knockout: knockoutPoints
-            }
-        });
-      }
       
       const updatedUsersSnap = await getDocs(collection(db, "users"));
       const updatedUsersArray: any[] = [];
