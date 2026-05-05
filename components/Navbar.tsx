@@ -427,8 +427,10 @@ export default function Navbar() {
         
         const msgInstance = await messaging();
         if (msgInstance) {
+          const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
           const currentToken = await getToken(msgInstance, {
-            vapidKey: "BDwmvr6hhuHu4lZg2TLpvfHyftO0h93FEx_q9vEX7HTWgOV3NIR6VC7Jg7jnYM3zvy1zWWf0lE6TGSZ4-yr2Tns"
+            vapidKey: "BDwmvr6hhuHu4lZg2TLpvfHyftO0h93FEx_q9vEX7HTWgOV3NIR6VC7Jg7jnYM3zvy1zWWf0lE6TGSZ4-yr2Tns",
+            serviceWorkerRegistration: registration // משדכים את הטוקן לקובץ הרקע שלנו!
           });
 
           if (currentToken && userId) {
