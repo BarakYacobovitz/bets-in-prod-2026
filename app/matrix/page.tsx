@@ -61,6 +61,8 @@ export default function MatrixPage() {
   const [searchTeam, setSearchTeam] = useState("");
   const [filterMatchday, setFilterMatchday] = useState("ALL");
   const [filterDate, setFilterDate] = useState("");
+  
+  const [filterBonusPhase, setFilterBonusPhase] = useState("ALL");
 
   // שעון חי כדי לחשוף שאלות הפתעה ברגע שהן נסגרות
   const [nowMs, setNowMs] = useState(Date.now());
@@ -72,12 +74,11 @@ export default function MatrixPage() {
   useEffect(() => {
     const fetchAllData = async () => {
       try {
-        // הוספנו כאן את הקריאה ל-predictions_knockout !
         const [uSnap, mSnap, pSnap, pkSnap, bpSnap, qSnap, tpSnap, bqDoc, aqDoc, atDoc, abDoc, sysDoc] = await Promise.all([
           getDocs(collection(db, "users")),
           getDocs(collection(db, "matches")),
           getDocs(collection(db, "predictions_matches")),
-          getDocs(collection(db, "predictions_knockout")), // <-- זה החלק שהיה חסר!
+          getDocs(collection(db, "predictions_knockout")),
           getDocs(collection(db, "predictions_bonus")),
           getDocs(collection(db, "predictions_qualifiers")),
           getDocs(collection(db, "predictions_third_place")),
@@ -106,27 +107,20 @@ export default function MatrixPage() {
         });
         setMatches(mList);
 
-        // --- חיבור הניחושים של שלב הבתים ושל הנוק-אאוט למשתנה אחד! ---
         const preds: any = {};
-        
-        // 1. קריאת ניחושי הבתים
         pSnap.forEach(d => {
           const data = d.data();
           const uid = data.userId || d.id;
           if (!preds[uid]) preds[uid] = {};
           preds[uid][data.matchId] = data; 
         });
-        
-        // 2. קריאת ניחושי הנוקאאוט והוספה לאותו אובייקט
         pkSnap.forEach(d => {
           const data = d.data();
           const uid = data.userId || d.id;
           if (!preds[uid]) preds[uid] = {};
           preds[uid][data.matchId] = data; 
         });
-        
         setPredictions(preds);
-        // --------------------------------------------------------
 
         if (bqDoc.exists() && bqDoc.data().questions) {
             setBonusQuestions(bqDoc.data().questions);
@@ -176,7 +170,17 @@ export default function MatrixPage() {
   const filteredMatches = useMemo(() => {
     return matches.filter(m => {
       const teamMatch = m.homeTeam.includes(searchTeam) || m.awayTeam.includes(searchTeam);
-      const matchdayMatch = filterMatchday === "ALL" || (filterMatchday === "KNOCKOUT" ? m.stage === "KNOCKOUT" : String(m.matchday) === filterMatchday);
+      
+      let matchdayMatch = true;
+      if (filterMatchday !== "ALL") {
+         if (filterMatchday === "KNOCKOUT") {
+             matchdayMatch = m.stage === "KNOCKOUT";
+         } else if (["32 הגדולות", "שמינית גמר", "רבע גמר", "חצי גמר", "גמר"].includes(filterMatchday)) {
+             matchdayMatch = m.stage === "KNOCKOUT" && (m.roundName === filterMatchday || (filterMatchday === "גמר" && m.roundName === "מקום שלישי"));
+         } else {
+             matchdayMatch = String(m.matchday) === filterMatchday;
+         }
+      }
       
       let dateMatch = true;
       if (filterDate && m.matchDate) {
@@ -190,6 +194,24 @@ export default function MatrixPage() {
       return teamMatch && matchdayMatch && dateMatch;
     });
   }, [matches, searchTeam, filterMatchday, filterDate]);
+
+  // סינון הבונוסים - עודכן לתפוס "ALL" לפי מסד הנתונים
+  const filteredBonusQuestions = useMemo(() => {
+    return bonusQuestions.filter(q => {
+      if (filterBonusPhase === "ALL") return true;
+      if (filterBonusPhase === "TOURNAMENT") return q.phase === "TOURNAMENT" || (!q.phase && !q.isSurprise);
+      if (filterBonusPhase === "GROUPS") return q.phase === "GROUPS";
+      if (filterBonusPhase === "KNOCKOUT_GENERAL") {
+          // הבדיקה המורחבת: מוודאת "ALL" בדיוק כפי שנשמר ב-DB
+          return q.phase === "KNOCKOUT" && (!q.knockoutRound || q.knockoutRound === "" || q.knockoutRound === "ALL" || q.knockoutRound.includes("כללי"));
+      }
+      if (["32 הגדולות", "שמינית גמר", "רבע גמר", "חצי גמר", "גמר"].includes(filterBonusPhase)) {
+          return q.phase === "KNOCKOUT" && q.knockoutRound === filterBonusPhase;
+      }
+      if (filterBonusPhase === "SURPRISE") return q.isSurprise;
+      return true;
+    });
+  }, [bonusQuestions, filterBonusPhase]);
 
   const handleExportCSV = () => {
     let csvContent = "\uFEFF";
@@ -249,12 +271,12 @@ export default function MatrixPage() {
     } 
     else if (activeTab === "BONUS") {
        const headers = ["דירוג", "שחקן", "נקודות"];
-       bonusQuestions.forEach(q => headers.push(q.label || q.questionText));
+       filteredBonusQuestions.forEach(q => headers.push(q.label || q.questionText));
        csvContent += headers.map(escapeCSV).join(",") + "\n";
 
        filteredUsers.forEach((u, idx) => {
           const row = [String(idx + 1), u.name || "ללא שם", String(u.totalPoints || 0)];
-          bonusQuestions.forEach(q => {
+          filteredBonusQuestions.forEach(q => {
              let answerText = "--";
              const bData = bonusPredictions[u.id];
              if (bData && bData[q.id] !== undefined) answerText = String(bData[q.id]);
@@ -262,7 +284,6 @@ export default function MatrixPage() {
              const phase = q.phase || "TOURNAMENT";
              let isExposed = (phase === "KNOCKOUT") ? (tournamentState >= 5) : (tournamentState >= 1);
 
-             // הגנה מיוחדת לשאלות הפתעה באקסל
              if (q.isSurprise) {
                 const closeMs = parseDateTimeLocal(q.closeTime);
                 isExposed = nowMs > closeMs;
@@ -292,7 +313,6 @@ export default function MatrixPage() {
 
   return (
     <div className="min-h-screen bg-slate-950 p-4 md:p-8" dir="rtl">
-      {/* פה אנחנו מכניסים את הסטייל של המצמוץ! */}
       <style dangerouslySetInnerHTML={{__html: `
         @keyframes eyeBlink {
           0%, 90%, 100% { transform: scaleY(1); }
@@ -328,12 +348,7 @@ export default function MatrixPage() {
          </div>
       </div>
 
-{/* ========================================== */}
-      {/* טאבים ראשיים של מטריצת גילוי נאות - משימה 4 */}
-      {/* ========================================== */}
       <div className="flex overflow-x-auto custom-scrollbar gap-2 mb-6 pb-2 bg-slate-900/50 p-2 rounded-2xl border border-slate-800 max-w-2xl mx-auto md:justify-center">
-        
-        {/* משחקים - כחול (Blue) */}
         <button 
           onClick={() => setActiveTab("MATCHES")} 
           className={`flex flex-1 items-center justify-center gap-2 min-w-[120px] px-4 py-3 rounded-xl font-black whitespace-nowrap transition-all text-sm ${activeTab === "MATCHES" ? "bg-blue-600 text-white shadow-lg shadow-blue-500/20" : "text-slate-400 hover:bg-slate-800 hover:text-blue-400"}`}
@@ -344,7 +359,6 @@ export default function MatrixPage() {
           משחקים
         </button>
 
-        {/* מעפילות - טורקיז (Teal) */}
         <button 
           onClick={() => setActiveTab("QUALIFIERS")} 
           className={`flex flex-1 items-center justify-center gap-2 min-w-[120px] px-4 py-3 rounded-xl font-black whitespace-nowrap transition-all text-sm ${activeTab === "QUALIFIERS" ? "bg-teal-600 text-white shadow-lg shadow-teal-500/20" : "text-slate-400 hover:bg-slate-800 hover:text-teal-400"}`}
@@ -355,7 +369,6 @@ export default function MatrixPage() {
           מעפילות
         </button>
 
-        {/* בונוסים - זהב (Amber) */}
         <button 
           onClick={() => setActiveTab("BONUS")} 
           className={`flex flex-1 items-center justify-center gap-2 min-w-[120px] px-4 py-3 rounded-xl font-black whitespace-nowrap transition-all text-sm ${activeTab === "BONUS" ? "bg-amber-500 text-slate-900 shadow-lg shadow-amber-500/20" : "text-slate-400 hover:bg-slate-800 hover:text-amber-400"}`}
@@ -365,7 +378,6 @@ export default function MatrixPage() {
           </svg>
           בונוסים
         </button>
-
       </div>
 
       <div className="flex flex-wrap gap-3 mb-6 bg-slate-900/30 p-4 rounded-2xl border border-slate-800/50 items-end">
@@ -373,6 +385,7 @@ export default function MatrixPage() {
           <label className="text-[10px] font-bold text-slate-500 mr-1">🔍 חפש שחקן</label>
           <input type="text" value={searchPlayer} onChange={e => setSearchPlayer(e.target.value)} placeholder="שם השחקן..." className="w-full bg-slate-950 border border-slate-700 text-white rounded-lg p-2 text-sm outline-none focus:border-blue-500" />
         </div>
+        
         {activeTab === "MATCHES" && (
           <>
             <div className="flex flex-col gap-1 flex-1 min-w-[120px]">
@@ -380,11 +393,18 @@ export default function MatrixPage() {
               <input type="text" value={searchTeam} onChange={e => setSearchTeam(e.target.value)} placeholder="שם קבוצה..." className="w-full bg-slate-950 border border-slate-700 text-white rounded-lg p-2 text-sm outline-none focus:border-blue-500" />
             </div>
             <div className="flex flex-col gap-1 flex-1 min-w-[120px]">
-              <label className="text-[10px] font-bold text-slate-500 mr-1">📅 מחזור</label>
+              <label className="text-[10px] font-bold text-slate-500 mr-1">📅 שלב / מחזור</label>
               <select value={filterMatchday} onChange={e => setFilterMatchday(e.target.value)} className="w-full bg-slate-950 border border-slate-700 text-white rounded-lg p-2 text-sm outline-none focus:border-blue-500">
                 <option value="ALL">הכל</option>
-                <option value="1">מחזור 1</option><option value="2">מחזור 2</option><option value="3">מחזור 3</option>
-                <option value="KNOCKOUT">נוק-אאוט</option>
+                <option value="1">מחזור 1</option>
+                <option value="2">מחזור 2</option>
+                <option value="3">מחזור 3</option>
+                <option value="KNOCKOUT">כל הנוק-אאוט</option>
+                <option value="32 הגדולות">-- 32 הגדולות</option>
+                <option value="שמינית גמר">-- שמינית גמר</option>
+                <option value="רבע גמר">-- רבע גמר</option>
+                <option value="חצי גמר">-- חצי גמר</option>
+                <option value="גמר">-- גמר</option>
               </select>
             </div>
             <div className="flex flex-col gap-1 flex-1 min-w-[140px]">
@@ -398,6 +418,24 @@ export default function MatrixPage() {
               />
             </div>
           </>
+        )}
+
+        {activeTab === "BONUS" && (
+           <div className="flex flex-col gap-1 flex-1 min-w-[120px]">
+              <label className="text-[10px] font-bold text-slate-500 mr-1">🏷️ שלב הבונוס</label>
+              <select value={filterBonusPhase} onChange={e => setFilterBonusPhase(e.target.value)} className="w-full bg-slate-950 border border-slate-700 text-white rounded-lg p-2 text-sm outline-none focus:border-blue-500">
+                <option value="ALL">הכל</option>
+                <option value="TOURNAMENT">כל הטורניר</option>
+                <option value="GROUPS">שלב הבתים</option>
+                <option value="KNOCKOUT_GENERAL">נוקאאוט כללי</option>
+                <option value="32 הגדולות">שלב 32</option>
+                <option value="שמינית גמר">שמינית הגמר</option>
+                <option value="רבע גמר">רבע גמר</option>
+                <option value="חצי גמר">חצי גמר</option>
+                <option value="גמר">גמר</option>
+                <option value="SURPRISE">שאלות הפתעה</option>
+              </select>
+           </div>
         )}
       </div>
 
@@ -453,7 +491,7 @@ export default function MatrixPage() {
                         <th className="sticky top-0 z-20 bg-purple-900/20 border-b-2 border-l border-purple-500/30 p-4 min-w-[180px]">
                            <div className="font-black text-purple-300">8 המעפילות</div>
                            {realThirdPlace.filter(x=>x).length > 0 && (
-                              <div className="mt-2 flex flex-wrap justify-center gap-1">
+                              <div className="grid grid-cols-4 gap-0.5 min-w-[150px] max-w-[180px] mx-auto mt-2">
                                 {realThirdPlace.filter(x=>x).map((t, idx) => (
                                    <div key={idx} className="text-[9px] text-emerald-400 font-black bg-emerald-900/40 px-1.5 py-0.5 rounded border border-emerald-500/30 flex items-center gap-1 shadow-sm">
                                       {getFlagUrl(t) && <img src={getFlagUrl(t)!} className="w-3 h-2 rounded-sm" alt="" />}
@@ -465,12 +503,23 @@ export default function MatrixPage() {
                         </th>
                      )}
 
-                     {activeTab === "BONUS" && bonusQuestions.map(q => {
+                     {activeTab === "BONUS" && filteredBonusQuestions.map(q => {
                         const truth = realBonusFull.answers?.[q.id];
                         const truthStr = truth ? (Array.isArray(truth) ? truth.join(", ") : truth) : null;
                         return (
                          <th key={q.id} className="sticky top-0 z-20 bg-slate-900 border-b-2 border-l border-slate-700/50 p-4 min-w-[160px] text-[11px] max-w-[180px]">
-                           <div className="line-clamp-2 text-slate-300" title={q.label}>{q.label}</div>
+                           <div className="flex flex-col gap-1.5 mb-1.5">
+                              <div className={`text-[9px] font-black flex items-center justify-center gap-1 px-1.5 py-0.5 rounded border shadow-sm ${
+                                q.isSurprise ? 'bg-purple-950/40 text-purple-400 border-purple-500/30' : 
+                                q.phase === 'KNOCKOUT' ? 'bg-rose-950/40 text-rose-400 border-rose-500/30' : 
+                                'bg-emerald-950/30 text-emerald-400 border-emerald-500/20'
+                              }`}>
+                                 <span>{q.isSurprise ? "🎁 הפתעה" : q.phase === "KNOCKOUT" ? "🔥 נוק-אאוט" : "🏆 בתים/כללי"}</span>
+                                 <span className="opacity-40">|</span>
+                                 <span>{q.points || 0} נק'</span>
+                              </div>
+                           </div>
+                           <div className="line-clamp-2 text-slate-300 font-bold leading-tight" title={q.label || q.questionText}>{q.label || q.questionText}</div>
                            {truthStr && (
                              <div className="text-[9px] text-emerald-400 font-black bg-emerald-900/30 px-2 py-0.5 rounded border border-emerald-500/20 mt-2 shadow-sm truncate flex items-center justify-center gap-1" title={truthStr}>
                                <span>אמת:</span>
@@ -496,7 +545,6 @@ export default function MatrixPage() {
                         </div>
                       </td>
 
-                      {/* תאים משחקים */}
                       {activeTab === "MATCHES" && filteredMatches.map(m => {
                         const uData = predictions[u.id];
                         const p = uData ? uData[m.id] : null;
@@ -523,7 +571,6 @@ export default function MatrixPage() {
                                  <span className="w-3 text-center">{p.predictedHomeScore}</span><span className="opacity-40">-</span><span className="w-3 text-center">{p.predictedAwayScore}</span>
                                </div>
                                
-                               {/* תוספת המעפילה לנוקאאוט */}
                                {m.stage === "KNOCKOUT" && p.qualifier && (
                                  <div className={`text-[8.5px] flex items-center gap-1 px-1.5 py-0.5 rounded shadow-sm border ${
                                      m.isFinished 
@@ -541,7 +588,6 @@ export default function MatrixPage() {
                         );
                       })}
 
-                      {/* תאים עולות מהבתים */}
                       {activeTab === "QUALIFIERS" && groupsList.map(group => {
                         const groupPred = qualifiersPredictions[u.id]?.[group];
                         const first = groupPred?.first;
@@ -587,7 +633,6 @@ export default function MatrixPage() {
                         );
                       })}
                       
-                      {/* תאים 8 מעפילות */}
                       {activeTab === "QUALIFIERS" && (() => {
                          const isThirdExposed = tournamentState >= 1;
                          const uTeams = thirdPlacePredictions[u.id]?.teams || [];
@@ -614,8 +659,7 @@ export default function MatrixPage() {
                          )
                       })()}
 
-                      {/* תאים בונוסים */}
-                      {activeTab === "BONUS" && bonusQuestions.map(q => {
+                      {activeTab === "BONUS" && filteredBonusQuestions.map(q => {
                         let answerText = "--";
                         const bData = bonusPredictions[u.id];
                         if (bData && bData[q.id] !== undefined) {
@@ -625,7 +669,6 @@ export default function MatrixPage() {
                         const phase = q.phase || "TOURNAMENT";
                         let isExposed = (phase === "KNOCKOUT") ? (tournamentState >= 5) : (tournamentState >= 1);
 
-                        // הלוגיקה החדשה: שאלת הפתעה מתעלמת מסטטוס הטורניר ונחשפת רק כשהיא נסגרת באמת
                         if (q.isSurprise) {
                            const closeTimeMs = parseDateTimeLocal(q.closeTime);
                            isExposed = nowMs > closeTimeMs;

@@ -11,6 +11,7 @@ import AdminSystemTab from "@/components/admin/AdminSystemTab";
 import AdminMagazineTab from "@/components/admin/AdminMagazineTab";
 import AdminBonusTab from "@/components/admin/AdminBonusTab";
 import AdminUsersTab from "@/components/admin/AdminUsersTab";
+import AdminNotificationTab from "@/components/admin/AdminNotificationTab";
 
 const ADMIN_EMAIL = "bawak.y10@gmail.com"; 
 
@@ -339,6 +340,20 @@ export default function AdminPanel() {
       toast.error("שגיאה בשמירת שעון העצר");
     } 
   };
+  const handleUpdateMatchDetails = async (matchId: string, details: any) => {
+  try {
+    const matchRef = doc(db, "matches", matchId);
+    await updateDoc(matchRef, details);
+    
+    // רענון ה-State המקומי של המשחקים כדי שהשינוי יופיע מיד ב-UI
+    setMatches(prev => prev.map(m => m.id === matchId ? { ...m, ...details } : m));
+    
+    return true;
+  } catch (error) {
+    console.error("Error updating details:", error);
+    throw error;
+  }
+};
 
   const handleUpdateMatchDate = async (matchId: string, newDate: string) => {
     try {
@@ -1788,7 +1803,9 @@ const handleCalculateScores = async (silentParam: any = false) => {
             { id: "BONUS", icon: "🎁", label: "בונוסים" },
             { id: "USERS", icon: "👥", label: "משתמשים" },
             { id: "STATS", icon: "📊", label: "ראדאר" },
+            { id: "NOTIFICATIONS", icon: "📢", label: "פוש" },
             { id: "BACKUP", icon: "💾", label: "גיבוי" }
+
           ].map(tab => (
             <button 
                key={tab.id} 
@@ -1797,6 +1814,7 @@ const handleCalculateScores = async (silentParam: any = false) => {
             >
               <span className="text-lg mb-0.5 sm:mb-0">{tab.icon}</span> <span>{tab.label}</span>
             </button>
+            
           ))}
         </div>
 
@@ -1971,7 +1989,10 @@ const handleCalculateScores = async (silentParam: any = false) => {
                )}
             </div>
           )}
-          
+          {/* --- הנה הקסם החדש שלנו --- */}
+          {activeTab === "NOTIFICATIONS" && (
+            <AdminNotificationTab />
+          )}
           {activeTab === "USERS" && (
             <AdminUsersTab
              usersList={usersList}
@@ -2130,6 +2151,7 @@ const handleCalculateScores = async (silentParam: any = false) => {
             handleUpdateMatchDate={handleUpdateMatchDate}
             groupsList={groupsList} 
             savingId={savingId}
+            handleUpdateMatchDetails={handleUpdateMatchDetails}
          />
        )}
 

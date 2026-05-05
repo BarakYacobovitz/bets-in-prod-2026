@@ -76,8 +76,8 @@ const isQuestionMandatoryNow = (q: any, state: number) => {
   // 3. שלב הנוקאאוט
   if (q.phase === "KNOCKOUT") {
     // בדיקה חדשה: אם זו שאלה "כללית" לנוקאאוט (בלי שלב מוגדר), היא חובה רק בסטייט 4 (32 הגדולות)
-    if (!q.knockoutRound || q.knockoutRound === "") {
-        return s === 4; 
+    if (!q.knockoutRound || q.knockoutRound === "" || q.knockoutRound === "ALL" || q.knockoutRound.includes("כללי")) {
+    return s === 4; 
     }
     
     // אם זו שאלת בונוס לשלב ספציפי (למשל "שמינית גמר"), היא חובה רק בסטייט הספציפי שלה
@@ -590,6 +590,19 @@ export default function Navbar() {
                         >
                           <span>🔔</span> הפעל התראות במסך הבית
                         </button>
+                      )}
+                      {/* --- סטטוס: מאושר פעיל --- */}
+                      {notifPermission === "granted" && (
+                        <div className="w-full text-[11px] font-black text-emerald-400 bg-emerald-950/30 p-2.5 rounded-xl border border-emerald-500/30 flex items-center justify-center gap-2 mb-2">
+                          <span>✅</span> התראות פועלות במכשיר זה
+                        </div>
+                      )}
+
+                      {/* --- סטטוס: נחסם על ידי המשתמש/דפדפן --- */}
+                      {notifPermission === "denied" && (
+                        <div className="w-full text-[10px] font-bold text-rose-400 bg-rose-950/30 p-2 rounded-xl border border-rose-500/30 flex items-center justify-center gap-1.5 mb-2 text-center">
+                          <span>❌</span> התראות חסומות בדפדפן. יש לשנות בהגדרות.
+                        </div>
                       )}
 
                       <div className="flex flex-col gap-1">

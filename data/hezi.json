@@ -1,0 +1,26 @@
+[
+  {
+    "id": "ko_sf_0001",
+    "homeTeam": "מנצחת רבע גמר 1",
+    "awayTeam": "מנצחת רבע גמר 2",
+    "matchDate": "14/07/2026 21:00",
+    "stage": "KNOCKOUT",
+    "roundName": "חצי גמר",
+    "isFinished": false,
+    "stadium": "אצטדיון AT&T",
+    "city": "דאלאס",
+    "broadcastUrl": ""
+  },
+  {
+    "id": "ko_sf_0002",
+    "homeTeam": "מנצחת רבע גמר 3",
+    "awayTeam": "מנצחת רבע גמר 4",
+    "matchDate": "15/07/2026 21:00",
+    "stage": "KNOCKOUT",
+    "roundName": "חצי גמר",
+    "isFinished": false,
+    "stadium": "אצטדיון מרצדס-בנץ",
+    "city": "אטלנטה",
+    "broadcastUrl": ""
+  }
+]

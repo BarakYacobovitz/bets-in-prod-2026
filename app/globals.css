@@ -41,12 +41,28 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
-/* העלמת פס הגלילה למחלקת custom-scrollbar */
-.custom-scrollbar {
-  -ms-overflow-style: none;  /* תמיכה ב-IE ו-Edge */
-  scrollbar-width: none;  /* תמיכה ב-Firefox */
+
+/* הגדרת הרוחב והגובה של פס הגלילה */
+.custom-scrollbar::-webkit-scrollbar {
+  height: 6px; /* גובה לפס גלילה אופקי (ימינה-שמאלה) */
+  width: 6px;  /* רוחב לפס גלילה אנכי (למעלה-למטה) */
 }
 
-.custom-scrollbar::-webkit-scrollbar {
-  display: none; /* תמיכה ב-Chrome, Safari, Opera */
+/* הרקע שעליו רץ פס הגלילה (המסילה) */
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: rgba(15, 23, 42, 0.3); /* כמעט שקוף, משתלב עם ה-slate-950 */
+  border-radius: 10px;
+  margin: 4px; /* נותן קצת אוויר בקצוות */
 }
+
+/* הפס עצמו שאותו תופסים וגוררים */
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(51, 65, 85, 0.8); /* צבע slate-700 מעודן */
+  border-radius: 10px;
+}
+
+/* כשעוברים עם העכבר על הפס - הוא קצת מואר */
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(71, 85, 105, 1); /* צבע slate-600 */
+}
+

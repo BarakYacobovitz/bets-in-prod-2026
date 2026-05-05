@@ -195,8 +195,7 @@ export default function BonusQuestions({ userId, tournamentState: propTournament
     if (state === 0) return false;
     if (q.phase === "TOURNAMENT" || q.phase === "GROUPS") return state >= 1;
     if (q.phase === "KNOCKOUT") {
-      if (q.knockoutRound === "ALL" || q.knockoutRound === "32 הגדולות") return state >= 5;
-      if (q.knockoutRound === "שמינית גמר") return state >= 7;
+if (!q.knockoutRound || q.knockoutRound === "" || q.knockoutRound === "ALL" || q.knockoutRound.includes("כללי") || q.knockoutRound === "32 הגדולות") return state >= 5;      if (q.knockoutRound === "שמינית גמר") return state >= 7;
       if (q.knockoutRound === "רבע גמר") return state >= 9;
       if (q.knockoutRound === "חצי גמר") return state >= 11;
       // הסרנו מכאן את מקום שלישי
@@ -336,8 +335,8 @@ export default function BonusQuestions({ userId, tournamentState: propTournament
   const filteredQuestions = questions.filter(q => {
     if (q.phase !== bonusCategory) return false;
     if (bonusCategory === "KNOCKOUT") {
-       // הגדרה קשיחה: שאלות ללא הגדרת שלב ייחשבו כ"כללי", ואנחנו דורשים התאמה מוחלטת לטאב שנבחר
-       const qRound = q.knockoutRound || "ALL";
+       // התיקון: מזהים את כל הוריאציות של שאלות "כללי" ומשייכים אותן לטאב ALL
+       const qRound = (!q.knockoutRound || q.knockoutRound === "" || q.knockoutRound === "ALL" || q.knockoutRound.includes("כללי")) ? "ALL" : q.knockoutRound;
        if (qRound !== knockoutRound) return false;
     }
     return true;
