@@ -98,13 +98,35 @@ export default function MatrixPage() {
         uList.sort((a, b) => (b.totalPoints || 0) - (a.totalPoints || 0));
         setUsers(uList);
 
-        const mList: any[] = [];
+const mList: any[] = [];
         mSnap.forEach(d => mList.push({ id: d.id, ...d.data() }));
+        
+        // --- מילון סדר השלבים הקשיח ---
+        const ROUND_ORDER: Record<string, number> = {
+          "32 הגדולות": 1,
+          "שמינית גמר": 2,
+          "רבע גמר": 3,
+          "חצי גמר": 4,
+          "מקום שלישי": 5,
+          "גמר": 6
+        };
+
         mList.sort((a, b) => {
+            // קודם כל, בתים לפני נוקאאוט
             if (a.stage !== "KNOCKOUT" && b.stage === "KNOCKOUT") return -1;
             if (a.stage === "KNOCKOUT" && b.stage !== "KNOCKOUT") return 1;
-            return (a.matchday || 1) - (b.matchday || 1) || a.id.localeCompare(b.id);
+            
+            // אם שניהם נוקאאוט - מיין לפי המילון שלנו!
+            if (a.stage === "KNOCKOUT" && b.stage === "KNOCKOUT") {
+                const orderA = ROUND_ORDER[a.roundName] || 99;
+                const orderB = ROUND_ORDER[b.roundName] || 99;
+                if (orderA !== orderB) return orderA - orderB;
+            }
+            
+            // אם זה שלב הבתים, מיין לפי מחזור
+            return (a.matchday || 1) - (b.matchday || 1) || String(a.id).localeCompare(String(b.id));
         });
+
         setMatches(mList);
 
         const preds: any = {};
@@ -175,7 +197,7 @@ export default function MatrixPage() {
       if (filterMatchday !== "ALL") {
          if (filterMatchday === "KNOCKOUT") {
              matchdayMatch = m.stage === "KNOCKOUT";
-         } else if (["32 הגדולות", "שמינית גמר", "רבע גמר", "חצי גמר", "גמר"].includes(filterMatchday)) {
+         } else if (["32 הגדולות", "שמינית גמר", "רבע גמר", "חצי גמר", "גמר","מקום 3"].includes(filterMatchday)) {
              matchdayMatch = m.stage === "KNOCKOUT" && (m.roundName === filterMatchday || (filterMatchday === "גמר" && m.roundName === "מקום שלישי"));
          } else {
              matchdayMatch = String(m.matchday) === filterMatchday;
@@ -205,7 +227,7 @@ export default function MatrixPage() {
           // הבדיקה המורחבת: מוודאת "ALL" בדיוק כפי שנשמר ב-DB
           return q.phase === "KNOCKOUT" && (!q.knockoutRound || q.knockoutRound === "" || q.knockoutRound === "ALL" || q.knockoutRound.includes("כללי"));
       }
-      if (["32 הגדולות", "שמינית גמר", "רבע גמר", "חצי גמר", "גמר"].includes(filterBonusPhase)) {
+      if (["32 הגדולות", "שמינית גמר", "רבע גמר", "חצי גמר", "גמר","מקום 3"].includes(filterBonusPhase)) {
           return q.phase === "KNOCKOUT" && q.knockoutRound === filterBonusPhase;
       }
       if (filterBonusPhase === "SURPRISE") return q.isSurprise;
@@ -413,7 +435,7 @@ export default function MatrixPage() {
                 type="date" 
                 value={filterDate} 
                 onChange={e => setFilterDate(e.target.value)} 
-                className="w-full bg-slate-950 border border-slate-700 text-white rounded-lg p-2 text-sm outline-none focus:border-blue-500 cursor-pointer" 
+                className="w-full bg-slate-950 border border-slate-700 text-white rounded-lg p-2 text-sm outline-none focus:border-blue-500 cursor-pointer " 
                 dir="ltr" 
               />
             </div>

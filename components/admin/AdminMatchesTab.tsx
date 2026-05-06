@@ -16,6 +16,7 @@ export default function AdminMatchesTab({
   handleUpdateMatchday,
   handleUpdateMatchDate,
   handleUpdateMatchDetails, // פרופ חדש שסידרנו
+  handleDeleteMatch,
   groupsList,
   savingId
 }: any) {
@@ -154,6 +155,7 @@ export default function AdminMatchesTab({
                  onUpdateDate={handleUpdateMatchDate} 
                  onUpdateMatchday={handleUpdateMatchday} 
                  onUpdateDetails={handleUpdateMatchDetails}
+                 onDelete={handleDeleteMatch}
                />
              ))
           )}
@@ -190,8 +192,7 @@ export default function AdminMatchesTab({
   );
 }
 
-function AdminMatchRow({ match, allMatches, isSaving, justSaved, onSave, onClear, onUpdateDate, onUpdateMatchday, onUpdateDetails }: any) {
-  const [homeInput, setHomeInput] = useState(match.realHomeScore ?? "");
+function AdminMatchRow({ match, allMatches, isSaving, justSaved, onSave, onClear, onUpdateDate, onUpdateMatchday, onUpdateDetails, onDelete }: any) {  const [homeInput, setHomeInput] = useState(match.realHomeScore ?? "");
   const [awayInput, setAwayInput] = useState(match.realAwayScore ?? "");
   const [qualifierInput, setQualifierInput] = useState(match.realQualifier ?? "");
   const [isEditingTime, setIsEditingTime] = useState(false);
@@ -418,6 +419,20 @@ function AdminMatchRow({ match, allMatches, isSaving, justSaved, onSave, onClear
         {match.isFinished && (
           <button type="button" onClick={() => { onClear(match.id); setHomeInput(""); setAwayInput(""); setQualifierInput(""); }} disabled={isSaving} className="w-10 sm:w-12 flex-shrink-0 flex items-center justify-center rounded-xl bg-slate-800 hover:bg-rose-900 text-rose-500 border border-slate-700 hover:border-rose-500 transition-all active:scale-95 disabled:opacity-50" title="אפס תוצאה">✕</button>
         )}
+        {/* --- כפתור מחיקה חדש --- */}
+        <button 
+          type="button" 
+          onClick={() => {
+          if(confirm("האם אתה בטוח שברצונך למחוק לחלוטין את המשחק הזה מהמערכת?")) {
+           onDelete(match.id);
+           }
+         }} 
+          className="w-10 sm:w-12 flex-shrink-0 flex items-center justify-center rounded-xl bg-slate-800 hover:bg-rose-600 text-rose-500 hover:text-white border border-slate-700 transition-all active:scale-95" 
+          title="מחק משחק"
+          >
+            🗑️
+          </button>
+        
       </div>
     </div>
   );

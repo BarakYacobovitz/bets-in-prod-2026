@@ -1015,7 +1015,7 @@ export default function Dashboard({ userId, userName, setActiveTab, setPredictio
                         </div>
                         <div className="w-px h-8 bg-emerald-500/30"></div>
                         <div className="flex flex-col items-center">
-                           <span className="text-2xl md:text-3xl font-black text-white drop-shadow-lg leading-none">{userStats.koRank > 0 ? userStats.koRank : "-"}</span>
+                           <span className="text-2xl md:text-3xl font-black text-amber-400 drop-shadow-lg leading-none">{userStats.koRank > 0 ? userStats.koRank : "-"}</span>
                            <span className="text-[9px] text-emerald-400/70 font-bold mt-1.5">מיקום</span>
                         </div>
                      </div>
@@ -1038,7 +1038,7 @@ export default function Dashboard({ userId, userName, setActiveTab, setPredictio
                   className="bg-gradient-to-br from-amber-500/20 to-amber-900/40 p-4 rounded-2xl border border-amber-500/50 shadow-[0_0_20px_rgba(245,158,11,0.15)] relative overflow-hidden flex flex-col items-center justify-center text-center gap-1 cursor-pointer hover:scale-[1.02] hover:border-amber-400 transition-all"
                >
                   <div className="absolute top-0 left-1/2 -translate-x-1/2 w-24 h-24 bg-amber-400/20 rounded-full blur-2xl pointer-events-none"></div>
-                  <div className="text-3xl md:text-4xl drop-shadow-[0_0_15px_rgba(251,191,36,0.8)] relative z-10 mb-1 animate-pulse">🏆</div>
+                  <div className="text-3xl md:text-4xl drop-shadow-[0_0_15px_rgba(251,191,36,0.8)] relative z-10 mb-1 animate-pulse">⚽</div>
                   <span className="text-[10px] text-amber-200/70 font-black uppercase tracking-widest relative z-10">כדור הזהב (מקום 1)</span>
                   <span className="text-base md:text-lg font-black text-amber-400 truncate relative z-10 w-full px-2">
                      {currentLeader} <span className="text-xs text-amber-200/60 font-normal">({allUsersList.sort((a,b)=>(b.totalPoints||0)-(a.totalPoints||0))[0]?.totalPoints || 0} נק')</span>

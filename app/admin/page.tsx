@@ -1473,6 +1473,15 @@ const handleCalculateScores = async (silentParam: any = false) => {
     finally { setIsCalculating(false); }
   };
 
+  const handleDeleteMatch = async (matchId: string) => {
+  try {
+    await deleteDoc(doc(db, "matches", matchId));
+    setMatches(prev => prev.filter(m => m.id !== matchId));
+    toast.success("המשחק נמחק מהמערכת.");
+  } catch (e) {
+    toast.error("שגיאה במחיקת המשחק.");
+  }
+};
   const handleExportPredictions = async (targetUserId: string | "ALL", targetUserName: string) => {
     setIsCalculating(true);
     toast.loading("מכין קובץ אקסל...", { id: "csvExport" });
@@ -2152,6 +2161,7 @@ const handleCalculateScores = async (silentParam: any = false) => {
             groupsList={groupsList} 
             savingId={savingId}
             handleUpdateMatchDetails={handleUpdateMatchDetails}
+            handleDeleteMatch={handleDeleteMatch} 
          />
        )}
 

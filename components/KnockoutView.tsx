@@ -48,12 +48,12 @@ export default function KnockoutView({ matches, userId, tournamentState }: { mat
   }, [userId]);
 
   const isRoundHidden = (round: string) => {
-    const limits: Record<string, number> = { "32 הגדולות": 4, "שמינית גמר": 6, "רבע גמר": 8, "חצי גמר": 10, "גמר": 12 };
+    const limits: Record<string, number> = { "32 הגדולות": 4, "שמינית גמר": 6, "רבע גמר": 8, "חצי גמר": 10, "גמר": 12, "מקום שלישי": 12 };
     return tournamentState < (limits[round] || 0);
   };
 
   const isRoundLocked = (round: string) => {
-    const limits: Record<string, number> = { "32 הגדולות": 5, "שמינית גמר": 7, "רבע גמר": 9, "חצי גמר": 11, "גמר": 13 };
+    const limits: Record<string, number> = { "32 הגדולות": 5, "שמינית גמר": 7, "רבע גמר": 9, "חצי גמר": 11, "גמר": 13, "מקום שלישי": 13  };
     return tournamentState >= (limits[round] || 0);
   };
 

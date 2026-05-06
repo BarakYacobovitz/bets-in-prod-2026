@@ -1,0 +1,26 @@
+[
+  {
+    "id": "ko_final_0001",
+    "homeTeam": "מפסידת חצי גמר 1",
+    "awayTeam": "מפסידת חצי גמר 2",
+    "matchDate": "18/07/2026 21:00",
+    "stage": "KNOCKOUT",
+    "roundName": "מקום שלישי",
+    "isFinished": false,
+    "stadium": "Hard Rock Stadium",
+    "city": "מיאמי",
+    "broadcastUrl": ""
+  },
+  {
+    "id": "ko_final_0002",
+    "homeTeam": "מנצחת חצי גמר 1",
+    "awayTeam": "מנצחת חצי גמר 2",
+    "matchDate": "19/07/2026 21:00",
+    "stage": "KNOCKOUT",
+    "roundName": "גמר",
+    "isFinished": false,
+    "stadium": "MetLife Stadium",
+    "city": "ניו יורק",
+    "broadcastUrl": ""
+  }
+]
