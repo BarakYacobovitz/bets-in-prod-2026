@@ -58,7 +58,31 @@ const Confetti = () => {
     </div>
   );
 };
-
+// <--- כאן בדיוק תדביק את סעיף 1 --->
+const BROADCAST_QUOTES = {
+  // סוף שלב הבתים (States 4-5)
+  GROUP_STAGE_END: [
+    "שלב הבתים ננעל! חלקנו נביאים, חלקנו צריכים להחליף מקצוע לניחוש תוצאות בטניס שולחן... 🏓",
+    "הבתים נסגרו, הלב נפתח. מי היה מאמין שבלגיה תעשה לנו ככה? (לפחות חלקכם צדקתם) 🇧🇪",
+    "הגענו לנוקאאוט! זה הזמן שבו הילדים הולכים לישון והמהמרים האמיתיים מוציאים את המחשבונים 🧮",
+    "מי ששרד את הבתים - גיבור. מי שמוביל - חשוד בשימוש בבינה מלאכותית או בקשרים ישירים עם פיפ״א... 👀",
+    "הבתים נגמרו. עכשיו כל גול שווה זהב, וכל החמצה שווה דמעות בוואטסאפ הקבוצתי 😢"
+  ],
+  // סוף הטורניר (State 13)
+  TOURNAMENT_END: [
+    "זהו, תם הטקס! הגביע הונף, הניקוד סופי, והמנצח הולך לחפור לנו על זה ב-4 השנים הקרובות... 🏆",
+    "הטורניר נגמר. חלק יצאו עם קופה, חלק יצאו עם תובנות, וכולנו יצאנו עם חוסר רציני בשעות שינה 😴",
+    "Bets in PROD נסגר רשמית. הניקוד נקבע, החובות בוואטסאפ נשלחו. נתראה ביורו? ⚽",
+    "אלוף הליגה שלנו הוא רשמית ה'בנאדם הכי מעצבן בקבוצה' עד המונדיאל הבא. ברכות! 👑",
+    "תודה לכל המהמרים, הנביאים ואלו שסתם ניחשו 0-0 כל הזמן וקיוו לנס. היה מטורף! ✨"
+  ],
+  // משפטים רגילים לשאר הזמן
+  REGULAR: [
+    "הטבלה לא משקרת, היא פשוט לפעמים קצת אכזרית... 📉",
+    "מישהו ראה את המקום הראשון? הוא נעלם באופק... 💨",
+    "זוכרים שבתחילת הטורניר כולם חשבו שהם מבינים בכדורגל? זמנים יפים... 🏟️"
+  ]
+};
 export default function Leaderboard() {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   
@@ -102,6 +126,19 @@ export default function Leaderboard() {
   const [isFirstPlace, setIsFirstPlace] = useState(false);
 
   const groupsList = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L"];
+  const [broadcastQuote, setBroadcastQuote] = useState("");
+  useEffect(() => {
+  let pool = BROADCAST_QUOTES.REGULAR;
+  
+  if (tournamentState >= 4 && tournamentState <= 5) {
+    pool = BROADCAST_QUOTES.GROUP_STAGE_END;
+  } else if (tournamentState >= 13) {
+    pool = BROADCAST_QUOTES.TOURNAMENT_END;
+  }
+  
+  const randomQuote = pool[Math.floor(Math.random() * pool.length)];
+  setBroadcastQuote(randomQuote);
+}, [tournamentState]);
 
   // --- קליטת ניתוב מהדאשבורד ---
   useEffect(() => {
@@ -352,39 +389,68 @@ const getPrizeForRank = (rank: number, board: string, allUsers: any[]) => {
     const getRandom = (arr: string[]) => arr[Math.floor(Math.random() * arr.length)];
     let newTeaser = "";
 
-    if (rankDiff > 0) {
-       const passedGuy = currentUsers[myIndex + 1]; 
-       const ptsStr = ptsDiff > 0 ? `אספת ${ptsDiff} נק' אתמול ו` : "";
-       newTeaser = `בואנה חביבי! ${ptsStr}עלית ${rankDiff} מקומות בדירוג! אתה פשוט חד. ${passedGuy ? `אפילו עקפת את ${passedGuy.name.split(' ')[0]} שהייתה כוכבת רצינית עד עכשיו.` : ''}`;
-    } else if (rankDiff < 0) {
-       const guyAhead = currentUsers[myIndex - 1]; 
-       newTeaser = `מה נסגר? הכל בסדר בבית? נפלת ${Math.abs(rankDiff)} מקומות ביום אחד... ${guyAhead ? `איך נתת ל-${guyAhead.name.split(' ')[0]} לעקוף אותך ככה בלי לראות אותך ממטר?` : ''}`;
-    } else {
-       if (me.displayRank === 1) {
-         const nextGuy = currentUsers[myIndex + 1];
-         if (nextGuy && nextGuy[scoreField] === myScore) newTeaser = getRandom([`אתה בפסגה, אבל צמוד ל-${nextGuy.name.split(' ')[0]} בדיוק באותו הניקוד! צריך פה שובר שוויון.`, `קרב צמוד! ${nextGuy.name.split(' ')[0]} יושב איתך על אותו כיסא בפסגה. מי ימצמץ ראשון?`]);
-         else if (nextGuy) {
-           const diff = myScore - (nextGuy[scoreField] || 0);
-           newTeaser = getRandom([`מלך הטבלה! 👑 אבל ${nextGuy.name.split(' ')[0]} מחכה למעידה שלך במרחק של ${diff} נק' בלבד.`, `האוויר פסגות עושה לך טוב. רק אל תסתכל אחורה, ${nextGuy.name.split(' ')[0]} בפיגור ${diff} נק' ומכין קאמבק.`]);
-         }
-       } else if (me.displayRank === 2) {
-         const king = currentUsers[myIndex - 1];
-         const diff = (king[scoreField] || 0) - myScore;
-         if (diff === 0) newTeaser = `שוויון עם הפסגה! אתה ו-${king.name.split(' ')[0]} נועלים קרניים. ניחוש בול אחד ואתה לוקח את זה.`;
-         else newTeaser = getRandom([`הכתר במרחק נגיעה! רק ${diff} נקודות מפרידות בינך לבין ${king.name.split(' ')[0]} שבפסגה.`, `סגנות זה נחמד לצרפתים, אבל אנחנו באנו לקחת גביע. תן איזה הפתעה ותעקוף את ${king.name.split(' ')[0]}! (${diff} נק' פער)`]);
-       } else if (myIndex === currentUsers.length - 1 && currentUsers.length > 3) {
-         const guyAbove = currentUsers[myIndex - 1];
-         const diff = (guyAbove[scoreField] || 0) - myScore;
-         newTeaser = getRandom([`נועל הטבלה חביבי... 📉 אפילו בוט רנדומלי עושה יותר מזה. לפחות תעקוף את ${guyAbove.name.split(' ')[0]} (פער ${diff} נק').`, `ראית פעם משחק כדורגל מלא? 😂 אתה צריך ${diff} נקודות רק כדי לא להיות אחרון.`]);
-       } else {
-         const prevGuy = currentUsers[myIndex - 1];
-         const diff = (prevGuy[scoreField] || 0) - myScore;
-         newTeaser = getRandom([`אתה מרחק יריקה מ-${prevGuy.name.split(' ')[0]} שמקדימה אותך ב-${diff} נקודות. תפסיק לשחק בטוח!`, `מגמה חיובית! עוד ${diff} נקודות ואתה שולח את ${prevGuy.name.split(' ')[0]} למטה. כיוון נכון אחד ויש לך את זה.`]);
-       }
-    }
-    setTeaser(newTeaser);
-  }, [currentUsers, activeBoard, currentUserId]);
 
+    // --- 1. קודם כל בודקים אם אנחנו בסיום שלב דרמטי בטורניר ---
+    if (tournamentState >= 13) {
+       // סוף הטורניר
+       if (me.displayRank === 1) {
+         newTeaser = `שריקת הסיום! ${me.name?.split(' ')[0]}, אתה האלוף הבלתי מעורער! תכין מקום בארון לגביע (ולמזומן) 🏆💸`;
+       } else if (me.displayRank <= 3) {
+         newTeaser = `סוף הטורניר! סיימת על הפודיום במקום ה-${me.displayRank}. מכובד מאוד! (אבל תמיד תזכור מי לקח ראשון 😉)`;
+       } else if (nemesisUser && myScore > (nemesisUser[scoreField] || 0)) {
+         newTeaser = `תם הטקס! לא הבאת אליפות, אבל היי - העיקר שהשארת את ${nemesisUser.name?.split(' ')[0]} לאכול אבק בטבלה! 😂`;
+       } else {
+         newTeaser = `הטורניר ננעל! לא אליפות ולא נעליים, אבל לפחות יש לך 4 שנים להתאמן למונדיאל הבא... 🤡`;
+       }
+    } 
+    else if (tournamentState === 4 || tournamentState === 5) {
+       // סוף שלב הבתים
+       if (me.displayRank === 1) {
+         newTeaser = `שלב הבתים ננעל ואתה בפסגה! כולם מחכים לראות אם תקרוס בלחץ של הנוקאאוט או שתלך עד הסוף... 👀`;
+       } else if (me.displayRank <= 5) {
+         newTeaser = `הבתים מאחורינו ואתה חזק בצמרת, מקום ${me.displayRank}! בנוקאאוט כל נקודה כפולה, זה הזמן לתת גז 🏎️`;
+       } else if (nemesisUser && myScore < (nemesisUser[scoreField] || 0)) {
+         newTeaser = `שלב הבתים נגמר ואתה בפיגור אחרי ${nemesisUser.name?.split(' ')[0]}. הנוקאאוט זה טורניר חדש לגמרי, תתעורר על עצמך! ⏰`;
+       } else {
+         newTeaser = `שלב הבתים הסתיים, וטוב שכך. תמחק את מה שהיה, בנוקאאוט מתחילים לעבוד על באמת! 💪`;
+       }
+    } 
+    // --- 2. אם אנחנו במהלך רגיל של הטורניר, נשתמש בלוגיקה המקורית והמעולה שלך ---
+    else {
+      if (rankDiff > 0) {
+         const passedGuy = currentUsers[myIndex + 1]; 
+         const ptsStr = ptsDiff > 0 ? `אספת ${ptsDiff} נק' אתמול ו` : "";
+         newTeaser = `בואנה חביבי! ${ptsStr}עלית ${rankDiff} מקומות בדירוג! אתה פשוט חד. ${passedGuy ? `אפילו עקפת את ${passedGuy.name.split(' ')[0]} שהייתה כוכבת רצינית עד עכשיו.` : ''}`;
+      } else if (rankDiff < 0) {
+         const guyAhead = currentUsers[myIndex - 1]; 
+         newTeaser = `מה נסגר? הכל בסדר בבית? נפלת ${Math.abs(rankDiff)} מקומות ביום אחד... ${guyAhead ? `איך נתת ל-${guyAhead.name.split(' ')[0]} לעקוף אותך ככה בלי לראות אותך ממטר?` : ''}`;
+      } else {
+         if (me.displayRank === 1) {
+           const nextGuy = currentUsers[myIndex + 1];
+           if (nextGuy && nextGuy[scoreField] === myScore) newTeaser = getRandom([`אתה בפסגה, אבל צמוד ל-${nextGuy.name.split(' ')[0]} בדיוק באותו הניקוד! צריך פה שובר שוויון.`, `קרב צמוד! ${nextGuy.name.split(' ')[0]} יושב איתך על אותו כיסא בפסגה. מי ימצמץ ראשון?`]);
+           else if (nextGuy) {
+             const diff = myScore - (nextGuy[scoreField] || 0);
+             newTeaser = getRandom([`מלך הטבלה! 👑 אבל ${nextGuy.name.split(' ')[0]} מחכה למעידה שלך במרחק של ${diff} נק' בלבד.`, `האוויר פסגות עושה לך טוב. רק אל תסתכל אחורה, ${nextGuy.name.split(' ')[0]} בפיגור ${diff} נק' ומכין קאמבק.`]);
+           }
+         } else if (me.displayRank === 2) {
+           const king = currentUsers[myIndex - 1];
+           const diff = (king[scoreField] || 0) - myScore;
+           if (diff === 0) newTeaser = `שוויון עם הפסגה! אתה ו-${king.name.split(' ')[0]} נועלים קרניים. ניחוש בול אחד ואתה לוקח את זה.`;
+           else newTeaser = getRandom([`הכתר במרחק נגיעה! רק ${diff} נקודות מפרידות בינך לבין ${king.name.split(' ')[0]} שבפסגה.`, `סגנות זה נחמד לצרפתים, אבל אנחנו באנו לקחת גביע. תן איזה הפתעה ותעקוף את ${king.name.split(' ')[0]}! (${diff} נק' פער)`]);
+         } else if (myIndex === currentUsers.length - 1 && currentUsers.length > 3) {
+           const guyAbove = currentUsers[myIndex - 1];
+           const diff = (guyAbove[scoreField] || 0) - myScore;
+           newTeaser = getRandom([`נועל הטבלה חביבי... 📉 אפילו בוט רנדומלי עושה יותר מזה. לפחות תעקוף את ${guyAbove.name.split(' ')[0]} (פער ${diff} נק').`, `ראית פעם משחק כדורגל מלא? 😂 אתה צריך ${diff} נקודות רק כדי לא להיות אחרון.`]);
+         } else {
+           const prevGuy = currentUsers[myIndex - 1];
+           const diff = (prevGuy[scoreField] || 0) - myScore;
+           newTeaser = getRandom([`אתה מרחק יריקה מ-${prevGuy.name.split(' ')[0]} שמקדימה אותך ב-${diff} נקודות. תפסיק לשחק בטוח!`, `מגמה חיובית! עוד ${diff} נקודות ואתה שולח את ${prevGuy.name.split(' ')[0]} למטה. כיוון נכון אחד ויש לך את זה.`]);
+         }
+      }
+    }
+
+    setTeaser(newTeaser);
+    }, [currentUsers, activeBoard, currentUserId, tournamentState]);
   useEffect(() => {
     let observer: IntersectionObserver;
     const timer = setTimeout(() => {
@@ -684,9 +750,9 @@ const getPrizeForRank = (rank: number, board: string, allUsers: any[]) => {
             <div>
               <div className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">סך הפרסים בטבלה</div>
               <div className="text-xl font-black text-white leading-none mt-1">
-                ₪{activeBoard === "GENERAL" 
+                 {activeBoard === "GENERAL" 
                    ? (Number(prizes.main1||0) + Number(prizes.main2||0) + Number(prizes.main3||0) + Number(prizes.main4||0))
-                   : (Number(prizes.ko1||0) + Number(prizes.ko2||0))}
+                   : (Number(prizes.ko1||0) + Number(prizes.ko2||0))} ₪
               </div>
             </div>
           </div>
@@ -779,7 +845,7 @@ const getPrizeForRank = (rank: number, board: string, allUsers: any[]) => {
                         {getPrizeForRank(podiumSecond.displayRank, activeBoard, currentUsers) ? (
                           <div className="mt-2 bg-slate-500/20 px-2.5 py-1 rounded-full border border-slate-500/30 flex items-center gap-1.5 shadow-sm">
                             <span className="text-[10px]">💰</span>
-                            <span className="text-xs font-black text-slate-900">₪{getPrizeForRank(podiumSecond.displayRank, activeBoard, currentUsers)}</span>
+                            <span className="text-xs font-black text-slate-900">{getPrizeForRank(podiumSecond.displayRank, activeBoard, currentUsers)} ₪</span>
                           </div>
                         ) : null}
                      </div>
@@ -815,7 +881,7 @@ const getPrizeForRank = (rank: number, board: string, allUsers: any[]) => {
                         {getPrizeForRank(podiumFirst.displayRank, activeBoard, currentUsers) ? (
                           <div className="mt-2 bg-amber-900/20 px-3 py-1 rounded-full border border-amber-900/30 flex items-center gap-1.5 shadow-sm">
                             <span className="text-[11px]">💰</span>
-                            <span className="text-sm font-black text-amber-950">₪{getPrizeForRank(podiumFirst.displayRank, activeBoard, currentUsers)}</span>
+                            <span className="text-sm font-black text-amber-950">{getPrizeForRank(podiumFirst.displayRank, activeBoard, currentUsers)} ₪</span>
                           </div>
                         ) : null}
                      </div>
@@ -838,7 +904,7 @@ const getPrizeForRank = (rank: number, board: string, allUsers: any[]) => {
                         {getPrizeForRank(podiumThird.displayRank, activeBoard, currentUsers) ? (
                           <div className="mt-2 bg-orange-950/30 px-2.5 py-1 rounded-full border border-orange-950/40 flex items-center gap-1.5 shadow-sm">
                             <span className="text-[10px]">💰</span>
-                            <span className="text-xs font-black text-orange-100">₪{getPrizeForRank(podiumThird.displayRank, activeBoard, currentUsers)}</span>
+                            <span className="text-xs font-black text-orange-100">{getPrizeForRank(podiumThird.displayRank, activeBoard, currentUsers)} ₪</span>
                           </div>
                         ) : null}
                      </div>

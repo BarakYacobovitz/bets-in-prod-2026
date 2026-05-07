@@ -881,81 +881,194 @@ export default function Dashboard({ userId, userName, setActiveTab, setPredictio
           /* שונה ל-3.5 שניות עם דיליי (השהייה) של 0.8 שניות */
           animation: lowerJumbotron 3.5s cubic-bezier(0.25, 1, 0.5, 1) 0.8s both; 
         }
+          @keyframes slowZoom {
+          0% { transform: scale(1); }
+          50% { transform: scale(1.15); }
+          100% { transform: scale(1); }
+        }
+        .animate-slow-zoom {
+          animation: slowZoom 25s ease-in-out infinite;
+        }
+          /* סגנון לבועות דיבור חלקות */
+        .speech-bubble {
+          position: absolute;
+          background: #1e293b; /* slate-800 */
+          color: white;
+          border-radius: 12px;
+          padding: 8px 12px;
+          border: 2px solid #475569; /* slate-600 */
+          filter: drop-shadow(0 4px 6px rgba(0,0,0,0.3));
+          font-weight: 800;
+          white-space: nowrap;
+          transform-origin: center;
+          transition: all 0.3s cubic-bezier(0.68, -0.55, 0.27, 1.55);
+          pointer-events: none;
+          z-index: 50;
+        }
+        /* הזנב של הבועה (בסגנון Tailwind) */
+        .speech-bubble::after {
+          content: '';
+          position: absolute;
+          width: 0; h: 0;
+          border-left: 10px solid transparent;
+          border-right: 10px solid transparent;
+          border-top: 10px solid #475569;
+          bottom: -11px; left: 50%;
+          transform: translateX(-50%);
+        }
       `}} />
 
+
 {/* ========================================================= */}
-      {/* עיצוב איצטדיון: מסכי ענק (Jumbotrons) + דגלי מארחות */}
+      {/* עיצוב איצטדיון: מסכי ענק רחבים (Jumbotrons) + דמויות מציצות */}
       {/* ========================================================= */}
       
-      {/* מסך ימני */}
-      <div className="hidden xl:flex fixed right-[1%] 2xl:right-[3%] top-1/2 z-0 flex-col items-center opacity-60 hover:opacity-100 transition-opacity duration-500 pointer-events-none drop-shadow-[0_20px_30px_rgba(0,0,0,0.8)] animate-jumbotron-right">
-         {/* כבלים / זרוע תלייה */}
-         <div className="w-2 h-16 bg-gradient-to-b from-slate-900 to-slate-700 shadow-inner"></div>
-         <div className="w-[180px] 2xl:w-[240px] h-3 bg-slate-800 rounded-t-md border-t-2 border-slate-600"></div>
+      {/* מסך ימני (USA, MEX, CAN) */}
+      <div className="hidden xl:flex fixed right-[1%] 2xl:right-[2%] top-1/2 z-0 flex-col items-center opacity-70 hover:opacity-100 transition-opacity duration-500 drop-shadow-[0_25px_40px_rgba(0,0,0,0.9)] animate-jumbotron-right">
+         {/* שני כבלים לתלייה */}
+         <div className="flex gap-20 2xl:gap-32 relative z-10 pointer-events-none">
+            <div className="w-2.5 h-16 bg-gradient-to-b from-slate-950 to-slate-800 shadow-inner"></div>
+            <div className="w-2.5 h-16 bg-gradient-to-b from-slate-950 to-slate-800 shadow-inner"></div>
+         </div>
          
-         {/* גוף המסך */}
-         <div className="w-[160px] 2xl:w-[220px] rounded-b-2xl bg-slate-950 border-4 md:border-[6px] border-slate-800 p-2 shadow-inner relative z-10">
-           <div className="absolute top-4 left-4 z-20 flex items-center gap-1.5 bg-black/80 px-2 py-0.5 rounded text-[8px] 2xl:text-[10px] font-black text-rose-500 tracking-widest border border-rose-500/30">
-             <span className="w-1.5 h-1.5 bg-rose-500 rounded-full animate-pulse"></span> LIVE
+         {/* קבוצת המסך והמציצים (חייב להיות z-20 ו-pointer-events-auto) */}
+         <div className="relative z-20 pointer-events-auto">
+           
+           {/* --- דמות 1: טראמפ (USA) --- */}
+           <div className="absolute -top-10 right-8 w-16 h-16 group/trump z-0 cursor-pointer">
+             {/* בועת דיבור: טראמפ */}
+             <div className="speech-bubble -top-12 left-1/2 opacity-0 scale-0 group-hover/trump:opacity-100 group-hover/trump:scale-100 text-[10px] whitespace-nowrap">
+               "Fake News! אני מקום ראשון!"
+             </div>
+             <img src="/donaldIcon-removebg.png" className="absolute inset-0 w-full h-full object-contain drop-shadow-xl hover:-translate-y-4 hover:rotate-6 transition-all duration-300" alt="Trump" />
            </div>
 
-           <div className="relative w-full h-[240px] 2xl:h-[340px] bg-black rounded-sm overflow-hidden border border-slate-700/80 shadow-[inset_0_0_20px_rgba(0,0,0,1)]">
-              <video src="/worldcup.mp4" autoPlay loop muted playsInline className="w-full h-full object-cover opacity-90 contrast-125 saturate-150" />
-              <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0IiBoZWlnaHQ9IjQiPgo8cmVjdCB3aWR0aD0iNCIgaGVpZ2h0PSI0IiBmaWxsPSIjZmZmIiBmaWxsLW9wYWNpdHk9IjAuMDUiLz4KPC9zdmc+')] mix-blend-overlay"></div>
-              <div className="absolute inset-0 shadow-[inset_0_0_15px_rgba(0,0,0,0.8)]"></div>
+           {/* --- דמות 2: מקסיקני --- */}
+           <div className="absolute top-1/2 -left-12 -translate-y-1/2 w-16 h-16 group/mexican z-0 cursor-pointer">
+             {/* בועת דיבור: מקסיקני (פונה ימינה) */}
+             <div className="speech-bubble -top-10 -right-36 opacity-0 scale-0 group-hover/mexican:opacity-100 group-hover/mexican:scale-100 text-[10px]">
+               "Jajaja! המנצח לוקח טקילה!"
+             </div>
+             <img src="/maxicanIcon-removebg.png" className="absolute inset-0 w-full h-full object-contain drop-shadow-xl hover:translate-x-4 hover:-rotate-12 transition-all duration-300" alt="Mexican" />
            </div>
 
-           <div className="w-full flex justify-center gap-3 mt-2 mb-1">
-              <div className="w-2 h-0.5 bg-blue-500/50 rounded shadow-[0_0_5px_rgba(59,130,246,0.8)]"></div>
-              <div className="w-2 h-0.5 bg-amber-500/50 rounded shadow-[0_0_5px_rgba(245,158,11,0.8)]"></div>
+           {/* --- דמות 3: קנדי --- */}
+           <div className="absolute bottom-1 w-16 h-16 group/canadian z-0 cursor-pointer left-8">
+             {/* בועת דיבור: קנדי */}
+             <div className="speech-bubble -bottom-14 left-1/2 opacity-0 scale-0 group-hover/canadian:opacity-100 group-hover/canadian:scale-100 text-[9px] -translate-x-1/2">
+                <span className="speech-bubble::after" style={{borderTop:'none', borderBottom:'10px solid #475569', top:'-11px', bottom:'auto'}}></span>
+                "סליחה, אבל אני הולך לעקוף אותך. Eh?"
+             </div>
+             <img src="/canadianIcon-removebg.png" className="absolute inset-0 w-full h-full object-contain drop-shadow-xl hover:translate-y-4 hover:rotate-6 transition-all duration-300" alt="Canadian" />
+           </div>
+           
+           {/* הקורה העליונה */}
+           <div className="w-[310px] 2xl:w-[410px] h-3 bg-slate-800 rounded-t-md border-t-2 border-slate-600 mx-auto relative z-10"></div>
+           
+           {/* גוף המסך הרחב */}
+           <div className="w-[330px] 2xl:w-[430px] rounded-b-2xl bg-slate-950 border-4 md:border-[6px] border-slate-800 p-2 shadow-inner relative z-10">
+             <div className="absolute top-3 left-3 z-20 flex items-center gap-1.5 bg-black/80 px-2 py-0.5 rounded text-[8px] 2xl:text-[10px] font-black text-rose-500 tracking-widest border border-rose-500/30">
+               <span className="w-1.5 h-1.5 bg-rose-500 rounded-full animate-pulse"></span> LIVE
+             </div>
+
+             <div className="relative w-full aspect-video bg-black rounded-sm overflow-hidden border border-slate-700/80 shadow-[inset_0_0_25px_rgba(0,0,0,1)]">
+                <img src="/worldcup-bg.png" className="absolute inset-0 w-full h-full object-contain opacity-80 animate-slow-zoom origin-center" alt="World Cup" />
+                <div className="absolute inset-0 pointer-events-none opacity-40 mix-blend-overlay" style={{ backgroundImage: 'linear-gradient(rgba(255, 255, 255, 0.15) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 255, 255, 0.15) 1px, transparent 1px)', backgroundSize: '3px 3px' }}></div>
+                <div className="absolute inset-0 shadow-[inset_0_0_20px_rgba(0,0,0,0.9)]"></div>
+                <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-2 z-10 pointer-events-auto">
+                  <h1 className="text-2xl 2xl:text-3xl font-black text-white drop-shadow-[0_0_15px_rgba(255,255,255,0.8)] tracking-tight italic">
+                    BETS IN PROD 2026
+                  </h1>
+                </div>
+             </div>
            </div>
          </div>
 
-         {/* דגלונים תלויים - משתמש בתמונות רשת אמיתיות (getFlagUrl) */}
-         <div className="flex gap-3 2xl:gap-4 justify-center -mt-1 relative z-0">
+         {/* דגלונים באיכות גבוהה */}
+         <div className="flex gap-8 2xl:gap-12 justify-center -mt-1 relative z-30 pointer-events-auto">
             {["ארה\"ב", "מקסיקו", "קנדה"].map((country) => (
-               <div key={country} className="w-8 h-12 2xl:w-10 2xl:h-14 bg-slate-900 shadow-xl relative overflow-hidden border-x border-b border-slate-700/80" style={{ clipPath: 'polygon(0 0, 100% 0, 100% 75%, 50% 100%, 0 75%)' }}>
-                  <img src={getFlagUrl(country)!} className="absolute inset-0 w-full h-full object-cover opacity-90 contrast-125 saturate-150" alt={country} />
-                  <div className="absolute inset-0 shadow-[inset_0_0_10px_rgba(0,0,0,0.8)]"></div>
+               <div key={country} title={country} className="w-10 h-16 2xl:w-12 2xl:h-20 drop-shadow-[0_10px_8px_rgba(0,0,0,0.8)] group hover:drop-shadow-[0_15px_12px_rgba(0,0,0,0.9)] hover:scale-110 hover:rotate-3 transition-all duration-300 origin-top cursor-pointer border border-t border-black/40">
+                  <div className="w-full h-full relative" style={{ clipPath: 'polygon(0 0, 100% 0, 100% 75%, 50% 100%, 0 75%)' }}>
+                    <img src={getFlagUrl(country)!} className="absolute inset-0 w-full h-full object-cover saturate-[1.1]" alt={country} />
+                    <div className="absolute inset-0 bg-gradient-to-b from-white/20 via-transparent to-black/60 mix-blend-overlay"></div>
+                    <div className="absolute inset-0 shadow-[inset_0_2px_8px_rgba(0,0,0,0.7)] border-t border-black/40"></div>
+                  </div>
                </div>
             ))}
          </div>
       </div>
 
-      {/* מסך שמאלי (העתק מראה עם השהייה של 0.3s) */}
-      <div className="hidden xl:flex fixed left-[1%] 2xl:left-[3%] top-1/2 z-0 flex-col items-center opacity-60 hover:opacity-100 transition-opacity duration-500 pointer-events-none drop-shadow-[0_20px_30px_rgba(0,0,0,0.8)] animate-jumbotron-left">
-         {/* כבלים / זרוע תלייה */}
-         <div className="w-2 h-16 bg-gradient-to-b from-slate-900 to-slate-700 shadow-inner"></div>
-         <div className="w-[180px] 2xl:w-[240px] h-3 bg-slate-800 rounded-t-md border-t-2 border-slate-600"></div>
+      {/* מסך שמאלי (USA, MEX, CAN - מציצים שונה) */}
+      <div className="hidden xl:flex fixed left-[1%] 2xl:left-[2%] top-1/2 z-0 flex-col items-center opacity-70 hover:opacity-100 transition-opacity duration-500 drop-shadow-[0_25px_40px_rgba(0,0,0,0.9)] animate-jumbotron-left">
+         {/* שני כבלים לתלייה */}
+         <div className="flex gap-20 2xl:gap-32 relative z-10 pointer-events-none">
+            <div className="w-2.5 h-16 bg-gradient-to-b from-slate-950 to-slate-800 shadow-inner"></div>
+            <div className="w-2.5 h-16 bg-gradient-to-b from-slate-950 to-slate-800 shadow-inner"></div>
+         </div>
          
-         {/* גוף המסך */}
-         <div className="w-[160px] 2xl:w-[220px] rounded-b-2xl bg-slate-950 border-4 md:border-[6px] border-slate-800 p-2 shadow-inner relative z-10">
-           <div className="absolute top-4 left-4 z-20 flex items-center gap-1.5 bg-black/80 px-2 py-0.5 rounded text-[8px] 2xl:text-[10px] font-black text-rose-500 tracking-widest border border-rose-500/30">
-             <span className="w-1.5 h-1.5 bg-rose-500 rounded-full animate-pulse"></span> LIVE
+         {/* קבוצת המסך והמציצים */}
+         <div className="relative z-20 pointer-events-auto">
+           
+           {/* --- דמות 1: טראמפ (USA - מציץ משמאל) --- */}
+           <div className="absolute -top-10 left-8 w-16 h-16 group/trump-l z-0 cursor-pointer">
+             <div className="speech-bubble -top-12 left-1/2 -translate-x-1/2 opacity-0 scale-0 group-hover/trump-l:opacity-100 group-hover/trump-l:scale-100 text-[10px]">
+               "עוד בול אחד שלי וזה ניצחון מוחץ!"
+             </div>
+             <img src="/donaldIcon-removebg.png" className="absolute inset-0 w-full h-full object-contain drop-shadow-xl hover:-translate-y-4 hover:-rotate-6 transition-all duration-300" alt="Trump" />
            </div>
 
-           <div className="relative w-full h-[240px] 2xl:h-[340px] bg-black rounded-sm overflow-hidden border border-slate-700/80 shadow-[inset_0_0_20px_rgba(0,0,0,1)]">
-              <video src="/worldcup.mp4" autoPlay loop muted playsInline className="w-full h-full object-cover opacity-90 contrast-125 saturate-150" />
-              <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0IiBoZWlnaHQ9IjQiPgo8cmVjdCB3aWR0aD0iNCIgaGVpZ2h0PSI0IiBmaWxsPSIjZmZmIiBmaWxsLW9wYWNpdHk9IjAuMDUiLz4KPC9zdmc+')] mix-blend-overlay"></div>
-              <div className="absolute inset-0 shadow-[inset_0_0_15px_rgba(0,0,0,0.8)]"></div>
+           {/* --- דמות 2: מקסיקני (מציץ מלמטה ימינה) --- */}
+           <div className="absolute -bottom-8 right-8 w-16 h-16 group/mexican-r z-0 cursor-pointer">
+             <div className="speech-bubble -top-10 -left-12 opacity-0 scale-0 group-hover/mexican-r:opacity-100 group-hover/mexican-r:scale-100 text-[10px]">
+               "אייייי! איזה ניחוש של הטאקו!"
+             </div>
+             <img src="/mexicanIcon-removebg.png" className="absolute inset-0 w-full h-full object-contain drop-shadow-xl hover:translate-y-4 hover:rotate-12 transition-all duration-300" alt="Mexican" />
            </div>
 
-           <div className="w-full flex justify-center gap-3 mt-2 mb-1">
-              <div className="w-2 h-0.5 bg-blue-500/50 rounded shadow-[0_0_5px_rgba(59,130,246,0.8)]"></div>
-              <div className="w-2 h-0.5 bg-amber-500/50 rounded shadow-[0_0_5px_rgba(245,158,11,0.8)]"></div>
+           {/* --- דמות 3: קנדי (מציץ מלמעלה ימינה) --- */}
+           <div className="absolute top-12 -right-12 w-16 h-16 group/canadian-t z-0 cursor-pointer">
+             <div className="speech-bubble -top-10 -right-20 opacity-0 scale-0 group-hover/canadian-t:opacity-100 group-hover/canadian-t:scale-100 text-[10px]">
+                "ניחוש בול של ההוקי!🏒"
+             </div>
+             <img src="/candianIcon-removebg.png" className="absolute inset-0 w-full h-full object-contain drop-shadow-xl hover:translate-x-4 hover:-rotate-6 transition-all duration-300" alt="Canadian" />
+           </div>
+           
+           {/* הקורה העליונה */}
+           <div className="w-[310px] 2xl:w-[410px] h-3 bg-slate-800 rounded-t-md border-t-2 border-slate-600 mx-auto relative z-10"></div>
+           
+           {/* גוף המסך הרחב */}
+           <div className="w-[330px] 2xl:w-[430px] rounded-b-2xl bg-slate-950 border-4 md:border-[6px] border-slate-800 p-2 shadow-inner relative z-10">
+             <div className="absolute top-3 left-3 z-20 flex items-center gap-1.5 bg-black/80 px-2 py-0.5 rounded text-[8px] 2xl:text-[10px] font-black text-rose-500 tracking-widest border border-rose-500/30">
+               <span className="w-1.5 h-1.5 bg-rose-500 rounded-full animate-pulse"></span> LIVE
+             </div>
+
+             <div className="relative w-full aspect-video bg-black rounded-sm overflow-hidden border border-slate-700/80 shadow-[inset_0_0_25px_rgba(0,0,0,1)]">
+                <img src="/worldcup-bg.png" className="absolute inset-0 w-full h-full object-contain opacity-80 animate-slow-zoom origin-center" alt="World Cup" />
+                <div className="absolute inset-0 pointer-events-none opacity-40 mix-blend-overlay" style={{ backgroundImage: 'linear-gradient(rgba(255, 255, 255, 0.15) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 255, 255, 0.15) 1px, transparent 1px)', backgroundSize: '3px 3px' }}></div>
+                <div className="absolute inset-0 shadow-[inset_0_0_20px_rgba(0,0,0,0.9)]"></div>
+                <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-2 z-10 pointer-events-auto">
+                  <h1 className="text-2xl 2xl:text-3xl font-black text-white drop-shadow-[0_0_15px_rgba(255,255,255,0.8)] tracking-tight italic">
+                    BETS IN PROD 2026
+                  </h1>
+                </div>
+             </div>
            </div>
          </div>
 
-         {/* דגלונים תלויים - משתמש בתמונות רשת אמיתיות (getFlagUrl) */}
-         <div className="flex gap-3 2xl:gap-4 justify-center -mt-1 relative z-0">
+         {/* דגלונים באיכות גבוהה */}
+         <div className="flex gap-8 2xl:gap-12 justify-center -mt-1 relative z-30 pointer-events-auto">
             {["ארה\"ב", "מקסיקו", "קנדה"].map((country) => (
-               <div key={country} className="w-8 h-12 2xl:w-10 2xl:h-14 bg-slate-900 shadow-xl relative overflow-hidden border-x border-b border-slate-700/80" style={{ clipPath: 'polygon(0 0, 100% 0, 100% 75%, 50% 100%, 0 75%)' }}>
-                  <img src={getFlagUrl(country)!} className="absolute inset-0 w-full h-full object-cover opacity-90 contrast-125 saturate-150" alt={country} />
-                  <div className="absolute inset-0 shadow-[inset_0_0_10px_rgba(0,0,0,0.8)]"></div>
+               <div key={country} title={country} className="w-10 h-16 2xl:w-12 2xl:h-20 drop-shadow-[0_10px_8px_rgba(0,0,0,0.8)] group hover:drop-shadow-[0_15px_12px_rgba(0,0,0,0.9)] hover:scale-110 hover:-rotate-3 transition-all duration-300 origin-top cursor-pointer border border-t border-black/40">
+                  <div className="w-full h-full relative" style={{ clipPath: 'polygon(0 0, 100% 0, 100% 75%, 50% 100%, 0 75%)' }}>
+                    <img src={getFlagUrl(country)!} className="absolute inset-0 w-full h-full object-cover saturate-[1.1]" alt={country} />
+                    <div className="absolute inset-0 bg-gradient-to-b from-white/20 via-transparent to-black/60 mix-blend-overlay"></div>
+                    <div className="absolute inset-0 shadow-[inset_0_2px_8px_rgba(0,0,0,0.7)] border-t border-black/40"></div>
+                  </div>
                </div>
             ))}
          </div>
       </div>
+
       {/* ========================================================= */}
       {/* ========================================================= */}
       {/* 🎈 קמעות פופ-אפ */}
@@ -1047,33 +1160,36 @@ export default function Dashboard({ userId, userName, setActiveTab, setPredictio
 )}
 
             <div className={`grid gap-3 relative z-10 w-full mb-6 ${tournamentState >= 4 ? 'grid-cols-2' : 'grid-cols-1'}`}>
-               <div 
+              <div 
                   onClick={() => {
                      sessionStorage.setItem("targetBoard", "GENERAL");
                      setActiveTab("LEADERBOARD");
                   }}
-                  className="bg-slate-900/80 backdrop-blur-md p-3 rounded-2xl border border-slate-700 text-center shadow-xl cursor-pointer hover:bg-slate-800 hover:scale-[1.02] transition-all group relative flex flex-col justify-between"
+                  className="bg-gradient-to-br from-amber-500/20 to-amber-900/40 backdrop-blur-md p-3 rounded-2xl border border-amber-500/50 text-center shadow-[0_0_20px_rgba(245,158,11,0.15)] cursor-pointer hover:border-amber-400 hover:scale-[1.02] transition-all group relative flex flex-col justify-between"
                >
+                  {/* הילת זהב ברקע (z-0 כדי לא להפריע לטקסט) */}
+                  <div className="absolute top-0 left-1/2 -translate-x-1/2 w-24 h-24 bg-amber-400/20 rounded-full blur-2xl pointer-events-none z-0"></div>
+
                   {ptsDiff > 0 && <div className="absolute -top-3 left-1/2 -translate-x-1/2 text-[10px] font-black text-white bg-gradient-to-r from-blue-600 to-blue-400 px-2 py-0.5 rounded-lg border border-blue-300 shadow-lg transform rotate-3 animate-pulse whitespace-nowrap z-20">+{ptsDiff} היום!</div>}
                   
-                  <div className="text-slate-500 text-[10px] font-black uppercase mb-3 group-hover:text-blue-400 transition-colors">דירוג כללי</div>
+                  <div className="text-amber-200/70 text-[10px] font-black uppercase mb-3 relative z-10 transition-colors">דירוג כללי</div>
                   
-                  <div className="flex justify-around items-center mb-3 px-4">
+                  <div className="flex justify-around items-center mb-3 px-4 relative z-10">
                      <div className="flex flex-col items-center">
-                        <span className="text-2xl md:text-3xl font-black text-emerald-400 drop-shadow-lg leading-none">{userStats.points}</span>
-                        <span className="text-[9px] text-slate-400 font-bold mt-1.5">נקודות</span>
+                        <span className="text-2xl md:text-3xl font-black text-amber-400 drop-shadow-[0_0_15px_rgba(251,191,36,0.8)] leading-none">{userStats.points}</span>
+                        <span className="text-[9px] text-amber-200/60 font-bold mt-1.5">נקודות</span>
                      </div>
-                     <div className="w-px h-8 bg-slate-700/50"></div>
+                     <div className="w-px h-8 bg-amber-500/30"></div>
                      <div className="flex flex-col items-center">
-                        <span className="text-2xl md:text-3xl font-black text-amber-400 drop-shadow-lg leading-none">{userStats.rank > 0 ? userStats.rank : "-"}</span>
-                        <span className="text-[9px] text-slate-400 font-bold mt-1.5">מיקום</span>
+                        <span className="text-2xl md:text-3xl font-black text-amber-400 drop-shadow-[0_0_15px_rgba(251,191,36,0.8)] leading-none">{userStats.rank > 0 ? userStats.rank : "-"}</span>
+                        <span className="text-[9px] text-amber-200/60 font-bold mt-1.5">מיקום</span>
                      </div>
                   </div>
                   
-                  <div className="mt-auto flex justify-center items-center min-h-[22px]">
+                  <div className="mt-auto flex justify-center items-center min-h-[22px] relative z-10">
                     {rankDiff > 0 && <span className="text-[9px] font-bold text-emerald-400 bg-emerald-950/80 px-2 py-0.5 rounded border border-emerald-500/30">▲ עלית {rankDiff}</span>}
                     {rankDiff < 0 && <span className="text-[9px] font-bold text-rose-400 bg-rose-950/80 px-2 py-0.5 rounded border border-rose-500/30">▼ ירדת {Math.abs(rankDiff)}</span>}
-                    {rankDiff === 0 && <span className="text-[9px] font-bold text-slate-400 bg-slate-800/80 px-2 py-0.5 rounded border border-slate-700/50">- ללא שינוי</span>}
+                    {rankDiff === 0 && <span className="text-[9px] font-bold text-amber-200/80 bg-amber-900/40 px-2 py-0.5 rounded border border-amber-500/40 shadow-sm">- ללא שינוי</span>}
                   </div>
                </div>
                
@@ -1089,12 +1205,12 @@ export default function Dashboard({ userId, userName, setActiveTab, setPredictio
                      
                      <div className="flex justify-around items-center mb-3 px-4">
                         <div className="flex flex-col items-center">
-                           <span className="text-2xl md:text-3xl font-black text-white drop-shadow-lg leading-none">{userStats.koPoints}</span>
+                           <span className="text-2xl md:text-3xl font-black text-emerald-400 drop-shadow-[0_0_15px_rgba(16,185,129,0.8)] leading-none">{userStats.koPoints}</span>
                            <span className="text-[9px] text-emerald-400/70 font-bold mt-1.5">נקודות</span>
                         </div>
                         <div className="w-px h-8 bg-emerald-500/30"></div>
                         <div className="flex flex-col items-center">
-                           <span className="text-2xl md:text-3xl font-black text-amber-400 drop-shadow-lg leading-none">{userStats.koRank > 0 ? userStats.koRank : "-"}</span>
+                           <span className="text-2xl md:text-3xl font-black text-emerald-400 drop-shadow-[0_0_15px_rgba(16,185,129,0.8)] leading-none">{userStats.koRank > 0 ? userStats.koRank : "-"}</span>
                            <span className="text-[9px] text-emerald-400/70 font-bold mt-1.5">מיקום</span>
                         </div>
                      </div>
