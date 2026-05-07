@@ -98,6 +98,7 @@ export default function Leaderboard() {
   const [tournamentState, setTournamentState] = useState<number>(0);
 
   const [teaser, setTeaser] = useState<string>("");
+  const [prizes, setPrizes] = useState<any>(null);
   const [isFirstPlace, setIsFirstPlace] = useState(false);
 
   const groupsList = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L"];
@@ -161,7 +162,8 @@ export default function Leaderboard() {
 
         const rtSnap = await getDoc(doc(db, "admin_results", "third_place"));
         if (rtSnap.exists()) setRealThirdPlace(rtSnap.data().teams || []);
-
+        const prizesSnap = await getDoc(doc(db, "settings", "prizes"));
+        if (prizesSnap.exists()) setPrizes(prizesSnap.data());
       } catch (error) { console.error("שגיאה:", error); } 
       finally { setIsLoading(false); }
     };
@@ -210,6 +212,38 @@ export default function Leaderboard() {
         toast.success(`הליגה '${name}' הוקמה! קוד הצטרפות: ${pin}`, { duration: 6000 });
     } catch(e) { toast.error("שגיאה בהקמת הליגה."); }
     finally { setIsLeagueLoading(false); }
+  };
+
+const getPrizeForRank = (rank: number, board: string, allUsers: any[]) => {
+    if (!prizes) return null;
+    
+    // מציא כמה אנשים חולקים את אותו הדירוג בדיוק
+    const winnersAtThisRank = allUsers.filter(u => u.displayRank === rank);
+    const count = winnersAtThisRank.length;
+    
+    // פונקציית עזר למשיכת ערך הפרס הגולמי מהמסד
+    const getRaw = (r: number) => {
+      if (board === "GENERAL") {
+        if (r === 1) return Number(prizes.main1 || 0);
+        if (r === 2) return Number(prizes.main2 || 0);
+        if (r === 3) return Number(prizes.main3 || 0);
+        if (r === 4) return Number(prizes.main4 || 0);
+      } else {
+        if (r === 1) return Number(prizes.ko1 || 0);
+        if (r === 2) return Number(prizes.ko2 || 0);
+      }
+      return 0;
+    };
+
+    // חישוב הקופה המשותפת: סכימת הפרסים של המקומות הרלוונטיים
+    // למשל: אם יש 3 אנשים במקום ראשון, הם חולקים את (פרס 1 + פרס 2 + פרס 3)
+    let totalPool = 0;
+    for (let i = 0; i < count; i++) {
+      totalPool += getRaw(rank + i);
+    }
+    
+    const finalPrize = totalPool / count;
+    return finalPrize > 0 ? Math.floor(finalPrize) : null;
   };
 
   const handleJoinLeague = async () => {
@@ -642,6 +676,25 @@ export default function Leaderboard() {
         </button>
         
       </div>
+      {/* קופת הטורניר בשקיפות מלאה */}
+      {prizes && activeBoard !== "LEAGUES" && (
+        <div className="bg-slate-900/50 border border-slate-800 p-3 sm:p-4 rounded-2xl mb-6 flex items-center justify-between max-w-sm mx-auto shadow-inner animate-fade-in-up">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-emerald-500/20 rounded-full flex items-center justify-center text-xl shadow-[0_0_15px_rgba(16,185,129,0.2)] border border-emerald-500/30">💰</div>
+            <div>
+              <div className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">סך הפרסים בטבלה</div>
+              <div className="text-xl font-black text-white leading-none mt-1">
+                ₪{activeBoard === "GENERAL" 
+                   ? (Number(prizes.main1||0) + Number(prizes.main2||0) + Number(prizes.main3||0) + Number(prizes.main4||0))
+                   : (Number(prizes.ko1||0) + Number(prizes.ko2||0))}
+              </div>
+            </div>
+          </div>
+          <div className="flex flex-col items-end gap-1">
+            <span className="text-[9px] bg-blue-500/10 text-blue-400 px-2 py-0.5 rounded-full border border-blue-500/20 shadow-sm">שקיפות מלאה</span>
+          </div>
+        </div>
+      )}
       {/* פאנל ניהול ובחירת ליגות פרטיות */}
       {activeBoard === "LEAGUES" && (
         <div className="mb-6 animate-fade-in-up">
@@ -717,11 +770,18 @@ export default function Leaderboard() {
                    <div className="text-slate-300 font-bold mb-3 text-center truncate w-full px-1 text-sm md:text-base">
                      {podiumSecond.name?.split(' ')[0]}
                    </div>
-                   <div className={`w-full bg-gradient-to-t from-slate-400 to-slate-300 h-28 md:h-32 rounded-t-lg shadow-lg relative flex flex-col items-center justify-start pt-2 pb-3 border-t-2 ${podiumSecond.id === myNemesisId ? 'border-rose-500 shadow-[0_0_15px_rgba(225,29,72,0.5)]' : 'border-slate-200'}`}>
-                     <span className="text-4xl drop-shadow-md mt-1 mb-auto">🥈</span>
-                     <div className="flex flex-col items-center w-full">
+                   <div className={`w-full bg-gradient-to-t from-slate-400 to-slate-300 pt-3 pb-4 rounded-t-lg shadow-lg relative flex flex-col items-center justify-between border-t-2 ${podiumSecond.id === myNemesisId ? 'border-rose-500 shadow-[0_0_15px_rgba(225,29,72,0.5)]' : 'border-slate-200'} min-h-[130px] md:min-h-[150px]`}>
+                     <span className="text-4xl drop-shadow-md mb-2">🥈</span>
+                     <div className="flex flex-col items-center w-full mt-auto">
                         <span className="text-slate-800 font-black text-2xl text-center leading-none">{podiumSecond[scoreField]}</span>
                         <span className="text-slate-700 font-bold text-[10px] md:text-xs text-center mt-1">מקום {podiumSecond.displayRank}</span>
+                        
+                        {getPrizeForRank(podiumSecond.displayRank, activeBoard, currentUsers) ? (
+                          <div className="mt-2 bg-slate-500/20 px-2.5 py-1 rounded-full border border-slate-500/30 flex items-center gap-1.5 shadow-sm">
+                            <span className="text-[10px]">💰</span>
+                            <span className="text-xs font-black text-slate-900">₪{getPrizeForRank(podiumSecond.displayRank, activeBoard, currentUsers)}</span>
+                          </div>
+                        ) : null}
                      </div>
                    </div>
                  </div>
@@ -746,11 +806,18 @@ export default function Leaderboard() {
                    <div className="text-amber-400 font-black mb-3 text-center truncate w-full px-1 text-base md:text-lg">
                      {podiumFirst.name?.split(' ')[0]}
                      </div>
-                   <div className={`w-full bg-gradient-to-t from-amber-600 to-amber-400 h-36 md:h-44 rounded-t-lg shadow-[0_0_30px_rgba(251,191,36,0.4)] relative flex flex-col items-center justify-start pt-2 pb-3 border-t-2 ${podiumFirst.id === myNemesisId ? 'border-rose-500 shadow-[0_0_20px_rgba(225,29,72,0.8)]' : 'border-amber-200'}`}>
-                     <span className="text-5xl drop-shadow-lg mt-1 mb-auto">🥇</span>
-                     <div className="flex flex-col items-center w-full">
+                   <div className={`w-full bg-gradient-to-t from-amber-600 to-amber-400 pt-3 pb-4 rounded-t-lg shadow-[0_0_30px_rgba(251,191,36,0.4)] relative flex flex-col items-center justify-between border-t-2 ${podiumFirst.id === myNemesisId ? 'border-rose-500 shadow-[0_0_20px_rgba(225,29,72,0.8)]' : 'border-amber-200'} min-h-[160px] md:min-h-[180px]`}>
+                     <span className="text-5xl drop-shadow-lg mb-2">🥇</span>
+                     <div className="flex flex-col items-center w-full mt-auto">
                         <span className="text-amber-950 font-black text-3xl text-center leading-none">{podiumFirst[scoreField]}</span>
                         <span className="text-amber-900 font-bold text-xs text-center mt-1">מקום {podiumFirst.displayRank}</span>
+                        
+                        {getPrizeForRank(podiumFirst.displayRank, activeBoard, currentUsers) ? (
+                          <div className="mt-2 bg-amber-900/20 px-3 py-1 rounded-full border border-amber-900/30 flex items-center gap-1.5 shadow-sm">
+                            <span className="text-[11px]">💰</span>
+                            <span className="text-sm font-black text-amber-950">₪{getPrizeForRank(podiumFirst.displayRank, activeBoard, currentUsers)}</span>
+                          </div>
+                        ) : null}
                      </div>
                    </div>
                  </div>
@@ -762,11 +829,18 @@ export default function Leaderboard() {
                    <div className="text-orange-300 font-bold mb-3 text-center truncate w-full px-1 text-sm md:text-base">
                      {podiumThird.name?.split(' ')[0]}
                    </div>
-                   <div className={`w-full bg-gradient-to-t from-orange-800 to-orange-600 h-24 md:h-28 rounded-t-lg shadow-lg relative flex flex-col items-center justify-start pt-2 pb-3 border-t-2 ${podiumThird.id === myNemesisId ? 'border-rose-500 shadow-[0_0_15px_rgba(225,29,72,0.5)]' : 'border-orange-400'}`}>
-                     <span className="text-3xl drop-shadow-md mt-1 mb-auto">🥉</span>
-                     <div className="flex flex-col items-center w-full">
+                   <div className={`w-full bg-gradient-to-t from-orange-800 to-orange-600 pt-3 pb-4 rounded-t-lg shadow-lg relative flex flex-col items-center justify-between border-t-2 ${podiumThird.id === myNemesisId ? 'border-rose-500 shadow-[0_0_15px_rgba(225,29,72,0.5)]' : 'border-orange-400'} min-h-[110px] md:min-h-[130px]`}>
+                     <span className="text-3xl drop-shadow-md mb-2">🥉</span>
+                     <div className="flex flex-col items-center w-full mt-auto">
                         <span className="text-orange-100 font-black text-xl text-center leading-none">{podiumThird[scoreField]}</span>
                         <span className="text-orange-200 font-bold text-[10px] md:text-xs text-center mt-1">מקום {podiumThird.displayRank}</span>
+                        
+                        {getPrizeForRank(podiumThird.displayRank, activeBoard, currentUsers) ? (
+                          <div className="mt-2 bg-orange-950/30 px-2.5 py-1 rounded-full border border-orange-950/40 flex items-center gap-1.5 shadow-sm">
+                            <span className="text-[10px]">💰</span>
+                            <span className="text-xs font-black text-orange-100">₪{getPrizeForRank(podiumThird.displayRank, activeBoard, currentUsers)}</span>
+                          </div>
+                        ) : null}
                      </div>
                    </div>
                  </div>
@@ -844,6 +918,7 @@ export default function Leaderboard() {
                         {isMe && <span className="bg-blue-600 text-white text-[9px] px-1.5 py-0.5 rounded uppercase tracking-wider shrink-0 shadow-sm">אתה</span>}
                         {isNemesis && <span className="bg-rose-600/20 border border-rose-500/50 text-rose-400 text-[9px] px-1.5 py-0.5 rounded tracking-wider shrink-0 flex items-center gap-1 shadow-sm" title="היריב המושבע שלך!"><span>🎯</span> יריב</span>}
                          {!u.hasPaid && <span className="text-[10px] text-rose-400">טרם שולם</span>}
+
                         </div>
                       </td>
                        <td className={`p-3 md:p-4 text-center font-black text-lg md:text-xl ${isTop3 ? (activeBoard === "GENERAL" || activeBoard === "LEAGUES" ? "text-amber-400" : "text-emerald-400") : "text-slate-200"}`}>

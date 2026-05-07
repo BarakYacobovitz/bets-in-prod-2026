@@ -12,6 +12,8 @@ import AdminMagazineTab from "@/components/admin/AdminMagazineTab";
 import AdminBonusTab from "@/components/admin/AdminBonusTab";
 import AdminUsersTab from "@/components/admin/AdminUsersTab";
 import AdminNotificationTab from "@/components/admin/AdminNotificationTab";
+import AdminPrizesTab from "@/components/admin/AdminPrizesTab";
+import AdminStatsTab from "@/components/admin/AdminStatsTab";
 
 const ADMIN_EMAIL = "bawak.y10@gmail.com"; 
 
@@ -19,12 +21,7 @@ export default function AdminPanel() {
   const [user, setUser] = useState<any>(null);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   
-  const [activeTab, setActiveTab] = useState<"SYSTEM" | "MAGAZINE" | "USERS" | "MATCHES" | "GENERATOR" | "QUALIFIERS" | "THIRD_PLACE" | "BONUS" | "STATS" | "BACKUP">("SYSTEM");
-  const [statsData, setStatsData] = useState<any>(null);
-  const [selectedStatMatch, setSelectedStatMatch] = useState<string>("");
-  const [selectedStatBonus, setSelectedStatBonus] = useState<string>("");
-  const [selectedStatGroup, setSelectedStatGroup] = useState<string>("A");
-  const [statSpyModal, setStatSpyModal] = useState<{title: string, list: any[], type: "MATCH_DIRECTION" | "NAMES_ONLY"} | null>(null);
+  const [activeTab, setActiveTab] = useState<"SYSTEM" | "MAGAZINE" | "USERS" | "MATCHES" | "GENERATOR" | "QUALIFIERS" | "THIRD_PLACE" | "BONUS" | "STATS" | "BACKUP" | "PRIZES">("SYSTEM");  
 
   const [adminBonusCategory, setAdminBonusCategory] = useState<string>("TOURNAMENT");
   const [adminKnockoutRound, setAdminKnockoutRound] = useState<string>("ALL");
@@ -849,114 +846,7 @@ const handleCalculateScores = async (silentParam: any = false) => {
     }
   };
 
-  const handleGenerateStats = async () => {
-    setIsCalculating(true);
-    try {
-      const usersSnap = await getDocs(collection(db, "users"));
-      const usersMap: any = {};
-      usersSnap.forEach(doc => { usersMap[doc.id] = doc.data().name; });
 
-      const matchStatsMap: any = {};
-      const bonusStatsMap: any = {};
-      const qualStatsMap: any = {};
-      const thirdStatsMap: any = {};
-
-      const gSnap = await getDocs(collection(db, "predictions_matches"));
-      const kSnap = await getDocs(collection(db, "predictions_knockout"));
-      const allMatches = [...gSnap.docs.map(d=>d.data()), ...kSnap.docs.map(d=>d.data())];
-
-      allMatches.forEach(pred => {
-        if (!pred.predictedHomeScore || !pred.predictedAwayScore) return;
-        const userName = usersMap[pred.userId];
-        if (!userName) return; 
-
-        const timeStr = formatAuditTime(pred.updatedAt);
-        const mId = pred.matchId;
-        if (!matchStatsMap[mId]) matchStatsMap[mId] = { total: 0, homeWins: [], awayWins: [], draws: [], exactScores: {} };
-        matchStatsMap[mId].total++;
-        
-        const h = Number(pred.predictedHomeScore); const a = Number(pred.predictedAwayScore);
-        const userObj = { name: userName, home: h, away: a, time: timeStr }; 
-
-        if (h > a) matchStatsMap[mId].homeWins.push(userObj);
-        else if (a > h) matchStatsMap[mId].awayWins.push(userObj);
-        else matchStatsMap[mId].draws.push(userObj);
-
-        const exact = `${h}-${a}`;
-        if (!matchStatsMap[mId].exactScores[exact]) matchStatsMap[mId].exactScores[exact] = { count: 0, users: [] };
-        matchStatsMap[mId].exactScores[exact].count++;
-        matchStatsMap[mId].exactScores[exact].users.push({ name: userName, time: timeStr }); 
-      });
-
-      const bSnap = await getDocs(collection(db, "predictions_bonus"));
-      bSnap.forEach(doc => {
-        const userName = usersMap[doc.id];
-        if (!userName) return; 
-        const timeStr = formatAuditTime(doc.data().updatedAt);
-        const answers = doc.data().answers || {};
-        for (const [qId, ans] of Object.entries(answers)) {
-          if (!ans) continue;
-          if (!bonusStatsMap[qId]) bonusStatsMap[qId] = { total: 0, answers: {} };
-          bonusStatsMap[qId].total++;
-          const answerStr = String(ans).trim();
-          if (!bonusStatsMap[qId].answers[answerStr]) bonusStatsMap[qId].answers[answerStr] = { count: 0, users: [] };
-          bonusStatsMap[qId].answers[answerStr].count++;
-          bonusStatsMap[qId].answers[answerStr].users.push({ name: userName, time: timeStr });
-        }
-      });
-
-      const qSnap = await getDocs(collection(db, "predictions_qualifiers"));
-      qSnap.forEach(doc => {
-        const userName = usersMap[doc.id];
-        if (!userName) return;
-        const timeStr = formatAuditTime(doc.data().updatedAt);
-        const data = doc.data().groups || {};
-        for (const [group, preds] of Object.entries<any>(data)) {
-          if (!qualStatsMap[group]) qualStatsMap[group] = { first: {}, second: {}, total: 0 };
-          qualStatsMap[group].total++;
-          if (preds.first) {
-            if (!qualStatsMap[group].first[preds.first]) qualStatsMap[group].first[preds.first] = { count: 0, users: [] };
-            qualStatsMap[group].first[preds.first].count++;
-            qualStatsMap[group].first[preds.first].users.push({ name: userName, time: timeStr });
-          }
-          if (preds.second) {
-            if (!qualStatsMap[group].second[preds.second]) qualStatsMap[group].second[preds.second] = { count: 0, users: [] };
-            qualStatsMap[group].second[preds.second].count++;
-            qualStatsMap[group].second[preds.second].users.push({ name: userName, time: timeStr });
-          }
-        }
-      });
-
-      const tSnap = await getDocs(collection(db, "predictions_third_place"));
-      let totalThirdPlaceUsers = 0;
-      tSnap.forEach(doc => {
-        const userName = usersMap[doc.id];
-        if (!userName) return;
-        const timeStr = formatAuditTime(doc.data().updatedAt);
-        const teams = doc.data().teams || [];
-        let hasVoted = false;
-        teams.forEach((team: string) => {
-          if (!team) return;
-          hasVoted = true;
-          if (!thirdStatsMap[team]) thirdStatsMap[team] = { count: 0, users: [] };
-          thirdStatsMap[team].count++;
-          thirdStatsMap[team].users.push({ name: userName, time: timeStr });
-        });
-        if (hasVoted) totalThirdPlaceUsers++;
-      });
-
-      setStatsData({ matches: matchStatsMap, bonuses: bonusStatsMap, qualifiers: qualStatsMap, thirdPlace: { teams: thirdStatsMap, totalUsers: totalThirdPlaceUsers } });
-      if (matches.length > 0) setSelectedStatMatch(matches[0].id);
-      if (bonusQuestions.length > 0) setSelectedStatBonus(bonusQuestions[0].id);
-      
-      toast.success("סריקת הנתונים הסתיימה!");
-
-    } catch(e) { 
-      console.error(e); 
-      toast.error("שגיאה ביצירת תובנות הקהל"); 
-    }
-    finally { setIsCalculating(false); }
-  };
   
   const handleCreateAutoInsights = () => {
     if (!statsData) {
@@ -1204,10 +1094,10 @@ const handleCalculateScores = async (silentParam: any = false) => {
          matchesToResolve = matches.filter(m => m.stage === "KNOCKOUT" && m.roundName === "רבע גמר");
          nextState = 10;
       } else if (simStage === "SF") {
-         matchesToResolve = matches.filter(m => m.stage === "KNOCKOUT" && (m.roundName === "חצי גמר" || m.roundName === "מקום שלישי"));
+         matchesToResolve = matches.filter(m => m.stage === "KNOCKOUT" && (m.roundName === "חצי גמר" ));
          nextState = 12;
       } else if (simStage === "FINAL") {
-         matchesToResolve = matches.filter(m => m.stage === "KNOCKOUT" && m.roundName === "גמר");
+         matchesToResolve = matches.filter(m => m.stage === "KNOCKOUT" && m.roundName === "גמר" || m.roundName === "מקום שלישי");
          nextState = 13;
       }
 
@@ -1812,6 +1702,7 @@ const handleCalculateScores = async (silentParam: any = false) => {
             { id: "BONUS", icon: "🎁", label: "בונוסים" },
             { id: "USERS", icon: "👥", label: "משתמשים" },
             { id: "STATS", icon: "📊", label: "ראדאר" },
+            { id: "PRIZES", icon: "💰", label: "פרסים" },
             { id: "NOTIFICATIONS", icon: "📢", label: "פוש" },
             { id: "BACKUP", icon: "💾", label: "גיבוי" }
 
@@ -1874,129 +1765,13 @@ const handleCalculateScores = async (silentParam: any = false) => {
           )}
 
           {activeTab === "STATS" && (
-            <div className="space-y-8 relative">
-               <div className="flex flex-col md:flex-row justify-between items-start md:items-center bg-gradient-to-r from-indigo-900/50 to-slate-800 p-6 md:p-8 rounded-3xl border border-indigo-500/30 shadow-lg gap-6">
-                 <div>
-                   <h2 className="text-2xl md:text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-purple-400 flex items-center gap-2"><span>📡</span> ראדאר תובנות וביון</h2>
-                   <p className="text-slate-400 text-sm mt-2">סרוק את הנתונים, צפה בהתפלגויות הקהל, ולחץ על הברים כדי לראות מי בדיוק אמר מה.</p>
-                 </div>
-                 <button onClick={handleGenerateStats} disabled={isCalculating} className="w-full md:w-auto bg-indigo-600 hover:bg-indigo-500 text-white font-black py-4 px-8 rounded-xl transition-all shadow-[0_0_20px_rgba(79,70,229,0.3)] active:scale-95">
-                   {isCalculating ? "סורק נתונים מסווגים... ⏳" : "🔍 התחל סריקת ראדאר"}
-                 </button>
-               </div>
-
-               {!statsData ? (
-                 <div className="text-center text-slate-500 py-16 border border-dashed border-slate-700 rounded-3xl font-bold text-lg">יש ללחוץ על "סריקת ראדאר" כדי להציג את הנתונים המעודכנים.</div>
-               ) : (
-                 <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
-                   
-                   <div className="bg-slate-800 p-6 md:p-8 rounded-3xl border border-slate-700 shadow-xl">
-                      <h3 className="text-xl md:text-2xl font-black text-white mb-6 border-b border-slate-700 pb-3">⚽ התפלגות ניחושי משחק</h3>
-                      <select value={selectedStatMatch} onChange={(e) => setSelectedStatMatch(e.target.value)} className="w-full bg-slate-900 text-blue-300 font-bold p-3.5 rounded-xl border border-slate-600 mb-6 outline-none shadow-inner cursor-pointer">
-                        {matches.map(m => (<option key={m.id} value={m.id}>{m.homeTeam} נגד {m.awayTeam}</option>))}
-                      </select>
-                      {statsData.matches[selectedStatMatch] ? (
-                        <>
-                          {(() => {
-                             const match = matches.find(m => m.id === selectedStatMatch);
-                             const stats = statsData.matches[selectedStatMatch];
-                             return (
-                               <div className="bg-slate-900/50 p-4 rounded-2xl border border-slate-700/50 shadow-inner mb-6">
-                                 {renderProgressBar(match?.homeTeam || "קבוצת בית", stats.homeWins.length, stats.total, "bg-blue-500", () => { if(stats.homeWins.length>0) setStatSpyModal({ title: `הימרו על ${match?.homeTeam}`, list: stats.homeWins, type: "MATCH_DIRECTION" })})}
-                                 {renderProgressBar("תיקו", stats.draws.length, stats.total, "bg-slate-400", () => { if(stats.draws.length>0) setStatSpyModal({ title: `הימרו על תיקו`, list: stats.draws, type: "MATCH_DIRECTION" })})}
-                                 {renderProgressBar(match?.awayTeam || "קבוצת חוץ", stats.awayWins.length, stats.total, "bg-emerald-500", () => { if(stats.awayWins.length>0) setStatSpyModal({ title: `הימרו על ${match?.awayTeam}`, list: stats.awayWins, type: "MATCH_DIRECTION" })})}
-                               </div>
-                             )
-                          })()}
-                          <div>
-                            <h4 className="text-sm font-black text-amber-400 mb-3 border-t border-slate-700/50 pt-4">התוצאות הכי פופולריות:</h4>
-                            <div className="flex flex-wrap gap-2">
-                              {Object.entries(statsData.matches[selectedStatMatch].exactScores).sort(([,a]:any, [,b]:any) => b.count - a.count).slice(0, 6).map(([score, data]: any) => (
-                                  <button key={score} onClick={() => setStatSpyModal({ title: `הימרו על תוצאה מדויקת ${score}`, list: data.users, type: "NAMES_ONLY" })} className="bg-slate-900 px-4 py-2.5 rounded-xl border border-slate-600 hover:border-amber-500 hover:bg-slate-800 font-black text-white flex gap-3 transition-colors shadow-sm">
-                                    <span className="tracking-widest">{score}</span><span className="text-amber-500 text-sm">({data.count})</span>
-                                  </button>
-                              ))}
-                            </div>
-                          </div>
-                        </>
-                      ) : (<div className="text-slate-500 text-center py-8">אף אחד לא ניחש עדיין את המשחק הזה.</div>)}
-                   </div>
-
-                   <div className="bg-slate-800 p-6 md:p-8 rounded-3xl border border-slate-700 shadow-xl">
-                      <h3 className="text-xl md:text-2xl font-black text-amber-400 mb-6 border-b border-slate-700 pb-3">⭐ שאלות בונוס</h3>
-                      <select value={selectedStatBonus} onChange={(e) => setSelectedStatBonus(e.target.value)} className="w-full bg-slate-900 text-amber-300 font-bold p-3.5 rounded-xl border border-slate-600 mb-6 outline-none shadow-inner cursor-pointer">
-                        {bonusQuestions.map(q => (<option key={q.id} value={q.id}>{q.label}</option>))}
-                      </select>
-                      {statsData.bonuses[selectedStatBonus] ? (
-                        <div className="bg-slate-900/50 p-4 rounded-2xl border border-slate-700/50 shadow-inner max-h-[300px] overflow-y-auto custom-scrollbar pr-2 space-y-2">
-                          {Object.entries(statsData.bonuses[selectedStatBonus].answers).sort(([,a]:any, [,b]:any) => b.count - a.count).map(([answer, data]: any, idx) => {
-                              return renderProgressBar(answer, data.count, statsData.bonuses[selectedStatBonus].total, idx === 0 ? "bg-amber-500" : "bg-slate-500", () => setStatSpyModal({ title: `הימרו על: ${answer}`, list: data.users, type: "NAMES_ONLY" }));
-                          })}
-                        </div>
-                      ) : (<div className="text-slate-500 text-center py-8">אף אחד לא ענה על שאלת הבונוס הזו.</div>)}
-                   </div>
-
-                   <div className="bg-slate-800 p-6 md:p-8 rounded-3xl border border-slate-700 shadow-xl">
-                      <h3 className="text-xl md:text-2xl font-black text-teal-400 mb-6 border-b border-slate-700 pb-3">🥇 עולות מהבתים</h3>
-                      <select value={selectedStatGroup} onChange={(e) => setSelectedStatGroup(e.target.value)} className="w-full bg-slate-900 text-teal-300 font-bold p-3.5 rounded-xl border border-slate-600 mb-6 outline-none shadow-inner cursor-pointer">
-                        {groupsList.map(g => <option key={g} value={g}>בית {g}</option>)}
-                      </select>
-                      {statsData.qualifiers[selectedStatGroup] ? (
-                        <div className="space-y-6">
-                          <div className="bg-slate-900/50 p-4 rounded-2xl border border-slate-700/50 shadow-inner"><h4 className="text-teal-400 font-bold mb-4 border-b border-slate-700/50 pb-2">מקום 1:</h4>{Object.entries(statsData.qualifiers[selectedStatGroup].first).sort(([,a]:any, [,b]:any) => b.count - a.count).map(([team, data]: any) => renderProgressBar(team, data.count, statsData.qualifiers[selectedStatGroup].total, "bg-teal-500", () => setStatSpyModal({ title: `הימרו על ${team} (מקום 1 - בית ${selectedStatGroup})`, list: data.users, type: "NAMES_ONLY" })))}</div>
-                          <div className="bg-slate-900/50 p-4 rounded-2xl border border-slate-700/50 shadow-inner"><h4 className="text-emerald-400 font-bold mb-4 border-b border-slate-700/50 pb-2">מקום 2:</h4>{Object.entries(statsData.qualifiers[selectedStatGroup].second).sort(([,a]:any, [,b]:any) => b.count - a.count).map(([team, data]: any) => renderProgressBar(team, data.count, statsData.qualifiers[selectedStatGroup].total, "bg-emerald-500", () => setStatSpyModal({ title: `הימרו על ${team} (מקום 2 - בית ${selectedStatGroup})`, list: data.users, type: "NAMES_ONLY" })))}</div>
-                        </div>
-                      ) : (<div className="text-slate-500 text-center py-8">אין נתונים.</div>)}
-                   </div>
-
-                   <div className="bg-slate-800 p-6 md:p-8 rounded-3xl border border-slate-700 shadow-xl">
-                      <h3 className="text-xl md:text-2xl font-black text-rose-400 mb-6 border-b border-slate-700 pb-3">🥉 8 המעפילות (מקום 3)</h3>
-                      {Object.keys(statsData.thirdPlace.teams).length > 0 ? (
-                        <div className="bg-slate-900/50 p-4 rounded-2xl border border-slate-700/50 shadow-inner max-h-[500px] overflow-y-auto custom-scrollbar pr-2">
-                          <div className="text-[10px] text-slate-500 mb-4 uppercase tracking-widest font-bold">אחוזים מחושבים מתוך סך המשתתפים שהצביעו:</div>
-                          <div className="space-y-3">
-                            {Object.entries(statsData.thirdPlace.teams).sort(([,a]:any, [,b]:any) => b.count - a.count).map(([team, data]: any) => renderProgressBar(team, data.count, statsData.thirdPlace.totalUsers, "bg-rose-500", () => setStatSpyModal({ title: `הימרו על ${team} (מקום 3)`, list: data.users, type: "NAMES_ONLY" })))}
-                          </div>
-                        </div>
-                      ) : (<div className="text-slate-500 text-center py-8">אין נתונים.</div>)}
-                   </div>
-
-                 </div>
-               )}
-
-               {statSpyModal && (
-                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-md animate-fade-in-up">
-                    <div className="bg-slate-900 border border-slate-600 p-6 rounded-3xl w-full max-w-md max-h-[85vh] flex flex-col shadow-2xl relative overflow-hidden md:resize">
-                       <div className="flex justify-between items-center mb-6 pb-4 border-b border-slate-800 shrink-0">
-                         <h3 className="text-xl font-bold text-white flex items-center gap-2"><span>👀</span> {statSpyModal.title}</h3>
-                         <button onClick={() => setStatSpyModal(null)} className="text-slate-400 hover:text-rose-400 font-bold w-10 h-10 bg-slate-800 rounded-full flex items-center justify-center border border-slate-700 transition-colors">✕</button>
-                       </div>
-                       <div className="overflow-y-auto custom-scrollbar flex-1 pr-2 space-y-2">
-                          {statSpyModal.type === "NAMES_ONLY" ? (
-                             statSpyModal.list.map((uObj, i) => (
-                               <div key={i} className="bg-slate-800 p-3 rounded-xl border border-slate-700 text-white font-bold flex justify-between items-center gap-3 hover:bg-slate-700 transition-colors shadow-sm">
-                                 <div className="flex items-center gap-2"><span className="text-slate-500 text-xs w-4">{i+1}.</span> {uObj.name || uObj}</div>
-                                 {uObj.time && <div className="text-[10px] font-bold text-slate-400 bg-slate-900 border border-slate-700 px-2 py-1 rounded">עדכון: {uObj.time}</div>}
-                               </div>
-                             ))
-                          ) : (
-                             statSpyModal.list.sort((a, b) => b.home - a.home).map((userObj, i) => (
-                               <div key={i} className="bg-slate-800 p-3 rounded-xl border border-slate-700 flex justify-between items-center hover:bg-slate-700 transition-colors shadow-sm">
-                                  <div className="text-white font-bold flex flex-col gap-1">
-                                    <div className="flex items-center gap-2"><span className="text-slate-500 text-xs w-4">{i+1}.</span> {userObj.name}</div>
-                                    {userObj.time && <div className="text-[10px] font-bold text-slate-400 bg-slate-900 border border-slate-700 px-2 py-1 rounded inline-block w-fit">עדכון: {userObj.time}</div>}
-                                  </div>
-                                  <div className="font-black text-slate-200 tracking-widest bg-slate-950 px-3 py-1.5 rounded-lg border border-slate-700 shadow-inner">
-                                    {userObj.home} - {userObj.away}
-                                  </div>
-                               </div>
-                             ))
-                          )}
-                       </div>
-                    </div>
-                 </div>
-               )}
-            </div>
+             <AdminStatsTab 
+             matches={matches} 
+             bonusQuestions={bonusQuestions} 
+             groupsList={groupsList} 
+             isCalculating={isCalculating} 
+             setIsCalculating={setIsCalculating} 
+             />
           )}
           {/* --- הנה הקסם החדש שלנו --- */}
           {activeTab === "NOTIFICATIONS" && (
@@ -2023,6 +1798,7 @@ const handleCalculateScores = async (silentParam: any = false) => {
              handleExportUserBackup={handleExportUserBackup}
            />
         )}
+        {activeTab === "PRIZES" && <AdminPrizesTab />}
 
           {activeTab === "BONUS" && (
             <AdminBonusTab />

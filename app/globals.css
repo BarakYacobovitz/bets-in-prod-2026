@@ -65,4 +65,19 @@ body {
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
   background: rgba(71, 85, 105, 1); /* צבע slate-600 */
 }
+@keyframes shimmer-fast {
+  0% { transform: translateX(-100%); }
+  50% { transform: translateX(100%); }
+  100% { transform: translateX(100%); }
+}
+.animate-shimmer-fast {
+  animation: shimmer-fast 3s infinite;
+}
+@keyframes bounce-slow {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
+}
+.animate-bounce-slow {
+  animation: bounce-slow 2s ease-in-out infinite;
+}
 

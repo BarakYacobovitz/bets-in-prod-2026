@@ -6,6 +6,8 @@ import { getFlagUrl } from "../app/utils/flags";
 import toast from "react-hot-toast";
 import Link from "next/link";
 import { getPlayerInfo, PLAYERS_DATA } from "../app/utils/players";
+import FinalePodiumModal from "./FinalePodiumModal"; 
+import WrappedModal from "./WrappedModal";
 
 const MASCOTS = [
   { id: "trump", name: "דונלד", image: "/donaldIcon.png", quotes: ["ניחוש ענק. כולם אומרים שזה הניחוש הכי טוב שהם ראו. פייק ניוז מי שאומר אחרת!", "אנחנו נבנה פער ענק בטבלה, והחברים ישלמו על זה יהיה מאוד נייס!", "המונדיאל באמריקה יהיה הכי huge אי פעם. נקודה. גם הניקוד שלך בסדר.", "אני ניצחתי בטבלת הגילוי הנאות, כולם יודעים את זה. גנבו לי נקודות!"] },
@@ -59,7 +61,7 @@ const getPhaseName = (state: number) => {
   }
 };
 
-export default function Dashboard({ userId, userName, setActiveTab, setPredictionTab, tournamentState }: any) {
+export default function Dashboard({ userId, userName, setActiveTab, setPredictionTab, tournamentState: initialTournamentState }: any) {
   const [userStats, setUserStats] = useState<any>({ points: 0, rank: 0, koPoints: 0, koRank: 0, hasPaid: false, prevPoints: 0, prevRank: 0, prevKoRank: 0, nemesisId: null });
   const [leaderboardInfo, setLeaderboardInfo] = useState({ totalUsers: 0 });
   const [dailyMessage, setDailyMessage] = useState("");
@@ -96,12 +98,25 @@ export default function Dashboard({ userId, userName, setActiveTab, setPredictio
   const [bonusQuestionsList, setBonusQuestionsList] = useState<any[]>([]);
   const [mascotQuote, setMascotQuote] = useState<{mascot: any, quote: string} | null>(null);
   const [showMascot, setShowMascot] = useState(false);
+  const [prizes, setPrizes] = useState<any>(null);
+  const [showPodiumState, setShowPodiumState] = useState(true);
 
   const [nowMs, setNowMs] = useState(Date.now());
   const [liveBonusQs, setLiveBonusQs] = useState<any[]>([]);
   const [liveBonusAns, setLiveBonusAns] = useState<any>({});
   const [activeSurpriseAlert, setActiveSurpriseAlert] = useState<number>(0);
+  const [showWrappedModal, setShowWrappedModal] = useState(false);
+  // הפיכת המנעול ל"חי" ומגיב בזמן אמת לשינויים באדמין
+  const [tournamentState, setTournamentState] = useState(initialTournamentState || 0);
 
+  useEffect(() => {
+    const unsubSys = onSnapshot(doc(db, "settings", "system"), (docSnap) => {
+      if (docSnap.exists()) {
+        setTournamentState(Number(docSnap.data().tournamentState) || 0);
+      }
+    });
+    return () => unsubSys();
+  }, []);
   // הריפרנס שיעזור לנו למנוע מהטאבים לקפוץ כל 30 שניות
   const isBannerInit = useRef(false);
 
@@ -246,6 +261,10 @@ export default function Dashboard({ userId, userName, setActiveTab, setPredictio
         if (dashSnap.data().dailyMediaUrl !== undefined) setDailyMediaUrl(dashSnap.data().dailyMediaUrl);
         if (dashSnap.data().dailySubtext !== undefined) setDailySubtext(dashSnap.data().dailySubtext);
       }
+      
+    });
+    const unsubscribePrizes = onSnapshot(doc(db, "settings", "prizes"), (snap) => {
+      if (snap.exists()) setPrizes(snap.data());
     });
 
     return () => {
@@ -667,6 +686,7 @@ export default function Dashboard({ userId, userName, setActiveTab, setPredictio
   const myDataInfo = allUsersList.find(u => u.id === userId);
   const safeUserName = myDataInfo?.name ? myDataInfo.name.split(" ")[0] : "אלוף";
   const nemesisFirstName = (nemesisData && nemesisData.name) ? nemesisData.name.split(" ")[0] : "";
+  const totalPrizesPool = prizes ? (Number(prizes.main1||0) + Number(prizes.main2||0) + Number(prizes.main3||0) + Number(prizes.main4||0) + Number(prizes.ko1||0) + Number(prizes.ko2||0)) : 0;
 
   const userLeaguesData = myLeagues.map(league => {
      const leagueUsers = allUsersList.filter(u => league.members?.includes(u.id));
@@ -693,7 +713,50 @@ export default function Dashboard({ userId, userName, setActiveTab, setPredictio
   };
 
   if (isLoading) return <div className="flex justify-center items-center h-64"><div className="animate-spin text-5xl text-blue-500">⚽</div></div>;
+// --- לוגיקת סיום הטורניר ופודיום ההכתרה ---
+  if (tournamentState >= 13 && showPodiumState && allUsersList.length > 0) {
+    // פונקציית חישוב פרסים כולל תיקו (זהה ל-Leaderboard)
+    const getPrizeForRank = (rank: number, board: "GENERAL" | "KNOCKOUT", usersArr: any[]) => {
+      if (!prizes) return 0;
+      const winnersAtThisRank = usersArr.filter(u => board === "GENERAL" ? u.displayRank === rank : u.displayKoRank === rank);
+      const count = winnersAtThisRank.length;
+      if (count === 0) return 0;
 
+      const getRaw = (r: number) => {
+        if (board === "GENERAL") return Number(prizes[`main${r}`] || 0);
+        return Number(prizes[`ko${r}`] || 0);
+      };
+
+      let totalPool = 0;
+      for (let i = 0; i < count; i++) totalPool += getRaw(rank + i);
+      return Math.floor(totalPool / count);
+    };
+
+    // בניית טבלה 1 (ראשית - 4 מקומות)
+    const sortedGeneral = [...allUsersList].sort((a, b) => (b.totalPoints || 0) - (a.totalPoints || 0));
+    const winnersTable1 = sortedGeneral.slice(0, 4).map(u => ({
+      name: u.name,
+      points: u.totalPoints,
+      prize: getPrizeForRank(u.displayRank, "GENERAL", sortedGeneral)
+    }));
+
+    // בניית טבלה 2 (נוקאאוט - 2 מקומות)
+    const sortedKo = [...allUsersList].sort((a, b) => (b.knockoutPoints || 0) - (a.knockoutPoints || 0));
+    const winnersTable2 = sortedKo.slice(0, 2).map(u => ({
+      name: u.name,
+      points: u.knockoutPoints,
+      prize: getPrizeForRank(u.displayKoRank, "KNOCKOUT", sortedKo)
+    }));
+
+    return (
+      <FinalePodiumModal 
+        winnersTable1={winnersTable1} 
+        winnersTable2={winnersTable2} 
+        onClose={() => setShowPodiumState(false)} 
+      />
+    );
+  }
+  // --- סוף לוגיקת הכתרה ---
   const isMatchesMode = activeBannerMode === "MATCHES";
   const currentDisplayedMatch = todayMatches[todayMatchIndex];
   const currentDisplayedBonus = todayTargets[todayBonusIndex];
@@ -966,6 +1029,22 @@ export default function Dashboard({ userId, userName, setActiveTab, setPredictio
                </h1>
                <p className="text-slate-300 text-sm font-medium drop-shadow-lg">ברוך הבא לחדר ההלבשה. הנה המצב שלך כרגע:</p>
             </div>
+            {tournamentState >= 4 && (
+       <button 
+    onClick={() => setShowWrappedModal(true)}
+    className="relative z-10 w-full mb-6 bg-gradient-to-r from-purple-600 via-pink-600 to-rose-600 p-1 rounded-2xl group cursor-pointer hover:scale-[1.02] transition-transform shadow-lg"
+  >
+    <div className="bg-slate-950/80 backdrop-blur-sm rounded-xl px-4 py-3 flex items-center justify-between">
+      <div className="flex items-center gap-3">
+        <span className="text-3xl animate-bounce">🎬</span>
+        <div className="text-right">
+          <div className="font-black text-white">הסיכום האישי שלך זמין!</div>
+          <div className="text-xs text-pink-300 font-bold">איך היית בשלב הבתים? כנס לגלות 👉</div>
+        </div>
+      </div>
+    </div>
+  </button>
+)}
 
             <div className={`grid gap-3 relative z-10 w-full mb-6 ${tournamentState >= 4 ? 'grid-cols-2' : 'grid-cols-1'}`}>
                <div 
@@ -1039,9 +1118,10 @@ export default function Dashboard({ userId, userName, setActiveTab, setPredictio
                >
                   <div className="absolute top-0 left-1/2 -translate-x-1/2 w-24 h-24 bg-amber-400/20 rounded-full blur-2xl pointer-events-none"></div>
                   <div className="text-3xl md:text-4xl drop-shadow-[0_0_15px_rgba(251,191,36,0.8)] relative z-10 mb-1 animate-pulse">⚽</div>
-                  <span className="text-[10px] text-amber-200/70 font-black uppercase tracking-widest relative z-10">כדור הזהב (מקום 1)</span>
-                  <span className="text-base md:text-lg font-black text-amber-400 truncate relative z-10 w-full px-2">
-                     {currentLeader} <span className="text-xs text-amber-200/60 font-normal">({allUsersList.sort((a,b)=>(b.totalPoints||0)-(a.totalPoints||0))[0]?.totalPoints || 0} נק')</span>
+                  <span className="text-[10px] text-amber-200/70 font-black uppercase tracking-widest relative z-10 leading-tight">כדור הזהב <br/>(מקום 1)</span>
+                  <span className="text-base md:text-lg font-black text-amber-400 relative z-10 w-full px-2 mt-1 leading-none">
+                     <span className="block truncate">{currentLeader}</span>
+                     <span className="block text-[11px] md:text-xs text-amber-200/60 font-normal mt-1">({allUsersList.sort((a,b)=>(b.totalPoints||0)-(a.totalPoints||0))[0]?.totalPoints || 0} נק')</span>
                   </span>
                </div>
 
@@ -1055,9 +1135,10 @@ export default function Dashboard({ userId, userName, setActiveTab, setPredictio
                  >
                     <div className="absolute top-0 left-1/2 -translate-x-1/2 w-24 h-24 bg-emerald-400/20 rounded-full blur-2xl pointer-events-none"></div>
                     <div className="text-3xl md:text-4xl drop-shadow-[0_0_15px_rgba(16,185,129,0.8)] relative z-10 mb-1 animate-pulse">👟</div>
-                    <span className="text-[10px] text-emerald-200/70 font-black uppercase tracking-widest relative z-10">נעל הזהב (נוקאאוט)</span>
-                    <span className="text-base md:text-lg font-black text-emerald-400 truncate relative z-10 w-full px-2">
-                       {currentKoLeader} <span className="text-xs text-emerald-200/60 font-normal">({allUsersList.sort((a,b)=>(b.knockoutPoints||0)-(a.knockoutPoints||0))[0]?.knockoutPoints || 0} נק')</span>
+                    <span className="text-[10px] text-emerald-200/70 font-black uppercase tracking-widest relative z-10 leading-tight">נעל הזהב <br/>(נוקאאוט)</span>
+                    <span className="text-base md:text-lg font-black text-emerald-400 relative z-10 w-full px-2 mt-1 leading-none">
+                       <span className="block truncate">{currentKoLeader}</span>
+                       <span className="block text-[11px] md:text-xs text-emerald-200/60 font-normal mt-1">({allUsersList.sort((a,b)=>(b.knockoutPoints||0)-(a.knockoutPoints||0))[0]?.knockoutPoints || 0} נק')</span>
                     </span>
                  </div>
                )}
@@ -1169,9 +1250,11 @@ export default function Dashboard({ userId, userName, setActiveTab, setPredictio
             </div>
 
             <div className="flex justify-between items-center gap-2 pt-2 border-t border-slate-700/50 relative z-10 text-center">
-               <div className="flex-1"><div className="text-[10px] text-slate-400 uppercase tracking-widest font-bold">משתתפים</div><div className="text-sm font-black text-slate-200">{leaderboardInfo.totalUsers}</div></div>
-               <div className="w-px h-6 bg-slate-700/50"></div>
-               <div className="flex-1"><div className="text-[10px] text-slate-400 uppercase tracking-widest font-bold">ממוצע קהל</div><div className="text-sm font-black text-slate-200">{avgPoints}</div></div>
+              <div className="flex-1"><div className="text-[10px] text-slate-400 uppercase tracking-widest font-bold">קופת פרסים</div><div className="text-sm font-black text-emerald-400">₪{totalPrizesPool}</div></div>
+              <div className="w-px h-6 bg-slate-700/50"></div>
+              <div className="flex-1"><div className="text-[10px] text-slate-400 uppercase tracking-widest font-bold">משתתפים</div><div className="text-sm font-black text-emerald-400">{leaderboardInfo.totalUsers}</div></div>
+              <div className="w-px h-6 bg-slate-700/50"></div>
+              <div className="flex-1"><div className="text-[10px] text-slate-400 uppercase tracking-widest font-bold">ממוצע קהל</div><div className="text-sm font-black text-emerald-400">{avgPoints}</div></div>
             </div>
          </div>
 
@@ -1786,6 +1869,17 @@ export default function Dashboard({ userId, userName, setActiveTab, setPredictio
           </div>
         </div>
       )}
+      {/* --- סעיף 4: הוספת המודאל של ה-Wrapped --- */}
+      {showWrappedModal && (
+        <WrappedModal 
+          onClose={() => setShowWrappedModal(false)}
+          userName={userName || safeUserName}
+          userStats={userStats}
+          allUsersList={allUsersList}
+          nemesisData={nemesisData}
+        />
+      )}
+      {/* ----------------------------------------- */}
     </div>
   );
 }
