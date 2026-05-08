@@ -108,7 +108,12 @@ export default function Dashboard({ userId, userName, setActiveTab, setPredictio
   const [showWrappedModal, setShowWrappedModal] = useState(false);
   // הפיכת המנעול ל"חי" ומגיב בזמן אמת לשינויים באדמין
   const [tournamentState, setTournamentState] = useState(initialTournamentState || 0);
-
+// טקסטים דינמיים לאולפן הפרשנים (יכול להגיע מה-Firebase)
+  const [studioQuotes, setStudioQuotes] = useState({
+    trump: '"FAKE NEWS! אני מנצח את כולם!" 🤬',
+    canadian: '"Sorry eh, הניחוש שלי מושלם..." 🍁',
+    mexican: '"Ay caramba! איזה בול!" 🌮'
+  });
   useEffect(() => {
     const unsubSys = onSnapshot(doc(db, "settings", "system"), (docSnap) => {
       if (docSnap.exists()) {
@@ -865,210 +870,120 @@ export default function Dashboard({ userId, userName, setActiveTab, setPredictio
           animation: eyeBlink 4s infinite;
           transform-origin: center;
         }
+          @keyframes scan {
+          0% { transform: translateY(0); opacity: 1; }
+          100% { transform: translateY(150px); opacity: 0; }
+        }
+        .animate-scan {
+          animation: scan 2.5s infinite linear;
+        }
+          @keyframes float {
+          0%, 100% { transform: translateY(0); }
+          50% { transform: translateY(-20px); }
+        }
+        .animate-float { animation: float 6s ease-in-out infinite; }
 
-        /* ⬇️ האנימציות שעודכנו לירידה איטית ודרמטית ⬇️ */
-        @keyframes lowerJumbotron {
-          0% { transform: translateY(-100vh); opacity: 0; }
-          60% { transform: translateY(-40%); opacity: 1; }
-          80% { transform: translateY(-52%); }
-          100% { transform: translateY(-50%); }
+        @keyframes rageShake {
+          0% { transform: translate(1px, 1px) rotate(0deg); }
+          10% { transform: translate(-1px, -2px) rotate(-1deg); }
+          20% { transform: translate(-3px, 0px) rotate(1deg); }
+          30% { transform: translate(3px, 2px) rotate(0deg); }
+          40% { transform: translate(1px, -1px) rotate(1deg); }
+          50% { transform: translate(-1px, 2px) rotate(-1deg); }
+          60% { transform: translate(-3px, 1px) rotate(0deg); }
+          70% { transform: translate(3px, 1px) rotate(-1deg); }
+          80% { transform: translate(-1px, -1px) rotate(1deg); }
+          90% { transform: translate(1px, 2px) rotate(0deg); }
+          100% { transform: translate(1px, -2px) rotate(-1deg); }
         }
-        .animate-jumbotron-right {
-          /* שונה ל-3.5 שניות */
-          animation: lowerJumbotron 3.5s cubic-bezier(0.25, 1, 0.5, 1) forwards; 
-        }
-        .animate-jumbotron-left {
-          /* שונה ל-3.5 שניות עם דיליי (השהייה) של 0.8 שניות */
-          animation: lowerJumbotron 3.5s cubic-bezier(0.25, 1, 0.5, 1) 0.8s both; 
-        }
-          @keyframes slowZoom {
-          0% { transform: scale(1); }
-          50% { transform: scale(1.15); }
-          100% { transform: scale(1); }
-        }
-        .animate-slow-zoom {
-          animation: slowZoom 25s ease-in-out infinite;
-        }
-          /* סגנון לבועות דיבור חלקות */
-        .speech-bubble {
-          position: absolute;
-          background: #1e293b; /* slate-800 */
-          color: white;
-          border-radius: 12px;
-          padding: 8px 12px;
-          border: 2px solid #475569; /* slate-600 */
-          filter: drop-shadow(0 4px 6px rgba(0,0,0,0.3));
-          font-weight: 800;
-          white-space: nowrap;
-          transform-origin: center;
-          transition: all 0.3s cubic-bezier(0.68, -0.55, 0.27, 1.55);
-          pointer-events: none;
-          z-index: 50;
-        }
-        /* הזנב של הבועה (בסגנון Tailwind) */
-        .speech-bubble::after {
-          content: '';
-          position: absolute;
-          width: 0; h: 0;
-          border-left: 10px solid transparent;
-          border-right: 10px solid transparent;
-          border-top: 10px solid #475569;
-          bottom: -11px; left: 50%;
-          transform: translateX(-50%);
-        }
+        .animate-rage { animation: rageShake 0.3s infinite; }
+        /* אנימציות למצגת הנופים בצד ימין (מתחלף כל 5 שניות) */
+        @keyframes fade1 { 0%, 28% { opacity: 1; } 33%, 95% { opacity: 0; } 100% { opacity: 1; } }
+        @keyframes fade2 { 0%, 28% { opacity: 0; } 33%, 61% { opacity: 1; } 66%, 100% { opacity: 0; } }
+        @keyframes fade3 { 0%, 61% { opacity: 0; } 66%, 95% { opacity: 1; } 100% { opacity: 0; } }
+        .animate-carousel-1 { animation: fade1 15s infinite ease-in-out; }
+        .animate-carousel-2 { animation: fade2 15s infinite ease-in-out; }
+        .animate-carousel-3 { animation: fade3 15s infinite ease-in-out; }
       `}} />
-
-
 {/* ========================================================= */}
-      {/* עיצוב איצטדיון: מסכי ענק רחבים (Jumbotrons) + דמויות מציצות */}
+      {/* אפקט ה-WOW למחשב: אולפן הפרשנים המתוקן (גרסה 2.0) */}
       {/* ========================================================= */}
       
-      {/* מסך ימני (USA, MEX, CAN) */}
-      <div className="hidden xl:flex fixed right-[1%] 2xl:right-[2%] top-1/2 z-0 flex-col items-center opacity-70 hover:opacity-100 transition-opacity duration-500 drop-shadow-[0_25px_40px_rgba(0,0,0,0.9)] animate-jumbotron-right">
-         {/* שני כבלים לתלייה */}
-         <div className="flex gap-20 2xl:gap-32 relative z-10 pointer-events-none">
-            <div className="w-2.5 h-16 bg-gradient-to-b from-slate-950 to-slate-800 shadow-inner"></div>
-            <div className="w-2.5 h-16 bg-gradient-to-b from-slate-950 to-slate-800 shadow-inner"></div>
-         </div>
+      {/* צד שמאל: אולפן הפרשנים - גרסת "הילת זעם" (Rage Aura) */}
+      <div className="hidden xl:block fixed bottom-0 left-2 2xl:left-10 z-0 w-[450px] 2xl:w-[550px] pointer-events-auto">
          
-         {/* קבוצת המסך והמציצים (חייב להיות z-20 ו-pointer-events-auto) */}
-         <div className="relative z-20 pointer-events-auto">
-           
-           {/* --- דמות 1: טראמפ (USA) --- */}
-           <div className="absolute -top-10 right-8 w-16 h-16 group/trump z-0 cursor-pointer">
-             {/* בועת דיבור: טראמפ */}
-             <div className="speech-bubble -top-12 left-1/2 opacity-0 scale-0 group-hover/trump:opacity-100 group-hover/trump:scale-100 text-[10px] whitespace-nowrap">
-               "Fake News! אני מקום ראשון!"
-             </div>
-             <img src="/donaldIcon-removebg.png" className="absolute inset-0 w-full h-full object-contain drop-shadow-xl hover:-translate-y-4 hover:rotate-6 transition-all duration-300" alt="Trump" />
-           </div>
-
-           {/* --- דמות 2: מקסיקני --- */}
-           <div className="absolute top-1/2 -left-12 -translate-y-1/2 w-16 h-16 group/mexican z-0 cursor-pointer">
-             {/* בועת דיבור: מקסיקני (פונה ימינה) */}
-             <div className="speech-bubble -top-10 -right-36 opacity-0 scale-0 group-hover/mexican:opacity-100 group-hover/mexican:scale-100 text-[10px]">
-               "Jajaja! המנצח לוקח טקילה!"
-             </div>
-             <img src="/maxicanIcon-removebg.png" className="absolute inset-0 w-full h-full object-contain drop-shadow-xl hover:translate-x-4 hover:-rotate-12 transition-all duration-300" alt="Mexican" />
-           </div>
-
-           {/* --- דמות 3: קנדי --- */}
-           <div className="absolute bottom-1 w-16 h-16 group/canadian z-0 cursor-pointer left-8">
-             {/* בועת דיבור: קנדי */}
-             <div className="speech-bubble -bottom-14 left-1/2 opacity-0 scale-0 group-hover/canadian:opacity-100 group-hover/canadian:scale-100 text-[9px] -translate-x-1/2">
-                <span className="speech-bubble::after" style={{borderTop:'none', borderBottom:'10px solid #475569', top:'-11px', bottom:'auto'}}></span>
-                "סליחה, אבל אני הולך לעקוף אותך. Eh?"
-             </div>
-             <img src="/canadianIcon-removebg.png" className="absolute inset-0 w-full h-full object-contain drop-shadow-xl hover:translate-y-4 hover:rotate-6 transition-all duration-300" alt="Canadian" />
-           </div>
-           
-           {/* הקורה העליונה */}
-           <div className="w-[310px] 2xl:w-[410px] h-3 bg-slate-800 rounded-t-md border-t-2 border-slate-600 mx-auto relative z-10"></div>
-           
-           {/* גוף המסך הרחב */}
-           <div className="w-[330px] 2xl:w-[430px] rounded-b-2xl bg-slate-950 border-4 md:border-[6px] border-slate-800 p-2 shadow-inner relative z-10">
-             <div className="absolute top-3 left-3 z-20 flex items-center gap-1.5 bg-black/80 px-2 py-0.5 rounded text-[8px] 2xl:text-[10px] font-black text-rose-500 tracking-widest border border-rose-500/30">
-               <span className="w-1.5 h-1.5 bg-rose-500 rounded-full animate-pulse"></span> LIVE
-             </div>
-
-             <div className="relative w-full aspect-video bg-black rounded-sm overflow-hidden border border-slate-700/80 shadow-[inset_0_0_25px_rgba(0,0,0,1)]">
-                <img src="/worldcup-bg.png" className="absolute inset-0 w-full h-full object-contain opacity-80 animate-slow-zoom origin-center" alt="World Cup" />
-                <div className="absolute inset-0 pointer-events-none opacity-40 mix-blend-overlay" style={{ backgroundImage: 'linear-gradient(rgba(255, 255, 255, 0.15) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 255, 255, 0.15) 1px, transparent 1px)', backgroundSize: '3px 3px' }}></div>
-                <div className="absolute inset-0 shadow-[inset_0_0_20px_rgba(0,0,0,0.9)]"></div>
-                <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-2 z-10 pointer-events-auto">
-                  <h1 className="text-2xl 2xl:text-3xl font-black text-white drop-shadow-[0_0_15px_rgba(255,255,255,0.8)] tracking-tight italic">
-                    BETS IN PROD 2026
-                  </h1>
-                </div>
-             </div>
-           </div>
-         </div>
-
-         {/* דגלונים באיכות גבוהה */}
-         <div className="flex gap-8 2xl:gap-12 justify-center -mt-1 relative z-30 pointer-events-auto">
-            {["ארה\"ב", "מקסיקו", "קנדה"].map((country) => (
-               <div key={country} title={country} className="w-10 h-16 2xl:w-12 2xl:h-20 drop-shadow-[0_10px_8px_rgba(0,0,0,0.8)] group hover:drop-shadow-[0_15px_12px_rgba(0,0,0,0.9)] hover:scale-110 hover:rotate-3 transition-all duration-300 origin-top cursor-pointer border border-t border-black/40">
-                  <div className="w-full h-full relative" style={{ clipPath: 'polygon(0 0, 100% 0, 100% 75%, 50% 100%, 0 75%)' }}>
-                    <img src={getFlagUrl(country)!} className="absolute inset-0 w-full h-full object-cover saturate-[1.1]" alt={country} />
-                    <div className="absolute inset-0 bg-gradient-to-b from-white/20 via-transparent to-black/60 mix-blend-overlay"></div>
-                    <div className="absolute inset-0 shadow-[inset_0_2px_8px_rgba(0,0,0,0.7)] border-t border-black/40"></div>
+         {/* מכולת הפרשנים - בגובה הנכון! (הורחק מהשולחן) */}
+         <div className="absolute bottom-[38%] 2xl:bottom-[40%] left-0 w-full flex justify-center items-end gap-6 2xl:gap-12 z-10 px-8">
+          
+            {/* טראמפ (שמאל) - עם אפקט "הילת זעם" אדומה בהובר! */}
+            <div className="relative group cursor-pointer pb-3 z-30">
+               
+               {/* בועת דיבור מורחקת מהקנדי (פונה שמאלה) */}
+              <div className="absolute -top-16 -left-16 opacity-0 group-hover:opacity-100 transition-all duration-300 z-50 pointer-events-none origin-bottom-right scale-90 group-hover:scale-100">
+                  <div className="bg-rose-700 text-white font-black text-sm px-4 py-2 rounded-2xl border-2 border-white shadow-[0_0_25px_rgba(225,29,72,0.9)] whitespace-nowrap">
+                     "FAKE NEWS! אני מנצח את כולם!" 🤬
+                     {/* החץ תוקן והוזז ימינה (right-8) כדי שיצביע בול על טראמפ! */}
+                     <div className="absolute -bottom-2 right-8 w-0 h-0 border-l-[8px] border-l-transparent border-r-[8px] border-r-transparent border-t-[8px] border-t-white"></div>
                   </div>
                </div>
-            ))}
-         </div>
-      </div>
 
-      {/* מסך שמאלי (USA, MEX, CAN - מציצים שונה) */}
-      <div className="hidden xl:flex fixed left-[1%] 2xl:left-[2%] top-1/2 z-0 flex-col items-center opacity-70 hover:opacity-100 transition-opacity duration-500 drop-shadow-[0_25px_40px_rgba(0,0,0,0.9)] animate-jumbotron-left">
-         {/* שני כבלים לתלייה */}
-         <div className="flex gap-20 2xl:gap-32 relative z-10 pointer-events-none">
-            <div className="w-2.5 h-16 bg-gradient-to-b from-slate-950 to-slate-800 shadow-inner"></div>
-            <div className="w-2.5 h-16 bg-gradient-to-b from-slate-950 to-slate-800 shadow-inner"></div>
-         </div>
-         
-         {/* קבוצת המסך והמציצים */}
-         <div className="relative z-20 pointer-events-auto">
-           
-           {/* --- דמות 1: טראמפ (USA - מציץ משמאל) --- */}
-           <div className="absolute -top-10 left-8 w-16 h-16 group/trump-l z-0 cursor-pointer">
-             <div className="speech-bubble -top-12 left-1/2 -translate-x-1/2 opacity-0 scale-0 group-hover/trump-l:opacity-100 group-hover/trump-l:scale-100 text-[10px]">
-               "עוד בול אחד שלי וזה ניצחון מוחץ!"
-             </div>
-             <img src="/donaldIcon-removebg.png" className="absolute inset-0 w-full h-full object-contain drop-shadow-xl hover:-translate-y-4 hover:-rotate-6 transition-all duration-300" alt="Trump" />
-           </div>
+               {/* המיכל של טראמפ שמקבל את האנימציות - החליפה נשארת כחולה! */}
+               <div className="relative transition-all duration-300 group-hover:-translate-y-6 group-hover:rotate-6 group-hover:scale-110">
+                 
+                 {/* תמונת הפנים המקורית (z-10) - ללא אפקט צבע מובנה */}
+                 <img 
+                   src="/donaldIcon-removebg.png" 
+                   alt="Trump" 
+                   className="relative z-10 w-24 2xl:w-32 object-contain drop-shadow-2xl transition-all group-hover:animate-rage filter group-hover:drop-shadow-[0_0_20px_rgba(225,29,72,1)] group-hover:contrast(1.1)" 
+                 />
+                 
+               </div>
+            </div>
 
-           {/* --- דמות 2: מקסיקני (מציץ מלמטה ימינה) --- */}
-           <div className="absolute -bottom-8 right-8 w-16 h-16 group/mexican-r z-0 cursor-pointer">
-             <div className="speech-bubble -top-10 -left-12 opacity-0 scale-0 group-hover/mexican-r:opacity-100 group-hover/mexican-r:scale-100 text-[10px]">
-               "אייייי! איזה ניחוש של הטאקו!"
-             </div>
-             <img src="/mexicanIcon-removebg.png" className="absolute inset-0 w-full h-full object-contain drop-shadow-xl hover:translate-y-4 hover:rotate-12 transition-all duration-300" alt="Mexican" />
-           </div>
-
-           {/* --- דמות 3: קנדי (מציץ מלמעלה ימינה) --- */}
-           <div className="absolute top-12 -right-12 w-16 h-16 group/canadian-t z-0 cursor-pointer">
-             <div className="speech-bubble -top-10 -right-20 opacity-0 scale-0 group-hover/canadian-t:opacity-100 group-hover/canadian-t:scale-100 text-[10px]">
-                "ניחוש בול של ההוקי!🏒"
-             </div>
-             <img src="/candianIcon-removebg.png" className="absolute inset-0 w-full h-full object-contain drop-shadow-xl hover:translate-x-4 hover:-rotate-6 transition-all duration-300" alt="Canadian" />
-           </div>
-           
-           {/* הקורה העליונה */}
-           <div className="w-[310px] 2xl:w-[410px] h-3 bg-slate-800 rounded-t-md border-t-2 border-slate-600 mx-auto relative z-10"></div>
-           
-           {/* גוף המסך הרחב */}
-           <div className="w-[330px] 2xl:w-[430px] rounded-b-2xl bg-slate-950 border-4 md:border-[6px] border-slate-800 p-2 shadow-inner relative z-10">
-             <div className="absolute top-3 left-3 z-20 flex items-center gap-1.5 bg-black/80 px-2 py-0.5 rounded text-[8px] 2xl:text-[10px] font-black text-rose-500 tracking-widest border border-rose-500/30">
-               <span className="w-1.5 h-1.5 bg-rose-500 rounded-full animate-pulse"></span> LIVE
-             </div>
-
-             <div className="relative w-full aspect-video bg-black rounded-sm overflow-hidden border border-slate-700/80 shadow-[inset_0_0_25px_rgba(0,0,0,1)]">
-                <img src="/worldcup-bg.png" className="absolute inset-0 w-full h-full object-contain opacity-80 animate-slow-zoom origin-center" alt="World Cup" />
-                <div className="absolute inset-0 pointer-events-none opacity-40 mix-blend-overlay" style={{ backgroundImage: 'linear-gradient(rgba(255, 255, 255, 0.15) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 255, 255, 0.15) 1px, transparent 1px)', backgroundSize: '3px 3px' }}></div>
-                <div className="absolute inset-0 shadow-[inset_0_0_20px_rgba(0,0,0,0.9)]"></div>
-                <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-2 z-10 pointer-events-auto">
-                  <h1 className="text-2xl 2xl:text-3xl font-black text-white drop-shadow-[0_0_15px_rgba(255,255,255,0.8)] tracking-tight italic">
-                    BETS IN PROD 2026
-                  </h1>
-                </div>
-             </div>
-           </div>
-         </div>
-
-         {/* דגלונים באיכות גבוהה */}
-         <div className="flex gap-8 2xl:gap-12 justify-center -mt-1 relative z-30 pointer-events-auto">
-            {["ארה\"ב", "מקסיקו", "קנדה"].map((country) => (
-               <div key={country} title={country} className="w-10 h-16 2xl:w-12 2xl:h-20 drop-shadow-[0_10px_8px_rgba(0,0,0,0.8)] group hover:drop-shadow-[0_15px_12px_rgba(0,0,0,0.9)] hover:scale-110 hover:-rotate-3 transition-all duration-300 origin-top cursor-pointer border border-t border-black/40">
-                  <div className="w-full h-full relative" style={{ clipPath: 'polygon(0 0, 100% 0, 100% 75%, 50% 100%, 0 75%)' }}>
-                    <img src={getFlagUrl(country)!} className="absolute inset-0 w-full h-full object-cover saturate-[1.1]" alt={country} />
-                    <div className="absolute inset-0 bg-gradient-to-b from-white/20 via-transparent to-black/60 mix-blend-overlay"></div>
-                    <div className="absolute inset-0 shadow-[inset_0_2px_8px_rgba(0,0,0,0.7)] border-t border-black/40"></div>
+            {/* קנדי (אמצע) - מופרד וגבוה מספיק */}
+            <div className="relative group cursor-pointer pb-5 z-20">
+               {/* בועת דיבור מנומסת */}
+               <div className="absolute -top-14 -left-8 opacity-0 group-hover:opacity-100 transition-all duration-300 z-50 pointer-events-none origin-bottom scale-90 group-hover:scale-100">
+                  <div className="bg-slate-900/95 text-blue-400 font-black text-xs px-4 py-2 rounded-xl border-2 border-blue-500/50 shadow-xl whitespace-nowrap">
+                     "Sorry eh, הניחוש שלי מושלם..." 🍁
                   </div>
                </div>
-            ))}
+               <img src="/candianIcon-removebg.png" alt="Canadian" className="w-24 2xl:w-32 object-contain drop-shadow-2xl transition-all duration-300 group-hover:-translate-y-6 group-hover:scale-110" />
+            </div>
+
+            {/* מקסיקני (ימין) - תוקן הגובה! */}
+            <div className="relative group cursor-pointer pb-7 z-10">
+               {/* בועת דיבור */}
+               <div className="absolute -top-14 -right-16 opacity-0 group-hover:opacity-100 transition-all duration-300 z-50 pointer-events-none origin-bottom-right scale-90 group-hover:scale-100">
+                  <div className="bg-slate-900/95 text-emerald-400 font-black text-xs px-4 py-2 rounded-xl border-2 border-blue-500/50 shadow-xl whitespace-nowrap">
+                     "Ay caramba! איזה בול!" 🌮
+                  </div>
+               </div>
+               <img src="/maxicanIcon-removebg.png" alt="Mexican" className="w-24 2xl:w-32 object-contain drop-shadow-2xl -scale-x-100 transition-all duration-300 group-hover:-translate-y-5 group-hover:-rotate-6 group-hover:scale-110 origin-bottom" />
+            </div>
+         </div>
+
+         {/* השולחן הפיזי (z-20) - תמיד בקדמה,z-index: 20 ו-pointer-events-none */}
+         <img src="/panel-removebg.png" alt="Studio Desk" className="relative z-20 w-full object-contain drop-shadow-[0_-10px_30px_rgba(0,0,0,0.8)] pointer-events-none" />
+      </div>
+      {/* צד ימין: מסך נופים מתחלף (Carousel) */}
+      <div className="hidden xl:block fixed top-1/3 right-8 2xl:right-16 z-0 w-[380px] 2xl:w-[480px] pointer-events-none">
+         <div className="relative w-full aspect-video rounded-3xl overflow-hidden border-[6px] border-slate-900 shadow-[0_20px_50px_rgba(0,0,0,0.9)] bg-black">
+            
+            {/* שלוש התמונות שיתחלפו בעמעום */}
+            <img src="/usa-bg.jpg" className="absolute inset-0 w-full h-full object-cover animate-carousel-1" alt="USA" />
+            <img src="/canada-bg.jpg" className="absolute inset-0 w-full h-full object-cover animate-carousel-2 opacity-0" alt="Canada" />
+            <img src="/mexico-bg.jpg" className="absolute inset-0 w-full h-full object-cover animate-carousel-3 opacity-0" alt="Mexico" />
+
+            {/* הילה שחורה עדינה למטה וכיתוב */}
+            <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-transparent to-transparent"></div>
+            <div className="absolute bottom-4 left-0 w-full text-center z-10 flex flex-col items-center">
+                <span className="text-[10px] text-amber-500 uppercase tracking-[0.3em] font-black mb-1">Host Nations</span>
+                <h3 className="text-white font-black text-xl 2xl:text-2xl tracking-widest drop-shadow-[0_0_10px_rgba(255,255,255,0.4)] italic">BETS IN PROD</h3>
+            </div>
          </div>
       </div>
-
+{/* candianIcon-removebg.png  maxicanIcon-removebg.png */ }
       {/* ========================================================= */}
       {/* ========================================================= */}
       {/* 🎈 קמעות פופ-אפ */}
@@ -1985,6 +1900,59 @@ export default function Dashboard({ userId, userName, setActiveTab, setPredictio
           </div>
         </div>
       )}
+{/* ========================================================= */}
+      {/* חברי הפאנל - גרסת סלולר - פרופורציה אבסולוטית (Responsive!) */}
+      {/* ========================================================= */}
+        <div className="xl:hidden w-full mt-8 mb-8 bg-slate-950/90 rounded-3xl border border-slate-700/50 shadow-2xl relative overflow-hidden flex flex-col items-center pt-16 pb-4">        
+        {/* פס עיטור למעלה */}
+        <div className="absolute top-0 right-0 w-full h-1.5 bg-gradient-to-r from-rose-400 via-amber-400 to-emerald-400"></div>
+        
+        {/* כותרת */}
+        <div className="mb-2 px-5 py-2 bg-slate-900/80 rounded-full border border-slate-700 text-white font-black text-sm flex items-center gap-2 z-30 shadow-md">
+          <span className="animate-pulse">🎙️</span> חברי הפאנל
+        </div>
+
+        {/* הקסם: מכולה משותפת לשולחן ולדמויות ששומרת על פרופורציה מושלמת */}
+        <div className="relative w-full mt-20">
+          
+          {/* שינוי גובה כללי: שיניתי מ-35% ל-40%. ככל שהמספר גדול יותר, כולם עולים למעלה! */}
+          <div className="absolute bottom-[40%] left-0 w-full flex justify-center items-end gap-2 px-4 z-10 pointer-events-auto">
+            
+            {/* טראמפ - כיוון עדין: translate-y-[10%] דוחף אותו טיפ-טיפה למטה ביחס לאחרים */}
+            <div className="relative group w-[28%] flex flex-col items-center translate-y-[-8%]" tabIndex={0}>
+              <div className="speech-bubble absolute bottom-full mb-6 right-0 opacity-0 group-hover:opacity-100 group-focus:opacity-100 group-active:opacity-100 transition-all duration-300 z-50 pointer-events-none scale-90 group-hover:scale-100 group-active:scale-100 bg-rose-700 text-white font-black text-[10px] sm:text-xs border border-white whitespace-nowrap px-3 py-1.5 rounded-xl shadow-[0_0_15px_rgba(225,29,72,0.8)] origin-bottom-right">
+                 {studioQuotes.trump}
+                 <div className="absolute -bottom-1.5 right-6 w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[6px] border-t-white"></div>
+              </div>
+              <div className="relative w-full transition-all duration-300 group-hover:-translate-y-2 group-active:-translate-y-2 group-focus:-translate-y-2 group-hover:rotate-6 group-active:rotate-6 group-hover:scale-110 group-active:scale-110">
+                 <div className="absolute inset-0 bg-red-600 rounded-full blur-xl opacity-0 group-hover:opacity-80 group-active:opacity-80 group-focus:opacity-80 transition-opacity duration-300 scale-125"></div>
+                 <img src="/donaldIcon-removebg.png" alt="Trump" className="relative z-10 w-full object-contain drop-shadow-xl transition-all group-hover:animate-rage group-active:animate-rage group-focus:animate-rage" />
+              </div>
+            </div>
+
+            {/* קנדי - כיוון עדין: translate-y-0 שם אותו בדיוק באמצע */}
+            <div className="relative group w-[28%] flex flex-col items-center translate-y-[-10%]" tabIndex={0}>
+               <div className="speech-bubble absolute bottom-full mb-3 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 group-active:opacity-100 group-focus:opacity-100 transition-all z-50 pointer-events-none scale-90 group-hover:scale-100 bg-slate-900 text-blue-400 font-black text-[10px] sm:text-xs border border-blue-500/30 whitespace-nowrap px-3 py-1.5 rounded-xl shadow-lg">
+                 {studioQuotes.canadian}
+                 <div className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[6px] border-t-blue-500/50"></div>
+               </div>
+               <img src="/candianIcon-removebg.png" className="relative z-10 w-full object-contain group-hover:-translate-y-2 group-active:-translate-y-2 group-focus:-translate-y-2 transition-transform drop-shadow-xl" />
+            </div>
+
+            {/* מקסיקני - כיוון עדין: -translate-y-[5%] מרים אותו טיפ-טיפה למעלה ביחס לאחרים */}
+            <div className="relative group w-[28%] flex flex-col items-center -translate-y-[15%]" tabIndex={0}>
+               <div className="speech-bubble absolute bottom-full mb-3 left-0 opacity-0 group-hover:opacity-100 group-active:opacity-100 group-focus:opacity-100 transition-all z-50 pointer-events-none scale-90 group-hover:scale-100 group-active:scale-100 bg-slate-900 text-emerald-400 font-black text-[10px] sm:text-xs border border-emerald-500/30 whitespace-nowrap px-3 py-1.5 rounded-xl shadow-lg origin-bottom-left">
+                 {studioQuotes.mexican}
+                 <div className="absolute -bottom-1.5 left-6 w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[6px] border-t-emerald-500/50"></div>
+               </div>
+               <img src="/maxicanIcon-removebg.png" className="relative z-10 w-full object-contain -scale-x-100 group-hover:-translate-y-2 group-active:-translate-y-2 group-focus:-translate-y-2 group-hover:-rotate-6 group-active:-rotate-6 transition-transform origin-bottom drop-shadow-xl" />
+            </div>
+          </div>
+
+          {/* השולחן */}
+          <img src="/panel-removebg.png" className="relative z-20 w-[110%] max-w-[110%] -ml-[5%] pointer-events-none drop-shadow-[0_-5px_15px_rgba(0,0,0,0.7)]" />
+        </div>
+      </div>
       {/* --- סעיף 4: הוספת המודאל של ה-Wrapped --- */}
       {showWrappedModal && (
         <WrappedModal 
