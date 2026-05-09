@@ -1341,7 +1341,7 @@ const handleCalculateScores = async (silentParam: any = false) => {
     setIsCalculating(true);
     try { 
       for (const match of matches) { 
-         await deleteDoc(doc(db, "matches", match.id)); 
+         await deleteDoc(doc(db, "matches", String(match.id))); 
       } 
       
       const pmSnap = await getDocs(collection(db, "predictions_matches"));

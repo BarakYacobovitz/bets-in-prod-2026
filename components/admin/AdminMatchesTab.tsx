@@ -334,8 +334,10 @@ function AdminMatchRow({ match, allMatches, isSaving, justSaved, onSave, onClear
       
       <div className="flex justify-between items-center mb-4 pb-3 border-b border-slate-800">
         <div className="flex items-center gap-2">
-          <span className="text-[10px] sm:text-xs font-black bg-blue-900/30 text-blue-400 px-2 sm:px-2.5 py-1 rounded-lg border border-blue-500/20 whitespace-nowrap">ID: {match.id.substring(0, 4)}...</span>
-          <button onClick={() => setIsEditingDetails(!isEditingDetails)} className={`transition-all ${isEditingDetails ? 'rotate-90 text-blue-400' : 'text-slate-500 hover:text-white'}`} title="ערוך פרטי נבחרות ושידור">✏️</button>
+        <span className="text-[10px] sm:text-xs font-black bg-blue-900/30 text-blue-400 px-2 sm:px-2.5 py-1 rounded-lg border border-blue-500/20 whitespace-nowrap">
+            ID: {match?.id ? String(match.id).substring(0, 4) : "---"}...
+        </span>         
+ <button onClick={() => setIsEditingDetails(!isEditingDetails)} className={`transition-all ${isEditingDetails ? 'rotate-90 text-blue-400' : 'text-slate-500 hover:text-white'}`} title="ערוך פרטי נבחרות ושידור">✏️</button>
         </div>
         <div className="flex gap-2">
           {isEditingMatchday ? (

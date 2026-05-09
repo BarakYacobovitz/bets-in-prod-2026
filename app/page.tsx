@@ -88,7 +88,7 @@ export default function Home() {
           }
         });
 
-        matchesData.sort((a, b) => a.id.localeCompare(b.id));
+        matchesData.sort((a, b) => String(a.id).localeCompare(String(b.id)));     
         setMatches(matchesData);
         setGroups(groupsData);
 

@@ -241,7 +241,7 @@ export default function AdminStatsTab({ matches, bonusQuestions, groupsList, isC
          // ב. עולות מהבתים (כולל ספירת כמות המדויקים והכיוונים)
          const qualPred = allQualPreds.find(p => p.userId === user.id)?.groups || {};
          let qualPoints = 0;
-         let qualStats = { exact: 0, direction: 0 }; // <--- התוספת החדשה לספירה מתוך 24
+         let qualStats = { exact: 0, direction: 0 }; 
          
          for (const [gName, preds] of Object.entries<any>(qualPred)) {
             const real = realQualifiers[gName];
@@ -265,7 +265,7 @@ export default function AdminStatsTab({ matches, bonusQuestions, groupsList, isC
          // ג. 8 המעפילות (מקום שלישי)
          const thirdPred = allThirdPreds.find(p => p.userId === user.id)?.teams || [];
          let thirdPlacePoints = 0;
-         let thirdPlaceHitsCount = 0; // <--- התוספת החדשה לספירה מתוך 8
+         let thirdPlaceHitsCount = 0; 
 
          thirdPred.forEach((t: string) => {
             if (t && realThirdPlace.includes(t)) {
@@ -277,7 +277,8 @@ export default function AdminStatsTab({ matches, bonusQuestions, groupsList, isC
          // ד. בונוסים
          const bonusPred = allBonusPreds.find(p => p.userId === user.id)?.answers || {};
          let bonusPoints = 0;
-         let bonusHitsCount = 0; // <--- התוספת החדשה לספירת כמות הבונוסים שפגעו
+         let bonusHitsCount = 0; 
+         const bonusBreakdown = { regular: 0, double: 0, surprise: 0 }; // <--- מעקב מפורט אחרי הבונוסים
 
          for (const [qId, ans] of Object.entries(bonusPred)) {
             const truth = realBonusAnswers[qId];
@@ -287,6 +288,15 @@ export default function AdminStatsTab({ matches, bonusQuestions, groupsList, isC
             if (truthArray.some((t: string) => t.toString().trim() === (ans as string).toString().trim())) {
                bonusPoints += (qInfo?.points || 0);
                bonusHitsCount++;
+               
+               // סיווג סוג הפגיעה לשקף הבונוסים
+               if (qInfo?.isDouble) {
+                  bonusBreakdown.double++;
+               } else if (qInfo?.isSurprise) {
+                  bonusBreakdown.surprise++;
+               } else {
+                  bonusBreakdown.regular++;
+               }
             }
          }
 
@@ -299,7 +309,7 @@ export default function AdminStatsTab({ matches, bonusQuestions, groupsList, isC
             if (points < worstGroup.points) worstGroup = { name: gName, points };
          });
 
-         // עדכון המבנה הסופי עם כל הספירות שביקשת!
+         // עדכון המבנה הסופי 
          const wrappedData = {
             exactHits,
             directionHits,
@@ -309,9 +319,10 @@ export default function AdminStatsTab({ matches, bonusQuestions, groupsList, isC
             bestGroup,
             worstGroup,
             rarestHit,
-            qualStats,          // אובייקט עם {exact, direction} עבור עולות מבתים
-            thirdPlaceHitsCount, // מספר הנבחרות שפגע ממקום 3
-            bonusHitsCount,      // מספר שאלות בונוס שפגע
+            qualStats,          
+            thirdPlaceHitsCount, 
+            bonusHitsCount,      
+            bonusBreakdown, // <--- הנתון החדש שנוסף עבור שקף הבונוסים המפורט
             pointsPerGroup
          };
 
