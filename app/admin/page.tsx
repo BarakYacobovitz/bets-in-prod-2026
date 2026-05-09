@@ -30,6 +30,7 @@ export default function AdminPanel() {
   const [savingId, setSavingId] = useState<string | null>(null);
   const [isCalculating, setIsCalculating] = useState(false);
   const [autoInsights, setAutoInsights] = useState<string[]>([]);
+  const [statsData, setStatsData] = useState<any>(null); // השורה שחסרה!
   
   const [realQualifiers, setRealQualifiers] = useState<any>({});
   const [realThirdPlace, setRealThirdPlace] = useState<string[]>(Array(8).fill(""));
@@ -1771,6 +1772,8 @@ const handleCalculateScores = async (silentParam: any = false) => {
              groupsList={groupsList} 
              isCalculating={isCalculating} 
              setIsCalculating={setIsCalculating} 
+             statsData={statsData}
+             setStatsData={setStatsData}
              />
           )}
           {/* --- הנה הקסם החדש שלנו --- */}

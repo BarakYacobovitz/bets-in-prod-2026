@@ -11,11 +11,11 @@ interface AdminStatsTabProps {
   groupsList: string[];
   isCalculating: boolean;
   setIsCalculating: (val: boolean) => void;
+  statsData: any;
+  setStatsData: React.Dispatch<React.SetStateAction<any>>;
 }
 
-export default function AdminStatsTab({ matches, bonusQuestions, groupsList, isCalculating, setIsCalculating }: AdminStatsTabProps) {
-  const [statsData, setStatsData] = useState<any>(null);
-  const [selectedStatMatch, setSelectedStatMatch] = useState<string>("");
+export default function AdminStatsTab({ matches, bonusQuestions, groupsList, isCalculating, setIsCalculating, statsData, setStatsData }: AdminStatsTabProps) {  const [selectedStatMatch, setSelectedStatMatch] = useState<string>("");
   const [selectedStatBonus, setSelectedStatBonus] = useState<string>("");
   const [selectedStatGroup, setSelectedStatGroup] = useState<string>("A");
   const [statSpyModal, setStatSpyModal] = useState<{title: string, list: any[], type: "MATCH_DIRECTION" | "NAMES_ONLY"} | null>(null);
@@ -311,7 +311,8 @@ export default function AdminStatsTab({ matches, bonusQuestions, groupsList, isC
             rarestHit,
             qualStats,          // אובייקט עם {exact, direction} עבור עולות מבתים
             thirdPlaceHitsCount, // מספר הנבחרות שפגע ממקום 3
-            bonusHitsCount       // מספר שאלות בונוס שפגע
+            bonusHitsCount,      // מספר שאלות בונוס שפגע
+            pointsPerGroup
          };
 
          await updateDoc(doc(db, "users", user.id), { wrappedData });
