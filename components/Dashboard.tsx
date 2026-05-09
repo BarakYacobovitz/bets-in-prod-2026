@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { doc, getDoc, collection, onSnapshot, getDocs, query, where, updateDoc } from "firebase/firestore";
 import { db } from "../app/firebase";
 import { getFlagUrl } from "../app/utils/flags"; 
@@ -8,12 +8,6 @@ import Link from "next/link";
 import { getPlayerInfo, PLAYERS_DATA } from "../app/utils/players";
 import FinalePodiumModal from "./FinalePodiumModal"; 
 import WrappedModal from "./WrappedModal";
-
-const MASCOTS = [
-  { id: "trump", name: "דונלד", image: "/donaldIcon.png", quotes: ["ניחוש ענק. כולם אומרים שזה הניחוש הכי טוב שהם ראו. פייק ניוז מי שאומר אחרת!", "אנחנו נבנה פער ענק בטבלה, והחברים ישלמו על זה יהיה מאוד נייס!", "המונדיאל באמריקה יהיה הכי huge אי פעם. נקודה. גם הניקוד שלך בסדר.", "אני ניצחתי בטבלת הגילוי הנאות, כולם יודעים את זה. גנבו לי נקודות!"] },
-  { id: "mexican", name: "חואן", image: "/maxicanIcon.png", quotes: ["איי קראמבה! איזה ניחוש חריף הבאת פה אמיגו! 🌶️", "ואמוס! תביא ירוק במטריצה ויוצאים לפיאסטה עד הבוקר! 🪅", "הכדורגל שלנו במקסיקו הכי שמח, אבל הניחושים שלך... איי איי איי.", "אל תהיה לוקו, תבדוק טוב טוב את הפצועים לפני שאתה שם תוצאה."] },
-  { id: "canadian", name: "בוב", image: "/candianIcon.png", quotes: ["סליחה שאני מפריע, אה, אבל נראה לי שהניחוש שלך קצת קפוא. 🍁", "קח קפה, שים סירופ מייפל ובוא נראה קצת סוקר, אה? ☕", "הוקי קרח זה הספורט האמיתי, אבל מונדיאל בקנדה זה גם נחמד, סליחה על ההתלהבות.", "אל תשכח להיות מנומס ליריב שלך כשתעקוף אותו בטבלה, אה?"] }
-];
 
 const parseDateTimeLocal = (dtStr: string) => {
   if (!dtStr) return 0;
@@ -96,8 +90,6 @@ export default function Dashboard({ userId, userName, setActiveTab, setPredictio
   const [realBonusFull, setRealBonusFull] = useState<any>({ answers: {}, blacklist: {}, locked: {}, leading: {} });
   const [userBonusAnswersState, setUserBonusAnswersState] = useState<any>({});
   const [bonusQuestionsList, setBonusQuestionsList] = useState<any[]>([]);
-  const [mascotQuote, setMascotQuote] = useState<{mascot: any, quote: string} | null>(null);
-  const [showMascot, setShowMascot] = useState(false);
   const [prizes, setPrizes] = useState<any>(null);
   const [showPodiumState, setShowPodiumState] = useState(true);
 
@@ -106,9 +98,7 @@ export default function Dashboard({ userId, userName, setActiveTab, setPredictio
   const [liveBonusAns, setLiveBonusAns] = useState<any>({});
   const [activeSurpriseAlert, setActiveSurpriseAlert] = useState<number>(0);
   const [showWrappedModal, setShowWrappedModal] = useState(false);
-  // הפיכת המנעול ל"חי" ומגיב בזמן אמת לשינויים באדמין
   const [tournamentState, setTournamentState] = useState(initialTournamentState || 0);
-// טקסטים דינמיים לאולפן הפרשנים (יכול להגיע מה-Firebase)
   const [studioQuotes, setStudioQuotes] = useState({
     trump: '"FAKE NEWS! אני מנצח את כולם!" 🤬',
     canadian: '"Sorry eh, הניחוש שלי מושלם..." 🍁',
@@ -122,7 +112,6 @@ export default function Dashboard({ userId, userName, setActiveTab, setPredictio
     });
     return () => unsubSys();
   }, []);
-  // הריפרנס שיעזור לנו למנוע מהטאבים לקפוץ כל 30 שניות
   const isBannerInit = useRef(false);
 
   useEffect(() => {
@@ -187,25 +176,6 @@ export default function Dashboard({ userId, userName, setActiveTab, setPredictio
   };
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-       const lastMascotTime = sessionStorage.getItem("lastMascotShowTime");
-       const now = new Date().getTime();
-       const cooldownMs = 15 * 60 * 1000; 
-       if (!lastMascotTime || (now - Number(lastMascotTime) > cooldownMs)) {
-           if (Math.random() < 0.3) { 
-              const randomMascot = MASCOTS[Math.floor(Math.random() * MASCOTS.length)];
-              const randomQuote = randomMascot.quotes[Math.floor(Math.random() * randomMascot.quotes.length)];
-              setMascotQuote({ mascot: randomMascot, quote: randomQuote });
-              setShowMascot(true);
-              sessionStorage.setItem("lastMascotShowTime", now.toString());
-              setTimeout(() => setShowMascot(false), 8000);
-            }
-       }
-    }, 2000); 
-    return () => clearTimeout(timer);
-  }, []);
-
-  useEffect(() => {
     if (!userId) return;
 
     const unsubscribeUsers = onSnapshot(collection(db, "users"), (usersSnap) => {
@@ -261,10 +231,14 @@ export default function Dashboard({ userId, userName, setActiveTab, setPredictio
     });
 
     const unsubscribeDash = onSnapshot(doc(db, "settings", "dashboard"), (dashSnap) => {
+      const data = dashSnap.data();
       if (dashSnap.exists()) {
-        if (dashSnap.data().dailyMessage !== undefined) setDailyMessage(dashSnap.data().dailyMessage);
-        if (dashSnap.data().dailyMediaUrl !== undefined) setDailyMediaUrl(dashSnap.data().dailyMediaUrl);
-        if (dashSnap.data().dailySubtext !== undefined) setDailySubtext(dashSnap.data().dailySubtext);
+        if (data.dailyMessage !== undefined) setDailyMessage(data.dailyMessage);
+        if (data.dailyMediaUrl !== undefined) setDailyMediaUrl(data.dailyMediaUrl);
+        if (data.dailySubtext !== undefined) setDailySubtext(data.dailySubtext);
+        if (data.studioQuotes !== undefined) {
+           setStudioQuotes(data.studioQuotes);
+        }
       }
       
     });
@@ -518,7 +492,6 @@ export default function Dashboard({ userId, userName, setActiveTab, setPredictio
         setTodayMatches(tMatches);
         setTodayTargets(targets);
         
-        // תיקון קפיצת הטאבים (UI Fix)
         if (!isBannerInit.current) {
             if (tMatches.length > 0) setActiveBannerMode("MATCHES");
             else if (targets.length > 0) setActiveBannerMode("BONUS");
@@ -716,11 +689,35 @@ export default function Dashboard({ userId, userName, setActiveTab, setPredictio
     if (points >= 15) return <span className="inline-flex items-center gap-1 whitespace-nowrap shrink-0 bg-emerald-900/40 text-emerald-400 border border-emerald-500/50 px-2 py-1 rounded text-[10px] font-black shadow-[0_0_10px_rgba(16,185,129,0.2)]">🎯 +{points} נק'</span>;
     return <span className="inline-flex items-center gap-1 whitespace-nowrap shrink-0 bg-blue-900/40 text-blue-400 border border-blue-500/40 px-2 py-1 rounded text-[10px] font-black shadow-sm">+{points} נק'</span>;
   };
-
+const renderedMagazineContent = useMemo(() => {
+    return (
+      <div className="text-slate-200 text-base md:text-lg leading-relaxed whitespace-pre-wrap
+                      [&_div]:w-full
+                      [&_b]:text-amber-400 [&_strong]:text-amber-400
+                      [&_i]:text-slate-400 [&_u]:underline [&_u]:decoration-blue-400 [&_u]:underline-offset-4
+                      [&_h1]:text-2xl md:[&_h1]:text-3xl [&_h1]:font-black [&_h1]:mb-4 [&_h1]:mt-6 [&_h1]:text-transparent [&_h1]:bg-clip-text [&_h1]:bg-gradient-to-r [&_h1]:from-blue-400 [&_h1]:to-emerald-400
+                      [&_h2]:text-xl md:[&_h2]:text-2xl [&_h2]:font-bold [&_h2]:mb-3 [&_h2]:mt-6 [&_h2]:text-blue-300
+                      [&_h3]:text-lg md:[&_h3]:text-xl [&_h3]:font-bold [&_h3]:mb-2 [&_h3]:mt-4 [&_h3]:text-emerald-300
+                      [&_h4]:text-base md:[&_h4]:text-lg [&_h4]:font-bold [&_h4]:mb-2 [&_h4]:mt-4 [&_h4]:text-slate-300
+                      [&_mark]:px-1.5 [&_mark]:rounded [&_mark]:font-bold
+                      [&_mark.yellow]:!bg-amber-500/20 [&_mark.yellow]:!text-amber-300
+                      [&_mark.green]:!bg-emerald-500/20 [&_mark.green]:!text-emerald-300
+                      [&_mark.blue]:!bg-blue-500/20 [&_mark.blue]:!text-blue-300
+                      [&_mark.red]:!bg-rose-500/20 [&_mark.red]:!text-rose-400
+                      [&_blockquote]:border-r-4 [&_blockquote]:border-emerald-500 [&_blockquote]:bg-slate-800/50 [&_blockquote]:p-5 [&_blockquote]:rounded-l-2xl [&_blockquote]:my-6 [&_blockquote]:italic [&_blockquote]:text-slate-300
+                      [&_ul]:list-disc [&_ul]:list-inside [&_ul]:space-y-2 [&_ul]:my-4 [&_ul]:text-slate-300
+                      [&_hr]:border-slate-700 [&_hr]:my-8
+                      [&_img]:block [&_img]:mx-auto [&_img]:rounded-2xl [&_img]:shadow-lg [&_img]:my-6 [&_img]:max-h-[300px] md:[&_img]:max-h-[400px] [&_img]:w-auto [&_img]:max-w-full [&_img]:object-contain [&_img]:border [&_img]:border-slate-700
+                      [&_video]:block [&_video]:mx-auto [&_video]:rounded-2xl [&_video]:shadow-lg [&_video]:my-6 [&_video]:max-h-[300px] md:[&_video]:max-h-[400px] [&_video]:w-auto [&_video]:max-w-full [&_video]:object-contain [&_video]:border [&_video]:border-slate-700 [&_video]:bg-slate-950
+                      [&_iframe]:block [&_iframe]:w-full [&_iframe]:aspect-video [&_iframe]:rounded-2xl [&_iframe]:shadow-[0_10px_30px_rgba(0,0,0,0.5)] [&_iframe]:my-6 [&_iframe]:border [&_iframe]:border-slate-700 [&_iframe]:mx-auto [&_iframe]:relative [&_iframe]:z-10
+                      [&_a]:text-cyan-400 [&_a]:underline hover:[&_a]:text-cyan-300" 
+           dangerouslySetInnerHTML={{ __html: dailyMessage || "הודעות הנהלה, עדכונים חמים, וכל מה שצריך לדעת כדי לא להישאר מאחור." }} 
+      />
+    );
+  }, [dailyMessage]);
   if (isLoading) return <div className="flex justify-center items-center h-64"><div className="animate-spin text-5xl text-blue-500">⚽</div></div>;
-// --- לוגיקת סיום הטורניר ופודיום ההכתרה ---
+
   if (tournamentState >= 13 && showPodiumState && allUsersList.length > 0) {
-    // פונקציית חישוב פרסים כולל תיקו (זהה ל-Leaderboard)
     const getPrizeForRank = (rank: number, board: "GENERAL" | "KNOCKOUT", usersArr: any[]) => {
       if (!prizes) return 0;
       const winnersAtThisRank = usersArr.filter(u => board === "GENERAL" ? u.displayRank === rank : u.displayKoRank === rank);
@@ -737,7 +734,6 @@ export default function Dashboard({ userId, userName, setActiveTab, setPredictio
       return Math.floor(totalPool / count);
     };
 
-    // בניית טבלה 1 (ראשית - 4 מקומות)
     const sortedGeneral = [...allUsersList].sort((a, b) => (b.totalPoints || 0) - (a.totalPoints || 0));
     const winnersTable1 = sortedGeneral.slice(0, 4).map(u => ({
       name: u.name,
@@ -745,7 +741,6 @@ export default function Dashboard({ userId, userName, setActiveTab, setPredictio
       prize: getPrizeForRank(u.displayRank, "GENERAL", sortedGeneral)
     }));
 
-    // בניית טבלה 2 (נוקאאוט - 2 מקומות)
     const sortedKo = [...allUsersList].sort((a, b) => (b.knockoutPoints || 0) - (a.knockoutPoints || 0));
     const winnersTable2 = sortedKo.slice(0, 2).map(u => ({
       name: u.name,
@@ -761,7 +756,7 @@ export default function Dashboard({ userId, userName, setActiveTab, setPredictio
       />
     );
   }
-  // --- סוף לוגיקת הכתרה ---
+
   const isMatchesMode = activeBannerMode === "MATCHES";
   const currentDisplayedMatch = todayMatches[todayMatchIndex];
   const currentDisplayedBonus = todayTargets[todayBonusIndex];
@@ -897,7 +892,6 @@ export default function Dashboard({ userId, userName, setActiveTab, setPredictio
           100% { transform: translate(1px, -2px) rotate(-1deg); }
         }
         .animate-rage { animation: rageShake 0.3s infinite; }
-        /* אנימציות למצגת הנופים בצד ימין (מתחלף כל 5 שניות) */
         @keyframes fade1 { 0%, 28% { opacity: 1; } 33%, 95% { opacity: 0; } 100% { opacity: 1; } }
         @keyframes fade2 { 0%, 28% { opacity: 0; } 33%, 61% { opacity: 1; } 66%, 100% { opacity: 0; } }
         @keyframes fade3 { 0%, 61% { opacity: 0; } 66%, 95% { opacity: 1; } 100% { opacity: 0; } }
@@ -905,99 +899,75 @@ export default function Dashboard({ userId, userName, setActiveTab, setPredictio
         .animate-carousel-2 { animation: fade2 15s infinite ease-in-out; }
         .animate-carousel-3 { animation: fade3 15s infinite ease-in-out; }
       `}} />
-{/* ========================================================= */}
-      {/* אפקט ה-WOW למחשב: אולפן הפרשנים המתוקן (גרסה 2.0) */}
-      {/* ========================================================= */}
-      
-      {/* צד שמאל: אולפן הפרשנים - גרסת "הילת זעם" (Rage Aura) */}
-      <div className="hidden xl:block fixed bottom-0 left-2 2xl:left-10 z-0 w-[450px] 2xl:w-[550px] pointer-events-auto">
-         
-         {/* מכולת הפרשנים - בגובה הנכון! (הורחק מהשולחן) */}
-         <div className="absolute bottom-[38%] 2xl:bottom-[40%] left-0 w-full flex justify-center items-end gap-6 2xl:gap-12 z-10 px-8">
-          
-            {/* טראמפ (שמאל) - עם אפקט "הילת זעם" אדומה בהובר! */}
-            <div className="relative group cursor-pointer pb-3 z-30">
-               
-               {/* בועת דיבור מורחקת מהקנדי (פונה שמאלה) */}
-              <div className="absolute -top-16 -left-16 opacity-0 group-hover:opacity-100 transition-all duration-300 z-50 pointer-events-none origin-bottom-right scale-90 group-hover:scale-100">
-                  <div className="bg-rose-700 text-white font-black text-sm px-4 py-2 rounded-2xl border-2 border-white shadow-[0_0_25px_rgba(225,29,72,0.9)] whitespace-nowrap">
-                     "FAKE NEWS! אני מנצח את כולם!" 🤬
-                     {/* החץ תוקן והוזז ימינה (right-8) כדי שיצביע בול על טראמפ! */}
-                     <div className="absolute -bottom-2 right-8 w-0 h-0 border-l-[8px] border-l-transparent border-r-[8px] border-r-transparent border-t-[8px] border-t-white"></div>
-                  </div>
-               </div>
 
-               {/* המיכל של טראמפ שמקבל את האנימציות - החליפה נשארת כחולה! */}
-               <div className="relative transition-all duration-300 group-hover:-translate-y-6 group-hover:rotate-6 group-hover:scale-110">
-                 
-                 {/* תמונת הפנים המקורית (z-10) - ללא אפקט צבע מובנה */}
-                 <img 
-                   src="/donaldIcon-removebg.png" 
-                   alt="Trump" 
-                   className="relative z-10 w-24 2xl:w-32 object-contain drop-shadow-2xl transition-all group-hover:animate-rage filter group-hover:drop-shadow-[0_0_20px_rgba(225,29,72,1)] group-hover:contrast(1.1)" 
-                 />
-                 
+      <div className="hidden xl:block fixed bottom-0 left-10 z-40 w-[550px] pointer-events-none">
+
+         <div className="absolute bottom-[82%] left-1/2 -translate-x-1/2 w-[500px] bg-slate-950 border-[6px] border-slate-800 rounded-3xl shadow-[0_25px_50px_rgba(0,0,0,0.8),0_0_30px_rgba(59,130,246,0.2)] pointer-events-auto overflow-hidden flex flex-col z-0 transition-transform duration-500 hover:scale-[1.02]">
+            
+            <div className="bg-slate-900 border-b border-slate-800 px-5 py-2.5 flex justify-between items-center z-10 relative shadow-md">
+               <div className="flex items-center gap-2.5">
+                  <div className="w-3 h-3 rounded-full bg-rose-500 animate-pulse shadow-[0_0_10px_rgba(244,63,94,0.8)]"></div>
+                  <span className="text-rose-500 font-black text-xs tracking-widest uppercase drop-shadow-md">LIVE GALLERY</span>
+               </div>
+               <div className="flex gap-1.5">
+                  <div className="w-2.5 h-2.5 rounded-full bg-slate-700"></div>
+                  <div className="w-2.5 h-2.5 rounded-full bg-slate-700"></div>
                </div>
             </div>
 
-            {/* קנדי (אמצע) - מופרד וגבוה מספיק */}
-            <div className="relative group cursor-pointer pb-5 z-20">
-               {/* בועת דיבור מנומסת */}
-               <div className="absolute -top-14 -left-8 opacity-0 group-hover:opacity-100 transition-all duration-300 z-50 pointer-events-none origin-bottom scale-90 group-hover:scale-100">
-                  <div className="bg-slate-900/95 text-blue-400 font-black text-xs px-4 py-2 rounded-xl border-2 border-blue-500/50 shadow-xl whitespace-nowrap">
-                     "Sorry eh, הניחוש שלי מושלם..." 🍁
-                  </div>
-               </div>
-               <img src="/candianIcon-removebg.png" alt="Canadian" className="w-24 2xl:w-32 object-contain drop-shadow-2xl transition-all duration-300 group-hover:-translate-y-6 group-hover:scale-110" />
-            </div>
+            <div className="relative aspect-video bg-black overflow-hidden">
+                <img src="/usa-bg.jpg" className="absolute inset-0 w-full h-full object-cover animate-carousel-1" alt="USA" />
+                <img src="/canada-bg.jpg" className="absolute inset-0 w-full h-full object-cover animate-carousel-2 opacity-0" alt="Canada" />
+                <img src="/mexico-bg.jpg" className="absolute inset-0 w-full h-full object-cover animate-carousel-3 opacity-0" alt="Mexico" />
 
-            {/* מקסיקני (ימין) - תוקן הגובה! */}
-            <div className="relative group cursor-pointer pb-7 z-10">
-               {/* בועת דיבור */}
-               <div className="absolute -top-14 -right-16 opacity-0 group-hover:opacity-100 transition-all duration-300 z-50 pointer-events-none origin-bottom-right scale-90 group-hover:scale-100">
-                  <div className="bg-slate-900/95 text-emerald-400 font-black text-xs px-4 py-2 rounded-xl border-2 border-blue-500/50 shadow-xl whitespace-nowrap">
-                     "Ay caramba! איזה בול!" 🌮
-                  </div>
-               </div>
-               <img src="/maxicanIcon-removebg.png" alt="Mexican" className="w-24 2xl:w-32 object-contain drop-shadow-2xl -scale-x-100 transition-all duration-300 group-hover:-translate-y-5 group-hover:-rotate-6 group-hover:scale-110 origin-bottom" />
+                <div className="absolute inset-0 bg-gradient-to-tr from-white/10 via-transparent to-transparent pointer-events-none z-10"></div>
+                
+                <div className="absolute bottom-4 left-4 bg-black/80 backdrop-blur-md px-4 py-1.5 rounded-xl border border-white/20 text-xs text-amber-400 font-black z-20 uppercase tracking-widest shadow-lg drop-shadow-md">
+                    Host Nations 2026
+                </div>
             </div>
          </div>
 
-         {/* השולחן הפיזי (z-20) - תמיד בקדמה,z-index: 20 ו-pointer-events-none */}
+         <div className="absolute bottom-[40%] left-0 w-full flex justify-center items-end gap-12 z-10 px-8 pointer-events-auto">
+          
+            <div className="relative group cursor-pointer pb-3 z-30">
+               <div className="absolute -top-16 -left-20 opacity-0 group-hover:opacity-100 transition-all duration-300 z-50 pointer-events-none origin-bottom-right scale-90 group-hover:scale-100">
+                  <div className="bg-rose-700 text-white font-bold text-base px-5 py-3 rounded-2xl border-2 border-white shadow-[0_0_25px_rgba(225,29,72,0.9)] whitespace-nowrap tracking-wide">
+                     {studioQuotes.trump}
+                     <div className="absolute -bottom-2.5 right-8 w-0 h-0 border-l-[10px] border-l-transparent border-r-[10px] border-r-transparent border-t-[10px] border-t-white"></div>
+                  </div>
+               </div>
+
+               <div className="relative transition-all duration-300 group-hover:-translate-y-6 group-hover:rotate-6 group-hover:scale-110">
+                 <img src="/donaldIcon-removebg.png" alt="Trump" className="w-32 object-contain transition-all duration-300 group-hover:animate-rage filter group-hover:drop-shadow-[0_0_25px_rgba(225,29,72,1)] group-hover:contrast-[1.15]" />
+               </div>
+            </div>
+
+            <div className="relative group cursor-pointer pb-5 z-20">
+               <div className="absolute -top-16 -left-12 opacity-0 group-hover:opacity-100 transition-all duration-300 z-50 pointer-events-none origin-bottom scale-90 group-hover:scale-100">
+                  <div className="bg-slate-900 text-blue-50 font-bold text-base px-5 py-3 rounded-2xl border-2 border-blue-500 shadow-[0_10px_25px_rgba(59,130,246,0.4)] whitespace-nowrap tracking-wide">
+                     {studioQuotes.canadian}
+                     <div className="absolute -bottom-2.5 left-1/2 -translate-x-1/2 w-0 h-0 border-l-[10px] border-l-transparent border-r-[10px] border-r-transparent border-t-[10px] border-t-blue-500"></div>
+                  </div>
+               </div>
+               <img src="/candianIcon-removebg.png" alt="Canadian" className="w-32 object-contain drop-shadow-2xl transition-all duration-300 group-hover:-translate-y-6 group-hover:scale-110" />
+            </div>
+
+            <div className="relative group cursor-pointer pb-7 z-10">
+               <div className="absolute -top-16 -right-20 opacity-0 group-hover:opacity-100 transition-all duration-300 z-50 pointer-events-none origin-bottom-right scale-90 group-hover:scale-100">
+                  <div className="bg-slate-900 text-emerald-50 font-bold text-base px-5 py-3 rounded-2xl border-2 border-emerald-500 shadow-[0_10px_25px_rgba(16,185,129,0.4)] whitespace-nowrap tracking-wide">
+                     {studioQuotes.mexican}
+                     <div className="absolute -bottom-2.5 left-6 w-0 h-0 border-l-[10px] border-l-transparent border-r-[10px] border-r-transparent border-t-[10px] border-t-emerald-500"></div>
+                  </div>
+               </div>
+               <img src="/maxicanIcon-removebg.png" alt="Mexican" className="w-32 object-contain drop-shadow-2xl -scale-x-100 transition-all duration-300 group-hover:-translate-y-5 group-hover:-rotate-6 group-hover:scale-110 origin-bottom" />
+            </div>
+         </div>
+
          <img src="/panel-removebg.png" alt="Studio Desk" className="relative z-20 w-full object-contain drop-shadow-[0_-10px_30px_rgba(0,0,0,0.8)] pointer-events-none" />
       </div>
-      {/* צד ימין: מסך נופים מתחלף (Carousel) */}
-      <div className="hidden xl:block fixed top-1/3 right-8 2xl:right-16 z-0 w-[380px] 2xl:w-[480px] pointer-events-none">
-         <div className="relative w-full aspect-video rounded-3xl overflow-hidden border-[6px] border-slate-900 shadow-[0_20px_50px_rgba(0,0,0,0.9)] bg-black">
-            
-            {/* שלוש התמונות שיתחלפו בעמעום */}
-            <img src="/usa-bg.jpg" className="absolute inset-0 w-full h-full object-cover animate-carousel-1" alt="USA" />
-            <img src="/canada-bg.jpg" className="absolute inset-0 w-full h-full object-cover animate-carousel-2 opacity-0" alt="Canada" />
-            <img src="/mexico-bg.jpg" className="absolute inset-0 w-full h-full object-cover animate-carousel-3 opacity-0" alt="Mexico" />
 
-            {/* הילה שחורה עדינה למטה וכיתוב */}
-            <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-transparent to-transparent"></div>
-            <div className="absolute bottom-4 left-0 w-full text-center z-10 flex flex-col items-center">
-                <span className="text-[10px] text-amber-500 uppercase tracking-[0.3em] font-black mb-1">Host Nations</span>
-                <h3 className="text-white font-black text-xl 2xl:text-2xl tracking-widest drop-shadow-[0_0_10px_rgba(255,255,255,0.4)] italic">BETS IN PROD</h3>
-            </div>
-         </div>
-      </div>
-{/* candianIcon-removebg.png  maxicanIcon-removebg.png */ }
-      {/* ========================================================= */}
-      {/* ========================================================= */}
-      {/* 🎈 קמעות פופ-אפ */}
-      <div className={`fixed bottom-4 left-4 md:left-8 z-[100] transition-all duration-700 transform ${showMascot ? 'translate-y-0 opacity-100' : 'translate-y-32 opacity-0 pointer-events-none'} flex items-end gap-3`} dir="ltr">
-         <div className="bg-slate-50 text-slate-900 p-4 rounded-2xl rounded-bl-none shadow-[0_10px_25px_rgba(0,0,0,0.5)] max-w-[220px] md:max-w-[280px] relative border-2 border-slate-300" dir="rtl">
-            <button onClick={() => setShowMascot(false)} className="absolute top-1 right-2 text-slate-400 hover:text-rose-500 font-black text-xs p-1">✕</button>
-            <p className="text-sm font-bold leading-tight pt-2">{mascotQuote?.quote}</p>
-         </div>
-         <div className="relative shrink-0">
-            <img src={mascotQuote?.mascot.image} alt={mascotQuote?.mascot.name} className="w-20 h-20 md:w-24 md:h-24 rounded-full border-4 border-slate-800 shadow-2xl object-cover bg-white" />
-         </div>
-      </div>
 
-      {/* 🚨 אזהרת דדליין ומשימות חסרות */}
       {missingTasksList.length > 0 && (
          <div className={`${bannerStyle} p-6 rounded-3xl border relative overflow-hidden transition-all duration-500`}>
             <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0IiBoZWlnaHQ9IjQiPgo8cmVjdCB3aWR0aD0iNCIgaGVpZ2h0PSI0IiBmaWxsPSIjZmZmIiBmaWxsLW9wYWNpdHk9IjAuMSIvPgo8L3N2Zz4=')] opacity-30"></div>
@@ -1023,7 +993,6 @@ export default function Dashboard({ userId, userName, setActiveTab, setPredictio
          </div>
       )}
 
-      {/* 🎁 באנר שאלת הפתעה */}
       {activeSurpriseAlert > 0 && (
          <div className="bg-gradient-to-r from-purple-600 via-pink-600 to-purple-600 p-6 rounded-3xl border border-purple-300 shadow-[0_0_40px_rgba(168,85,247,0.6)] relative overflow-hidden animate-pulse">
             <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0IiBoZWlnaHQ9IjQiPgo8cmVjdCB3aWR0aD0iNCIgaGVpZ2h0PSI0IiBmaWxsPSIjZmZmIiBmaWxsLW9wYWNpdHk9IjAuMSIvPgo8L3N2Zz4=')] opacity-30"></div>
@@ -1043,7 +1012,6 @@ export default function Dashboard({ userId, userName, setActiveTab, setPredictio
          </div>
       )}
 
-      {/* מרכז השליטה האישי המפוצל */}
       <div className="flex md:grid md:grid-cols-2 items-stretch overflow-x-auto snap-x snap-mandatory md:overflow-visible gap-4 md:gap-8 pb-4 md:pb-0 custom-scrollbar -mx-4 px-4 md:mx-0 md:px-0">
          
          <div className="w-[90%] md:w-auto shrink-0 snap-center rounded-3xl p-6 shadow-2xl relative overflow-hidden bg-slate-900 border border-slate-700 flex flex-col min-h-full">
@@ -1082,7 +1050,6 @@ export default function Dashboard({ userId, userName, setActiveTab, setPredictio
                   }}
                   className="bg-gradient-to-br from-amber-500/20 to-amber-900/40 backdrop-blur-md p-3 rounded-2xl border border-amber-500/50 text-center shadow-[0_0_20px_rgba(245,158,11,0.15)] cursor-pointer hover:border-amber-400 hover:scale-[1.02] transition-all group relative flex flex-col justify-between"
                >
-                  {/* הילת זהב ברקע (z-0 כדי לא להפריע לטקסט) */}
                   <div className="absolute top-0 left-1/2 -translate-x-1/2 w-24 h-24 bg-amber-400/20 rounded-full blur-2xl pointer-events-none z-0"></div>
 
                   {ptsDiff > 0 && <div className="absolute -top-3 left-1/2 -translate-x-1/2 text-[10px] font-black text-white bg-gradient-to-r from-blue-600 to-blue-400 px-2 py-0.5 rounded-lg border border-blue-300 shadow-lg transform rotate-3 animate-pulse whitespace-nowrap z-20">+{ptsDiff} היום!</div>}
@@ -1665,7 +1632,6 @@ export default function Dashboard({ userId, userName, setActiveTab, setPredictio
          </div>
       </div>
 
-      {/* מודאלים נקיים */}
       {showMagazineModal && (
         <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/85 p-4 backdrop-blur-md animate-fade-in-up" dir="rtl">
           <div className="bg-slate-900 border border-slate-700 p-6 md:p-8 rounded-3xl w-full max-w-3xl max-h-[90vh] flex flex-col shadow-2xl relative overflow-hidden">
@@ -1696,31 +1662,12 @@ export default function Dashboard({ userId, userName, setActiveTab, setPredictio
 
                  {dailySubtext && (
                     <div 
-                      className="text-slate-300 text-base md:text-lg leading-relaxed mb-6 font-medium whitespace-pre-wrap italic border-r-4 border-slate-600 pr-4 [&_b]:text-amber-400 [&_strong]:text-amber-400 [&_mark]:px-1.5 [&_mark]:rounded [&_mark.yellow]:bg-amber-500/20 [&_mark.yellow]:text-amber-300 [&_mark.green]:bg-emerald-500/20 [&_mark.green]:text-emerald-300 [&_mark.red]:bg-rose-500/20 [&_mark.red]:text-rose-400 [&_a]:text-cyan-400 [&_a]:underline"
+                      className="text-slate-300 text-base md:text-lg leading-relaxed mb-6 font-medium whitespace-pre-wrap italic border-r-4 border-slate-600 pr-4 [&_b]:text-amber-400 [&_strong]:text-amber-400 [&_mark]:px-1.5 [&_mark]:rounded [&_mark.yellow]:!bg-amber-500/20 [&_mark.yellow]:!text-amber-300 [&_mark.green]:!bg-emerald-500/20 [&_mark.green]:!text-emerald-300 [&_mark.red]:!bg-rose-500/20 [&_mark.red]:!text-rose-400 [&_a]:text-cyan-400 [&_a]:underline"
                       dangerouslySetInnerHTML={{ __html: dailySubtext }}
                     />
                  )}
 
-                 <div className="text-slate-200 text-base md:text-lg leading-relaxed whitespace-pre-wrap
-                                 [&_div]:w-full
-                                 [&_b]:text-amber-400 [&_strong]:text-amber-400
-                                 [&_i]:text-slate-400 [&_u]:underline [&_u]:decoration-blue-400 [&_u]:underline-offset-4
-                                 [&_h1]:text-2xl md:[&_h1]:text-3xl [&_h1]:font-black [&_h1]:mb-4 [&_h1]:mt-6 [&_h1]:text-transparent [&_h1]:bg-clip-text [&_h1]:bg-gradient-to-r [&_h1]:from-blue-400 [&_h1]:to-emerald-400
-                                 [&_h2]:text-xl md:[&_h2]:text-2xl [&_h2]:font-bold [&_h2]:mb-3 [&_h2]:mt-6 [&_h2]:text-blue-300
-                                 [&_h3]:text-lg md:[&_h3]:text-xl [&_h3]:font-bold [&_h3]:mb-2 [&_h3]:mt-4 [&_h3]:text-emerald-300
-                                 [&_h4]:text-base md:[&_h4]:text-lg [&_h4]:font-bold [&_h4]:mb-2 [&_h4]:mt-4 [&_h4]:text-slate-300
-                                 [&_mark]:px-1.5 [&_mark]:rounded [&_mark]:font-bold
-                                 [&_mark.yellow]:!bg-amber-500/20 [&_mark.yellow]:!text-amber-300
-                                 [&_mark.green]:!bg-emerald-500/20 [&_mark.green]:!text-emerald-300
-                                 [&_mark.blue]:!bg-blue-500/20 [&_mark.blue]:!text-blue-300
-                                 [&_mark.red]:!bg-rose-500/20 [&_mark.red]:!text-rose-400
-                                 [&_blockquote]:border-r-4 [&_blockquote]:border-emerald-500 [&_blockquote]:bg-slate-800/50 [&_blockquote]:p-5 [&_blockquote]:rounded-l-2xl [&_blockquote]:my-6 [&_blockquote]:italic [&_blockquote]:text-slate-300
-                                 [&_ul]:list-disc [&_ul]:list-inside [&_ul]:space-y-2 [&_ul]:my-4 [&_ul]:text-slate-300
-                                 [&_hr]:border-slate-700 [&_hr]:my-8
-                                 [&_img]:inline-block [&_img]:rounded-2xl [&_img]:shadow-lg [&_img]:my-6 [&_img]:max-h-[300px] md:[&_img]:max-h-[400px] [&_img]:w-auto [&_img]:max-w-full [&_img]:object-contain [&_img]:border [&_img]:border-slate-700
-                                 [&_a]:text-cyan-400 [&_a]:underline hover:[&_a]:text-cyan-300" 
-                      dangerouslySetInnerHTML={{ __html: dailyMessage || "הודעות הנהלה, עדכונים חמים, וכל מה שצריך לדעת כדי לא להישאר מאחור." }} 
-                 />
+                 {renderedMagazineContent}
             </div>
             
             <div className="pt-4 mt-2 border-t border-slate-800 flex justify-end">
@@ -1900,29 +1847,45 @@ export default function Dashboard({ userId, userName, setActiveTab, setPredictio
           </div>
         </div>
       )}
-{/* ========================================================= */}
-      {/* חברי הפאנל - גרסת סלולר - פרופורציה אבסולוטית (Responsive!) */}
-      {/* ========================================================= */}
-        <div className="xl:hidden w-full mt-8 mb-8 bg-slate-950/90 rounded-3xl border border-slate-700/50 shadow-2xl relative overflow-hidden flex flex-col items-center pt-16 pb-4">        
-        {/* פס עיטור למעלה */}
+
+      <div className="xl:hidden w-full mt-8 mb-8 bg-slate-950/90 rounded-3xl border border-slate-700/50 shadow-2xl relative overflow-hidden flex flex-col items-center pt-6 pb-4">        
         <div className="absolute top-0 right-0 w-full h-1.5 bg-gradient-to-r from-rose-400 via-amber-400 to-emerald-400"></div>
         
-        {/* כותרת */}
-        <div className="mb-2 px-5 py-2 bg-slate-900/80 rounded-full border border-slate-700 text-white font-black text-sm flex items-center gap-2 z-30 shadow-md">
+        <div className="mb-4 relative z-30 px-5 py-2 bg-slate-900/80 rounded-full border border-slate-700 text-white font-black text-sm flex items-center gap-2 shadow-md mt-2">
           <span className="animate-pulse">🎙️</span> חברי הפאנל
         </div>
 
-        {/* הקסם: מכולה משותפת לשולחן ולדמויות ששומרת על פרופורציה מושלמת */}
-        <div className="relative w-full mt-20">
+        <div className="relative w-full mt-38 sm:mt-40">
           
-          {/* שינוי גובה כללי: שיניתי מ-35% ל-40%. ככל שהמספר גדול יותר, כולם עולים למעלה! */}
-          <div className="absolute bottom-[40%] left-0 w-full flex justify-center items-end gap-2 px-4 z-10 pointer-events-auto">
+          <div className="absolute bottom-[75%] left-1/2 -translate-x-1/2 w-[85%] bg-slate-950 border-[3px] border-slate-800 rounded-2xl shadow-[0_15px_30px_rgba(0,0,0,0.7)] pointer-events-auto overflow-hidden flex flex-col z-0">
+             <div className="bg-slate-900 border-b border-slate-800 px-3 py-1.5 flex justify-between items-center z-10 relative">
+                <div className="flex items-center gap-1.5">
+                   <div className="w-2 h-2 rounded-full bg-rose-500 animate-pulse shadow-[0_0_8px_rgba(244,63,94,0.8)]"></div>
+                   <span className="text-rose-500 font-black text-[9px] tracking-widest uppercase">LIVE</span>
+                </div>
+                <div className="flex gap-1">
+                   <div className="w-1.5 h-1.5 rounded-full bg-slate-700"></div>
+                   <div className="w-1.5 h-1.5 rounded-full bg-slate-700"></div>
+                   <div className="w-1.5 h-1.5 rounded-full bg-slate-700"></div>
+                </div>
+             </div>
+             <div className="relative aspect-video bg-black overflow-hidden">
+                 <img src="/usa-bg.jpg" className="absolute inset-0 w-full h-full object-cover animate-carousel-1" alt="USA" />
+                 <img src="/canada-bg.jpg" className="absolute inset-0 w-full h-full object-cover animate-carousel-2 opacity-0" alt="Canada" />
+                 <img src="/mexico-bg.jpg" className="absolute inset-0 w-full h-full object-cover animate-carousel-3 opacity-0" alt="Mexico" />
+                 <div className="absolute inset-0 bg-gradient-to-tr from-white/10 via-transparent to-transparent pointer-events-none z-10"></div>
+                 <div className="absolute bottom-1.5 left-1.5 bg-black/80 backdrop-blur-md px-2 py-0.5 rounded-lg border border-white/20 text-[8px] text-amber-400 font-black z-20 uppercase tracking-widest">
+                     Host Nations
+                 </div>
+             </div>
+          </div>
+
+          <div className="absolute bottom-[44%] left-0 w-full flex justify-center items-end gap-2 px-4 z-10 pointer-events-auto">
             
-            {/* טראמפ - כיוון עדין: translate-y-[10%] דוחף אותו טיפ-טיפה למטה ביחס לאחרים */}
-            <div className="relative group w-[28%] flex flex-col items-center translate-y-[-8%]" tabIndex={0}>
-              <div className="speech-bubble absolute bottom-full mb-6 right-0 opacity-0 group-hover:opacity-100 group-focus:opacity-100 group-active:opacity-100 transition-all duration-300 z-50 pointer-events-none scale-90 group-hover:scale-100 group-active:scale-100 bg-rose-700 text-white font-black text-[10px] sm:text-xs border border-white whitespace-nowrap px-3 py-1.5 rounded-xl shadow-[0_0_15px_rgba(225,29,72,0.8)] origin-bottom-right">
+            <div className="relative group w-[28%] flex flex-col items-center -translate-y-[15%]" tabIndex={0}>
+              <div className="speech-bubble absolute bottom-full mb-8 right-0 opacity-0 group-hover:opacity-100 group-focus:opacity-100 group-active:opacity-100 transition-all duration-300 z-50 pointer-events-none scale-90 group-hover:scale-100 group-active:scale-100 bg-rose-700 text-white font-bold text-sm border-2 border-white px-4 py-2.5 rounded-xl shadow-[0_0_15px_rgba(225,29,72,0.8)] origin-bottom-right tracking-wide w-max max-w-[200px] whitespace-normal break-words text-center">
                  {studioQuotes.trump}
-                 <div className="absolute -bottom-1.5 right-6 w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[6px] border-t-white"></div>
+                 <div className="absolute -bottom-2 right-6 w-0 h-0 border-l-[8px] border-l-transparent border-r-[8px] border-r-transparent border-t-[8px] border-t-white"></div>
               </div>
               <div className="relative w-full transition-all duration-300 group-hover:-translate-y-2 group-active:-translate-y-2 group-focus:-translate-y-2 group-hover:rotate-6 group-active:rotate-6 group-hover:scale-110 group-active:scale-110">
                  <div className="absolute inset-0 bg-red-600 rounded-full blur-xl opacity-0 group-hover:opacity-80 group-active:opacity-80 group-focus:opacity-80 transition-opacity duration-300 scale-125"></div>
@@ -1930,30 +1893,26 @@ export default function Dashboard({ userId, userName, setActiveTab, setPredictio
               </div>
             </div>
 
-            {/* קנדי - כיוון עדין: translate-y-0 שם אותו בדיוק באמצע */}
-            <div className="relative group w-[28%] flex flex-col items-center translate-y-[-10%]" tabIndex={0}>
-               <div className="speech-bubble absolute bottom-full mb-3 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 group-active:opacity-100 group-focus:opacity-100 transition-all z-50 pointer-events-none scale-90 group-hover:scale-100 bg-slate-900 text-blue-400 font-black text-[10px] sm:text-xs border border-blue-500/30 whitespace-nowrap px-3 py-1.5 rounded-xl shadow-lg">
+            <div className="relative group w-[28%] flex flex-col items-center -translate-y-[10%]" tabIndex={0}>
+               <div className="speech-bubble absolute bottom-full mb-6 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 group-active:opacity-100 group-focus:opacity-100 transition-all z-50 pointer-events-none scale-90 group-hover:scale-100 bg-slate-900 text-blue-50 font-bold text-sm border-2 border-blue-500/80 px-4 py-2.5 rounded-xl shadow-[0_5px_15px_rgba(59,130,246,0.3)] tracking-wide w-max max-w-[200px] whitespace-normal break-words text-center">
                  {studioQuotes.canadian}
-                 <div className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[6px] border-t-blue-500/50"></div>
+                 <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-0 h-0 border-l-[8px] border-l-transparent border-r-[8px] border-r-transparent border-t-[8px] border-t-blue-500/80"></div>
                </div>
                <img src="/candianIcon-removebg.png" className="relative z-10 w-full object-contain group-hover:-translate-y-2 group-active:-translate-y-2 group-focus:-translate-y-2 transition-transform drop-shadow-xl" />
             </div>
 
-            {/* מקסיקני - כיוון עדין: -translate-y-[5%] מרים אותו טיפ-טיפה למעלה ביחס לאחרים */}
-            <div className="relative group w-[28%] flex flex-col items-center -translate-y-[15%]" tabIndex={0}>
-               <div className="speech-bubble absolute bottom-full mb-3 left-0 opacity-0 group-hover:opacity-100 group-active:opacity-100 group-focus:opacity-100 transition-all z-50 pointer-events-none scale-90 group-hover:scale-100 group-active:scale-100 bg-slate-900 text-emerald-400 font-black text-[10px] sm:text-xs border border-emerald-500/30 whitespace-nowrap px-3 py-1.5 rounded-xl shadow-lg origin-bottom-left">
+            <div className="relative group w-[28%] flex flex-col items-center -translate-y-[12%]" tabIndex={0}>
+               <div className="speech-bubble absolute bottom-full mb-6 left-0 opacity-0 group-hover:opacity-100 group-active:opacity-100 group-focus:opacity-100 transition-all z-50 pointer-events-none scale-90 group-hover:scale-100 group-active:scale-100 bg-slate-900 text-emerald-50 font-bold text-sm border-2 border-emerald-500/80 px-4 py-2.5 rounded-xl shadow-[0_5px_15px_rgba(16,185,129,0.3)] origin-bottom-left tracking-wide w-max max-w-[200px] whitespace-normal break-words text-center">
                  {studioQuotes.mexican}
-                 <div className="absolute -bottom-1.5 left-6 w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[6px] border-t-emerald-500/50"></div>
+                 <div className="absolute -bottom-2 left-6 w-0 h-0 border-l-[8px] border-l-transparent border-r-[8px] border-r-transparent border-t-[8px] border-t-emerald-500/80"></div>
                </div>
                <img src="/maxicanIcon-removebg.png" className="relative z-10 w-full object-contain -scale-x-100 group-hover:-translate-y-2 group-active:-translate-y-2 group-focus:-translate-y-2 group-hover:-rotate-6 group-active:-rotate-6 transition-transform origin-bottom drop-shadow-xl" />
             </div>
           </div>
 
-          {/* השולחן */}
           <img src="/panel-removebg.png" className="relative z-20 w-[110%] max-w-[110%] -ml-[5%] pointer-events-none drop-shadow-[0_-5px_15px_rgba(0,0,0,0.7)]" />
         </div>
       </div>
-      {/* --- סעיף 4: הוספת המודאל של ה-Wrapped --- */}
       {showWrappedModal && (
         <WrappedModal 
           onClose={() => setShowWrappedModal(false)}
@@ -1963,7 +1922,6 @@ export default function Dashboard({ userId, userName, setActiveTab, setPredictio
           nemesisData={nemesisData}
         />
       )}
-      {/* ----------------------------------------- */}
     </div>
   );
 }
