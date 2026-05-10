@@ -22,6 +22,43 @@ const parseDateTimeLocal = (dtStr: string) => {
   } catch { return 0; }
 };
 
+const AnimatedNumber = ({ value, prefix = "" }: { value: number, prefix?: string }) => {
+  const [current, setCurrent] = useState(0);
+
+  useEffect(() => {
+    const finalValue = Number(value) || 0;
+    if (finalValue === 0) {
+      setCurrent(0);
+      return;
+    }
+    
+    let start: number | null = null;
+    const duration = 2000; // זמן האנימציה - 2 שניות (אפשר לשנות)
+    let animationFrameId: number;
+
+    const step = (timestamp: number) => {
+      if (!start) start = timestamp;
+      const progress = Math.min((timestamp - start) / duration, 1);
+      
+      // נוסחת Ease-Out (מתחיל מהר, מאט בסוף)
+      const easeOut = progress === 1 ? 1 : 1 - Math.pow(2, -10 * progress);
+      
+      setCurrent(Math.floor(easeOut * finalValue));
+      
+      if (progress < 1) {
+        animationFrameId = window.requestAnimationFrame(step);
+      } else {
+        setCurrent(finalValue);
+      }
+    };
+    
+    animationFrameId = window.requestAnimationFrame(step);
+    
+    return () => window.cancelAnimationFrame(animationFrameId); // ניקוי זיכרון חשוב!
+  }, [value]);
+
+  return <>{prefix}{current.toLocaleString()}</>; // הוספנו toLocaleString כדי שיהיו פסיקים באלפים!
+};
 const isMatchInCurrentActivePhase = (m: any, state: number) => {
   const s = Number(state) || 0;
   if (m.stage !== "KNOCKOUT") {
@@ -900,71 +937,72 @@ const renderedMagazineContent = useMemo(() => {
         .animate-carousel-3 { animation: fade3 15s infinite ease-in-out; }
       `}} />
 
-      <div className="hidden xl:block fixed bottom-0 left-10 z-40 w-[550px] pointer-events-none">
+        <div className="hidden 2xl:block fixed bottom-0 left-4 z-40 w-[380px] pointer-events-none origin-bottom-left">
 
-         <div className="absolute bottom-[82%] left-1/2 -translate-x-1/2 w-[500px] bg-slate-950 border-[6px] border-slate-800 rounded-3xl shadow-[0_25px_50px_rgba(0,0,0,0.8),0_0_30px_rgba(59,130,246,0.2)] pointer-events-auto overflow-hidden flex flex-col z-0 transition-transform duration-500 hover:scale-[1.02]">
-            
-            <div className="bg-slate-900 border-b border-slate-800 px-5 py-2.5 flex justify-between items-center z-10 relative shadow-md">
-               <div className="flex items-center gap-2.5">
-                  <div className="w-3 h-3 rounded-full bg-rose-500 animate-pulse shadow-[0_0_10px_rgba(244,63,94,0.8)]"></div>
-                  <span className="text-rose-500 font-black text-xs tracking-widest uppercase drop-shadow-md">LIVE GALLERY</span>
+         {/* המסך טלוויזיה */}
+         <div className="absolute bottom-[80%] left-1/2 -translate-x-1/2 w-[90%] bg-slate-950 border-[4px] border-slate-800 rounded-3xl shadow-[0_25px_50px_rgba(0,0,0,0.8),0_0_30px_rgba(59,130,246,0.2)] pointer-events-auto overflow-hidden flex flex-col z-0 transition-transform duration-500 hover:scale-[1.02]">
+            <div className="bg-slate-900 border-b border-slate-800 px-4 py-2 flex justify-between items-center z-10 relative shadow-md">
+               <div className="flex items-center gap-2">
+                  <div className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-pulse shadow-[0_0_10px_rgba(244,63,94,0.8)]"></div>
+                  <span className="text-rose-500 font-black text-[10px] tracking-widest uppercase drop-shadow-md">LIVE BROADCAST</span>
                </div>
-               <div className="flex gap-1.5">
-                  <div className="w-2.5 h-2.5 rounded-full bg-slate-700"></div>
-                  <div className="w-2.5 h-2.5 rounded-full bg-slate-700"></div>
+               <div className="flex gap-1">
+                  <div className="w-2 h-2 rounded-full bg-slate-700"></div>
+                  <div className="w-2 h-2 rounded-full bg-slate-700"></div>
                </div>
             </div>
-
             <div className="relative aspect-video bg-black overflow-hidden">
                 <img src="/usa-bg.jpg" className="absolute inset-0 w-full h-full object-cover animate-carousel-1" alt="USA" />
                 <img src="/canada-bg.jpg" className="absolute inset-0 w-full h-full object-cover animate-carousel-2 opacity-0" alt="Canada" />
                 <img src="/mexico-bg.jpg" className="absolute inset-0 w-full h-full object-cover animate-carousel-3 opacity-0" alt="Mexico" />
-
                 <div className="absolute inset-0 bg-gradient-to-tr from-white/10 via-transparent to-transparent pointer-events-none z-10"></div>
-                
-                <div className="absolute bottom-4 left-4 bg-black/80 backdrop-blur-md px-4 py-1.5 rounded-xl border border-white/20 text-xs text-amber-400 font-black z-20 uppercase tracking-widest shadow-lg drop-shadow-md">
+                <div className="absolute bottom-3 left-3 bg-black/80 backdrop-blur-md px-3 py-1 rounded-lg border border-white/20 text-[10px] text-amber-400 font-black z-20 uppercase tracking-widest shadow-lg drop-shadow-md">
                     Host Nations 2026
                 </div>
             </div>
          </div>
 
-         <div className="absolute bottom-[40%] left-0 w-full flex justify-center items-end gap-12 z-10 px-8 pointer-events-auto">
+         {/* הדמויות והבועות */}
+         <div className="absolute bottom-[40%] left-0 w-full flex justify-center items-end gap-3 z-10 px-2 pointer-events-auto">
           
-            <div className="relative group cursor-pointer pb-3 z-30">
-               <div className="absolute -top-16 -left-20 opacity-0 group-hover:opacity-100 transition-all duration-300 z-50 pointer-events-none origin-bottom-right scale-90 group-hover:scale-100">
-                  <div className="bg-rose-700 text-white font-bold text-base px-5 py-3 rounded-2xl border-2 border-white shadow-[0_0_25px_rgba(225,29,72,0.9)] whitespace-nowrap tracking-wide">
+            {/* Trump */}
+            <div className="relative group cursor-pointer pb-2 z-30 shrink-0">
+               <div className="absolute bottom-full mb-2 -right-2 opacity-0 group-hover:opacity-100 transition-all duration-300 z-50 pointer-events-none origin-bottom-right scale-90 group-hover:scale-100 w-max max-w-[180px]">
+                  <div className="bg-rose-700 text-white font-bold text-xs px-3 py-2 rounded-xl border-2 border-white shadow-[0_0_20px_rgba(225,29,72,0.9)] whitespace-normal break-words text-center leading-snug">
                      {studioQuotes.trump}
-                     <div className="absolute -bottom-2.5 right-8 w-0 h-0 border-l-[10px] border-l-transparent border-r-[10px] border-r-transparent border-t-[10px] border-t-white"></div>
+                     <div className="absolute -bottom-2 right-4 w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[6px] border-t-white"></div>
                   </div>
                </div>
-
-               <div className="relative transition-all duration-300 group-hover:-translate-y-6 group-hover:rotate-6 group-hover:scale-110">
-                 <img src="/donaldIcon-removebg.png" alt="Trump" className="w-32 object-contain transition-all duration-300 group-hover:animate-rage filter group-hover:drop-shadow-[0_0_25px_rgba(225,29,72,1)] group-hover:contrast-[1.15]" />
+               <div className="relative transition-all duration-300 group-hover:-translate-y-4 group-hover:rotate-6 group-hover:scale-110">
+                 <img src="/donaldIcon-removebg.png" alt="Trump" className="w-24 object-contain transition-all duration-300 group-hover:animate-rage filter group-hover:drop-shadow-[0_0_20px_rgba(225,29,72,1)] group-hover:contrast-[1.15]" />
                </div>
             </div>
 
-            <div className="relative group cursor-pointer pb-5 z-20">
-               <div className="absolute -top-16 -left-12 opacity-0 group-hover:opacity-100 transition-all duration-300 z-50 pointer-events-none origin-bottom scale-90 group-hover:scale-100">
-                  <div className="bg-slate-900 text-blue-50 font-bold text-base px-5 py-3 rounded-2xl border-2 border-blue-500 shadow-[0_10px_25px_rgba(59,130,246,0.4)] whitespace-nowrap tracking-wide">
+            {/* Canadian */}
+            <div className="relative group cursor-pointer pb-4 z-20 shrink-0">
+               <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-all duration-300 z-50 pointer-events-none origin-bottom scale-90 group-hover:scale-100 w-max max-w-[180px]">
+                  <div className="bg-slate-900 text-blue-50 font-bold text-xs px-3 py-2 rounded-xl border-2 border-blue-500 shadow-[0_8px_20px_rgba(59,130,246,0.4)] whitespace-normal break-words text-center leading-snug">
                      {studioQuotes.canadian}
-                     <div className="absolute -bottom-2.5 left-1/2 -translate-x-1/2 w-0 h-0 border-l-[10px] border-l-transparent border-r-[10px] border-r-transparent border-t-[10px] border-t-blue-500"></div>
+                     <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[6px] border-t-blue-500"></div>
                   </div>
                </div>
-               <img src="/candianIcon-removebg.png" alt="Canadian" className="w-32 object-contain drop-shadow-2xl transition-all duration-300 group-hover:-translate-y-6 group-hover:scale-110" />
+               <img src="/candianIcon-removebg.png" alt="Canadian" className="w-24 object-contain drop-shadow-xl transition-all duration-300 group-hover:-translate-y-4 group-hover:scale-110" />
             </div>
 
-            <div className="relative group cursor-pointer pb-7 z-10">
-               <div className="absolute -top-16 -right-20 opacity-0 group-hover:opacity-100 transition-all duration-300 z-50 pointer-events-none origin-bottom-right scale-90 group-hover:scale-100">
-                  <div className="bg-slate-900 text-emerald-50 font-bold text-base px-5 py-3 rounded-2xl border-2 border-emerald-500 shadow-[0_10px_25px_rgba(16,185,129,0.4)] whitespace-nowrap tracking-wide">
+            {/* Mexican */}
+            <div className="relative group cursor-pointer pb-6 z-10 shrink-0">
+               <div className="absolute bottom-full mb-2 -left-2 opacity-0 group-hover:opacity-100 transition-all duration-300 z-50 pointer-events-none origin-bottom-left scale-90 group-hover:scale-100 w-max max-w-[180px]">
+                  <div className="bg-slate-900 text-emerald-50 font-bold text-xs px-3 py-2 rounded-xl border-2 border-emerald-500 shadow-[0_8px_20px_rgba(16,185,129,0.4)] whitespace-normal break-words text-center leading-snug">
                      {studioQuotes.mexican}
-                     <div className="absolute -bottom-2.5 left-6 w-0 h-0 border-l-[10px] border-l-transparent border-r-[10px] border-r-transparent border-t-[10px] border-t-emerald-500"></div>
+                     <div className="absolute -bottom-2 left-4 w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[6px] border-t-emerald-500"></div>
                   </div>
                </div>
-               <img src="/maxicanIcon-removebg.png" alt="Mexican" className="w-32 object-contain drop-shadow-2xl -scale-x-100 transition-all duration-300 group-hover:-translate-y-5 group-hover:-rotate-6 group-hover:scale-110 origin-bottom" />
+               <img src="/maxicanIcon-removebg.png" alt="Mexican" className="w-24 object-contain drop-shadow-xl -scale-x-100 transition-all duration-300 group-hover:-translate-y-4 group-hover:-rotate-6 group-hover:scale-110 origin-bottom" />
             </div>
          </div>
 
-         <img src="/panel-removebg.png" alt="Studio Desk" className="relative z-20 w-full object-contain drop-shadow-[0_-10px_30px_rgba(0,0,0,0.8)] pointer-events-none" />
+         {/* שולחן האולפן */}
+         <img src="/panel-removebg.png" alt="Studio Desk" className="relative z-20 w-full object-contain drop-shadow-[0_-8px_20px_rgba(0,0,0,0.8)] pointer-events-none" />
       </div>
 
 
@@ -1014,8 +1052,7 @@ const renderedMagazineContent = useMemo(() => {
 
       <div className="flex md:grid md:grid-cols-2 items-stretch overflow-x-auto snap-x snap-mandatory md:overflow-visible gap-4 md:gap-8 pb-4 md:pb-0 custom-scrollbar -mx-4 px-4 md:mx-0 md:px-0">
          
-         <div className="w-[90%] md:w-auto shrink-0 snap-center rounded-3xl p-6 shadow-2xl relative overflow-hidden bg-slate-900 border border-slate-700 flex flex-col min-h-full">
-            <img src="tunnel.png" alt="Bets in Prod Tunnel" className="absolute inset-0 w-full h-full object-cover z-0 opacity-40 transition-all duration-1000 pointer-events-none" />
+        <div className="w-[90%] md:w-auto shrink-0 snap-center rounded-3xl p-6 shadow-2xl relative overflow-hidden bg-slate-900 border border-slate-700 flex flex-col min-h-full min-w-0">            <img src="tunnel.png" alt="Bets in Prod Tunnel" className="absolute inset-0 w-full h-full object-cover z-0 opacity-40 transition-all duration-1000 pointer-events-none" />
             <div className="absolute inset-0 z-0 bg-gradient-to-l from-slate-950/90 via-slate-900/60 to-slate-950/90 pointer-events-none"></div>
             
             <div className="relative z-10 text-right mb-6">
@@ -1042,105 +1079,190 @@ const renderedMagazineContent = useMemo(() => {
   </button>
 )}
 
-            <div className={`grid gap-3 relative z-10 w-full mb-6 ${tournamentState >= 4 ? 'grid-cols-2' : 'grid-cols-1'}`}>
-              <div 
-                  onClick={() => {
-                     sessionStorage.setItem("targetBoard", "GENERAL");
-                     setActiveTab("LEADERBOARD");
-                  }}
-                  className="bg-gradient-to-br from-amber-500/20 to-amber-900/40 backdrop-blur-md p-3 rounded-2xl border border-amber-500/50 text-center shadow-[0_0_20px_rgba(245,158,11,0.15)] cursor-pointer hover:border-amber-400 hover:scale-[1.02] transition-all group relative flex flex-col justify-between"
-               >
-                  <div className="absolute top-0 left-1/2 -translate-x-1/2 w-24 h-24 bg-amber-400/20 rounded-full blur-2xl pointer-events-none z-0"></div>
-
-                  {ptsDiff > 0 && <div className="absolute -top-3 left-1/2 -translate-x-1/2 text-[10px] font-black text-white bg-gradient-to-r from-blue-600 to-blue-400 px-2 py-0.5 rounded-lg border border-blue-300 shadow-lg transform rotate-3 animate-pulse whitespace-nowrap z-20">+{ptsDiff} היום!</div>}
-                  
-                  <div className="text-amber-200/70 text-[10px] font-black uppercase mb-3 relative z-10 transition-colors">דירוג כללי</div>
-                  
-                  <div className="flex justify-around items-center mb-3 px-4 relative z-10">
-                     <div className="flex flex-col items-center">
-                        <span className="text-2xl md:text-3xl font-black text-amber-400 drop-shadow-[0_0_15px_rgba(251,191,36,0.8)] leading-none">{userStats.points}</span>
-                        <span className="text-[9px] text-amber-200/60 font-bold mt-1.5">נקודות</span>
-                     </div>
-                     <div className="w-px h-8 bg-amber-500/30"></div>
-                     <div className="flex flex-col items-center">
-                        <span className="text-2xl md:text-3xl font-black text-amber-400 drop-shadow-[0_0_15px_rgba(251,191,36,0.8)] leading-none">{userStats.rank > 0 ? userStats.rank : "-"}</span>
-                        <span className="text-[9px] text-amber-200/60 font-bold mt-1.5">מיקום</span>
-                     </div>
-                  </div>
-                  
-                  <div className="mt-auto flex justify-center items-center min-h-[22px] relative z-10">
-                    {rankDiff > 0 && <span className="text-[9px] font-bold text-emerald-400 bg-emerald-950/80 px-2 py-0.5 rounded border border-emerald-500/30">▲ עלית {rankDiff}</span>}
-                    {rankDiff < 0 && <span className="text-[9px] font-bold text-rose-400 bg-rose-950/80 px-2 py-0.5 rounded border border-rose-500/30">▼ ירדת {Math.abs(rankDiff)}</span>}
-                    {rankDiff === 0 && <span className="text-[9px] font-bold text-amber-200/80 bg-amber-900/40 px-2 py-0.5 rounded border border-amber-500/40 shadow-sm">- ללא שינוי</span>}
-                  </div>
-               </div>
-               
-               {tournamentState >= 4 && (
-                  <div 
-                     onClick={() => {
-                        sessionStorage.setItem("targetBoard", "KNOCKOUT");
-                        setActiveTab("LEADERBOARD");
-                     }}
-                     className="bg-emerald-900/20 backdrop-blur-md p-3 rounded-2xl border border-emerald-500/30 text-center shadow-xl cursor-pointer hover:bg-emerald-900/40 hover:border-emerald-400 hover:scale-[1.02] transition-all group relative flex flex-col justify-between"
-                  >
-                     <div className="text-emerald-500 text-[10px] font-black uppercase mb-3 group-hover:text-emerald-300 transition-colors">דירוג נוקאאוט</div>
+{tournamentState === 0 ? (
+               /* --- מצב 0: כרטיס טיסה VIP ממוקד --- */
+               <div className="relative z-10 w-full mb-8 group">
+                  <div className={`bg-gradient-to-br ${userStats.hasPaid ? 'from-emerald-900/40 via-slate-900 to-emerald-900/20 border-emerald-500/40' : 'from-slate-900 via-blue-950 to-slate-900 border-blue-500/30'} rounded-3xl border shadow-2xl overflow-hidden relative transition-all duration-500`}>
                      
-                     <div className="flex justify-around items-center mb-3 px-4">
-                        <div className="flex flex-col items-center">
-                           <span className="text-2xl md:text-3xl font-black text-emerald-400 drop-shadow-[0_0_15px_rgba(16,185,129,0.8)] leading-none">{userStats.koPoints}</span>
-                           <span className="text-[9px] text-emerald-400/70 font-bold mt-1.5">נקודות</span>
+                     {/* אפקט גזירה/כרטיס משומש במידה ושילם */}
+                     {userStats.hasPaid && (
+                        <div className="absolute -top-10 -right-10 w-40 h-40 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none"></div>
+                     )}
+
+                     {/* פס עליון */}
+                     <div className={`absolute top-0 left-0 w-full h-2 ${userStats.hasPaid ? 'bg-emerald-500' : 'bg-blue-500'}`}></div>
+                     
+                     <div className="p-8 md:p-10 relative">
+                        
+                        {/* חותמת שולם (מוצגת רק אם hasPaid === true) */}
+                        {userStats.hasPaid && (
+                           <div className="absolute top-12 left-8 md:left-12 transform -rotate-12 z-20 pointer-events-none animate-fade-in">
+                              <div className="border-4 border-emerald-500/60 text-emerald-500/60 font-black text-2xl md:text-4xl px-4 py-2 rounded-xl uppercase tracking-tighter shadow-lg">
+                                 VALIDATED
+                              </div>
+                           </div>
+                        )}
+
+                        <div className="flex justify-between items-center mb-10 border-b border-slate-700/50 pb-8 border-dashed">
+                           <div className="text-right">
+                              <h2 className="text-4xl md:text-6xl font-black text-white tracking-tighter mb-2">
+                                 BETTING PASS
+                              </h2>
+                              <div className="flex items-center gap-3 text-blue-400 font-bold text-lg md:text-xl">
+                                 <span className="line-through opacity-50 decoration-rose-500 decoration-2">EXCEL</span>
+                                 <span>✈️</span>
+                                 <span className="text-emerald-400 animate-pulse">WORLD CUP 2026</span>
+                              </div>
+                           </div>
+                           <div className="hidden sm:block text-6xl opacity-20">⚽</div>
                         </div>
-                        <div className="w-px h-8 bg-emerald-500/30"></div>
-                        <div className="flex flex-col items-center">
-                           <span className="text-2xl md:text-3xl font-black text-emerald-400 drop-shadow-[0_0_15px_rgba(16,185,129,0.8)] leading-none">{userStats.koRank > 0 ? userStats.koRank : "-"}</span>
-                           <span className="text-[9px] text-emerald-400/70 font-bold mt-1.5">מיקום</span>
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-10">
+                           <div>
+                              <div className="text-xs text-slate-500 uppercase font-black tracking-widest mb-2">PASSENGER NAME</div>
+                              <div className="text-3xl font-black text-white">{safeUserName}</div>
+                           </div>
+                           <div className="md:text-left">
+                              <div className="text-xs text-slate-500 uppercase font-black tracking-widest mb-2">REGISTRATION STATUS</div>
+                              {userStats.hasPaid ? (
+                                 <div className="text-2xl font-black text-emerald-400 flex md:justify-end items-center gap-2">
+                                    מאושר לטיסה ✅
+                                 </div>
+                              ) : (
+                                 <div className="flex flex-col md:items-end">
+                                    <div className="text-2xl font-black text-rose-500 mb-1">ממתין להסדר ⚠️</div>
+                                    <div className="text-sm font-bold text-slate-400">צרו קשר: 052-5583098</div>
+                                 </div>
+                              )}
+                           </div>
+                        </div>
+
+                        {/* שורת המשימה התחתונה */}
+                        <div className="bg-slate-950/80 rounded-2xl p-6 border border-slate-800 text-center relative overflow-hidden group-hover:border-blue-500/50 transition-colors">
+                           <div className="absolute inset-0 bg-blue-500/5 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                           <p className="text-lg md:text-xl text-slate-200 font-bold relative z-10 leading-relaxed">
+                              כל שנותר זה להגיע ל-<span className="text-blue-400 font-black text-2xl">100%</span> במד למעלה <br className="hidden md:block" /> באמצעות מילוי הניחושים. המראה בקרוב!
+                           </p>
+                        </div>
+
+                        {/* ברקוד מעוצב רחב */}
+                        <div className="mt-10 flex justify-center items-center gap-1.5 opacity-30 grayscale">
+                           {[...Array(30)].map((_, i) => (
+                              <div key={i} className={`bg-white h-12 ${i % 4 === 0 ? 'w-2' : i % 7 === 0 ? 'w-3' : 'w-0.5'}`}></div>
+                           ))}
                         </div>
                      </div>
 
-                     <div className="mt-auto flex justify-center items-center min-h-[22px]">
-                        {koRankDiff > 0 && <span className="text-[9px] font-bold text-emerald-400 bg-emerald-950/80 px-2 py-0.5 rounded border border-emerald-500/30">▲ עלית {koRankDiff}</span>}
-                        {koRankDiff < 0 && <span className="text-[9px] font-bold text-rose-400 bg-rose-950/80 px-2 py-0.5 rounded border border-rose-500/30">▼ ירדת {Math.abs(koRankDiff)}</span>}
-                        {koRankDiff === 0 && <span className="text-[9px] font-bold text-emerald-200 bg-emerald-800/50 px-2 py-0.5 rounded border border-emerald-500/30">🏆 שלב ההכרעות</span>}
-                     </div>
+                     {/* אפקט "חור" בכרטיס (Ticket Punch) אם שולם */}
+                     {userStats.hasPaid && (
+                        <div className="absolute top-1/2 -right-6 w-12 h-12 bg-slate-950 rounded-full border border-emerald-500/30 z-30"></div>
+                     )}
                   </div>
-               )}
-            </div>
-
-            <div className={`grid gap-3 relative z-10 w-full mb-5 ${tournamentState >= 4 ? 'grid-cols-2' : 'grid-cols-1'}`}>
-               <div 
-                  onClick={() => {
-                     sessionStorage.setItem("targetBoard", "GENERAL");
-                     setActiveTab("LEADERBOARD");
-                  }}
-                  className="bg-gradient-to-br from-amber-500/20 to-amber-900/40 p-4 rounded-2xl border border-amber-500/50 shadow-[0_0_20px_rgba(245,158,11,0.15)] relative overflow-hidden flex flex-col items-center justify-center text-center gap-1 cursor-pointer hover:scale-[1.02] hover:border-amber-400 transition-all"
-               >
-                  <div className="absolute top-0 left-1/2 -translate-x-1/2 w-24 h-24 bg-amber-400/20 rounded-full blur-2xl pointer-events-none"></div>
-                  <div className="text-3xl md:text-4xl drop-shadow-[0_0_15px_rgba(251,191,36,0.8)] relative z-10 mb-1 animate-pulse">⚽</div>
-                  <span className="text-[10px] text-amber-200/70 font-black uppercase tracking-widest relative z-10 leading-tight">כדור הזהב <br/>(מקום 1)</span>
-                  <span className="text-base md:text-lg font-black text-amber-400 relative z-10 w-full px-2 mt-1 leading-none">
-                     <span className="block truncate">{currentLeader}</span>
-                     <span className="block text-[11px] md:text-xs text-amber-200/60 font-normal mt-1">({allUsersList.sort((a,b)=>(b.totalPoints||0)-(a.totalPoints||0))[0]?.totalPoints || 0} נק')</span>
-                  </span>
                </div>
+            ) : (
+               /* --- מצב 1 ומעלה: קוביות הדירוג הרגילות (הקוד המקורי שלך) --- */
+               <>
+                  <div className={`grid gap-3 relative z-10 w-full mb-6 ${tournamentState >= 4 ? 'grid-cols-2' : 'grid-cols-1'}`}>
+                    <div 
+                        onClick={() => {
+                           sessionStorage.setItem("targetBoard", "GENERAL");
+                           setActiveTab("LEADERBOARD");
+                        }}
+                        className="bg-gradient-to-br from-amber-500/20 to-amber-900/40 backdrop-blur-md p-3 rounded-2xl border border-amber-500/50 text-center shadow-[0_0_20px_rgba(245,158,11,0.15)] cursor-pointer hover:border-amber-400 hover:scale-[1.02] transition-all group relative flex flex-col justify-between"
+                     >
+                        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-24 h-24 bg-amber-400/20 rounded-full blur-2xl pointer-events-none z-0"></div>
 
-               {tournamentState >= 4 && (
-                 <div 
-                    onClick={() => {
-                       sessionStorage.setItem("targetBoard", "KNOCKOUT");
-                       setActiveTab("LEADERBOARD");
-                    }}
-                    className="bg-gradient-to-br from-emerald-500/20 to-emerald-900/40 p-4 rounded-2xl border border-emerald-500/50 shadow-[0_0_20px_rgba(16,185,129,0.15)] relative overflow-hidden flex flex-col items-center justify-center text-center gap-1 cursor-pointer hover:scale-[1.02] hover:border-emerald-400 transition-all"
-                 >
-                    <div className="absolute top-0 left-1/2 -translate-x-1/2 w-24 h-24 bg-emerald-400/20 rounded-full blur-2xl pointer-events-none"></div>
-                    <div className="text-3xl md:text-4xl drop-shadow-[0_0_15px_rgba(16,185,129,0.8)] relative z-10 mb-1 animate-pulse">👟</div>
-                    <span className="text-[10px] text-emerald-200/70 font-black uppercase tracking-widest relative z-10 leading-tight">נעל הזהב <br/>(נוקאאוט)</span>
-                    <span className="text-base md:text-lg font-black text-emerald-400 relative z-10 w-full px-2 mt-1 leading-none">
-                       <span className="block truncate">{currentKoLeader}</span>
-                       <span className="block text-[11px] md:text-xs text-emerald-200/60 font-normal mt-1">({allUsersList.sort((a,b)=>(b.knockoutPoints||0)-(a.knockoutPoints||0))[0]?.knockoutPoints || 0} נק')</span>
-                    </span>
-                 </div>
-               )}
-            </div>
+                        {ptsDiff > 0 && <div className="absolute -top-3 left-1/2 -translate-x-1/2 text-[10px] font-black text-white bg-gradient-to-r from-blue-600 to-blue-400 px-2 py-0.5 rounded-lg border border-blue-300 shadow-lg transform rotate-3 animate-pulse whitespace-nowrap z-20">+{ptsDiff} היום!</div>}
+                        
+                        <div className="text-amber-200/70 text-[10px] font-black uppercase mb-3 relative z-10 transition-colors">דירוג כללי</div>
+                        
+                        <div className="flex justify-around items-center mb-3 px-4 relative z-10">
+                           <div className="flex flex-col items-center">
+                              <span className="text-2xl md:text-3xl font-black text-amber-400 drop-shadow-[0_0_15px_rgba(251,191,36,0.8)] leading-none">{userStats.points}</span>
+                              <span className="text-[9px] text-amber-200/60 font-bold mt-1.5">נקודות</span>
+                           </div>
+                           <div className="w-px h-8 bg-amber-500/30"></div>
+                           <div className="flex flex-col items-center">
+                              <span className="text-2xl md:text-3xl font-black text-amber-400 drop-shadow-[0_0_15px_rgba(251,191,36,0.8)] leading-none">{userStats.rank > 0 ? userStats.rank : "-"}</span>
+                              <span className="text-[9px] text-amber-200/60 font-bold mt-1.5">מיקום</span>
+                           </div>
+                        </div>
+                        
+                        <div className="mt-auto flex justify-center items-center min-h-[22px] relative z-10">
+                          {rankDiff > 0 && <span className="text-[9px] font-bold text-emerald-400 bg-emerald-950/80 px-2 py-0.5 rounded border border-emerald-500/30">▲ עלית {rankDiff}</span>}
+                          {rankDiff < 0 && <span className="text-[9px] font-bold text-rose-400 bg-rose-950/80 px-2 py-0.5 rounded border border-rose-500/30">▼ ירדת {Math.abs(rankDiff)}</span>}
+                          {rankDiff === 0 && <span className="text-[9px] font-bold text-amber-200/80 bg-amber-900/40 px-2 py-0.5 rounded border border-amber-500/40 shadow-sm">- ללא שינוי</span>}
+                        </div>
+                     </div>
+                     
+                     {tournamentState >= 4 && (
+                        <div 
+                           onClick={() => {
+                              sessionStorage.setItem("targetBoard", "KNOCKOUT");
+                              setActiveTab("LEADERBOARD");
+                           }}
+                           className="bg-emerald-900/20 backdrop-blur-md p-3 rounded-2xl border border-emerald-500/30 text-center shadow-xl cursor-pointer hover:bg-emerald-900/40 hover:border-emerald-400 hover:scale-[1.02] transition-all group relative flex flex-col justify-between"
+                        >
+                           <div className="text-emerald-500 text-[10px] font-black uppercase mb-3 group-hover:text-emerald-300 transition-colors">דירוג נוקאאוט</div>
+                           
+                           <div className="flex justify-around items-center mb-3 px-4">
+                              <div className="flex flex-col items-center">
+                                 <span className="text-2xl md:text-3xl font-black text-emerald-400 drop-shadow-[0_0_15px_rgba(16,185,129,0.8)] leading-none">{userStats.koPoints}</span>
+                                 <span className="text-[9px] text-emerald-400/70 font-bold mt-1.5">נקודות</span>
+                              </div>
+                              <div className="w-px h-8 bg-emerald-500/30"></div>
+                              <div className="flex flex-col items-center">
+                                 <span className="text-2xl md:text-3xl font-black text-emerald-400 drop-shadow-[0_0_15px_rgba(16,185,129,0.8)] leading-none">{userStats.koRank > 0 ? userStats.koRank : "-"}</span>
+                                 <span className="text-[9px] text-emerald-400/70 font-bold mt-1.5">מיקום</span>
+                              </div>
+                           </div>
+
+                           <div className="mt-auto flex justify-center items-center min-h-[22px]">
+                              {koRankDiff > 0 && <span className="text-[9px] font-bold text-emerald-400 bg-emerald-950/80 px-2 py-0.5 rounded border border-emerald-500/30">▲ עלית {koRankDiff}</span>}
+                              {koRankDiff < 0 && <span className="text-[9px] font-bold text-rose-400 bg-rose-950/80 px-2 py-0.5 rounded border border-rose-500/30">▼ ירדת {Math.abs(koRankDiff)}</span>}
+                              {koRankDiff === 0 && <span className="text-[9px] font-bold text-emerald-200 bg-emerald-800/50 px-2 py-0.5 rounded border border-emerald-500/30">🏆 שלב ההכרעות</span>}
+                           </div>
+                        </div>
+                     )}
+                  </div>
+
+                  <div className={`grid gap-3 relative z-10 w-full mb-5 ${tournamentState >= 4 ? 'grid-cols-2' : 'grid-cols-1'}`}>
+                     <div 
+                        onClick={() => {
+                           sessionStorage.setItem("targetBoard", "GENERAL");
+                           setActiveTab("LEADERBOARD");
+                        }}
+                        className="bg-gradient-to-br from-amber-500/20 to-amber-900/40 p-4 rounded-2xl border border-amber-500/50 shadow-[0_0_20px_rgba(245,158,11,0.15)] relative overflow-hidden flex flex-col items-center justify-center text-center gap-1 cursor-pointer hover:scale-[1.02] hover:border-amber-400 transition-all"
+                     >
+                        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-24 h-24 bg-amber-400/20 rounded-full blur-2xl pointer-events-none"></div>
+                        <div className="text-3xl md:text-4xl drop-shadow-[0_0_15px_rgba(251,191,36,0.8)] relative z-10 mb-1 animate-pulse">⚽</div>
+                        <span className="text-[10px] text-amber-200/70 font-black uppercase tracking-widest relative z-10 leading-tight">כדור הזהב <br/>(מקום 1)</span>
+                        <span className="text-base md:text-lg font-black text-amber-400 relative z-10 w-full px-2 mt-1 leading-none">
+                           <span className="block truncate">{currentLeader}</span>
+                           <span className="block text-[11px] md:text-xs text-amber-200/60 font-normal mt-1">({allUsersList.sort((a,b)=>(b.totalPoints||0)-(a.totalPoints||0))[0]?.totalPoints || 0} נק')</span>
+                        </span>
+                     </div>
+
+                     {tournamentState >= 4 && (
+                       <div 
+                          onClick={() => {
+                             sessionStorage.setItem("targetBoard", "KNOCKOUT");
+                             setActiveTab("LEADERBOARD");
+                          }}
+                          className="bg-gradient-to-br from-emerald-500/20 to-emerald-900/40 p-4 rounded-2xl border border-emerald-500/50 shadow-[0_0_20px_rgba(16,185,129,0.15)] relative overflow-hidden flex flex-col items-center justify-center text-center gap-1 cursor-pointer hover:scale-[1.02] hover:border-emerald-400 transition-all"
+                       >
+                          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-24 h-24 bg-emerald-400/20 rounded-full blur-2xl pointer-events-none"></div>
+                          <div className="text-3xl md:text-4xl drop-shadow-[0_0_15px_rgba(16,185,129,0.8)] relative z-10 mb-1 animate-pulse">👟</div>
+                          <span className="text-[10px] text-emerald-200/70 font-black uppercase tracking-widest relative z-10 leading-tight">נעל הזהב <br/>(נוקאאוט)</span>
+                          <span className="text-base md:text-lg font-black text-emerald-400 relative z-10 w-full px-2 mt-1 leading-none">
+                             <span className="block truncate">{currentKoLeader}</span>
+                             <span className="block text-[11px] md:text-xs text-emerald-200/60 font-normal mt-1">({allUsersList.sort((a,b)=>(b.knockoutPoints||0)-(a.knockoutPoints||0))[0]?.knockoutPoints || 0} נק')</span>
+                          </span>
+                       </div>
+                     )}
+                  </div>
+               </>
+            )}
 
             <div className="relative z-10 w-full mb-6">
                <div className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-2.5 px-1 flex items-center gap-1.5">
@@ -1248,19 +1370,19 @@ const renderedMagazineContent = useMemo(() => {
             </div>
 
             <div className="flex justify-between items-center gap-2 pt-2 border-t border-slate-700/50 relative z-10 text-center">
-              <div className="flex-1"><div className="text-[10px] text-slate-400 uppercase tracking-widest font-bold">קופת פרסים</div><div className="text-sm font-black text-emerald-400">₪{totalPrizesPool}</div></div>
+              <div className="flex-1"><div className="text-[10px] text-slate-400 uppercase tracking-widest font-bold">קופת פרסים</div><div className="text-sm font-black text-emerald-400"><AnimatedNumber value={totalPrizesPool} prefix="₪" /></div></div>
               <div className="w-px h-6 bg-slate-700/50"></div>
-              <div className="flex-1"><div className="text-[10px] text-slate-400 uppercase tracking-widest font-bold">משתתפים</div><div className="text-sm font-black text-emerald-400">{leaderboardInfo.totalUsers}</div></div>
+              <div className="flex-1"><div className="text-[10px] text-slate-400 uppercase tracking-widest font-bold">משתתפים</div><div className="text-sm font-black text-emerald-400"><AnimatedNumber value={leaderboardInfo.totalUsers} /></div></div>
               <div className="w-px h-6 bg-slate-700/50"></div>
-              <div className="flex-1"><div className="text-[10px] text-slate-400 uppercase tracking-widest font-bold">ממוצע קהל</div><div className="text-sm font-black text-emerald-400">{avgPoints}</div></div>
-            </div>
+              <div className="flex-1"><div className="text-[10px] text-slate-400 uppercase tracking-widest font-bold">ממוצע קהל</div><div className="text-sm font-black text-emerald-400"><AnimatedNumber value={avgPoints} /></div></div>
+            </div>  
          </div>
 
-         <div className="w-[90%] md:w-auto shrink-0 snap-center flex flex-col gap-4 md:gap-6 h-full">
-            <div 
-               onClick={() => setShowMagazineModal(true)}
-               className="bg-slate-900 rounded-3xl p-6 shadow-xl relative overflow-hidden border border-slate-700 group cursor-pointer flex flex-col hover:border-blue-500/50 transition-all duration-300 flex-1"
-            >
+            <div className="w-[90%] md:w-auto shrink-0 snap-center flex flex-col gap-4 md:gap-6 h-full min-w-0">            
+              <div 
+                  onClick={() => setShowMagazineModal(true)}
+                  className="bg-slate-900 rounded-3xl p-6 shadow-xl relative overflow-hidden border border-slate-700 group cursor-pointer flex flex-col hover:border-blue-500/50 transition-all duration-300 flex-1 min-w-0"      
+              >
                <div className="absolute inset-0 bg-gradient-to-br from-blue-900/20 to-emerald-900/10 z-0"></div>
                <div className="absolute -bottom-10 -left-10 text-9xl opacity-5 transform -rotate-12 pointer-events-none group-hover:scale-110 transition-transform duration-500">📰</div>
                <div className="absolute top-0 right-0 w-1.5 h-full bg-gradient-to-b from-blue-400 to-emerald-500"></div>
@@ -1277,16 +1399,16 @@ const renderedMagazineContent = useMemo(() => {
                      {dailyMediaUrl.match(/\.(jpeg|jpg|gif|png|webp)$/i) != null ? (
                         <img src={dailyMediaUrl} alt="Magazine Cover" className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-500" />
                      ) : (
-                        <video src={dailyMediaUrl} autoPlay loop muted playsInline className="w-full h-full object-contain opacity-80 group-hover:opacity-100 transition-opacity" />
+                      <video src={dailyMediaUrl} autoPlay loop muted playsInline className="w-full max-w-full h-full object-contain opacity-80 group-hover:opacity-100 transition-opacity" />
                      )}
                   </div>
                )}
 
-               <div className="relative z-10 flex-1 flex flex-col">
+               <div className="relative z-10 flex-1 flex flex-col min-w-0">
                   <h2 className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400 mb-2 shrink-0">המהדורה המרכזית</h2>
                   
                   <div 
-                     className="text-slate-300 text-sm font-medium leading-relaxed mb-6 line-clamp-5 flex-1 whitespace-pre-wrap [&_b]:text-amber-400 [&_strong]:text-amber-400 [&_mark]:px-1.5 [&_mark]:rounded [&_mark.yellow]:bg-amber-500/20 [&_mark.yellow]:text-amber-300 [&_mark.green]:bg-emerald-500/20 [&_mark.green]:text-emerald-300 [&_mark.red]:bg-rose-500/20 [&_mark.red]:text-rose-400 [&_a]:text-cyan-400 [&_a]:underline"
+                     className="text-slate-300 text-sm font-medium leading-relaxed mb-6 line-clamp-5 flex-1 whitespace-pre-wrap break-words [&_b]:text-amber-400 [&_strong]:text-amber-400 [&_mark]:px-1.5 [&_mark]:rounded [&_mark.yellow]:bg-amber-500/20 [&_mark.yellow]:text-amber-300 [&_mark.green]:bg-emerald-500/20 [&_mark.green]:text-emerald-300 [&_mark.red]:bg-rose-500/20 [&_mark.red]:text-rose-400 [&_a]:text-cyan-400 [&_a]:underline [&_video]:max-w-full [&_video]:max-h-[140px] [&_video]:object-contain [&_iframe]:max-w-full [&_iframe]:h-[140px] [&_img]:max-w-full [&_img]:max-h-[140px] [&_img]:object-contain"
                      dangerouslySetInnerHTML={{ __html: dailySubtext || "אין עדכונים מיוחדים הבוקר. שווה לעקוב במהלך היום!" }} 
                   />
                   
@@ -1295,31 +1417,75 @@ const renderedMagazineContent = useMemo(() => {
                   </button>
                </div>
             </div>
+{/* אולפן המובייל - עכשיו כחלק מהעמודה */}
+      <div className="xl:hidden w-full mt-4 bg-slate-950/40 rounded-3xl border border-slate-700/50 shadow-inner flex flex-col items-center pt-6 pb-2 overflow-hidden shrink-0">        
+        <div className="absolute top-0 right-0 w-full h-1 bg-gradient-to-r from-rose-400 via-amber-400 to-emerald-400"></div>
+        
+        <div className="mb-2 relative z-30 px-4 py-1.5 bg-slate-900/80 rounded-full border border-slate-700 text-white font-black text-[10px] flex items-center gap-2 shadow-md">
+          <span className="animate-pulse">🎙️</span> חברי הפאנל בלייב
+        </div>
 
-            <Link href="/matrix" className="w-full flex flex-col md:flex-row items-center justify-between bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 hover:from-blue-900/30 hover:to-slate-800 border-2 border-slate-700 hover:border-blue-500/50 p-5 md:p-6 rounded-3xl shadow-[0_10px_30px_rgba(0,0,0,0.4)] transition-all active:scale-[0.98] group relative overflow-hidden shrink-0">
-               <div className="absolute top-0 right-0 w-2 h-full bg-blue-500"></div>
-               <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0IiBoZWlnaHQ9IjQiPgo8cmVjdCB3aWR0aD0iNCIgaGVpZ2h0PSI0IiBmaWxsPSIjZmZmIiBmaWxsLW9wYWNpdHk9IjAuMSIvPgo8L3N2Zz4=')] opacity-20"></div>
-               
-               <div className="flex flex-col md:flex-row items-center gap-4 md:gap-6 relative z-10 w-full md:w-auto text-center md:text-right mb-4 md:mb-0">
-                  <div className="w-16 h-16 md:w-20 md:h-20 bg-slate-950 rounded-2xl flex items-center justify-center border border-slate-700 shadow-inner group-hover:scale-110 group-hover:border-blue-500/50 transition-all shrink-0">
-                     <span className="animate-eye-blink text-3xl md:text-4xl drop-shadow-lg">👁️</span>
-                  </div>
-                  <div className="flex flex-col">
-                     <span className="font-black text-white text-xl md:text-2xl mb-1 tracking-wide">טבלת הגילוי הנאות</span>
-                     <span className="text-xs md:text-sm text-slate-400 font-medium">מי ניחש מה? כנסו לראות.</span>
-                  </div>
+        <div className="relative w-full mt-32 sm:mt-40">
+          <div className="absolute bottom-[75%] left-1/2 -translate-x-1/2 w-[85%] bg-slate-950 border-[3px] border-slate-800 rounded-2xl shadow-[0_15px_30px_rgba(0,0,0,0.7)] pointer-events-auto overflow-hidden flex flex-col z-0">
+             <div className="bg-slate-900 border-b border-slate-800 px-3 py-1 flex justify-between items-center z-10 relative">
+                <div className="flex items-center gap-1.5">
+                   <div className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse"></div>
+                   <span className="text-rose-500 font-black text-[8px] tracking-widest uppercase">LIVE</span>
+                </div>
+                <div className="flex gap-1">
+                   <div className="w-1 h-1 rounded-full bg-slate-700"></div>
+                   <div className="w-1 h-1 rounded-full bg-slate-700"></div>
+                </div>
+             </div>
+             <div className="relative aspect-video bg-black overflow-hidden">
+                 <img src="/usa-bg.jpg" className="absolute inset-0 w-full h-full object-cover animate-carousel-1" alt="USA" />
+                 <img src="/canada-bg.jpg" className="absolute inset-0 w-full h-full object-cover animate-carousel-2 opacity-0" alt="Canada" />
+                 <img src="/mexico-bg.jpg" className="absolute inset-0 w-full h-full object-cover animate-carousel-3 opacity-0" alt="Mexico" />
+                 <div className="absolute inset-0 bg-gradient-to-tr from-white/10 via-transparent to-transparent pointer-events-none z-10"></div>
+             </div>
+          </div>
+
+          <div className="absolute bottom-[44%] left-0 w-full flex justify-center items-end gap-2 px-4 z-10 pointer-events-auto">
+            
+            {/* Trump */}
+            <div className="relative group w-[28%] flex flex-col items-center -translate-y-[15%]" tabIndex={0}>
+              <div className="speech-bubble absolute bottom-full mb-8 right-0 opacity-0 group-hover:opacity-100 group-focus:opacity-100 group-active:opacity-100 transition-all duration-300 z-50 pointer-events-none scale-90 group-hover:scale-100 group-active:scale-100 bg-rose-700 text-white font-bold text-[11px] sm:text-sm border-2 border-white px-3 py-2 rounded-xl shadow-[0_0_15px_rgba(225,29,72,0.8)] origin-bottom-right tracking-wide w-max max-w-[160px] whitespace-normal break-words text-center">
+                 {studioQuotes.trump}
+                 <div className="absolute -bottom-2 right-6 w-0 h-0 border-l-[8px] border-l-transparent border-r-[8px] border-r-transparent border-t-[8px] border-t-white"></div>
+              </div>
+              <div className="relative w-full transition-all duration-300 group-hover:-translate-y-2 group-active:-translate-y-2 group-focus:-translate-y-2 group-hover:rotate-6 group-active:rotate-6 group-hover:scale-110 group-active:scale-110">
+                 <div className="absolute inset-0 bg-red-600 rounded-full blur-xl opacity-0 group-hover:opacity-80 group-active:opacity-80 group-focus:opacity-80 transition-opacity duration-300 scale-125"></div>
+                 <img src="/donaldIcon-removebg.png" alt="Trump" className="relative z-10 w-full object-contain drop-shadow-xl transition-all group-hover:animate-rage group-active:animate-rage group-focus:animate-rage" />
+              </div>
+            </div>
+
+            {/* Canadian */}
+            <div className="relative group w-[28%] flex flex-col items-center -translate-y-[10%]" tabIndex={0}>
+               <div className="speech-bubble absolute bottom-full mb-6 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 group-active:opacity-100 group-focus:opacity-100 transition-all z-50 pointer-events-none scale-90 group-hover:scale-100 bg-slate-900 text-blue-50 font-bold text-[11px] sm:text-sm border-2 border-blue-500/80 px-3 py-2 rounded-xl shadow-[0_5px_15px_rgba(59,130,246,0.3)] tracking-wide w-max max-w-[160px] whitespace-normal break-words text-center">
+                 {studioQuotes.canadian}
+                 <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-0 h-0 border-l-[8px] border-l-transparent border-r-[8px] border-r-transparent border-t-[8px] border-t-blue-500/80"></div>
                </div>
-               
-               <div className="w-full md:w-auto flex justify-center md:justify-end relative z-10">
-                  <div className="bg-blue-600 text-white px-6 md:px-8 py-3 rounded-xl font-bold flex items-center justify-center gap-3 group-hover:bg-blue-500 transition-colors shadow-lg w-full md:w-auto">
-                     לכניסה <span className="text-xl">👉</span>
-                  </div>
+               <img src="/candianIcon-removebg.png" className="relative z-10 w-full object-contain group-hover:-translate-y-2 group-active:-translate-y-2 group-focus:-translate-y-2 transition-transform drop-shadow-xl" />
+            </div>
+
+            {/* Mexican */}
+            <div className="relative group w-[28%] flex flex-col items-center -translate-y-[12%]" tabIndex={0}>
+               <div className="speech-bubble absolute bottom-full mb-6 left-0 opacity-0 group-hover:opacity-100 group-active:opacity-100 group-focus:opacity-100 transition-all z-50 pointer-events-none scale-90 group-hover:scale-100 group-active:scale-100 bg-slate-900 text-emerald-50 font-bold text-[11px] sm:text-sm border-2 border-emerald-500/80 px-3 py-2 rounded-xl shadow-[0_5px_15px_rgba(16,185,129,0.3)] origin-bottom-left tracking-wide w-max max-w-[160px] whitespace-normal break-words text-center">
+                 {studioQuotes.mexican}
+                 <div className="absolute -bottom-2 left-6 w-0 h-0 border-l-[8px] border-l-transparent border-r-[8px] border-r-transparent border-t-[8px] border-t-emerald-500/80"></div>
                </div>
-            </Link>
+               <img src="/maxicanIcon-removebg.png" className="relative z-10 w-full object-contain -scale-x-100 group-hover:-translate-y-2 group-active:-translate-y-2 group-focus:-translate-y-2 group-hover:-rotate-6 group-active:-rotate-6 transition-transform origin-bottom drop-shadow-xl" />
+            </div>
+          </div>
+
+          <img src="/panel-removebg.png" className="relative z-20 w-[110%] max-w-[110%] -ml-[5%] pointer-events-none" />
+        </div>
+      </div>
+
          </div>
 
       </div>
-
+      {tournamentState > 0 ? (
       <div className="bg-slate-900 rounded-3xl border border-slate-700 shadow-xl flex flex-col lg:h-[600px] overflow-hidden relative z-10">
          <div className="flex lg:hidden bg-slate-950 border-b border-slate-700 shrink-0">
             <button onClick={() => setTimelineTab("TODAY")} className={`flex-1 py-4 text-sm font-bold transition-all ${timelineTab === "TODAY" ? "bg-slate-800 text-white border-b-2 border-blue-500" : "text-slate-500 hover:bg-slate-900"}`}>📅 צפוי היום</button>
@@ -1631,6 +1797,49 @@ const renderedMagazineContent = useMemo(() => {
             </div>
          </div>
       </div>
+      ) : (
+         <div className="w-full bg-slate-900/40 rounded-3xl border border-slate-700/50 shadow-inner flex flex-col items-center justify-center py-20 relative z-10 text-center overflow-hidden">
+            <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0IiBoZWlnaHQ9IjQiPgo8cmVjdCB3aWR0aD0iNCIgaGVpZ2h0PSI0IiBmaWxsPSIjZmZmIiBmaWxsLW9wYWNpdHk9IjAuMSIvPgo8L3N2Zz4=')] opacity-10"></div>
+            
+            <div className="text-6xl mb-6 opacity-80 animate-bounce drop-shadow-lg">⏳</div>
+            <h3 className="text-3xl md:text-4xl font-black text-transparent bg-clip-text bgGreat things are coming-gradient-to-r from-slate-300 to-slate-500 mb-4 tracking-tight">
+               Great things are coming...
+            </h3>
+            <p className="text-slate-400 font-medium text-sm md:text-base max-w-lg px-6 leading-relaxed">
+               כאן יופיע בקרוב חמ"ל התוצאות המלא! <br/>
+               מעקב לייב אחרי המשחקים, קופת הבונוסים, הראדאר וכל מה שקורה על הדשא. בינתיים, ודאו שהניחושים שלכם מוכנים.
+            </p>
+         </div>
+      )}
+      {/* טבלת גילוי נאות - עכשיו בתחתית הדשבורד */}
+      <div className="relative z-10 w-full mt-4">
+         {tournamentState > 0 ? (
+            <Link href="/matrix" className="w-full flex flex-col md:flex-row items-center justify-between bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 hover:from-blue-900/30 hover:to-slate-800 border-2 border-slate-700 hover:border-blue-500/50 p-6 md:p-8 rounded-3xl shadow-[0_10px_40px_rgba(0,0,0,0.4)] transition-all active:scale-[0.99] group relative overflow-hidden">
+               <div className="absolute top-0 right-0 w-2 h-full bg-blue-500"></div>
+               <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0IiBoZWlnaHQ9IjQiPgo8cmVjdCB3aWR0aD0iNCIgaGVpZ2h0PSI0IiBmaWxsPSIjZmZmIiBmaWxsLW9wYWNpdHk9IjAuMSIvPgo8L3N2Zz4=')] opacity-20"></div>
+               
+               <div className="flex flex-col md:flex-row items-center gap-6 relative z-10 text-center md:text-right">
+                  <div className="w-20 h-20 bg-slate-950 rounded-2xl flex items-center justify-center border border-slate-700 shadow-inner group-hover:scale-110 group-hover:border-blue-500/50 transition-all shrink-0">
+                     <span className="animate-eye-blink text-4xl drop-shadow-lg">👁️</span>
+                  </div>
+                  <div className="flex flex-col">
+                     <span className="font-black text-white text-2xl md:text-3xl mb-1 tracking-tight">טבלת הגילוי הנאות המלאה</span>
+                     <span className="text-sm md:text-base text-slate-400 font-medium">כאן תוכלו לראות בזמן אמת מה כולם ניחשו - שקיפות מלאה.</span>
+                  </div>
+               </div>
+               
+               <div className="mt-6 md:mt-0 relative z-10 w-full md:w-auto">
+                  <div className="bg-blue-600 text-white px-10 py-4 rounded-2xl font-black text-lg flex items-center justify-center gap-3 group-hover:bg-blue-500 transition-colors shadow-xl">
+                     לכניסה למערכת <span className="text-2xl">👉</span>
+                  </div>
+               </div>
+            </Link>
+         ) : (
+            <div className="w-full flex items-center justify-center bg-slate-900/40 border border-slate-700/50 border-dashed p-8 rounded-3xl shadow-inner text-slate-500 font-bold transition-all hover:bg-slate-900/60 cursor-not-allowed">
+               <span className="mr-3 text-3xl opacity-60">🔒</span> טבלת הגילוי הנאות תפתח באופן אוטומטי לאחר שריקת הפתיחה
+            </div>
+         )}
+      </div>
 
       {showMagazineModal && (
         <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/85 p-4 backdrop-blur-md animate-fade-in-up" dir="rtl">
@@ -1848,71 +2057,7 @@ const renderedMagazineContent = useMemo(() => {
         </div>
       )}
 
-      <div className="xl:hidden w-full mt-8 mb-8 bg-slate-950/90 rounded-3xl border border-slate-700/50 shadow-2xl relative overflow-hidden flex flex-col items-center pt-6 pb-4">        
-        <div className="absolute top-0 right-0 w-full h-1.5 bg-gradient-to-r from-rose-400 via-amber-400 to-emerald-400"></div>
-        
-        <div className="mb-4 relative z-30 px-5 py-2 bg-slate-900/80 rounded-full border border-slate-700 text-white font-black text-sm flex items-center gap-2 shadow-md mt-2">
-          <span className="animate-pulse">🎙️</span> חברי הפאנל
-        </div>
 
-        <div className="relative w-full mt-38 sm:mt-40">
-          
-          <div className="absolute bottom-[75%] left-1/2 -translate-x-1/2 w-[85%] bg-slate-950 border-[3px] border-slate-800 rounded-2xl shadow-[0_15px_30px_rgba(0,0,0,0.7)] pointer-events-auto overflow-hidden flex flex-col z-0">
-             <div className="bg-slate-900 border-b border-slate-800 px-3 py-1.5 flex justify-between items-center z-10 relative">
-                <div className="flex items-center gap-1.5">
-                   <div className="w-2 h-2 rounded-full bg-rose-500 animate-pulse shadow-[0_0_8px_rgba(244,63,94,0.8)]"></div>
-                   <span className="text-rose-500 font-black text-[9px] tracking-widest uppercase">LIVE</span>
-                </div>
-                <div className="flex gap-1">
-                   <div className="w-1.5 h-1.5 rounded-full bg-slate-700"></div>
-                   <div className="w-1.5 h-1.5 rounded-full bg-slate-700"></div>
-                   <div className="w-1.5 h-1.5 rounded-full bg-slate-700"></div>
-                </div>
-             </div>
-             <div className="relative aspect-video bg-black overflow-hidden">
-                 <img src="/usa-bg.jpg" className="absolute inset-0 w-full h-full object-cover animate-carousel-1" alt="USA" />
-                 <img src="/canada-bg.jpg" className="absolute inset-0 w-full h-full object-cover animate-carousel-2 opacity-0" alt="Canada" />
-                 <img src="/mexico-bg.jpg" className="absolute inset-0 w-full h-full object-cover animate-carousel-3 opacity-0" alt="Mexico" />
-                 <div className="absolute inset-0 bg-gradient-to-tr from-white/10 via-transparent to-transparent pointer-events-none z-10"></div>
-                 <div className="absolute bottom-1.5 left-1.5 bg-black/80 backdrop-blur-md px-2 py-0.5 rounded-lg border border-white/20 text-[8px] text-amber-400 font-black z-20 uppercase tracking-widest">
-                     Host Nations
-                 </div>
-             </div>
-          </div>
-
-          <div className="absolute bottom-[44%] left-0 w-full flex justify-center items-end gap-2 px-4 z-10 pointer-events-auto">
-            
-            <div className="relative group w-[28%] flex flex-col items-center -translate-y-[15%]" tabIndex={0}>
-              <div className="speech-bubble absolute bottom-full mb-8 right-0 opacity-0 group-hover:opacity-100 group-focus:opacity-100 group-active:opacity-100 transition-all duration-300 z-50 pointer-events-none scale-90 group-hover:scale-100 group-active:scale-100 bg-rose-700 text-white font-bold text-sm border-2 border-white px-4 py-2.5 rounded-xl shadow-[0_0_15px_rgba(225,29,72,0.8)] origin-bottom-right tracking-wide w-max max-w-[200px] whitespace-normal break-words text-center">
-                 {studioQuotes.trump}
-                 <div className="absolute -bottom-2 right-6 w-0 h-0 border-l-[8px] border-l-transparent border-r-[8px] border-r-transparent border-t-[8px] border-t-white"></div>
-              </div>
-              <div className="relative w-full transition-all duration-300 group-hover:-translate-y-2 group-active:-translate-y-2 group-focus:-translate-y-2 group-hover:rotate-6 group-active:rotate-6 group-hover:scale-110 group-active:scale-110">
-                 <div className="absolute inset-0 bg-red-600 rounded-full blur-xl opacity-0 group-hover:opacity-80 group-active:opacity-80 group-focus:opacity-80 transition-opacity duration-300 scale-125"></div>
-                 <img src="/donaldIcon-removebg.png" alt="Trump" className="relative z-10 w-full object-contain drop-shadow-xl transition-all group-hover:animate-rage group-active:animate-rage group-focus:animate-rage" />
-              </div>
-            </div>
-
-            <div className="relative group w-[28%] flex flex-col items-center -translate-y-[10%]" tabIndex={0}>
-               <div className="speech-bubble absolute bottom-full mb-6 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 group-active:opacity-100 group-focus:opacity-100 transition-all z-50 pointer-events-none scale-90 group-hover:scale-100 bg-slate-900 text-blue-50 font-bold text-sm border-2 border-blue-500/80 px-4 py-2.5 rounded-xl shadow-[0_5px_15px_rgba(59,130,246,0.3)] tracking-wide w-max max-w-[200px] whitespace-normal break-words text-center">
-                 {studioQuotes.canadian}
-                 <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-0 h-0 border-l-[8px] border-l-transparent border-r-[8px] border-r-transparent border-t-[8px] border-t-blue-500/80"></div>
-               </div>
-               <img src="/candianIcon-removebg.png" className="relative z-10 w-full object-contain group-hover:-translate-y-2 group-active:-translate-y-2 group-focus:-translate-y-2 transition-transform drop-shadow-xl" />
-            </div>
-
-            <div className="relative group w-[28%] flex flex-col items-center -translate-y-[12%]" tabIndex={0}>
-               <div className="speech-bubble absolute bottom-full mb-6 left-0 opacity-0 group-hover:opacity-100 group-active:opacity-100 group-focus:opacity-100 transition-all z-50 pointer-events-none scale-90 group-hover:scale-100 group-active:scale-100 bg-slate-900 text-emerald-50 font-bold text-sm border-2 border-emerald-500/80 px-4 py-2.5 rounded-xl shadow-[0_5px_15px_rgba(16,185,129,0.3)] origin-bottom-left tracking-wide w-max max-w-[200px] whitespace-normal break-words text-center">
-                 {studioQuotes.mexican}
-                 <div className="absolute -bottom-2 left-6 w-0 h-0 border-l-[8px] border-l-transparent border-r-[8px] border-r-transparent border-t-[8px] border-t-emerald-500/80"></div>
-               </div>
-               <img src="/maxicanIcon-removebg.png" className="relative z-10 w-full object-contain -scale-x-100 group-hover:-translate-y-2 group-active:-translate-y-2 group-focus:-translate-y-2 group-hover:-rotate-6 group-active:-rotate-6 transition-transform origin-bottom drop-shadow-xl" />
-            </div>
-          </div>
-
-          <img src="/panel-removebg.png" className="relative z-20 w-[110%] max-w-[110%] -ml-[5%] pointer-events-none drop-shadow-[0_-5px_15px_rgba(0,0,0,0.7)]" />
-        </div>
-      </div>
       {showWrappedModal && (
         <WrappedModal 
           onClose={() => setShowWrappedModal(false)}
