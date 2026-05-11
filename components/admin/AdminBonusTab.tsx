@@ -250,6 +250,8 @@ export default function AdminBonusTab() {
        case "NUMBER_MINUTE": return <span className="bg-slate-900 border border-slate-700 text-slate-300 px-2 py-0.5 rounded text-[10px]">🔢 מספר</span>;
        case "PLAYER": return <span className="bg-slate-900 border border-slate-700 text-slate-300 px-2 py-0.5 rounded text-[10px]">👤 שחקן</span>;
        case "CUSTOM": return <span className="bg-slate-900 border border-slate-700 text-slate-300 px-2 py-0.5 rounded text-[10px]">📝 בחירה</span>;
+       case "CLUB": return <span className="bg-slate-900 border border-slate-700 text-slate-300 px-2 py-0.5 rounded text-[10px]">🛡️ קבוצה</span>;
+       case "MATCH": return <span className="bg-slate-900 border border-slate-700 text-slate-300 px-2 py-0.5 rounded text-[10px]">🏟️ משחק</span>;
        default: return <span className="bg-slate-900 border border-slate-700 text-slate-300 px-2 py-0.5 rounded text-[10px]">🏳️ נבחרת</span>;
     }
   };
@@ -395,6 +397,8 @@ export default function AdminBonusTab() {
                            <option className="bg-slate-900 text-white" value="NUMBER_MINUTE">דקת משחק (תומך גם בתוספת זמן, למשל 45+3)</option>
                            <option className="bg-slate-900 text-white" value="PLAYER">שם שחקן (עם השלמה אוטומטית למשתמש)</option>
                            <option className="bg-slate-900 text-white" value="CUSTOM">בחירה מותאמת (הקלדת אפשרויות ספציפיות)</option>
+                           <option className="bg-slate-900 text-white" value="CLUB">מועדון / קבוצה (🛡️)</option>
+                           <option className="bg-slate-900 text-white" value="MATCH">בחירת משחק (🏟️)</option>
 
                         </select>
                      </div>
@@ -445,7 +449,7 @@ export default function AdminBonusTab() {
                         </div>
                      )}
 
-                     {currentAnswerType === "CUSTOM" && (
+                     {["CUSTOM", "CLUB", "MATCH"].includes(currentAnswerType) && (
                         <div className="pt-3 border-t border-emerald-900/50 mt-3 animate-fade-in-up">
                           <label className="block text-emerald-400 text-[10px] font-bold mb-1">אפשרויות לבחירה (הפרד בפסיקים)</label>
                           <input type="text" value={formData.possibleOptions || ""} onChange={e => setFormData({...formData, possibleOptions: e.target.value})} className="w-full bg-emerald-950/20 border border-emerald-500/30 rounded-lg p-2.5 text-white outline-none focus:border-emerald-500 text-xs" placeholder="למשל: אמבפה, האלנד, כמות שווה" />

@@ -19,6 +19,15 @@ const parseDateTimeLocal = (dtStr: string) => {
     return new Date(dtStr).getTime();
   } catch { return 0; }
 };
+const CLUB_ICONS: Record<string, string> = {
+  "ריאל מדריד": "/real_madrid_footballteam_18009.png",
+  "ברצלונה": "/fc_barcelona_footballteam_18015.png",
+  "מנצ'סטר סיטי": "/manchester_united_17973.png",
+  "ארסנל": "/arsenal_17995.png",
+  "באיירן מינכן": "/Bayern_Munchen_icon-icons.com_75868.png",
+  "פאריז סן ז'רמן": "/Paris-Saint-Germain-icon-256_37658.png"
+
+};
 
 const TEAM_EMOJIS: Record<string, string> = {
   "מקסיקו": "🇲🇽", "דרום אפריקה": "🇿🇦", "קוריאה הדרומית": "🇰🇷", "צ'כיה": "🇨🇿",
@@ -80,7 +89,15 @@ export default function BonusQuestions({ userId, tournamentState: propTournament
   const hasAutoNavigated = useRef(false); 
 
   const [nowMs, setNowMs] = useState(Date.now());
-  
+  const [allMatches, setAllMatches] = useState<any[]>([]);
+
+  useEffect(() => {
+  const fetchMatches = async () => {
+    const mSnap = await getDocs(collection(db, "matches"));
+    setAllMatches(mSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+  };
+  fetchMatches();
+}, []);
   useEffect(() => {
     if (typeof window !== "undefined") {
       const ua = navigator.userAgent;
@@ -239,7 +256,7 @@ if (!q.knockoutRound || q.knockoutRound === "" || q.knockoutRound === "ALL" || q
        if (q.hasAllOption) opts.push("כל הנבחרות");
        ans = opts[Math.floor(Math.random() * opts.length)];
        
-    } else if (currentAnswerType === "CUSTOM") {
+    } else if (["CUSTOM", "CLUB", "MATCH"].includes(currentAnswerType)) {
        const opts = q.possibleOptions ? q.possibleOptions.split(",").map((s:string)=>s.trim()).filter(Boolean) : [];
        if (opts.length > 0) ans = opts[Math.floor(Math.random() * opts.length)];
 
@@ -286,7 +303,7 @@ if (!q.knockoutRound || q.knockoutRound === "" || q.knockoutRound === "ALL" || q
                        if (q.hasAllOption) opts.push("כל הנבחרות");
                        ans = opts[Math.floor(Math.random() * opts.length)];
                        
-                    } else if (currentAnswerType === "CUSTOM") {
+                    }  else if (["CUSTOM", "CLUB", "MATCH"].includes(currentAnswerType)) {
                        const opts = q.possibleOptions ? q.possibleOptions.split(",").map((s:string)=>s.trim()).filter(Boolean) : [];
                        if (opts.length > 0) ans = opts[Math.floor(Math.random() * opts.length)];
 
@@ -348,7 +365,10 @@ const regularQuestions = filteredQuestions.filter(q => !q.isDouble && !q.isSurpr
   // פונקציית עזר שמרנדרת כרטיסיית שאלה בודדת - עברה "דיאטה" קלה כדי לחסוך מקום בגלילה
   const renderQuestionCard = (q: any) => {
     const locked = isQuestionLocked(q);
-    const hasTruth = !!realBonusAnswers[q.id];
+    // הגנה קפדנית: מוודא שיש ערך ממשי ולא רק מערך ריק
+    const hasTruth = realBonusAnswers[q.id] && (Array.isArray(realBonusAnswers[q.id]) ? realBonusAnswers[q.id].length > 0 : String(realBonusAnswers[q.id]).trim() !== "");
+    const hasLeading = realBonusData.leading?.[q.id] && (Array.isArray(realBonusData.leading[q.id]) ? realBonusData.leading[q.id].length > 0 : String(realBonusData.leading[q.id]).trim() !== "");
+    
     const myPoints = checkAnswerPoints(q, answers[q.id]);
     
     const openMs = q.openTime ? parseDateTimeLocal(q.openTime) : 0;
@@ -383,8 +403,8 @@ const regularQuestions = filteredQuestions.filter(q => !q.isDouble && !q.isSurpr
             <div className="flex flex-col gap-1.5">
               {!isWaitingToOpen && (
                 <div className="flex flex-wrap gap-1.5">
-                <span className="text-[10px] font-black text-slate-400 bg-slate-950 px-2 py-0.5 rounded w-fit border border-slate-800">
-                     קופה: <span className={q.isDouble ? "text-rose-400" : "text-amber-400"}>
+                <span className="text-xs md:text-sm font-black text-slate-400 bg-slate-950 px-3 py-1.5 rounded-lg w-fit border border-slate-800 shadow-sm flex items-center gap-1.5">
+                     קופה: <span className={`${q.isDouble ? "text-rose-400" : "text-amber-400"} text-sm md:text-base drop-shadow-sm`}>
                      {q.isProximity ? "עד 50" : q.points} נק'
                      </span>
                 </span>
@@ -430,7 +450,7 @@ const regularQuestions = filteredQuestions.filter(q => !q.isDouble && !q.isSurpr
            {isWaitingToOpen ? "שאלת הפתעה סודית..." : q.label}
          </h3>
          
-         {realBonusData.leading?.[q.id] && !locked && !isWaitingToOpen && (
+         {hasLeading && !locked && !isWaitingToOpen && (
             <div className="text-[10px] font-bold text-amber-400 bg-amber-950/30 px-2 py-1 rounded-lg border border-amber-500/20 mb-3 inline-flex items-center gap-1.5 w-fit">
                <span className="animate-pulse">👑 מובילה כרגע:</span> 
                {Array.isArray(realBonusData.leading[q.id]) ? realBonusData.leading[q.id].join(', ') : realBonusData.leading[q.id]}
@@ -493,23 +513,85 @@ const regularQuestions = filteredQuestions.filter(q => !q.isDouble && !q.isSurpr
                      )}
                   </div>
                );
-            })() : currentAnswerType === "CUSTOM" ? (() => {
+            })() : ["CUSTOM", "CLUB"].includes(currentAnswerType) ? (() => {
                const opts = q.possibleOptions ? q.possibleOptions.split(",").map((s:string)=>s.trim()).filter(Boolean) : [];
-               return (
-                  <div className="flex flex-col gap-1.5">
-                     {opts.map((opt: string) => (
-                        <button
-                           key={opt}
-                           onClick={() => !locked && handleChange(q.id, opt)}
+               
+               // הגנה: אם לא הוזנו אופציות, נציג שורת טקסט חופשית מותאמת אישית
+               if (opts.length === 0) {
+                  return (
+                     <div className="relative">
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-lg pointer-events-none drop-shadow-sm">{currentAnswerType === "CLUB" ? "🛡️" : "📝"}</span>
+                        <input
+                           type="text"
+                           value={answers[q.id] || ""}
+                           onChange={e => handleChange(q.id, e.target.value)}
                            disabled={locked}
-                           className={`w-full py-2.5 px-3 rounded-xl font-bold text-sm text-right transition-all flex items-center gap-3 ${answers[q.id] === opt ? "bg-amber-600/20 text-amber-400 border border-amber-500 shadow-md" : "bg-slate-950 text-slate-400 border border-slate-700 hover:bg-slate-800"} ${locked && answers[q.id] !== opt ? "opacity-50 cursor-not-allowed" : ""}`}
-                        >
-                           <div className={`w-3.5 h-3.5 rounded-full border flex items-center justify-center shrink-0 ${answers[q.id] === opt ? "border-amber-400" : "border-slate-500"}`}>
-                             {answers[q.id] === opt && <div className="w-1.5 h-1.5 bg-amber-400 rounded-full"></div>}
-                           </div>
-                           <span className="truncate">{opt}</span>
-                        </button>
-                     ))}
+                           placeholder={currentAnswerType === "CLUB" ? "הקלד שם קבוצה..." : "הקלד תשובה..."}
+                           className={`w-full px-4 py-3 pl-10 rounded-xl font-bold text-sm outline-none transition-all shadow-inner ${locked ? "bg-slate-900/50 text-slate-400 border-slate-700 cursor-not-allowed" : (!answers[q.id] || answers[q.id].trim()==="") ? "bg-slate-950 text-white border-amber-500/80 focus:border-amber-400" : "bg-slate-900 text-white border-slate-600 focus:border-blue-500"}`}
+                        />
+                     </div>
+                  );
+               }
+
+               return (
+                  <div className="grid grid-cols-1 gap-2">
+                     {opts.map((opt: string) => {
+                        const isSelected = answers[q.id] === opt;
+                        const clubIcon = typeof CLUB_ICONS !== 'undefined' ? CLUB_ICONS[opt] : null;
+
+                        return (
+                           <button
+                              key={opt}
+                              onClick={() => !locked && handleChange(q.id, opt)}
+                              disabled={locked}
+                              className={`w-full py-3 px-4 rounded-xl font-bold text-sm text-right transition-all flex items-center gap-3 ${isSelected ? "bg-amber-600/20 text-amber-400 border border-amber-500 shadow-md" : "bg-slate-950 text-slate-400 border border-slate-700 hover:bg-slate-800"} ${locked && !isSelected ? "opacity-50 cursor-not-allowed" : ""}`}
+                           >
+                              <div className={`w-4 h-4 rounded-full border flex items-center justify-center shrink-0 ${isSelected ? "border-amber-400" : "border-slate-500"}`}>
+                                {isSelected && <div className="w-2 h-2 bg-amber-400 rounded-full"></div>}
+                              </div>
+
+                              {clubIcon ? (
+                                 <img src={clubIcon} className="w-6 h-6 object-contain drop-shadow-sm" alt={opt} />
+                              ) : getFlagUrl(opt) ? (
+                                 <img src={getFlagUrl(opt)!} className="w-5 h-3.5 object-cover rounded-sm shadow-sm" alt="flag" />
+                              ) : (
+                                 <span className="text-lg opacity-60">{currentAnswerType === "CLUB" ? "🛡️" : "📝"}</span>
+                              )}
+
+                              <span className="truncate">{opt}</span>
+                           </button>
+                        );
+                     })}
+                  </div>
+               );
+
+               })() : currentAnswerType === "MATCH" ? (() => {
+               // סינון המשחקים לפי השלב המוגדר לשאלה
+               const relevantMatches = allMatches.filter(m => {
+                  if (q.phase === "GROUPS") return m.stage !== "KNOCKOUT";
+                  if (q.phase === "KNOCKOUT") {
+                      return m.stage === "KNOCKOUT" && (q.knockoutRound === "ALL" || m.roundName === q.knockoutRound);
+                  }
+                  return true; 
+               });
+
+               // הפיכת רשימת המשחקים למערך של מחרוזות עבור ה-Autocomplete
+               const matchSuggestions = relevantMatches.map(m => `${m.homeTeam} - ${m.awayTeam}`);
+
+               return (
+                  <div className="relative">
+                     <AutocompleteInput
+                        value={answers[q.id] || ""}
+                        onChange={(val: string) => handleChange(q.id, val)}
+                        placeholder="חפש משחק (למשל: מקסיקו)..."
+                        suggestions={matchSuggestions}
+                        disabled={locked}
+                        showAllOnFocus={true}
+                        customClassName={`w-full px-4 py-3 pl-10 rounded-xl font-bold text-sm outline-none transition-all shadow-inner ${locked ? "bg-slate-900/50 text-slate-400 border-slate-700 cursor-not-allowed" : (!answers[q.id] || answers[q.id].trim()==="") ? "bg-slate-950 text-white border-amber-500/80 focus:border-amber-400" : "bg-slate-900 text-white border-slate-600 focus:border-blue-500"}`}
+                     />
+                     <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none text-lg">
+                        🏟️
+                     </div>
                   </div>
                );
             })() : currentAnswerType === "NUMBER_PURE" ? (
@@ -729,7 +811,7 @@ const regularQuestions = filteredQuestions.filter(q => !q.isDouble && !q.isSurpr
                                    if (q.hasNoneOption) opts.push("אף נבחרת");
                                    if (q.hasAllOption) opts.push("כל הנבחרות");
                                    ans = opts[Math.floor(Math.random() * opts.length)];
-                                } else if (currentAnswerType === "CUSTOM") {
+                                } else if (["CUSTOM", "CLUB", "MATCH"].includes(currentAnswerType)) {
                                    const opts = q.possibleOptions ? q.possibleOptions.split(",").map((s:string)=>s.trim()).filter(Boolean) : [];
                                    if (opts.length > 0) ans = opts[Math.floor(Math.random() * opts.length)];
                                 } else if (currentAnswerType === "PLAYER") {
@@ -957,7 +1039,12 @@ const regularQuestions = filteredQuestions.filter(q => !q.isDouble && !q.isSurpr
             </div>
           </div>
         </div>
+        
       )}
+      {/* קרדיט לאייקונים של הקבוצות */}
+      <div className="mt-8 pb-4 text-center text-slate-500 text-[10px] tracking-wide">
+        Icons by Giannis Zographos on <a href="https://icon-icons.com/authors/66-giannis-zographos" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300 transition-colors underline decoration-blue-500/50 underline-offset-2">Icon-Icons.com</a>
+      </div>
     </>
   );
 }

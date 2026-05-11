@@ -407,8 +407,10 @@ export default function KnockoutView({ matches, userId, tournamentState }: { mat
           </div>
         </div>
       )}
-      
-      <footer className="mt-8 text-center text-slate-600 text-[10px]">Icons by Flaticon. Logic by Tech Lead Gemini.</footer>
+            {/* קרדיט לאייקונים של הקבוצות */}
+      <div className="mt-8 pb-4 text-center text-slate-500 text-[10px] tracking-wide">
+       Icons by Flaticon. Logic by Tech Lead Gemini.
+      </div>
     </div>
   );
 }

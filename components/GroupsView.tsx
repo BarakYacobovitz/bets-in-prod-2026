@@ -481,9 +481,9 @@ export default function GroupsView({ matches, groups, userId, tournamentState }:
 
       {viewMode === "MATCHES" && (
          <div className="animate-fade-in-up">
-            {renderMatchday("מחזור 1", activeMatches.filter((m: any) => (m.matchday || 1) === 1), tournamentState >= 1, 1)}
-            {renderMatchday("מחזור 2", activeMatches.filter((m: any) => m.matchday === 2), tournamentState >= 2, 2)}
-            {renderMatchday("מחזור 3", activeMatches.filter((m: any) => m.matchday === 3), tournamentState >= 3, 3)}
+            {renderMatchday("מחזור 1", activeMatches.filter((m: any) => Number(m.matchday || 1) === 1), tournamentState >= 1, 1)}
+            {renderMatchday("מחזור 2", activeMatches.filter((m: any) => Number(m.matchday) === 2), tournamentState >= 2, 2)}
+            {renderMatchday("מחזור 3", activeMatches.filter((m: any) => Number(m.matchday) === 3), tournamentState >= 3, 3)}
             
             <div className="mt-6 pt-4 border-t border-slate-800/50 flex justify-center">
                <button 

@@ -699,7 +699,7 @@ const getPrizeForRank = (rank: number, board: string, allUsers: any[]) => {
   return (
     <div className="w-full max-w-4xl mx-auto pb-12" dir="rtl">
       
-      {isFirstPlace && <Confetti />}
+      {isFirstPlace && tournamentState > 0 && <Confetti />}
 
 {/* ========================================== */}
       {/* טאבים ראשיים של הטבלה - משימה 2 מהבקלוג */}
@@ -800,6 +800,49 @@ const getPrizeForRank = (rank: number, board: string, allUsers: any[]) => {
            <p className="text-slate-400 text-sm max-w-sm mx-auto">
              השתמש בכפתורים למעלה כדי ליצור ליגה חדשה או להצטרף לליגה קיימת עם קוד, ובוא להתחרות מול החברים!
            </p>
+         </div>
+      ) : tournamentState === 0 ? (
+         <div className="bg-slate-800 pt-12 pb-16 px-4 md:px-8 rounded-3xl border border-slate-700 shadow-2xl relative overflow-hidden flex flex-col items-center justify-center text-center">
+             <div className="absolute top-0 right-0 w-64 h-64 rounded-full blur-3xl pointer-events-none -mr-20 -mt-20 bg-amber-500/10"></div>
+             
+             <div className="text-6xl md:text-7xl drop-shadow-[0_0_20px_rgba(251,191,36,0.6)] mb-6 animate-pulse z-10">🏆</div>
+             <h3 className="text-2xl md:text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-amber-200 via-amber-400 to-amber-200 mb-4 tracking-tight px-4 z-10">
+                 כאן תוכלו לראות את הדירוג שלכם בתחרות כשהיא תתחיל...
+             </h3>
+             <p className="text-slate-400 max-w-lg mx-auto mb-10 z-10 text-sm md:text-base font-medium leading-relaxed">
+                 בינתיים, קבלו את נבחרת החלומות שכבר נרשמה, הסדירה תשלום והבטיחה את מקומה בטורניר. הבורדינג כבר בעיצומו! ✈️
+             </p>
+
+             <div className="flex flex-wrap justify-center items-center max-w-5xl mx-auto relative z-10 py-16 px-4 gap-x-4 gap-y-10 md:gap-x-8 md:gap-y-14">
+                 {generalUsers.filter(u => u.hasPaid).map((user, i) => {
+                    // לוגיקה חכמה ליצירת מראה "מפוזר ואקראי" על בסיס האינדקס
+                    const sizeScale = i % 3 === 0 ? "scale-110" : i % 5 === 0 ? "scale-90" : "scale-100";
+                    const verticalOffset = i % 4 === 0 ? "-translate-y-8 md:-translate-y-12" : i % 3 === 0 ? "translate-y-6 md:translate-y-10" : i % 2 === 0 ? "-translate-y-3" : "translate-y-4";
+                    const animDelay = `${(i * 0.4) % 3}s`; // דיליי משתנה לאנימציית הריחוף
+
+                    return (
+                       <div 
+                          key={user.id} 
+                          className={`flex items-center gap-2 bg-slate-900/80 backdrop-blur-md border border-slate-600/50 hover:border-amber-500/80 pl-4 pr-1.5 py-1.5 rounded-full shadow-xl hover:shadow-[0_0_25px_rgba(245,158,11,0.3)] transition-all duration-300 cursor-default hover:z-30 hover:!scale-125 ${sizeScale} ${verticalOffset}`}
+                          style={{
+                             animation: 'pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                             animationDelay: animDelay
+                          }}
+                       >
+                          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-slate-700 to-slate-800 flex items-center justify-center text-sm shadow-inner font-black text-amber-400 border border-slate-600 shrink-0">
+                             {user.name ? user.name.charAt(0).toUpperCase() : "👤"}
+                          </div>
+                          <span className="text-sm font-bold text-slate-200">
+                             {user.name?.split(' ')[0]}
+                          </span>
+                          <span className="text-[10px] bg-emerald-500/20 text-emerald-400 p-1 rounded-full border border-emerald-500/30" title="שולם ומאושר">✅</span>
+                       </div>
+                    );
+                 })}
+                 {generalUsers.filter(u => u.hasPaid).length === 0 && (
+                    <div className="text-slate-500 text-sm font-bold bg-slate-900/50 px-6 py-3 rounded-full border border-slate-800">הלובי ריק כרגע. תהיו הראשונים לתפוס מקום בטיסה! ✈️</div>
+                 )}
+             </div>
          </div>
       ) : (
          <div className="bg-slate-800 pt-10 rounded-3xl border border-slate-700 shadow-2xl relative overflow-hidden flex flex-col">
