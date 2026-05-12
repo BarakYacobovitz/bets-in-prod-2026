@@ -457,7 +457,7 @@ export default function Dashboard({ userId, userName, setActiveTab, setPredictio
           return false;
         };
 
-        bonusQuestionsList.forEach((q: any) => {
+          bonusQuestions.forEach((q: any) => {
            if (!isQuestionLockedLocal(q)) {
               const ans = userBonusAnswers[q.id];
               if (!ans || String(ans).trim() === "") {
@@ -472,7 +472,7 @@ export default function Dashboard({ userId, userName, setActiveTab, setPredictio
         });
         
         setMissingTasksList(currentMissingList);
-
+        
         const noneKeywords = ["אף נבחרת", "אף אחת", "אין", "none"];
         
         if (todayTeams.size > 0) {
@@ -1103,18 +1103,24 @@ const renderedMagazineContent = useMemo(() => {
                            </div>
                         )}
 
-                        <div className="flex justify-between items-center mb-10 border-b border-slate-700/50 pb-8 border-dashed">
-                           <div className="text-right">
-                              <h2 className="text-4xl md:text-6xl font-black text-white tracking-tighter mb-2">
+                        <div className="flex justify-between items-center mb-8 md:mb-10 border-b border-slate-700/50 pb-6 md:pb-8 border-dashed gap-3 md:gap-4">
+                           <div className="text-right flex-1">
+                              <h2 className="text-3xl sm:text-4xl md:text-6xl font-black text-white tracking-tighter mb-1 md:mb-2 leading-none">
                                  BETTING PASS
                               </h2>
-                              <div className="flex items-center gap-3 text-blue-400 font-bold text-lg md:text-xl">
+                              <div className="flex flex-wrap items-center gap-1.5 md:gap-3 text-blue-400 font-bold text-sm md:text-xl mt-1">
                                  <span className="line-through opacity-50 decoration-rose-500 decoration-2">EXCEL</span>
-                                 <span>✈️</span>
+                                 <span className="text-xs md:text-base">✈️</span>
                                  <span className="text-emerald-400 animate-pulse">WORLD CUP 2026</span>
                               </div>
                            </div>
-                           <div className="hidden sm:block text-6xl opacity-20">⚽</div>
+                           <div className="shrink-0">
+                              <img 
+                                src="/worldcup26.png" 
+                                alt="World Cup 2026 Logo" 
+                                className="w-14 sm:w-20 md:w-28 object-contain opacity-90 drop-shadow-[0_0_15px_rgba(255,255,255,0.15)]" 
+                              />
+                           </div>
                         </div>
                         
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-10">
@@ -1129,9 +1135,22 @@ const renderedMagazineContent = useMemo(() => {
                                     מאושר לטיסה ✅
                                  </div>
                               ) : (
-                                 <div className="flex flex-col md:items-end">
+                                 <div className="flex flex-col md:items-end gap-1.5">
                                     <div className="text-2xl font-black text-rose-500 mb-1">ממתין להסדר ⚠️</div>
-                                    <div className="text-sm font-bold text-slate-400">צרו קשר: 052-5583098</div>
+                                    <a 
+                                      href={`https://wa.me/972525583098?text=${encodeURIComponent('היי ברק, אני רוצה להסדיר תשלום עבור Bets in PROD ולהבטיח את מקומי בטיסה! ✈️\n\nאגב, שמעתי עליכם דרך: ')}`}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black px-4 py-2 rounded-xl transition-all flex items-center justify-center gap-2 shadow-lg shadow-emerald-900/20 active:scale-95 w-full md:w-auto"
+                                    >
+                                      <span className="text-base">💬</span> הסדר בוואטסאפ
+                                    </a>
+                                    <span className="text-[11px] font-bold text-slate-400/80 tracking-wide text-center w-full md:text-right">
+                                      או בוואטסאפ/ביט: 052-5583098
+                                    </span>
+                                    <span className="text-xs text-amber-400 font-bold text-center w-full md:text-right mt-0.5 drop-shadow-sm">
+                                      * נשמח ממש שתציינו בהודעה איך הגעתם אלינו! 🫶
+                                    </span>
                                  </div>
                               )}
                            </div>

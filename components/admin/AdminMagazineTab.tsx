@@ -86,30 +86,72 @@ export default function AdminMagazineTab() {
   };
 
   const renderToolbar = (target: 'msg' | 'subtext') => (
-     <div className="flex flex-wrap gap-2 mb-0 bg-slate-800 p-2 rounded-t-xl border border-slate-700 border-b-0">
-        <button onClick={() => wrapText('<b>', '</b>', target)} className="w-8 h-8 flex items-center justify-center bg-slate-950 hover:bg-slate-700 text-white rounded font-bold border border-slate-700" title="הדגש (Bold)">B</button>
-        {target === 'msg' && (
-          <>
-            <button onClick={() => wrapText('<h1>', '</h1>', target)} className="w-8 h-8 flex items-center justify-center bg-slate-950 hover:bg-slate-700 text-white rounded font-bold border border-slate-700" title="כותרת גדולה">H1</button>
-            <button onClick={() => wrapText('<h2>', '</h2>', target)} className="w-8 h-8 flex items-center justify-center bg-slate-950 hover:bg-slate-700 text-white rounded font-bold border border-slate-700" title="כותרת משנית">H2</button>
-          </>
-        )}
-        <div className="w-px bg-slate-700 mx-1 my-1"></div>
-        <button onClick={() => wrapText('<mark class="yellow">', '</mark>', target)} className="px-2 h-8 flex items-center justify-center bg-slate-950 hover:bg-slate-700 text-amber-400 rounded font-bold border border-slate-700" title="מרקר צהוב">מרקר צהוב</button>
-        <button onClick={() => wrapText('<mark class="green">', '</mark>', target)} className="px-2 h-8 flex items-center justify-center bg-slate-950 hover:bg-slate-700 text-emerald-400 rounded font-bold border border-slate-700" title="מרקר ירוק">מרקר ירוק</button>
-        <button onClick={() => wrapText('<mark class="red">', '</mark>', target)} className="px-2 h-8 flex items-center justify-center bg-slate-950 hover:bg-slate-700 text-rose-400 rounded font-bold border border-slate-700" title="מרקר אדום">מרקר אדום</button>
-        <div className="w-px bg-slate-700 mx-1 my-1"></div>
-        <button onClick={() => wrapText('<a href="כאן_שמים_את_הלינק" target="_blank">', '</a>', target)} className="w-8 h-8 flex items-center justify-center bg-slate-950 hover:bg-slate-700 text-cyan-400 rounded font-bold border border-slate-700" title="הוסף קישור">🔗</button>
-        
-        {/* כפתורי מדיה נקיים */}
-        {target === 'msg' && (
-          <>
-            <button onClick={() => wrapText('<img src="כאן_הלינק_לתמונה" alt="תמונה" />', '', target)} className="w-8 h-8 flex items-center justify-center bg-slate-950 hover:bg-slate-700 text-purple-400 rounded font-bold border border-slate-700" title="הוסף תמונה פנימית">🖼️</button>
-            <button onClick={() => wrapText('<video src="כאן_הלינק_לוידאו_ישיר" autoplay loop muted playsinline controls></video>', '', target)} className="w-8 h-8 flex items-center justify-center bg-slate-950 hover:bg-slate-700 text-pink-400 rounded font-bold border border-slate-700" title="הוסף וידאו פנימי (MP4)">🎬</button>
-            <button onClick={() => wrapText('<iframe src="https://www.youtube.com/embed/', '" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>', target)} className="w-8 h-8 flex items-center justify-center bg-slate-950 hover:bg-slate-700 text-red-500 rounded font-bold border border-slate-700" title="הוסף סרטון יוטיוב (סמן את מזהה הסרטון)">🟥</button>          </>
-        )}
-        
-        <button onClick={() => wrapText('<br/>\n', '', target)} className="w-8 h-8 flex items-center justify-center bg-slate-950 hover:bg-slate-700 text-slate-300 rounded font-bold border border-slate-700" title="שבירת שורה (אנטר)">⏎</button>
+     <div className="flex flex-col gap-3 mb-0 bg-slate-800/90 p-3 rounded-t-xl border border-slate-700 border-b-0 shadow-inner">
+        {/* שורה 1: טיפוגרפיה, יישור וסגנון בסיסי */}
+        <div className="flex flex-wrap items-center gap-3">
+          
+          {/* כותרות */}
+          {target === 'msg' && (
+            <div className="flex items-center bg-slate-950 rounded-lg border border-slate-700 overflow-hidden shadow-sm">
+              <button onClick={() => wrapText('<h1>', '</h1>', target)} className="px-3 h-8 hover:bg-slate-700 text-white font-black text-sm border-l border-slate-700" title="כותרת ראשית (H1)">H1</button>
+              <button onClick={() => wrapText('<h2>', '</h2>', target)} className="px-3 h-8 hover:bg-slate-700 text-white font-bold text-sm border-l border-slate-700" title="כותרת משנית (H2)">H2</button>
+              <button onClick={() => wrapText('<h3>', '</h3>', target)} className="px-3 h-8 hover:bg-slate-700 text-white font-medium text-sm" title="כותרת קטנה (H3)">H3</button>
+            </div>
+          )}
+
+          {/* מראה טקסט */}
+          <div className="flex items-center bg-slate-950 rounded-lg border border-slate-700 overflow-hidden shadow-sm">
+            <button onClick={() => wrapText('<b>', '</b>', target)} className="w-8 h-8 hover:bg-slate-700 text-white font-black border-l border-slate-700" title="הדגש (Bold)">B</button>
+            <button onClick={() => wrapText('<i>', '</i>', target)} className="w-8 h-8 hover:bg-slate-700 text-white italic font-serif border-l border-slate-700" title="נטוי (Italic)">I</button>
+            <button onClick={() => wrapText('<u>', '</u>', target)} className="w-8 h-8 hover:bg-slate-700 text-white underline" title="קו תחתון (Underline)">U</button>
+          </div>
+
+          {/* יישור טקסט (מרכז, ימין, שמאל) */}
+          <div className="flex items-center bg-slate-950 rounded-lg border border-slate-700 overflow-hidden shadow-sm" dir="ltr">
+             <button onClick={() => wrapText('<div style="text-align: left;">\n', '\n</div>', target)} className="w-8 h-8 hover:bg-slate-700 text-white text-lg border-r border-slate-700" title="יישור לשמאל">⇤</button>
+             <button onClick={() => wrapText('<div style="text-align: center;">\n', '\n</div>', target)} className="w-8 h-8 hover:bg-slate-700 text-white text-lg border-r border-slate-700" title="מרכוז טקסט">↔</button>
+             <button onClick={() => wrapText('<div style="text-align: right;">\n', '\n</div>', target)} className="w-8 h-8 hover:bg-slate-700 text-white text-lg" title="יישור לימין">⇥</button>
+          </div>
+
+          {/* טקסט רגיל / ללא צבע */}
+          <button onClick={() => wrapText('<span style="color: #e2e8f0; font-weight: normal; background: transparent;">', '</span>', target)} className="px-3 h-8 flex items-center justify-center bg-slate-950 hover:bg-slate-700 text-slate-200 text-xs rounded-lg border border-slate-700 shadow-sm transition-colors" title="נקה עיצוב וצבע חזרה לטקסט רגיל">טקסט רגיל (נקי)</button>
+        </div>
+
+        {/* שורה 2: מרקרים, קישורים, ציטוטים ומדיה */}
+        <div className="flex flex-wrap items-center gap-3">
+          
+          {/* מרקרים (צבעים) */}
+          <div className="flex items-center bg-slate-950 rounded-lg border border-slate-700 px-2 py-1 gap-2 shadow-sm">
+             <span className="text-xs text-slate-500 font-bold ml-1">הדגשה:</span>
+             <button onClick={() => wrapText('<mark class="yellow">', '</mark>', target)} className="w-5 h-5 rounded-full bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.5)] hover:scale-125 transition-transform" title="צהוב"></button>
+             <button onClick={() => wrapText('<mark class="green">', '</mark>', target)} className="w-5 h-5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)] hover:scale-125 transition-transform" title="ירוק"></button>
+             <button onClick={() => wrapText('<mark class="red">', '</mark>', target)} className="w-5 h-5 rounded-full bg-rose-500 shadow-[0_0_8px_rgba(225,29,72,0.5)] hover:scale-125 transition-transform" title="אדום"></button>
+             <button onClick={() => wrapText('<mark class="blue">', '</mark>', target)} className="w-5 h-5 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.5)] hover:scale-125 transition-transform" title="כחול"></button>
+          </div>
+
+          <div className="w-px h-6 bg-slate-600"></div>
+
+          {/* קישורים ותוספות */}
+          <div className="flex items-center gap-1">
+             <button onClick={() => wrapText('<a href="כאן_שמים_את_הלינק" target="_blank">', '</a>', target)} className="w-8 h-8 flex items-center justify-center bg-slate-950 hover:bg-slate-700 text-cyan-400 rounded-lg border border-slate-700 shadow-sm" title="הוסף קישור">🔗</button>
+             <button onClick={() => wrapText('<blockquote>\n', '\n</blockquote>', target)} className="w-8 h-8 flex items-center justify-center bg-slate-950 hover:bg-slate-700 text-slate-300 rounded-lg border border-slate-700 text-xl font-serif shadow-sm" title="ציטוט בולט (Blockquote)">"</button>
+             <button onClick={() => wrapText('<ul>\n  <li>', '</li>\n</ul>', target)} className="w-8 h-8 flex items-center justify-center bg-slate-950 hover:bg-slate-700 text-slate-300 rounded-lg border border-slate-700 shadow-sm" title="רשימה עם נקודות (Bullets)">📋</button>
+          </div>
+
+          {target === 'msg' && (
+            <>
+              <div className="w-px h-6 bg-slate-600 mx-1"></div>
+              {/* כפתורי מדיה */}
+              <div className="flex items-center gap-1">
+                <button onClick={() => wrapText('<img src="כאן_הלינק_לתמונה" alt="תמונה" />', '', target)} className="w-8 h-8 flex items-center justify-center bg-slate-950 hover:bg-slate-700 text-purple-400 rounded-lg border border-slate-700 shadow-sm" title="תמונה בתוך הטקסט">🖼️</button>
+                <button onClick={() => wrapText('<video src="כאן_הלינק_לוידאו_ישיר" autoplay loop muted playsinline controls></video>', '', target)} className="w-8 h-8 flex items-center justify-center bg-slate-950 hover:bg-slate-700 text-pink-400 rounded-lg border border-slate-700 shadow-sm" title="וידאו (MP4)">🎬</button>
+                <button onClick={() => wrapText('<iframe src="https://www.youtube.com/embed/', '" title="YouTube video player" frameborder="0" allowfullscreen></iframe>', target)} className="w-8 h-8 flex items-center justify-center bg-slate-950 hover:bg-slate-700 text-red-500 rounded-lg border border-slate-700 shadow-sm" title="סרטון יוטיוב">🟥</button>
+              </div>
+            </>
+          )}
+          
+          <button onClick={() => wrapText('<br/>\n', '', target)} className="mr-auto w-8 h-8 flex items-center justify-center bg-slate-950 hover:bg-slate-700 text-slate-300 rounded-lg border border-slate-700 shadow-sm" title="שבירת שורה (אנטר קשיח)">⏎</button>
+        </div>
      </div>
   );
 

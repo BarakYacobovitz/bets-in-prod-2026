@@ -22,10 +22,10 @@ const parseDateTimeLocal = (dtStr: string) => {
 const CLUB_ICONS: Record<string, string> = {
   "ריאל מדריד": "/real_madrid_footballteam_18009.png",
   "ברצלונה": "/fc_barcelona_footballteam_18015.png",
-  "מנצ'סטר סיטי": "/manchester_united_17973.png",
+  "מנצ'סטר סיטי": "/manchester_city_17974.png",
   "ארסנל": "/arsenal_17995.png",
   "באיירן מינכן": "/Bayern_Munchen_icon-icons.com_75868.png",
-  "פאריז סן ז'רמן": "/Paris-Saint-Germain-icon-256_37658.png"
+  "פריז סן ז'רמן": "/france_paris-saint-germain.football-logos.cc.svg"
 
 };
 
@@ -457,7 +457,7 @@ const regularQuestions = filteredQuestions.filter(q => !q.isDouble && !q.isSurpr
             </div>
          )}
 
-         <div className="mt-auto pt-3 flex-1 flex flex-col justify-end">
+         <div className="mt-8 pt-3 flex flex-col">
             {isWaitingToOpen ? (
                <div className="bg-slate-950/80 border border-slate-700 p-4 rounded-xl text-center shadow-inner">
                   <span className="text-3xl block mb-2 opacity-80 animate-bounce">🎁</span>
