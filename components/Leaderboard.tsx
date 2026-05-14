@@ -510,11 +510,26 @@ const getPrizeForRank = (rank: number, board: string, allUsers: any[]) => {
   };
 
   const calculateMatchPoints = (match: any, predH: string, predA: string, predQ: string) => {
-    if (!match.isFinished || predH === "" || predA === "") return null;
-    let pts = 0; const rH = Number(match.realHomeScore); const rA = Number(match.realAwayScore); const pH = Number(predH); const pA = Number(predA);
-    if (Math.sign(pH - pA) === Math.sign(rH - rA)) { pts += 5; if (pH === rH && pA === rA) pts += 10; }
+    // התיקון הקריטי: מוודאים שבאמת הוזנה תוצאה ושזה לא שדה ריק
+    if (!match.isFinished || predH === "" || predA === "" || match.realHomeScore === "" || match.realAwayScore === "" || match.realHomeScore === undefined) return null;
+    
+    let pts = 0; 
+    const rH = Number(match.realHomeScore); 
+    const rA = Number(match.realAwayScore); 
+    const pH = Number(predH); 
+    const pA = Number(predA);
+    
+    // מונע באגים של חישובי NaN
+    if (!isNaN(pH) && !isNaN(pA) && !isNaN(rH) && !isNaN(rA)) {
+       if (Math.sign(pH - pA) === Math.sign(rH - rA)) { 
+           pts += 5; 
+           if (pH === rH && pA === rA) pts += 10; 
+       }
+    }
+    
     if (match.stage === "KNOCKOUT" && predQ === match.realQualifier && predQ !== "") {
-      const qMap: any = { "32 הגדולות": 5, "שמינית גמר": 10, "רבע גמר": 15, "חצי גמר": 20, "גמר": 25, "מקום שלישי": 10 }; pts += (qMap[match.roundName] || 0);
+      const qMap: any = { "32 הגדולות": 5, "שמינית גמר": 10, "רבע גמר": 15, "חצי גמר": 20, "גמר": 25, "מקום שלישי": 10 }; 
+      pts += (qMap[match.roundName] || 0);
     }
     return pts;
   };
@@ -575,14 +590,18 @@ const getPrizeForRank = (rank: number, board: string, allUsers: any[]) => {
       const snapGroups = await getDocs(qGroups);
       snapGroups.forEach(doc => {
         const data = doc.data(); const matchInfo = matchesMap[data.matchId];
-        if (matchInfo && data.predictedHomeScore !== "" && isMatchLocked(matchInfo, tournamentState)) {
+        // גם אם המשחק לא "נעול" טכנית לפי השלב, אבל הוא הסתיים בפועל, חובה להציג אותו!
+        if (matchInfo && data.predictedHomeScore !== "" && (isMatchLocked(matchInfo, tournamentState) || matchInfo.isFinished)) {
           gatheredMatches.push({ ...data, matchInfo, points: calculateMatchPoints(matchInfo, data.predictedHomeScore, data.predictedAwayScore, "") });
-          if (matchInfo.isFinished) {
+          
+          if (matchInfo.isFinished && matchInfo.realHomeScore !== "" && matchInfo.realAwayScore !== "") {
             const pH = Number(data.predictedHomeScore); const pA = Number(data.predictedAwayScore);
             const rH = Number(matchInfo.realHomeScore); const rA = Number(matchInfo.realAwayScore);
-            if (Math.sign(pH - pA) === Math.sign(rH - rA)) {
-               if (pH === rH && pA === rA) { stats.exactC++; stats.exactP += 15; } 
-               else { stats.dirC++; stats.dirP += 5; }
+            if (!isNaN(pH) && !isNaN(pA) && !isNaN(rH) && !isNaN(rA)) {
+               if (Math.sign(pH - pA) === Math.sign(rH - rA)) {
+                  if (pH === rH && pA === rA) { stats.exactC++; stats.exactP += 15; } 
+                  else { stats.dirC++; stats.dirP += 5; }
+               }
             }
           }
         }
@@ -591,14 +610,17 @@ const getPrizeForRank = (rank: number, board: string, allUsers: any[]) => {
       const snapKnockout = await getDocs(qKnockout);
       snapKnockout.forEach(doc => {
         const data = doc.data(); const matchInfo = matchesMap[data.matchId];
-        if (matchInfo && data.predictedHomeScore !== "" && isMatchLocked(matchInfo, tournamentState)) {
+        if (matchInfo && data.predictedHomeScore !== "" && (isMatchLocked(matchInfo, tournamentState) || matchInfo.isFinished)) {
           gatheredMatches.push({ ...data, matchInfo, points: calculateMatchPoints(matchInfo, data.predictedHomeScore, data.predictedAwayScore, data.qualifier || "") });
-          if (matchInfo.isFinished) {
+          
+          if (matchInfo.isFinished && matchInfo.realHomeScore !== "" && matchInfo.realAwayScore !== "") {
             const pH = Number(data.predictedHomeScore); const pA = Number(data.predictedAwayScore);
             const rH = Number(matchInfo.realHomeScore); const rA = Number(matchInfo.realAwayScore);
-            if (Math.sign(pH - pA) === Math.sign(rH - rA)) {
-               if (pH === rH && pA === rA) { stats.exactC++; stats.exactP += 15; }
-               else { stats.dirC++; stats.dirP += 5; }
+            if (!isNaN(pH) && !isNaN(pA) && !isNaN(rH) && !isNaN(rA)) {
+               if (Math.sign(pH - pA) === Math.sign(rH - rA)) {
+                  if (pH === rH && pA === rA) { stats.exactC++; stats.exactP += 15; }
+                  else { stats.dirC++; stats.dirP += 5; }
+               }
             }
             if (data.qualifier === matchInfo.realQualifier && data.qualifier !== "") {
                stats.koC++; stats.koP += (qMap[matchInfo.roundName] || 0);

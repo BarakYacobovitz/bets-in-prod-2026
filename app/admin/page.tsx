@@ -700,8 +700,9 @@ const handleCalculateScores = async (silentParam: any = false) => {
           const userGroupMatches = allUserMatches.filter(m => m.userId === uid);
           userGroupMatches.forEach(userMatch => {
             const realMatch = realMatches.find(m => m.id === userMatch.matchId);
-            // @ts-ignore
-            if (realMatch && realMatch.isFinished && realMatch.stage !== "KNOCKOUT") {
+            
+            // התיקון: חומת מגן שמוודאת שהתוצאות האמיתיות קיימות והן לא מחרוזת ריקה או null
+            if (realMatch && realMatch.isFinished && realMatch.stage !== "KNOCKOUT" && realMatch.realHomeScore !== "" && realMatch.realAwayScore !== "" && realMatch.realHomeScore !== null && realMatch.realAwayScore !== null) {
               const predH = Number(userMatch.predictedHomeScore); const predA = Number(userMatch.predictedAwayScore);
               const realH = Number(realMatch.realHomeScore); const realA = Number(realMatch.realAwayScore);
               if (!isNaN(predH) && !isNaN(predA) && !isNaN(realH) && !isNaN(realA)) {
@@ -747,7 +748,9 @@ const handleCalculateScores = async (silentParam: any = false) => {
           const userKnockoutMatches = allUserKnockouts.filter(m => m.userId === uid);
           userKnockoutMatches.forEach(koMatch => {
             const realMatch = realMatches.find(m => m.id === koMatch.matchId);
-            if (realMatch && realMatch.isFinished && realMatch.stage === "KNOCKOUT") {
+            
+            // התיקון: חומת מגן גם לשלב הנוקאאוט
+            if (realMatch && realMatch.isFinished && realMatch.stage === "KNOCKOUT" && realMatch.realHomeScore !== "" && realMatch.realAwayScore !== "" && realMatch.realHomeScore !== null && realMatch.realAwayScore !== null) {
               const predH = Number(koMatch.predictedHomeScore); const predA = Number(koMatch.predictedAwayScore);
               const realH = Number(realMatch.realHomeScore); const realA = Number(realMatch.realAwayScore);
               if (!isNaN(predH) && !isNaN(predA) && !isNaN(realH) && !isNaN(realA)) {

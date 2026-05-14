@@ -316,47 +316,70 @@ const calculateMatchPoints = (predH: string, predA: string, predQ: string) => {
     <>
       <div id={`match-${match.id}`} className={`rounded-2xl p-4 sm:p-5 w-full max-w-lg mx-auto relative ${cardStyle}`} dir="rtl">
         
-        <div className="absolute top-3 left-3 z-10">
-          {match.isFinished ? (
-            getPointsBadge(myPoints)
-          ) : !isLocked ? (
-            <button 
-              type="button"
-              onClick={handleRandomize} 
-              title="ניחוש אקראי" 
-              className="flex items-center gap-1.5 px-2 py-1 bg-slate-800/80 border border-slate-700 hover:border-slate-500 hover:bg-slate-700/80 rounded-lg text-slate-400 hover:text-white transition-all shadow-sm group active:scale-95"
-            >
-              <span className="text-[9px] font-bold uppercase tracking-wider hidden sm:inline">אקראי</span>
-              <span className="text-xs group-hover:rotate-12 transition-transform">🎲</span>
-            </button>
-          ) : null}
-        </div>
-
-        <div className="absolute top-3 right-3 z-10"><span className={`text-[9px] uppercase font-black tracking-wider px-2 py-1 rounded-lg bg-${themeColor}-500/10 text-${themeColor}-400 border border-${themeColor}-500/20`}>{isKnockout ? match.roundName : `בית ${match.group}`}</span></div>
-
-        {/* האזור ששודרג עם הלינקים! */}
-        <div className="flex flex-col justify-center items-center mt-2 mb-4 gap-1.5">
-           <div className="flex flex-wrap justify-center items-center gap-2">
-              <div className="text-[11px] font-bold text-slate-400 bg-slate-900/50 px-2.5 py-1 rounded-full border border-slate-800 flex items-center gap-1.5">
-                 🕒 {getSmartDateText()}
-                 {/* אייקון טלוויזיה אלגנטי כשזה טרם החל */}
+        {/* --- האזור העליון המאוחד - סדר משופר ודינמי --- */}
+        <div className="flex flex-col gap-4 mb-6 mt-1 relative z-10">
+           
+           {/* שורה 1: הכותרת העליונה - מיקום וזמן המשחק */}
+           <div className="flex justify-between items-center px-1">
+              {/* מיקום המשחק (ימין) */}
+              {(match.stadium || match.city) && (
+                 <div className="text-[10px] sm:text-[11px] font-bold text-slate-500 flex items-center gap-1.5 bg-slate-900/40 px-2.5 py-1 rounded-lg border border-slate-800/50 shadow-sm">
+                    <span>🏟️</span>
+                    <span className="truncate max-w-[130px] sm:max-w-none">
+                       {match.stadium}{match.stadium && match.city ? " • " : ""}{match.city}
+                    </span>
+                 </div>
+              )}
+              
+              {/* זמן ושידור (שמאל) */}
+              <div className="flex items-center gap-2">
+                 <div className="text-[10px] sm:text-[11px] font-bold text-slate-300 bg-slate-900/80 px-2.5 py-1.5 rounded-lg border border-slate-700/80 flex items-center gap-1.5 whitespace-nowrap shadow-sm">
+                    <span>🕒</span> {getSmartDateText()}
+                 </div>
                  {!isLive && match.broadcastUrl && (
-                    <a href={match.broadcastUrl} target="_blank" rel="noopener noreferrer" title="לינק לשידור" className="text-slate-500 hover:text-cyan-400 transition-colors border-r border-slate-700 pr-1.5 ml-0.5">
+                    <a href={match.broadcastUrl} target="_blank" rel="noopener noreferrer" title="לינק לשידור" className="w-7 h-7 flex items-center justify-center bg-slate-800 rounded-lg text-slate-400 hover:text-cyan-400 transition-colors border border-slate-700 shadow-sm">
                        📺
                     </a>
                  )}
               </div>
            </div>
-           
-           {(match.stadium || match.city) && (
-              <div className="text-[10px] font-bold text-slate-500 flex items-center gap-1">
-                 <span>🏟️</span>
-                 <span>{match.stadium}{match.stadium && match.city ? " • " : ""}{match.city}</span>
-              </div>
-           )}
-           {statusBadge}
-        </div>
 
+           {/* שורה 2: מרכז הבקרה - ניקוד / סטטוס / הגרלה (הכל באותו מקום!) */}
+           <div className="flex justify-between items-center px-1 relative">
+              
+              {/* ימין: השלב/בית */}
+              <div className="flex-1 flex justify-start">
+                 <span className={`text-[10px] sm:text-[11px] uppercase font-black tracking-wider px-2.5 py-1.5 rounded-xl bg-${themeColor}-500/10 text-${themeColor}-400 border border-${themeColor}-500/20 shadow-sm whitespace-nowrap`}>
+                    {isKnockout ? match.roundName : `בית ${match.group}`}
+                 </span>
+              </div>
+
+              {/* אמצע: הסטטוס הדינמי המרכזי (מוגדל ובולט) */}
+              <div className="flex-none flex justify-center items-center min-w-[100px]">
+                 {match.isFinished ? (
+                    /* 1. המשחק נגמר? מציגים את הניקוד שקיבל המשתמש */
+                    <div className="animate-fade-in-up scale-125 transform origin-center drop-shadow-md">
+                       {getPointsBadge(myPoints)}
+                    </div>
+                 ) : (isLive || isWaitingForResult || isLocked) ? (
+                    /* 2. המשחק פעיל או נעול? מציגים את הבאדג' החכם (LIVE/ממתין/נעול) */
+                    <div className="scale-110 sm:scale-125 transform origin-center">
+                       {statusBadge}
+                    </div>
+                 ) : (
+                    /* 3. המשחק פתוח לניחושים? מציגים את כפתור ההגרלה */
+                    <button type="button" onClick={handleRandomize} title="ניחוש אקראי" className="flex items-center gap-2 px-4 py-1.5 bg-slate-800/90 border border-slate-700 hover:border-slate-500 hover:bg-slate-700 rounded-2xl text-slate-300 hover:text-white transition-all shadow-lg group active:scale-95">
+                       <span className="text-[10px] sm:text-xs font-black uppercase tracking-wider">אקראי</span>
+                       <span className="text-sm group-hover:rotate-12 transition-transform">🎲</span>
+                    </button>
+                 )}
+              </div>
+
+              {/* שמאל: ריק לאיזון הפריסה (Flex-1) */}
+              <div className="flex-1"></div>
+
+           </div>
+        </div>
         <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 sm:gap-3 mb-4 mt-1">
           <div className="flex justify-end items-center gap-2 text-right">
             {getFlagUrl(match.homeTeam) ? <img src={getFlagUrl(match.homeTeam)!} className="w-6 h-4 sm:w-7 sm:h-5 object-cover rounded-sm shadow-sm" alt="flag" /> : <span className="text-lg sm:text-xl drop-shadow-md">🏳️</span>}

@@ -273,8 +273,13 @@ export default function Dashboard({ userId, userName, setActiveTab, setPredictio
         if (data.dailyMessage !== undefined) setDailyMessage(data.dailyMessage);
         if (data.dailyMediaUrl !== undefined) setDailyMediaUrl(data.dailyMediaUrl);
         if (data.dailySubtext !== undefined) setDailySubtext(data.dailySubtext);
-        if (data.studioQuotes !== undefined) {
-           setStudioQuotes(data.studioQuotes);
+        if (data.studioQuotes) {
+           // מנגנון הגנה: אם המשפט ריק באדמין, נשתמש בברירת המחדל
+           setStudioQuotes({
+             trump: data.studioQuotes.trump || '"FAKE NEWS! אני מנצח את כולם!" 🤬',
+             canadian: data.studioQuotes.canadian || '"Sorry eh, הניחוש שלי מושלם..." 🍁',
+             mexican: data.studioQuotes.mexican || '"Ay caramba! איזה בול!" 🌮'
+           });
         }
       }
       
@@ -937,10 +942,11 @@ const renderedMagazineContent = useMemo(() => {
         .animate-carousel-3 { animation: fade3 15s infinite ease-in-out; }
       `}} />
 
-        <div className="hidden 2xl:block fixed bottom-0 left-4 z-40 w-[380px] pointer-events-none origin-bottom-left">
+        {/* אולפן שולחני - מופיע ממסכי XL ומעלה (1280px+) */}
+        <div className="hidden xl:block fixed bottom-0 left-4 z-[60] w-[480px] pointer-events-none origin-bottom-left">
 
          {/* המסך טלוויזיה */}
-         <div className="absolute bottom-[80%] left-1/2 -translate-x-1/2 w-[90%] bg-slate-950 border-[4px] border-slate-800 rounded-3xl shadow-[0_25px_50px_rgba(0,0,0,0.8),0_0_30px_rgba(59,130,246,0.2)] pointer-events-auto overflow-hidden flex flex-col z-0 transition-transform duration-500 hover:scale-[1.02]">
+         <div className="absolute bottom-[80%] left-1/2 -translate-x-1/2 w-[85%] bg-slate-950 border-[4px] border-slate-800 rounded-3xl shadow-[0_25px_50px_rgba(0,0,0,0.8),0_0_30px_rgba(59,130,246,0.2)] pointer-events-auto overflow-hidden flex flex-col z-0 transition-transform duration-500 hover:scale-[1.02]">
             <div className="bg-slate-900 border-b border-slate-800 px-4 py-2 flex justify-between items-center z-10 relative shadow-md">
                <div className="flex items-center gap-2">
                   <div className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-pulse shadow-[0_0_10px_rgba(244,63,94,0.8)]"></div>
@@ -962,49 +968,50 @@ const renderedMagazineContent = useMemo(() => {
             </div>
          </div>
 
-         {/* הדמויות והבועות */}
-         <div className="absolute bottom-[40%] left-0 w-full flex justify-center items-end gap-3 z-10 px-2 pointer-events-auto">
+         {/* הדמויות והבועות - הוגדלו והותאמו ללחיצה וריחוף */}
+         <div className="absolute bottom-[38%] left-0 w-full flex justify-center items-end gap-2 z-20 px-4 pointer-events-auto">
           
             {/* Trump */}
-            <div className="relative group cursor-pointer pb-2 z-30 shrink-0">
-               <div className="absolute bottom-full mb-2 -right-2 opacity-0 group-hover:opacity-100 transition-all duration-300 z-50 pointer-events-none origin-bottom-right scale-90 group-hover:scale-100 w-max max-w-[180px]">
-                  <div className="bg-rose-700 text-white font-bold text-xs px-3 py-2 rounded-xl border-2 border-white shadow-[0_0_20px_rgba(225,29,72,0.9)] whitespace-normal break-words text-center leading-snug">
+            <div className="relative group cursor-pointer pb-2 z-30 shrink-0 pointer-events-auto" tabIndex={0}>
+               <div className="absolute bottom-full mb-4 -right-4 opacity-0 group-hover:opacity-100 group-focus:opacity-100 group-active:opacity-100 transition-all duration-300 z-[100] pointer-events-none origin-bottom-right scale-90 group-hover:scale-100 group-focus:scale-100 w-max max-w-[220px]">
+                  <div className="bg-rose-700 text-white font-bold text-sm px-4 py-2.5 rounded-xl border-2 border-white shadow-[0_0_20px_rgba(225,29,72,0.9)] whitespace-normal break-words text-center leading-snug">
                      {studioQuotes.trump}
-                     <div className="absolute -bottom-2 right-4 w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[6px] border-t-white"></div>
+                     <div className="absolute -bottom-2 right-6 w-0 h-0 border-l-[8px] border-l-transparent border-r-[8px] border-r-transparent border-t-[8px] border-t-white"></div>
                   </div>
                </div>
-               <div className="relative transition-all duration-300 group-hover:-translate-y-4 group-hover:rotate-6 group-hover:scale-110">
-                 <img src="/donaldIcon-removebg.png" alt="Trump" className="w-24 object-contain transition-all duration-300 group-hover:animate-rage filter group-hover:drop-shadow-[0_0_20px_rgba(225,29,72,1)] group-hover:contrast-[1.15]" />
+               <div className="relative transition-all duration-300 group-hover:-translate-y-4 group-focus:-translate-y-4 group-hover:rotate-6 group-focus:rotate-6 group-hover:scale-110 group-focus:scale-110">
+                 {/* הנה ההילה האדומה שחזרה! */}
+                 <div className="absolute inset-0 bg-red-600 rounded-full blur-2xl opacity-0 group-hover:opacity-80 group-focus:opacity-80 transition-opacity duration-300 scale-125 z-0"></div>
+                 <img src="/donaldIcon-removebg.png" alt="Trump" className="w-36 relative z-10 object-contain transition-all duration-300 group-hover:animate-rage group-focus:animate-rage filter group-hover:drop-shadow-[0_0_20px_rgba(225,29,72,1)] group-focus:drop-shadow-[0_0_20px_rgba(225,29,72,1)]" />
                </div>
             </div>
 
             {/* Canadian */}
-            <div className="relative group cursor-pointer pb-4 z-20 shrink-0">
-               <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-all duration-300 z-50 pointer-events-none origin-bottom scale-90 group-hover:scale-100 w-max max-w-[180px]">
-                  <div className="bg-slate-900 text-blue-50 font-bold text-xs px-3 py-2 rounded-xl border-2 border-blue-500 shadow-[0_8px_20px_rgba(59,130,246,0.4)] whitespace-normal break-words text-center leading-snug">
+            <div className="relative group cursor-pointer pb-4 z-20 shrink-0 pointer-events-auto" tabIndex={0}>
+               <div className="absolute bottom-full mb-4 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 group-focus:opacity-100 group-active:opacity-100 transition-all duration-300 z-[100] pointer-events-none origin-bottom scale-90 group-hover:scale-100 group-focus:scale-100 w-max max-w-[220px]">
+                  <div className="bg-slate-900 text-blue-50 font-bold text-sm px-4 py-2.5 rounded-xl border-2 border-blue-500 shadow-[0_8px_20px_rgba(59,130,246,0.4)] whitespace-normal break-words text-center leading-snug">
                      {studioQuotes.canadian}
-                     <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[6px] border-t-blue-500"></div>
+                     <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-0 h-0 border-l-[8px] border-l-transparent border-r-[8px] border-r-transparent border-t-[8px] border-t-blue-500"></div>
                   </div>
                </div>
-               <img src="/candianIcon-removebg.png" alt="Canadian" className="w-24 object-contain drop-shadow-xl transition-all duration-300 group-hover:-translate-y-4 group-hover:scale-110" />
+               <img src="/candianIcon-removebg.png" alt="Canadian" className="w-36 object-contain drop-shadow-xl transition-all duration-300 group-hover:-translate-y-4 group-focus:-translate-y-4 group-hover:scale-110 group-focus:scale-110" />
             </div>
 
             {/* Mexican */}
-            <div className="relative group cursor-pointer pb-6 z-10 shrink-0">
-               <div className="absolute bottom-full mb-2 -left-2 opacity-0 group-hover:opacity-100 transition-all duration-300 z-50 pointer-events-none origin-bottom-left scale-90 group-hover:scale-100 w-max max-w-[180px]">
-                  <div className="bg-slate-900 text-emerald-50 font-bold text-xs px-3 py-2 rounded-xl border-2 border-emerald-500 shadow-[0_8px_20px_rgba(16,185,129,0.4)] whitespace-normal break-words text-center leading-snug">
+            <div className="relative group cursor-pointer pb-6 z-10 shrink-0 pointer-events-auto" tabIndex={0}>
+               <div className="absolute bottom-full mb-4 -left-4 opacity-0 group-hover:opacity-100 group-focus:opacity-100 group-active:opacity-100 transition-all duration-300 z-[100] pointer-events-none origin-bottom-left scale-90 group-hover:scale-100 group-focus:scale-100 w-max max-w-[220px]">
+                  <div className="bg-slate-900 text-emerald-50 font-bold text-sm px-4 py-2.5 rounded-xl border-2 border-emerald-500 shadow-[0_8px_20px_rgba(16,185,129,0.4)] whitespace-normal break-words text-center leading-snug">
                      {studioQuotes.mexican}
-                     <div className="absolute -bottom-2 left-4 w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[6px] border-t-emerald-500"></div>
+                     <div className="absolute -bottom-2 left-6 w-0 h-0 border-l-[8px] border-l-transparent border-r-[8px] border-r-transparent border-t-[8px] border-t-emerald-500"></div>
                   </div>
                </div>
-               <img src="/maxicanIcon-removebg.png" alt="Mexican" className="w-24 object-contain drop-shadow-xl -scale-x-100 transition-all duration-300 group-hover:-translate-y-4 group-hover:-rotate-6 group-hover:scale-110 origin-bottom" />
+               <img src="/maxicanIcon-removebg.png" alt="Mexican" className="w-36 object-contain drop-shadow-xl -scale-x-100 transition-all duration-300 group-hover:-translate-y-4 group-focus:-translate-y-4 group-hover:-rotate-6 group-focus:-rotate-6 group-hover:scale-110 group-focus:scale-110 origin-bottom" />
             </div>
          </div>
 
          {/* שולחן האולפן */}
-         <img src="/panel-removebg.png" alt="Studio Desk" className="relative z-20 w-full object-contain drop-shadow-[0_-8px_20px_rgba(0,0,0,0.8)] pointer-events-none" />
+         <img src="/panel-removebg.png" alt="Studio Desk" className="relative z-30 w-full object-contain drop-shadow-[0_-8px_20px_rgba(0,0,0,0.8)] pointer-events-none" />
       </div>
-
 
       {missingTasksList.length > 0 && (
          <div className={`${bannerStyle} p-6 rounded-3xl border relative overflow-hidden transition-all duration-500`}>

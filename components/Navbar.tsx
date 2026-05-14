@@ -105,6 +105,8 @@ export default function Navbar() {
   const [ptsDiff, setPtsDiff] = useState(0);
   const [missingNormalTasks, setMissingNormalTasks] = useState(0);
   const [requiredNormalTasks, setRequiredNormalTasks] = useState(0);
+  // ה-State החדש שיחזיק את הפירוט ללחיצה
+  const [alertDetails, setAlertDetails] = useState<{type: string, count: number, text: string, href: string}[]>([]);
   
   const [showNotifMenu, setShowNotifMenu] = useState(false);
   const notifRef = useRef<HTMLDivElement>(null);
@@ -185,8 +187,14 @@ export default function Navbar() {
     const doCalc = () => {
       let required = 0;
       let missing = 0;
+      
+      // מונים לפי קטגוריות
+      let mMissing = 0;
+      let bMissing = 0;
+      let qMissing = 0;
+      let tMissing = 0;
 
-      // חישוב משחקים פתוחים
+      // 1. חישוב משחקים
       const userPreds = new Set();
       [...pmData, ...pkData].forEach(d => {
         const hasScores = d.predictedHomeScore !== undefined && d.predictedHomeScore !== "" && 
@@ -203,35 +211,53 @@ export default function Navbar() {
       matchesData.forEach((m: any) => {
         if (isMatchOpenForPrediction(m, currentTState)) {
            required++;
-           if (!m.isFinished && !userPreds.has(m.id)) missing++;
+           if (!m.isFinished && !userPreds.has(m.id)) {
+              missing++;
+              mMissing++;
+           }
         }
       });
 
-      // חישוב בונוסים קבועים בלבד
+      // 2. חישוב בונוסים קבועים
       bqData.forEach((q: any) => {
         if (!q.isSurprise && isQuestionMandatoryNow(q, currentTState)) {
           required++;
-          if (!pbData[q.id] || String(pbData[q.id]).trim() === "") missing++;
+          if (!pbData[q.id] || String(pbData[q.id]).trim() === "") {
+             missing++;
+             bMissing++;
+          }
         }
       });
 
-      // חישוב שלב הבתים ומקום שלישי
+      // 3. חישוב שלב הבתים ומקום שלישי
       if (currentTState === 0) {
          const groups = Array.from(new Set(matchesData.filter((m: any) => m.stage !== "KNOCKOUT").map((m: any) => m.group))).filter(Boolean);
          required += groups.length; 
-
          groups.forEach((g: any) => {
-            if (!pqData[g]?.first || !pqData[g]?.second) missing++;
+            if (!pqData[g]?.first || !pqData[g]?.second) {
+               missing++;
+               qMissing++;
+            }
          });
 
          required += 1;
-         if (ptData.filter((t: any) => t && String(t).trim() !== "").length < 8) missing++;
+         if (ptData.filter((t: any) => t && String(t).trim() !== "").length < 8) {
+            missing++;
+            tMissing++;
+         }
       }
 
+      // בניית מערך ההתראות המפורט
+      const newAlerts = [];
+      if (mMissing > 0) newAlerts.push({ type: 'MATCH', count: mMissing, text: `חסר ניחוש ל-${mMissing} משחקים`, href: '/predictions' });
+      if (qMissing > 0) newAlerts.push({ type: 'QUAL', count: qMissing, text: `חסר ניחוש מעפילה ל-${qMissing} בתים`, href: '/qualifiers' });
+      if (tMissing > 0) newAlerts.push({ type: 'THIRD', count: 1, text: 'חסרה מעפילה מהמקום ה-3', href: '/third-place' });
+      if (bMissing > 0) newAlerts.push({ type: 'BONUS', count: bMissing, text: `חסרה תשובה ל-${bMissing} שאלות בונוס`, href: '/bonus' });
+
+      setAlertDetails(newAlerts);
       setMissingNormalTasks(missing);
       setRequiredNormalTasks(required);
     };
-
     // כל מאזין פה מבטיח שטבעת האחוזים קופצת ישר כשמשהו משתנה!
     const unsubSys = onSnapshot(doc(db, "settings", "system"), (snap) => {
       currentTState = snap.exists() ? Number(snap.data().tournamentState) || 0 : 0;
@@ -607,10 +633,40 @@ export default function Navbar() {
                         </div>
                       )}
 
-                      <div className="flex flex-col gap-1">
-                         {ptsDiff > 0 && <div className="text-xs font-bold text-emerald-400 bg-emerald-950/30 p-2.5 rounded-xl border border-emerald-500/20 flex items-center gap-2"><span>📈</span> עלית ב-{ptsDiff} נקודות היום!</div>}
-                         {missingNormalTasks > 0 && <div className="text-xs font-bold text-amber-400 bg-amber-950/30 p-2.5 rounded-xl border border-amber-500/20 flex items-center gap-2"><span>⚠️</span> חסר ניחוש ל-{missingNormalTasks} משימות קבועות!</div>}
-                         {activeSurpriseAlert > 0 && <div className="text-xs font-bold text-purple-400 bg-purple-950/30 p-2.5 rounded-xl border border-purple-500/20 flex items-center gap-2"><span>🎁</span> יש {activeSurpriseAlert} שאלות הפתעה פתוחות!</div>}
+                      <div className="flex flex-col gap-1.5">
+                         {/* התראת עלייה בנקודות */}
+                         {ptsDiff > 0 && (
+                            <button 
+                               onClick={(e) => { setShowNotifMenu(false); navigateToLeaderboard(e); }} 
+                               className="w-full text-right text-[11px] font-bold text-emerald-400 bg-emerald-950/30 hover:bg-emerald-900/40 p-2.5 rounded-xl border border-emerald-500/20 flex items-center gap-2 transition-all active:scale-95 shadow-sm cursor-pointer"
+                            >
+                               <span className="animate-bounce text-xs">📈</span> עלית ב-{ptsDiff} נקודות היום!
+                            </button>
+                         )}
+
+                         {/* התראות פירוט חוסרים (השינוי החדש!) */}
+                         {alertDetails.map((alert, idx) => (
+                            <Link 
+                               key={idx}
+                               href={alert.href}
+                               onClick={() => setShowNotifMenu(false)}
+                               className="w-full text-right text-[11px] font-bold text-amber-400 bg-amber-950/30 hover:bg-amber-900/40 p-2.5 rounded-xl border border-amber-500/20 flex items-center gap-2 transition-all active:scale-95 shadow-sm"
+                            >
+                               <span className="animate-pulse text-xs">⚠️</span> {alert.text}
+                            </Link>
+                         ))}
+                         
+                         {/* שאלות הפתעה */}
+                         {activeSurpriseAlert > 0 && (
+                            <Link 
+                               href="/bonus"
+                               onClick={() => setShowNotifMenu(false)}
+                               className="w-full text-right text-[11px] font-bold text-purple-400 bg-purple-950/30 hover:bg-purple-900/40 p-2.5 rounded-xl border border-purple-500/20 flex items-center gap-2 transition-all active:scale-95 shadow-sm"
+                            >
+                               <span className="animate-pulse text-xs">🎁</span> יש {activeSurpriseAlert} שאלות הפתעה פתוחות!
+                            </Link>
+                         )}
+                         
                          {totalNotifs === 0 && ptsDiff <= 0 && <div className="text-xs font-medium text-slate-500 text-center py-4">אין התראות חדשות.</div>}
                       </div>
                    </div>
