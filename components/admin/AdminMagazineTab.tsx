@@ -56,7 +56,7 @@ export default function AdminMagazineTab() {
       const finalMsg = isMsgHtmlMode ? dashMsg : (msgRef.current?.innerHTML || "");
       const finalSubtext = isSubtextHtmlMode ? dashSubtext : (subtextRef.current?.innerHTML || "");
 
-      await setDoc(doc(doc(db, "settings", "dashboard")), {
+      await setDoc(doc(db, "settings", "dashboard"), {
         dailyMessage: finalMsg,
         dailyMediaUrl: dashMediaUrl,
         dailySubtext: finalSubtext,
