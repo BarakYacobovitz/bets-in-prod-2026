@@ -1057,9 +1057,8 @@ const renderedMagazineContent = useMemo(() => {
          </div>
       )}
 
-      <div className="flex md:grid md:grid-cols-2 items-stretch overflow-x-auto snap-x snap-mandatory md:overflow-visible gap-4 md:gap-8 pb-4 md:pb-0 custom-scrollbar -mx-4 px-4 md:mx-0 md:px-0">
-         
-        <div className="w-[90%] md:w-auto shrink-0 snap-center rounded-3xl p-6 shadow-2xl relative overflow-hidden bg-slate-900 border border-slate-700 flex flex-col min-h-full min-w-0">            <img src="tunnel.png" alt="Bets in Prod Tunnel" className="absolute inset-0 w-full h-full object-cover z-0 opacity-40 transition-all duration-1000 pointer-events-none" />
+    <div className="flex lg:grid lg:grid-cols-2 items-stretch overflow-x-auto snap-x snap-mandatory gap-4 md:gap-8 pb-4 md:pb-0 custom-scrollbar -mx-4 px-4 md:mx-0 md:px-0 shrink-0 w-full"> 
+        <div className="w-[calc(100vw-32px)] lg:w-auto shrink-0 snap-center rounded-3xl p-6 shadow-2xl relative overflow-hidden bg-slate-900 border border-slate-700 flex flex-col min-h-full min-w-0">         <img src="tunnel.png" alt="Bets in Prod Tunnel" className="absolute inset-0 w-full h-full object-cover z-0 opacity-40 transition-all duration-1000 pointer-events-none" />
             <div className="absolute inset-0 z-0 bg-gradient-to-l from-slate-950/90 via-slate-900/60 to-slate-950/90 pointer-events-none"></div>
             
             <div className="relative z-10 text-right mb-6">
@@ -1087,7 +1086,7 @@ const renderedMagazineContent = useMemo(() => {
 )}
 
 {tournamentState === 0 ? (
-               /* --- מצב 0: כרטיס טיסה VIP ממוקד --- */
+               /* --- מצ  ב 0: כרטיס טיסה VIP ממוקד --- */
                <div className="relative z-10 w-full mb-8 group">
                   <div className={`bg-gradient-to-br ${userStats.hasPaid ? 'from-emerald-900/40 via-slate-900 to-emerald-900/20 border-emerald-500/40' : 'from-slate-900 via-blue-950 to-slate-900 border-blue-500/30'} rounded-3xl border shadow-2xl overflow-hidden relative transition-all duration-500`}>
                      
@@ -1110,58 +1109,53 @@ const renderedMagazineContent = useMemo(() => {
                            </div>
                         )}
 
-                        <div className="flex justify-between items-center mb-8 md:mb-10 border-b border-slate-700/50 pb-6 md:pb-8 border-dashed gap-3 md:gap-4">
-                           <div className="text-right flex-1">
-                              <h2 className="text-3xl sm:text-4xl md:text-6xl font-black text-white tracking-tighter mb-1 md:mb-2 leading-none">
-                                 BETTING PASS
-                              </h2>
-                              <div className="flex flex-wrap items-center gap-1.5 md:gap-3 text-blue-400 font-bold text-sm md:text-xl mt-1">
-                                 <span className="line-through opacity-50 decoration-rose-500 decoration-2">EXCEL</span>
-                                 <span className="text-xs md:text-base">✈️</span>
-                                 <span className="text-emerald-400 animate-pulse">WORLD CUP 2026</span>
-                              </div>
-                           </div>
-                           <div className="shrink-0">
-                              <img 
-                                src="/worldcup26.png" 
-                                alt="World Cup 2026 Logo" 
-                                className="w-14 sm:w-20 md:w-28 object-contain opacity-90 drop-shadow-[0_0_15px_rgba(255,255,255,0.15)]" 
-                              />
-                           </div>
-                        </div>
+                        <div className="flex justify-between items-center mb-6 md:mb-10 border-b border-slate-700/50 pb-6 md:pb-8 border-dashed gap-3 md:gap-4">
+   <div className="text-right flex-1">
+      <h2 className="text-3xl sm:text-4xl md:text-6xl font-black text-white tracking-tighter mb-1 md:mb-2 leading-none uppercase">
+         Betting Pass
+      </h2>
+      <div className="flex flex-wrap items-center gap-1.5 md:gap-3 text-blue-400 font-bold text-sm md:text-xl mt-1">
+         <span className="line-through opacity-50 decoration-rose-500 decoration-2">EXCEL</span>
+         <span className="text-xs md:text-base">✈️</span>
+         <span className="text-emerald-400 animate-pulse uppercase">World Cup 2026</span>
+      </div>
+   </div>
+   <div className="shrink-0">
+      <img 
+        src="/worldcup26.png" 
+        alt="World Cup 2026 Logo" 
+        className="w-16 sm:w-20 md:w-28 object-contain opacity-90 drop-shadow-[0_0_15px_rgba(255,255,255,0.15)]" 
+      />
+   </div>
+</div>
                         
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-10">
-                           <div>
-                              <div className="text-xs text-slate-500 uppercase font-black tracking-widest mb-2">PASSENGER NAME</div>
-                              <div className="text-3xl font-black text-white">{safeUserName}</div>
-                           </div>
-                           <div className="md:text-left">
-                              <div className="text-xs text-slate-500 uppercase font-black tracking-widest mb-2">REGISTRATION STATUS</div>
-                              {userStats.hasPaid ? (
-                                 <div className="text-2xl font-black text-emerald-400 flex md:justify-end items-center gap-2">
-                                    מאושר לטיסה ✅
-                                 </div>
-                              ) : (
-                                 <div className="flex flex-col md:items-end gap-1.5">
-                                    <div className="text-2xl font-black text-rose-500 mb-1">ממתין להסדר ⚠️</div>
-                                    <a 
-                                      href={`https://wa.me/972525583098?text=${encodeURIComponent('היי ברק, אני רוצה להסדיר תשלום עבור Bets in PROD ולהבטיח את מקומי בטיסה! ✈️\n\nאגב, שמעתי עליכם דרך: ')}`}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black px-4 py-2 rounded-xl transition-all flex items-center justify-center gap-2 shadow-lg shadow-emerald-900/20 active:scale-95 w-full md:w-auto"
-                                    >
-                                      <span className="text-base">💬</span> הסדר בוואטסאפ
-                                    </a>
-                                    <span className="text-[11px] font-bold text-slate-400/80 tracking-wide text-center w-full md:text-right">
-                                      או בוואטסאפ/ביט: 052-5583098
-                                    </span>
-                                    <span className="text-xs text-amber-400 font-bold text-center w-full md:text-right mt-0.5 drop-shadow-sm">
-                                      * נשמח ממש שתציינו בהודעה איך הגעתם אלינו! 🫶
-                                    </span>
-                                 </div>
-                              )}
-                           </div>
-                        </div>
+                        {/* שינוי ל-grid-cols-2 קבוע וצמצום ה-gap במובייל לסימטריה מקסימלית */}
+<div className="grid grid-cols-2 gap-4 md:gap-8 mb-8 md:mb-10">
+   <div className="flex flex-col justify-center">
+      <div className="text-[10px] md:text-xs text-slate-500 uppercase font-black tracking-widest mb-1 md:mb-2">Passenger Name</div>
+      <div className="text-xl sm:text-2xl md:text-3xl font-black text-white leading-tight truncate">{safeUserName}</div>
+   </div>
+   <div className="flex flex-col justify-center md:items-end">
+      <div className="text-[10px] md:text-xs text-slate-500 uppercase font-black tracking-widest mb-1 md:mb-2 md:text-left w-full">Registration Status</div>
+      {userStats.hasPaid ? (
+         <div className="text-lg sm:text-xl md:text-2xl font-black text-emerald-400 flex md:justify-end items-center gap-2 leading-tight">
+            מאושר לטיסה ✅
+         </div>
+      ) : (
+         <div className="flex flex-col md:items-end gap-2">
+            <div className="text-lg sm:text-xl md:text-2xl font-black text-rose-500 leading-tight">ממתין להסדר ⚠️</div>
+            <a 
+              href={`https://wa.me/972525583098?text=${encodeURIComponent('היי ברק, אני רוצה להסדיר תשלום עבור Bets in PROD ולהבטיח את מקומי בטיסה! ✈️')}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] md:text-xs font-black px-3 py-2 rounded-xl transition-all flex items-center justify-center gap-2 shadow-lg active:scale-95 w-full md:w-auto"
+            >
+              <span className="text-sm">💬</span> הסדר בוואטסאפ
+            </a>
+         </div>
+      )}
+   </div>
+</div>
 
                         {/* שורת המשימה התחתונה */}
                         <div className="bg-slate-950/80 rounded-2xl p-6 border border-slate-800 text-center relative overflow-hidden group-hover:border-blue-500/50 transition-colors">
@@ -1186,7 +1180,7 @@ const renderedMagazineContent = useMemo(() => {
                   </div>
                </div>
             ) : (
-               /* --- מצב 1 ומעלה: קוביות הדירוג הרגילות (הקוד המקורי שלך) --- */
+               /* --- מצב 1 ומעלה: קוביות הדירוג המקוריות (העיצוב שאהבת) --- */
                <>
                   <div className={`grid gap-3 relative z-10 w-full mb-6 ${tournamentState >= 4 ? 'grid-cols-2' : 'grid-cols-1'}`}>
                     <div 
@@ -1252,7 +1246,7 @@ const renderedMagazineContent = useMemo(() => {
                      )}
                   </div>
 
-                  <div className={`grid gap-3 relative z-10 w-full mb-5 ${tournamentState >= 4 ? 'grid-cols-2' : 'grid-cols-1'}`}>
+                  <div className={`grid gap-3 relative z-10 w-full mb-8 ${tournamentState >= 4 ? 'grid-cols-2' : 'grid-cols-1'}`}>
                      <div 
                         onClick={() => {
                            sessionStorage.setItem("targetBoard", "GENERAL");
@@ -1289,7 +1283,47 @@ const renderedMagazineContent = useMemo(() => {
                   </div>
                </>
             )}
-
+            {/* מפריד אזור מודיעין */}
+            {tournamentState > 0 && (
+               <div className="relative z-10 w-full flex items-center gap-3 mt-4 mb-6 opacity-90">
+                  <div className="flex-1 h-px bg-gradient-to-r from-transparent to-slate-600"></div>
+                  <span className="text-xs md:text-sm font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                     <span>👁️</span> כלים ומודיעין
+                  </span>
+                  <div className="flex-1 h-px bg-gradient-to-l from-transparent to-slate-600"></div>
+               </div>
+            )}
+            {/* כפתור גילוי נאות - ממלא את החור בצורה חכמה ומוסיף ערך */}
+            {tournamentState > 0 && (
+               <div className="relative z-10 w-full mb-6 flex-1 flex flex-col justify-center min-h-[80px]">
+                  <Link href="/matrix" className="bg-gradient-to-r from-blue-900/20 to-slate-900/80 border border-blue-500/30 hover:border-blue-400 p-4 rounded-2xl flex items-center justify-between group transition-all shadow-lg active:scale-95 backdrop-blur-sm relative overflow-hidden">
+                     {/* אפקט רקע עדין */}
+                     <div className="absolute top-0 right-0 w-1.5 h-full bg-blue-500"></div>
+                     <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0IiBoZWlnaHQ9IjQiPgo8cmVjdCB3aWR0aD0iNCIgaGVpZ2h0PSI0IiBmaWxsPSIjZmZmIiBmaWxsLW9wYWNpdHk9IjAuMSIvPgo8L3N2Zz4=')] opacity-10"></div>
+                     
+                     <div className="flex items-center gap-4 relative z-10">
+                        <div className="w-12 h-12 bg-slate-950 rounded-xl flex items-center justify-center border border-slate-700 shadow-inner group-hover:scale-110 transition-transform shrink-0">
+                           <span className="text-2xl drop-shadow-md animate-pulse">👁️</span>
+                        </div>
+                        <div className="text-right">
+                           <div className="font-black text-white text-sm md:text-base">טבלת הגילוי הנאות</div>
+                           <div className="text-[10px] md:text-xs text-blue-300 font-medium mt-0.5">מי ניחש מה? כנס לראות הכל</div>
+                        </div>
+                     </div>
+                     <div className="w-8 h-8 rounded-full bg-blue-600/20 flex items-center justify-center text-blue-400 group-hover:bg-blue-600 group-hover:text-white transition-colors shrink-0 relative z-10">
+                        <span className="text-sm transform rotate-180">➜</span>
+                     </div>
+                  </Link>
+               </div>
+            )}
+            {/* מפריד אזור חברתי */}
+               <div className="w-full flex items-center gap-3 mb-6 opacity-90 mt-2">
+                  <div className="flex-1 h-px bg-gradient-to-r from-transparent to-slate-600"></div>
+                  <span className="text-xs md:text-sm font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                     <span>🏟️</span> הזירה החברתית
+                  </span>
+                  <div className="flex-1 h-px bg-gradient-to-l from-transparent to-slate-600"></div>
+               </div>
             <div className="relative z-10 w-full mb-6">
                <div className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-2.5 px-1 flex items-center gap-1.5">
                   <span>🏟️</span> הליגות שלי
@@ -1394,6 +1428,16 @@ const renderedMagazineContent = useMemo(() => {
                  </div>
                )}
             </div>
+            {/* מפריד נתונים יבשים */}
+            <div className="relative z-10 w-full flex items-center gap-3 mt-8 mb-4 opacity-80">
+               <div className="flex-1 h-px bg-gradient-to-r from-transparent to-slate-700"></div>
+               <span className="text-[10px] md:text-xs font-black text-slate-500 uppercase tracking-widest flex items-center gap-1.5">
+                  סטטיסטיקת המערכת
+               </span>
+               <div className="flex-1 h-px bg-gradient-to-l from-transparent to-slate-700"></div>
+            </div>
+
+            <div className="flex justify-between items-center gap-2 relative z-10 text-center mb-2"></div>
 
             <div className="flex justify-between items-center gap-2 pt-2 border-t border-slate-700/50 relative z-10 text-center">
               <div className="flex-1"><div className="text-[10px] text-slate-400 uppercase tracking-widest font-bold">קופת פרסים</div><div className="text-sm font-black text-emerald-400"><AnimatedNumber value={totalPrizesPool} prefix="₪" /></div></div>
@@ -1404,8 +1448,7 @@ const renderedMagazineContent = useMemo(() => {
             </div>  
          </div>
 
-            <div className="w-[90%] md:w-auto shrink-0 snap-center flex flex-col gap-4 md:gap-6 h-full min-w-0">            
-              <div 
+              <div className="w-[calc(100vw-32px)] lg:w-auto shrink-0 snap-center flex flex-col gap-4 md:gap-6 h-full min-w-0">              <div 
                   onClick={() => setShowMagazineModal(true)}
                   className="bg-slate-900 rounded-3xl p-6 shadow-xl relative overflow-hidden border border-slate-700 group cursor-pointer flex flex-col hover:border-blue-500/50 transition-all duration-300 flex-1 min-w-0"      
               >
@@ -1837,35 +1880,7 @@ const renderedMagazineContent = useMemo(() => {
             </p>
          </div>
       )}
-      {/* טבלת גילוי נאות - עכשיו בתחתית הדשבורד */}
-      <div className="relative z-10 w-full mt-4">
-         {tournamentState > 0 ? (
-            <Link href="/matrix" className="w-full flex flex-col md:flex-row items-center justify-between bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 hover:from-blue-900/30 hover:to-slate-800 border-2 border-slate-700 hover:border-blue-500/50 p-6 md:p-8 rounded-3xl shadow-[0_10px_40px_rgba(0,0,0,0.4)] transition-all active:scale-[0.99] group relative overflow-hidden">
-               <div className="absolute top-0 right-0 w-2 h-full bg-blue-500"></div>
-               <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0IiBoZWlnaHQ9IjQiPgo8cmVjdCB3aWR0aD0iNCIgaGVpZ2h0PSI0IiBmaWxsPSIjZmZmIiBmaWxsLW9wYWNpdHk9IjAuMSIvPgo8L3N2Zz4=')] opacity-20"></div>
-               
-               <div className="flex flex-col md:flex-row items-center gap-6 relative z-10 text-center md:text-right">
-                  <div className="w-20 h-20 bg-slate-950 rounded-2xl flex items-center justify-center border border-slate-700 shadow-inner group-hover:scale-110 group-hover:border-blue-500/50 transition-all shrink-0">
-                     <span className="animate-eye-blink text-4xl drop-shadow-lg">👁️</span>
-                  </div>
-                  <div className="flex flex-col">
-                     <span className="font-black text-white text-2xl md:text-3xl mb-1 tracking-tight">טבלת הגילוי הנאות המלאה</span>
-                     <span className="text-sm md:text-base text-slate-400 font-medium">כאן תוכלו לראות בזמן אמת מה כולם ניחשו - שקיפות מלאה.</span>
-                  </div>
-               </div>
-               
-               <div className="mt-6 md:mt-0 relative z-10 w-full md:w-auto">
-                  <div className="bg-blue-600 text-white px-10 py-4 rounded-2xl font-black text-lg flex items-center justify-center gap-3 group-hover:bg-blue-500 transition-colors shadow-xl">
-                     לכניסה למערכת <span className="text-2xl">👉</span>
-                  </div>
-               </div>
-            </Link>
-         ) : (
-            <div className="w-full flex items-center justify-center bg-slate-900/40 border border-slate-700/50 border-dashed p-8 rounded-3xl shadow-inner text-slate-500 font-bold transition-all hover:bg-slate-900/60 cursor-not-allowed">
-               <span className="mr-3 text-3xl opacity-60">🔒</span> טבלת הגילוי הנאות תפתח באופן אוטומטי לאחר שריקת הפתיחה
-            </div>
-         )}
-      </div>
+
 
       {showMagazineModal && (
         <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/85 p-4 backdrop-blur-md animate-fade-in-up" dir="rtl">
