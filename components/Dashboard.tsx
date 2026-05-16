@@ -129,7 +129,51 @@ export default function Dashboard({ userId, userName, setActiveTab, setPredictio
   const [bonusQuestionsList, setBonusQuestionsList] = useState<any[]>([]);
   const [prizes, setPrizes] = useState<any>(null);
   const [showPodiumState, setShowPodiumState] = useState(true);
+  // --- States for AI Analyst ---
+  const [aiQuery, setAiQuery] = useState("");
+  const [aiResponse, setAiResponse] = useState("");
+  const [isAiLoading, setIsAiLoading] = useState(false);
+  // --- Function to fetch AI answer ---
+  // --- Function to fetch AI answer ---
+  const handleAskAnalyst = async () => {
+    if (!aiQuery.trim()) return;
+    
+    setIsAiLoading(true);
+    setAiResponse(""); 
+    
+    try {
+      // 1. אוספים את המידע שכבר קיים אצלנו בלקוח (חוסך קריאה לשרת ולמסד הנתונים!)
+      const contextData = {
+        userName: safeUserName,
+        myPoints: userStats.points,
+        // לוקחים רק את ה-5 הראשונים בטבלה כדי לחסוך טוקנים
+        leaderboardTop5: allUsersList.slice(0, 5).map(u => ({ name: u.name, pts: u.totalPoints || 0 })) 
+      };
 
+      // 2. שולחים את השאלה יחד עם הקונטקסט
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          message: aiQuery,
+          context: contextData
+        })
+      });
+      
+      const data = await res.json();
+      
+      if (data.reply) {
+        setAiResponse(data.reply);
+      } else {
+        setAiResponse("תקלה בתקשורת עם ה-VAR. נסה שוב.");
+      }
+    } catch (error) {
+      console.error("Error asking analyst:", error);
+      setAiResponse("האנליסט יצא להפסקת קפה, נסה שוב מאוחר יותר.");
+    } finally {
+      setIsAiLoading(false);
+    }
+  };
   const [nowMs, setNowMs] = useState(Date.now());
   const [liveBonusQs, setLiveBonusQs] = useState<any[]>([]);
   const [liveBonusAns, setLiveBonusAns] = useState<any>({});
@@ -266,6 +310,7 @@ export default function Dashboard({ userId, userName, setActiveTab, setPredictio
         snap.forEach(doc => leagues.push({ id: doc.id, ...doc.data() }));
         setMyLeagues(leagues);
     });
+
 
     const unsubscribeDash = onSnapshot(doc(db, "settings", "dashboard"), (dashSnap) => {
       const data = dashSnap.data();
@@ -1008,6 +1053,11 @@ const renderedMagazineContent = useMemo(() => {
                <img src="/maxicanIcon-removebg.png" alt="Mexican" className="w-36 object-contain drop-shadow-xl -scale-x-100 transition-all duration-300 group-hover:-translate-y-4 group-focus:-translate-y-4 group-hover:-rotate-6 group-focus:-rotate-6 group-hover:scale-110 group-focus:scale-110 origin-bottom" />
             </div>
          </div>
+         {/* הוספת הטאבלט של האנליסט לשולחן */}
+<div className="relative group cursor-pointer pb-2 z-40 shrink-0 pointer-events-auto" onClick={() => setIsChatOpen(true)}>
+   <div className="absolute inset-0 bg-cyan-500 rounded-full blur-xl opacity-20 group-hover:opacity-50 transition-opacity"></div>
+   <img src="/ai-monitor.png" alt="AI Analyst" className="w-24 object-contain drop-shadow-[0_0_15px_rgba(34,211,238,0.4)] group-hover:scale-110 transition-transform" />
+</div>
 
          {/* שולחן האולפן */}
          <img src="/panel-removebg.png" alt="Studio Desk" className="relative z-30 w-full object-contain drop-shadow-[0_-8px_20px_rgba(0,0,0,0.8)] pointer-events-none" />
@@ -1293,6 +1343,52 @@ const renderedMagazineContent = useMemo(() => {
                   <div className="flex-1 h-px bg-gradient-to-l from-transparent to-slate-600"></div>
                </div>
             )}
+          
+            <div className="relative z-10 w-full mb-6">
+  {/* עמדת האנליסט - מחוברת ללוגיקה במלואה */}
+            <div className="relative z-10 w-full mb-6 mt-4">
+              <div className="bg-gradient-to-br from-slate-900 to-blue-950 border border-blue-500/30 rounded-3xl p-4 shadow-xl relative overflow-hidden group">
+                <div className="absolute inset-0 opacity-10 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] pointer-events-none"></div>
+                
+                <div className="flex items-center gap-4 relative z-10 mb-4">
+                  <div className="w-12 h-12 md:w-16 md:h-16 bg-blue-500/10 rounded-2xl flex items-center justify-center border border-blue-500/20 shrink-0 shadow-inner">
+                     <span className="text-2xl md:text-3xl animate-pulse">🤖</span>
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="text-white font-black text-sm md:text-lg">האנליסט של Bets in PROD</h3>
+                    <p className="text-blue-300 text-[10px] md:text-xs font-medium">שאל אותי על מגמות, ניחושים וסטטיסטיקות</p>
+                  </div>
+                </div>
+
+                <div className="relative z-10 flex flex-col gap-3">
+                  <div className="relative">
+                    <input 
+                      type="text" 
+                      value={aiQuery}
+                      onChange={(e) => setAiQuery(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && handleAskAnalyst()}
+                      placeholder="למשל: כמה הימרו על אנגליה?" 
+                      className="w-full bg-slate-950/80 border border-slate-700 rounded-xl py-3 pr-4 pl-14 text-white text-xs md:text-sm outline-none focus:border-blue-500 transition-all shadow-inner"
+                      disabled={isAiLoading}
+                    />
+                    <button 
+                      onClick={handleAskAnalyst}
+                      disabled={isAiLoading || !aiQuery.trim()}
+                      className="absolute left-1.5 top-1/2 -translate-y-1/2 bg-blue-600 hover:bg-blue-500 disabled:bg-slate-700 text-white p-2 md:px-3 rounded-lg text-[10px] md:text-xs font-bold shadow-lg transition-colors flex items-center justify-center min-w-[40px]"
+                    >
+                      {isAiLoading ? <span className="animate-spin text-base">⏳</span> : "שאל ➜"}
+                    </button>
+                  </div>
+
+                  {aiResponse && (
+                    <div className="bg-slate-950/80 border border-emerald-500/30 rounded-xl p-4 text-xs md:text-sm text-emerald-50 leading-relaxed shadow-inner animate-fade-in text-right mt-2">
+                       <span className="text-emerald-400 font-black ml-1">האנליסט:</span> {aiResponse}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+</div>
             {/* כפתור גילוי נאות - ממלא את החור בצורה חכמה ומוסיף ערך */}
             {tournamentState > 0 && (
                <div className="relative z-10 w-full mb-6 flex-1 flex flex-col justify-center min-h-[80px]">
@@ -1871,7 +1967,7 @@ const renderedMagazineContent = useMemo(() => {
             <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0IiBoZWlnaHQ9IjQiPgo8cmVjdCB3aWR0aD0iNCIgaGVpZ2h0PSI0IiBmaWxsPSIjZmZmIiBmaWxsLW9wYWNpdHk9IjAuMSIvPgo8L3N2Zz4=')] opacity-10"></div>
             
             <div className="text-6xl mb-6 opacity-80 animate-bounce drop-shadow-lg">⏳</div>
-            <h3 className="text-3xl md:text-4xl font-black text-transparent bg-clip-text bgGreat things are coming-gradient-to-r from-slate-300 to-slate-500 mb-4 tracking-tight">
+            <h3 className="text-3xl md:text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-slate-300 to-slate-500 mb-4 tracking-tight">
                Great things are coming...
             </h3>
             <p className="text-slate-400 font-medium text-sm md:text-base max-w-lg px-6 leading-relaxed">

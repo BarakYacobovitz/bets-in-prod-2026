@@ -55,6 +55,11 @@ export default function MatrixPage() {
 
   const [tournamentState, setTournamentState] = useState<number>(0);
   const [isLoading, setIsLoading] = useState(true);
+// 👑 כאן בדיוק להדביק: המשתנים החדשים של עמדת ה-VAR
+  // --- States for VAR Station (AI) ---
+  const [varQuery, setVarQuery] = useState("");
+  const [varResponse, setVarResponse] = useState("");
+  const [isVarLoading, setIsVarLoading] = useState(false);
 
   const [activeTab, setActiveTab] = useState<TabType>("MATCHES");
   const [searchPlayer, setSearchPlayer] = useState("");
@@ -328,7 +333,90 @@ const mList: any[] = [];
     link.click();
     document.body.removeChild(link);
   };
+  // --- Function to fetch AI answer using Local Matrix State ---
+  const handleAskVAR = async () => {
+    if (!varQuery.trim()) return;
+    
+    setIsVarLoading(true);
+    setVarResponse(""); 
+    
+    try {
+      // אריזת הקונטקסט מתוך הסטייט המקומי שכבר קיים בדפדפן
+      let contextData: any = { activeTab };
 
+      if (activeTab === "MATCHES") {
+         // שולחים רק משחקים שכבר נחשפו או ננעלו בטבלה כדי למנוע הדלפת ניחושים
+         const exposedMatches = matches.filter(m => tournamentState > 0 && (m.isFinished || checkIsMatchLocked(m, tournamentState)));
+         contextData.data = exposedMatches.map(m => {
+            const predsForMatch = users.map(u => {
+               const p = predictions[u.id]?.[m.id];
+               return p && p.predictedHomeScore !== undefined && p.predictedHomeScore !== "" 
+                 ? `${u.name}: ${p.predictedHomeScore}-${p.predictedAwayScore}${p.qualifier ? ` (עולה: ${p.qualifier})` : ""}` 
+                 : null;
+            }).filter(x => x);
+            return { match: `${m.homeTeam} נגד ${m.awayTeam}`, predictions: predsForMatch };
+         });
+      } 
+      else if (activeTab === "BONUS") {
+         // שולחים רק שאלות בונוס שהזמן שלהן עבר או שהשלב שלהן נפתח
+         const exposedBonus = bonusQuestions.filter(q => {
+             const phase = q.phase || "TOURNAMENT";
+             let isExposed = (phase === "KNOCKOUT") ? (tournamentState >= 5) : (tournamentState >= 1);
+             if (q.isSurprise) isExposed = nowMs > parseDateTimeLocal(q.closeTime);
+             return isExposed;
+         });
+         contextData.data = exposedBonus.map(q => {
+             const predsForQ = users.map(u => {
+                const ans = bonusPredictions[u.id]?.[q.id];
+                return ans ? `${u.name}: ${ans}` : null;
+             }).filter(x => x);
+             return { question: q.label || q.questionText, predictions: predsForQ };
+         });
+      } 
+      else if (activeTab === "QUALIFIERS") {
+         // שולחים את ניחושי העולות מהבתים ומקום 3 אם השלב פתוח
+         const isQualExposed = tournamentState >= 1;
+         if (isQualExposed) {
+            contextData.data = users.map(u => {
+               const uQuals = qualifiersPredictions[u.id] || {};
+               const uThird = thirdPlacePredictions[u.id]?.teams || [];
+               const groupsStr = Object.entries(uQuals).map(([g, val]: any) => `בית ${g}: 1-${val.first || '?'}, 2-${val.second || '?'}`).join(" | ");
+               return {
+                  player: u.name,
+                  groups: groupsStr,
+                  thirdPlaceTeams: uThird.filter((x: string) => x).join(", ")
+               };
+            });
+         } else {
+            contextData.data = "המידע על המעפילות חסוי בשלב זה.";
+         }
+      }
+
+      // פנייה ישירה לראוט ה-API
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          message: varQuery,
+          context: contextData
+        })
+      });
+      
+      const data = await res.json();
+      
+      if (data.reply) {
+         setVarResponse(data.reply);
+      } else {
+         setVarResponse("תקלה בתקשורת עם צוות ה-VAR. נסה שוב.");
+      }
+      
+    } catch (error) {
+      console.error("VAR Error:", error);
+      setVarResponse("ה-VAR שבת מפעילות, כנראה מישהו ניתק את הסיב באולפן.");
+    } finally {
+      setIsVarLoading(false);
+    }
+  };
   if (isLoading) return <div className="min-h-screen flex items-center justify-center bg-slate-950 text-blue-400 font-black animate-pulse text-2xl" dir="rtl">טוען נתוני גילוי נאות... 🕵️‍♂️</div>;
 
   const groupsList = ["A","B","C","D","E","F","G","H","I","J","K","L"];
@@ -460,7 +548,55 @@ const mList: any[] = [];
            </div>
         )}
       </div>
+      {/* עמדת ה-VAR של המטריקס - מחוברת ללוגיקת הזיכרון המקומי */}
+      <div className="max-w-3xl mx-auto mb-6 relative z-30">
+        <div className="bg-slate-900 border border-indigo-500/30 rounded-2xl p-4 shadow-[0_0_30px_rgba(79,70,229,0.15)] relative overflow-hidden group">
+          <div className="absolute top-0 right-0 w-2 h-full bg-indigo-500"></div>
+          <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-10 pointer-events-none"></div>
+          
+          <div className="flex flex-col md:flex-row gap-4 items-center relative z-10">
+            
+            <div className="flex items-center gap-3 shrink-0 w-full md:w-auto">
+              <div className="w-12 h-12 bg-indigo-950 border border-indigo-500/40 rounded-xl flex items-center justify-center shadow-inner">
+                <span className="text-2xl animate-pulse drop-shadow-[0_0_10px_rgba(99,102,241,0.8)]">📺</span>
+              </div>
+              <div>
+                <h3 className="text-white font-black tracking-wide flex items-center gap-1.5">
+                  עמדת VAR <span className="text-[10px] bg-rose-600 text-white px-1.5 rounded uppercase tracking-widest font-black">AI</span>
+                </h3>
+                <div className="text-indigo-300 text-[10px] font-bold">חפש ונתח נתונים מתוך הטבלה</div>
+              </div>
+            </div>
 
+            <div className="flex-1 w-full flex gap-2">
+              <input 
+                type="text" 
+                value={varQuery}
+                onChange={(e) => setVarQuery(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleAskVAR()}
+                placeholder={activeTab === "MATCHES" ? "למשל: כמה הימרו על 2-1 לאנגליה?" : activeTab === "BONUS" ? "למשל: מי אמר שטראמפ יזכה?" : "למשל: מי שם את ברזיל במקום הראשון?"} 
+                className="w-full bg-slate-950 border border-slate-700 text-white rounded-xl py-2 px-4 text-sm outline-none focus:border-indigo-500 shadow-inner text-right"
+                disabled={isVarLoading}
+              />
+              <button 
+                onClick={handleAskVAR}
+                disabled={isVarLoading || !varQuery.trim()}
+                className="bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-700 text-white px-5 rounded-xl font-bold transition-all shrink-0 flex items-center justify-center min-w-[70px]"
+              >
+                {isVarLoading ? <span className="animate-spin text-base">⏳</span> : "שאל ➜"}
+              </button>
+            </div>
+          </div>
+
+          {/* תצוגת התשובה החכמה של ה-VAR */}
+          {varResponse && (
+            <div className="mt-3 pt-3 border-t border-slate-800 text-indigo-100 text-xs md:text-sm font-medium leading-relaxed bg-indigo-950/40 p-3 rounded-xl border-r-4 border-r-indigo-500 relative z-10 animate-fade-in-up text-right">
+              <span className="font-black text-indigo-400 ml-2">VAR:</span>
+              {varResponse}
+            </div>
+          )}
+        </div>
+      </div>
       <div className="max-w-[98vw] mx-auto bg-slate-900/80 rounded-2xl border border-slate-700 shadow-2xl overflow-hidden">
          <div className="overflow-auto max-h-[65vh] w-full custom-scrollbar">
             <table className="w-max min-w-full text-center border-collapse text-sm">

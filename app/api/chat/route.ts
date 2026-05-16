@@ -1,87 +1,72 @@
 import { NextResponse } from 'next/server';
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import { doc, getDoc, collection, getDocs, updateDoc, increment } from 'firebase/firestore';
-import { db } from '../../firebase'; // ודא שהנתיב תואם לקובץ שלך
 
-// הגדרת ה-API Key (חובה להוסיף ב- .env.local את המשתנה GEMINI_API_KEY)
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
 
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { userId, message } = body;
+    const { message, context } = body;
 
-    if (!userId || !message) {
-      return NextResponse.json({ error: 'Missing userId or message' }, { status: 400 });
+    if (!message || !context) {
+      return NextResponse.json({ error: 'Missing message or context' }, { status: 400 });
     }
 
-    // --- 1. בדיקת מכסת שאלות יומית (Rate Limiting) ---
-    const userRef = doc(db, 'users', userId);
-    const userSnap = await getDoc(userRef);
-    
-    if (!userSnap.exists()) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 });
-    }
+    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+    let prompt = "";
 
-    const userData = userSnap.data();
-    const dailyQueries = userData.dailyBotQueries || 0;
-    const lastQueryDate = userData.lastBotQueryDate || '';
-    const todayStr = new Date().toISOString().split('T')[0];
-
-    // איפוס ספירה אם עבר יום, אחרת בדיקה אם חרג מהמכסה (למשל: 5 שאלות ביום)
-    if (lastQueryDate === todayStr && dailyQueries >= 5) {
-      return NextResponse.json({ 
-        reply: 'חפרת לי היום! ⚽ תן לראות את המשחק בשקט, נדבר מחר כשיתאפסו לך השאלות.' 
-      });
-    }
-
-    // עדכון מונה שאלות ב-Firestore
-    await updateDoc(userRef, {
-      dailyBotQueries: lastQueryDate === todayStr ? increment(1) : 1,
-      lastBotQueryDate: todayStr
-    });
-
-    // --- 2. שליפת הנתונים הרלוונטיים ויצירת JSON רזה (Minified Context) ---
-    // כאן אנחנו שולפים רק טבלאות ומשחקים נעולים כדי לחסוך טוקנים ולמנוע הדלפות
-    const usersSnap = await getDocs(collection(db, 'users'));
-    const leaderboard: any[] = [];
-    usersSnap.forEach(doc => {
-      const d = doc.data();
-      leaderboard.push({ name: d.name, pts: d.totalPoints || 0 });
-    });
-    // מיון המשתמשים כדי שלבוט יהיה קל להבין מי מוביל
-    leaderboard.sort((a, b) => b.pts - a.pts);
-
-    // TODO במערכת אמיתית: לשלוף מכאן את המשחקים שהסטטוס שלהם "נעול" בלבד
-    // const lockedMatches = ... 
-
-    const gameContext = {
-      currentUser: userData.name,
-      myPoints: userData.totalPoints || 0,
-      leaderboardTop5: leaderboard.slice(0, 5), // נשלח רק את הטופ 5 כדי לחסוך טוקנים
-      // lockedMatches: lockedMatches
-    };
-
-    // --- 3. פנייה ל-Gemini עם ה-System Prompt ---
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" }); // המודל המהיר והזול
-
-    const prompt = `
-      אתה "פרשן הבית" של האפליקציה "Bets in PROD" - משחק ניחושי מונדיאל.
-      האישיות שלך: ציני, מצחיק, מדבר בסלנג של כדורגל ישראלי, לפעמים קצת עוקצני אבל תמיד עוזר. 
-      המשתמש שמדבר איתך עכשיו הוא: ${gameContext.currentUser} (יש לו ${gameContext.myPoints} נקודות).
+    // ניתוב חכם: בדיקה מאיפה הגיעה הבקשה (מטריקס או דשבורד)
+    if (context.activeTab) {
       
-      הנה מצב הטבלה המעודכן כרגע (בפורמט JSON):
-      ${JSON.stringify(gameContext.leaderboardTop5)}
+      // ==========================================
+      // 📺 המוח של ה-VAR (מופעל מתוך עמוד המטריקס)
+      // ==========================================
+      prompt = `
+        אתה מנהל "עמדת ה-VAR" (עוזר AI) של משחק ניחושי כדורגל שנקרא "Bets in PROD".
+        המשתמש נמצא כרגע בעמוד ה"מטריקס" (טבלת גילוי נאות) בלשונית ${context.activeTab}, ושואל אותך שאלה.
 
-      המשתמש שואל אותך: "${message}"
+        הנה כל הנתונים שמופיעים כרגע בטבלה מול עיני המשתמש (בפורמט JSON):
+        ${JSON.stringify(context.data)}
+
+        תפקידך: 
+        1. לסרוק את הנתונים שהועברו ב-JSON ולענות במדויק לשאלת המשתמש (למשל: "מי הימר 1-1?", "כמה הימרו על מקסיקו?").
+        2. לענות קצר, ענייני, ועם קצת הומור של שופט כדורגל / צוות שידור.
+        3. חוק ברזל: אתה מתבסס אך ורק על ה-JSON המצורף למעלה! אם המידע לא מופיע שם, אל תמציא, תגיד שהמידע הזה לא מופיע בטבלה הנוכחית.
+        
+        שאילתת המשתמש: "${message}"
+      `;
+
+    } else {
       
-      תענה לו בצורה קצרה (עד 3-4 משפטים), מצחיקה, ותתייחס לנתונים האמיתיים מהטבלה אם זה רלוונטי לשאלה שלו.
-    `;
+      // ==========================================
+      // 🎙️ המוח של האנליסט (מופעל מתוך הדשבורד)
+      // ==========================================
+      prompt = `
+        אתה "פרשן הבית" של האפליקציה "Bets in PROD" - משחק ניחושי מונדיאל.
+        האישיות שלך: ציני, מצחיק, משתמש בסלנג של כדורגל ישראלי, עוקצני כשצריך אבל מקצועי.
+        
+        המשתמש הנוכחי הוא: ${context.userName} (יש לו ${context.myPoints} נקודות).
+        
+        הנה מצב הטבלה הכללי (Top 5):
+        ${JSON.stringify(context.leaderboardTop5)}
 
+        הנה הניחושים המדויקים של כל השחקנים עבור המשחקים של היום בלבד:
+        ${JSON.stringify(context.todayPredictions)}
+
+        חוקי התנהגות ברזל:
+        1. מותר לך לענות על ניחושים של שחקנים *רק* אם הם מופיעים ברשימת הניחושים של היום (todayPredictions) למעלה.
+        2. תענה תמיד על סמך הנתונים האמיתיים של todayPredictions. אל תמציא שום ניחוש שלא קיים שם.
+        
+        המשתמש שואל אותך: "${message}"
+        
+        תענה לו בצורה קצרה (עד 3 משפטים), קולעת ומלאת אופי.
+      `;
+    }
+
+    // שליחה למודל הרלוונטי
     const result = await model.generateContent(prompt);
     const responseText = result.response.text();
 
-    // --- 4. החזרת התשובה לקליינט ---
     return NextResponse.json({ reply: responseText });
 
   } catch (error) {
