@@ -141,7 +141,9 @@ else if (match.roundName === "גמר" || match.roundName === "מקום שליש�
     const today = new Date(now); today.setHours(0, 0, 0, 0);
     const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate() + 1);
     const checkDate = new Date(matchDateObj); checkDate.setHours(0, 0, 0, 0);
-    const timeString = match.matchDate.split(" ")[1];
+    const timeString = match.matchDate && match.matchDate.includes(" ") 
+  ? match.matchDate.split(" ")[1] 
+  : "00:00";
 
     if (checkDate.getTime() === today.getTime()) return `היום ב-${timeString}`;
     if (checkDate.getTime() === tomorrow.getTime()) return `מחר ב-${timeString}`;

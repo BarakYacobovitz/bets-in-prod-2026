@@ -1,7 +1,7 @@
 "use client";
 import React, { useState, useEffect } from "react";
 import { getFlagUrl } from "../../app/utils/flags";
-import { doc, setDoc, updateDoc } from "firebase/firestore";
+import { doc, setDoc, updateDoc, getDoc } from "firebase/firestore";
 import { db } from "../../app/firebase";
 import toast from "react-hot-toast";
 
@@ -24,7 +24,7 @@ export default function AdminMatchesTab({
   const [adminMatchGroup, setAdminMatchGroup] = useState<string>("ALL");
   const [adminSearchTerm, setAdminSearchTerm] = useState<string>("");
   const [adminKnockoutViewMode, setAdminKnockoutViewMode] = useState<"LIST" | "BRACKET">("LIST");
-  const [quickFilter, setQuickFilter] = useState<"ALL" | "TODAY" | "MISSING">("ALL");
+  const [quickFilter, setQuickFilter] = useState<"ALL" | "TODAY" | "MISSING" | "MISSING_THIRD">("ALL");
   const [recentlySavedIds, setRecentlySavedIds] = useState<string[]>([]);
   
   const [showGeneratorModal, setShowGeneratorModal] = useState(false);
@@ -59,12 +59,14 @@ export default function AdminMatchesTab({
        return (new Date().getTime() - matchTime) > (1000 * 60 * 120); 
      } catch { return false; }
   };
+  const [thirdPlaceTeams, setThirdPlaceTeams] = useState<string[]>([]);
+
 
   const filteredMatches = matches.filter((m: any) => {
     if (adminSearchTerm && !m.homeTeam.includes(adminSearchTerm) && !m.awayTeam.includes(adminSearchTerm)) return false;
     if (quickFilter === "TODAY" && !isMatchToday(m.matchDate)) return false;
     if (quickFilter === "MISSING" && !isMatchMissingResult(m)) return false;
-    
+    if (quickFilter === "MISSING_THIRD" && !(m.roundName === "32 הגדולות" && (String(m.homeTeam).includes("מקום 3") || String(m.awayTeam).includes("מקום 3")))) return false; 
     if (adminMatchGroup !== "ALL") {
        if (KNOCKOUT_ROUNDS.includes(adminMatchGroup)) {
           if (m.stage !== "KNOCKOUT") return false;
@@ -89,6 +91,74 @@ export default function AdminMatchesTab({
      } catch (error) {
        console.error("Error in UI feedback:", error);
      }
+  };
+  // הפונקציה למיפוי אוטומטי של מקומות 1 ו-2 לשלב 32 הגדולות
+  const handleAutoMapWinnersAndRunnersUp = async () => {
+    try {
+      // 1. שולפים את העולות האמיתיות מהדאטה-בייס (אלה שהזנת בסיום הבתים)
+      const rQualSnap = await getDoc(doc(db, "admin_results", "qualifiers"));
+      const realQuals = rQualSnap.exists() ? rQualSnap.data().results : null;
+
+      if (!realQuals || Object.keys(realQuals).length === 0) {
+        return toast.error("אין נתוני עולות במסד! אנא ודא שהזנת ושמרת עולות קודם.");
+      }
+
+      // 2. מסננים רק את משחקי 32 הגדולות מתוך הסטייט
+      const knockoutMatches32 = matches.filter((m: any) => m.roundName === "32 הגדולות");
+      if (knockoutMatches32.length === 0) {
+        return toast.error("לא נמצאו משחקי 32 הגדולות במערכת.");
+      }
+
+      let updatedCount = 0;
+      toast.loading("ממפה נבחרות...", { id: "mapping-toast" });
+
+      // 3. רצים על המשחקים ומשבצים
+      for (const match of knockoutMatches32) {
+        let updatedHome = match.homeTeam;
+        let updatedAway = match.awayTeam;
+        let changed = false;
+
+        // נבדוק גם את הפלייסחולדר וגם את השם הנוכחי כדי לחפש את התבנית (למשל: "1A")
+        const homeCheckStr = match.homePlaceholder || match.homeTeam;
+        const awayCheckStr = match.awayPlaceholder || match.awayTeam;
+
+        const homeMatch = String(homeCheckStr).match(/^([12])([A-L])$/i);
+        if (homeMatch) {
+          const position = homeMatch[1]; // "1" או "2"
+          const group = homeMatch[2].toUpperCase(); // "A" עד "L"
+          const newTeam = position === "1" ? realQuals[group]?.first : realQuals[group]?.second;
+          if (newTeam && newTeam !== updatedHome) {
+            updatedHome = newTeam;
+            changed = true;
+          }
+        }
+
+        const awayMatch = String(awayCheckStr).match(/^([12])([A-L])$/i);
+        if (awayMatch) {
+          const position = awayMatch[1];
+          const group = awayMatch[2].toUpperCase();
+          const newTeam = position === "1" ? realQuals[group]?.first : realQuals[group]?.second;
+          if (newTeam && newTeam !== updatedAway) {
+            updatedAway = newTeam;
+            changed = true;
+          }
+        }
+
+        // 4. מעדכנים בדאטה-בייס רק אם היה שינוי
+        if (changed) {
+          await updateDoc(doc(db, "matches", match.id), {
+            homeTeam: updatedHome,
+            awayTeam: updatedAway
+          });
+          updatedCount++;
+        }
+      }
+
+      toast.success(`הושלם! ${updatedCount * 2} נבחרות (מקומות 1-2) שובצו בהצלחה.`, { id: "mapping-toast" });
+    } catch (e) {
+      console.error(e);
+      toast.error("תקלה בשיבוץ האוטומטי", { id: "mapping-toast" });
+    }
   };
 
   return (
@@ -115,6 +185,9 @@ export default function AdminMatchesTab({
              </button>
              <button onClick={() => setQuickFilter("MISSING")} className={`px-4 py-2 rounded-xl text-sm font-bold whitespace-nowrap transition-all flex items-center gap-2 snap-center ${quickFilter === "MISSING" ? 'bg-rose-600 text-white shadow-md' : 'bg-slate-900 text-slate-400 border border-slate-700 hover:bg-slate-700'}`}>
                 ⚠️ חסרה תוצאה
+             </button>
+             <button onClick={() => setQuickFilter("MISSING_THIRD")} className={`px-4 py-2 rounded-xl text-sm font-bold whitespace-nowrap transition-all flex items-center gap-2 snap-center ${quickFilter === "MISSING_THIRD" ? 'bg-purple-600 text-white shadow-md' : 'bg-slate-900 text-slate-400 border border-slate-700 hover:bg-slate-700'}`}>
+                🧩 חסר מקום 3
              </button>
            </div>
         </div>
@@ -209,6 +282,21 @@ function AdminMatchRow({ match, allMatches, isSaving, justSaved, onSave, onClear
      city: match.city || "",
      broadcastUrl: match.broadcastUrl || ""
   });
+  const [thirdPlaceTeams, setThirdPlaceTeams] = useState<string[]>([]);
+
+  // שולף את 8 המעפילות (מקום 3) רק כשפותחים את פאנל העריכה של שלב 32 הגדולות
+  useEffect(() => {
+    if (isEditingDetails && match.roundName === "32 הגדולות") {
+      const fetchThirdPlace = async () => {
+        const { getDoc, doc } = await import("firebase/firestore");
+        const tpSnap = await getDoc(doc(db, "admin_results", "third_place"));
+        if (tpSnap.exists()) {
+           setThirdPlaceTeams(tpSnap.data().teams || []);
+        }
+      };
+      fetchThirdPlace();
+    }
+  }, [isEditingDetails, match.roundName]);
 
   useEffect(() => {
     setEditData({
@@ -255,55 +343,150 @@ function AdminMatchRow({ match, allMatches, isSaving, justSaved, onSave, onClear
   };
 
   const availableTeams = getRelevantTeams();
+  // זיהוי האם השדה מחכה למקום 3 לפי הפלייסחולדר (מתחיל ב-"_3")
+  const isHomeThirdPlace = String(match.homePlaceholder || match.homeTeam).startsWith("3_");
+  const isAwayThirdPlace = String(match.awayPlaceholder || match.awayTeam).startsWith("3_");
+
+  const homeListId = `home-list-${match.id}`;
+  const awayListId = `away-list-${match.id}`;
+
+  // 🚀 שדרוג חדש: סינון נבחרות שכבר שובצו במשחקים אחרים באותו שלב
+  const alreadyAssignedTeams = allMatches
+     .filter((m: any) => m.roundName === "32 הגדולות" && m.id !== match.id) // מסתכלים על כל המשחקים חוץ מהנוכחי
+     .flatMap((m: any) => [m.homeTeam, m.awayTeam]); // אוספים את כל הקבוצות ששובצו
+
+  // משאירים ברשימה של המקום ה-3 רק את הנבחרות שעדיין לא מופיעות במערך שאספנו
+  const unassignedThirdPlaceTeams = thirdPlaceTeams.filter(t => !alreadyAssignedTeams.includes(t));
+
+  // אם זה מקום 3 ויש לנו את הנתונים, נציג רק את הנבחרות הפנויות. אחרת נציג את הרשימה הרגילה
+  const homeOptions = isHomeThirdPlace && unassignedThirdPlaceTeams.length > 0 ? unassignedThirdPlaceTeams : availableTeams;
+  const awayOptions = isAwayThirdPlace && unassignedThirdPlaceTeams.length > 0 ? unassignedThirdPlaceTeams : availableTeams;
   const datalistId = `teams-list-${match.id}`;
 
   // תוספת 2: פונקציית הקסם למילוי אוטומטי
-  const handleAutoFillTeams = () => {
-    let prevRound = "";
-    if (match.roundName === "מקום שלישי" || match.roundName === "גמר") prevRound = "חצי גמר";
-    else if (match.roundName === "חצי גמר") prevRound = "רבע גמר";
-    else if (match.roundName === "רבע גמר") prevRound = "שמינית גמר";
-    else if (match.roundName === "שמינית גמר") prevRound = "32 הגדולות";
-
-    if (!prevRound) {
-        toast.error("לא ניתן לשאוב נתונים לשלב זה");
-        return;
-    }
-
-    const sortMatchesById = (arr: any[]) => arr.sort((a,b) => {
-        const numA = parseInt(a.id.replace(/\D/g, '') || "0");
-        const numB = parseInt(b.id.replace(/\D/g, '') || "0");
-        return numA - numB;
-    });
-
-    const currentRoundMatches = sortMatchesById(allMatches.filter((m: any) => m.roundName === match.roundName));
-    const matchIndex = currentRoundMatches.findIndex((m: any) => m.id === match.id);
-    const prevMatches = sortMatchesById(allMatches.filter((m: any) => m.roundName === prevRound));
-
+  // תוספת: פונקציית הקסם למילוי אוטומטי (משודרגת לתמיכה גם בשלב 32 הגדולות)
+  const handleAutoFillTeams = async () => {
     let newHome = editData.homeTeam;
     let newAway = editData.awayTeam;
     let autoFilledCount = 0;
 
-    if (match.roundName === "מקום שלישי") {
-        const getLoser = (m: any) => m?.isFinished && m?.realQualifier ? (m.realQualifier === m.homeTeam ? m.awayTeam : m.homeTeam) : "";
-        const loser1 = getLoser(prevMatches[0]);
-        const loser2 = getLoser(prevMatches[1]);
+    // 🚀 אם אנחנו בשלב 32 הגדולות - נשאב ישירות מטבלת העולות של הבתים
+    if (match.roundName === "32 הגדולות") {
+       try {
+          const { getDoc, doc } = await import("firebase/firestore");
+          const rQualSnap = await getDoc(doc(db, "admin_results", "qualifiers"));
+          const realQuals = rQualSnap.exists() ? rQualSnap.data().results : null;
+          
+          if (!realQuals || Object.keys(realQuals).length === 0) {
+             toast.error("טרם הוזנו או נשמרו עולות משלב הבתים באדמין");
+             return;
+          }
 
-        if (loser1) { newHome = loser1; autoFilledCount++; }
-        if (loser2) { newAway = loser2; autoFilledCount++; }
+          const homeCheckStr = match.homePlaceholder || match.homeTeam;
+          const awayCheckStr = match.awayPlaceholder || match.awayTeam;
+
+          // פענוח קבוצת הבית (למשל 1A)
+          const homeMatch = String(homeCheckStr).match(/^([12])([A-L])$/i);
+          if (homeMatch) {
+             const position = homeMatch[1];
+             const group = homeMatch[2].toUpperCase();
+             const team = position === "1" ? realQuals[group]?.first : realQuals[group]?.second;
+             if (team) { newHome = team; autoFilledCount++; }
+          }
+
+          // פענוח קבוצת החוץ (למשל 2B)
+          const awayMatch = String(awayCheckStr).match(/^([12])([A-L])$/i);
+          if (awayMatch) {
+             const position = awayMatch[1];
+             const group = awayMatch[2].toUpperCase();
+             const team = position === "1" ? realQuals[group]?.first : realQuals[group]?.second;
+             if (team) { newAway = team; autoFilledCount++; }
+          }
+       } catch (e) {
+          console.error(e);
+          toast.error("שגיאה במשיכת נתוני הבתים מהשרת");
+          return;
+       }
     } else {
-        const prev1 = prevMatches[matchIndex * 2];
-        const prev2 = prevMatches[matchIndex * 2 + 1];
+        // 🏟️ הלוגיקה המשודרגת לשלבים המאוחרים (שמינית, רבע וכו')
+        
+        // פונקציית עזר שמזהה מספר משחק בטקסט (למשל מחלצת "73" מתוך "מנצחת משחק 73")
+        const extractSourceMatchId = (text: string) => {
+           if (!text) return null;
+           const matchNum = String(text).match(/(?:משחק|match_?)\s*(\d+)/i);
+           return matchNum ? `match_${matchNum[1]}` : null;
+        };
 
-        if (prev1?.isFinished && prev1?.realQualifier) { newHome = prev1.realQualifier; autoFilledCount++; }
-        if (prev2?.isFinished && prev2?.realQualifier) { newAway = prev2.realQualifier; autoFilledCount++; }
+        const homeSourceId = extractSourceMatchId(match.homePlaceholder || match.homeTeam);
+        const awaySourceId = extractSourceMatchId(match.awayPlaceholder || match.awayTeam);
+
+        // 1. שיטה חדשה וחכמה: חיפוש לפי מספר משחק מפורש (World Cup 2026 Format)
+        if (homeSourceId || awaySourceId) {
+            if (homeSourceId) {
+                const sourceMatch = allMatches.find((m: any) => m.id === homeSourceId);
+                // במקרה של משחק על המקום השלישי אנחנו רוצים את המפסידה, אחרת את המנצחת (realQualifier)
+                if (sourceMatch?.isFinished && sourceMatch?.realQualifier) {
+                    newHome = match.roundName === "מקום שלישי" 
+                        ? (sourceMatch.realQualifier === sourceMatch.homeTeam ? sourceMatch.awayTeam : sourceMatch.homeTeam)
+                        : sourceMatch.realQualifier;
+                    autoFilledCount++;
+                }
+            }
+            if (awaySourceId) {
+                const sourceMatch = allMatches.find((m: any) => m.id === awaySourceId);
+                if (sourceMatch?.isFinished && sourceMatch?.realQualifier) {
+                    newAway = match.roundName === "מקום שלישי" 
+                        ? (sourceMatch.realQualifier === sourceMatch.homeTeam ? sourceMatch.awayTeam : sourceMatch.homeTeam)
+                        : sourceMatch.realQualifier;
+                    autoFilledCount++;
+                }
+            }
+        } 
+        // 2. שיטת הגיבוי הישנה שלך (למקרה שלא רשמת מספרי משחקים)
+        else {
+            let prevRound = "";
+            if (match.roundName === "מקום שלישי" || match.roundName === "גמר") prevRound = "חצי גמר";
+            else if (match.roundName === "חצי גמר") prevRound = "רבע גמר";
+            else if (match.roundName === "רבע גמר") prevRound = "שמינית גמר";
+            else if (match.roundName === "שמינית גמר") prevRound = "32 הגדולות";
+
+            if (!prevRound) {
+                toast.error("לא ניתן לשאוב נתונים לשלב זה");
+                return;
+            }
+
+            const sortMatchesById = (arr: any[]) => arr.sort((a,b) => {
+                const numA = parseInt(a.id.replace(/\D/g, '') || "0");
+                const numB = parseInt(b.id.replace(/\D/g, '') || "0");
+                return numA - numB;
+            });
+
+            const currentRoundMatches = sortMatchesById(allMatches.filter((m: any) => m.roundName === match.roundName));
+            const matchIndex = currentRoundMatches.findIndex((m: any) => m.id === match.id);
+            const prevMatches = sortMatchesById(allMatches.filter((m: any) => m.roundName === prevRound));
+
+            if (match.roundName === "מקום שלישי") {
+                const getLoser = (m: any) => m?.isFinished && m?.realQualifier ? (m.realQualifier === m.homeTeam ? m.awayTeam : m.homeTeam) : "";
+                const loser1 = getLoser(prevMatches[0]);
+                const loser2 = getLoser(prevMatches[1]);
+
+                if (loser1) { newHome = loser1; autoFilledCount++; }
+                if (loser2) { newAway = loser2; autoFilledCount++; }
+            } else {
+                const prev1 = prevMatches[matchIndex * 2];
+                const prev2 = prevMatches[matchIndex * 2 + 1];
+
+                if (prev1?.isFinished && prev1?.realQualifier) { newHome = prev1.realQualifier; autoFilledCount++; }
+                if (prev2?.isFinished && prev2?.realQualifier) { newAway = prev2.realQualifier; autoFilledCount++; }
+            }
+        }
     }
 
     if (autoFilledCount === 0) {
-        toast.error("עדיין אין מנצחות בשלב הקודם שניתן לשאוב");
+        toast.error("לא נמצאו נבחרות תואמות או שהשלב הקודם טרם הסתיים");
     } else {
         setEditData(prev => ({...prev, homeTeam: newHome, awayTeam: newAway}));
-        toast.success(`נשאבו ${autoFilledCount} נבחרות בהצלחה! לא לשכוח לשמור.`);
+        toast.success(`נשאבו ${autoFilledCount} נבחרות בהצלחה! אל תשכח ללחוץ על שמירה 💾`);
     }
   };
 
@@ -326,7 +509,6 @@ function AdminMatchRow({ match, allMatches, isSaving, justSaved, onSave, onClear
       setIsSavingDetails(false);
     }
   };
-
   return (
     <div className={`bg-slate-900 p-4 sm:p-5 rounded-3xl border transition-all duration-300 shadow-lg relative overflow-hidden flex flex-col h-full ${justSaved ? 'border-emerald-500 shadow-[0_0_20px_rgba(16,185,129,0.3)] bg-emerald-900/10' : match.isFinished ? 'border-slate-700 opacity-90' : 'border-slate-600 hover:border-blue-500/50'}`}>
       
@@ -362,20 +544,38 @@ function AdminMatchRow({ match, allMatches, isSaving, justSaved, onSave, onClear
         <div className="flex flex-col gap-3 bg-slate-950/80 p-4 rounded-xl border border-slate-700 mb-4 shadow-inner">
           
           {/* תוספת 3: כפתור השאיבה ורשימת האפשרויות */}
-          {isKnockout && match.roundName !== "32 הגדולות" && (
+          {isKnockout && (
              <button onClick={handleAutoFillTeams} className="w-full bg-indigo-600/20 hover:bg-indigo-600/40 text-indigo-400 border border-indigo-500/30 text-[11px] font-bold py-2 rounded-lg shadow-sm transition-all flex items-center justify-center gap-1.5 active:scale-95 mb-1">
-                <span>⚡</span> שאב אוטומטית נבחרות מהשלב הקודם
+                <span>⚡</span> שאב אוטומטית נבחרות לשורה זו
              </button>
           )}
 
-          <datalist id={datalistId}>
-             {availableTeams.map(t => <option key={t} value={t} />)}
+          {/* ה-datalists המפוצלים והחכמים */}
+          <datalist id={homeListId}>
+             {homeOptions.map(t => <option key={t} value={t} />)}
+          </datalist>
+          <datalist id={awayListId}>
+             {awayOptions.map(t => <option key={t} value={t} />)}
           </datalist>
 
           <div className="flex items-center gap-2">
-             <input list={datalistId} type="text" value={editData.homeTeam} onChange={e=>setEditData({...editData, homeTeam: e.target.value})} className="flex-1 bg-slate-900 border border-slate-700 rounded p-2 text-white text-center text-xs outline-none focus:border-blue-500" placeholder="נבחרת בית" />
+             <input 
+               list={homeListId} 
+               type="text" 
+               value={editData.homeTeam} 
+               onChange={e=>setEditData({...editData, homeTeam: e.target.value})} 
+               className="flex-1 bg-slate-900 border border-slate-700 rounded p-2 text-white text-center text-xs outline-none focus:border-blue-500" 
+               placeholder={match.homePlaceholder || "נבחרת בית"} 
+             />
              <span className="text-xs font-bold text-slate-500">VS</span>
-             <input list={datalistId} type="text" value={editData.awayTeam} onChange={e=>setEditData({...editData, awayTeam: e.target.value})} className="flex-1 bg-slate-900 border border-slate-700 rounded p-2 text-white text-center text-xs outline-none focus:border-blue-500" placeholder="נבחרת חוץ" />
+             <input 
+               list={awayListId} 
+               type="text" 
+               value={editData.awayTeam} 
+               onChange={e=>setEditData({...editData, awayTeam: e.target.value})} 
+               className="flex-1 bg-slate-900 border border-slate-700 rounded p-2 text-white text-center text-xs outline-none focus:border-blue-500" 
+               placeholder={match.awayPlaceholder || "נבחרת חוץ"} 
+             />
           </div>
           <div className="flex items-center gap-2">
              <input type="text" value={editData.stadium} onChange={e=>setEditData({...editData, stadium: e.target.value})} className="flex-1 bg-slate-900 border border-slate-700 rounded p-2 text-white text-center text-xs outline-none focus:border-blue-500" placeholder="אצטדיון" />

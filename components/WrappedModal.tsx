@@ -31,13 +31,27 @@ export default function WrappedModal({ onClose, userName, userStats, allUsersLis
     }
   }, [currentSlide, totalSlides]);
 
-  if (!data || isLoadingMatches) {
+  // 1. מצב טעינה - משיכת נתונים ראשונית מהשרת
+  if (isLoadingMatches) {
     return (
       <div className="fixed inset-0 z-[100] bg-slate-950 flex items-center justify-center text-white text-center p-6" dir="rtl">
         <div className="animate-fade-in">
           <div className="text-5xl mb-4 animate-bounce">⚽</div>
-          <h2 className="text-2xl font-black">הסיכום שלך מתבשל...</h2>
-          <p className="text-slate-400 text-sm mt-2">האדמין מנתח את הביצועים, מיד זה מוכן.</p>
+          <h2 className="text-2xl font-black">מושך נתונים מהמגרש...</h2>
+        </div>
+      </div>
+    );
+  }
+
+  // 2. מצב שגיאה - הטעינה הסתיימה אבל האדמין טרם יצר נתונים למשתמש הזה
+  if (!data) {
+    return (
+      <div className="fixed inset-0 z-[100] bg-slate-950/90 backdrop-blur-sm flex items-center justify-center text-white text-center p-6" dir="rtl">
+        <div className="animate-fade-in relative bg-slate-900 border border-slate-700 p-8 rounded-3xl max-w-sm shadow-2xl">
+          <button onClick={onClose} className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-full bg-slate-800 text-slate-400 hover:text-white hover:bg-rose-500 transition-colors font-bold">✕</button>
+          <div className="text-5xl mb-4 opacity-80">📭</div>
+          <h2 className="text-2xl font-black mb-2">הסיכום טרם מוכן</h2>
+          <p className="text-slate-400 text-sm leading-relaxed">נראה שהאדמין עדיין לא סיים לחשב את הסיכום שלך, או שאין מספיק נתונים להציג. נסה שוב מאוחר יותר.</p>
         </div>
       </div>
     );

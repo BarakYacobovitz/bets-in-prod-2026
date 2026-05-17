@@ -107,8 +107,9 @@ export default function KnockoutView({ matches, userId, tournamentState }: { mat
            if (previousRoundMatches.length > 0) {
                const prev1 = previousRoundMatches[i * 2];
                const prev2 = previousRoundMatches[i * 2 + 1];
-               if (prev1) pHome = prev1.isFinished ? prev1.realQualifier : (knockoutPreds[prev1.id]?.qualifier || prev1.projectedHome);
-               if (prev2) pAway = prev2.isFinished ? prev2.realQualifier : (knockoutPreds[prev2.id]?.qualifier || prev2.projectedAway);
+               // עכשיו, אם אין ניחוש - מחזירים מחרוזת ריקה ("") ולא מקדמים קבוצה אקראית
+               if (prev1) pHome = prev1.isFinished ? prev1.realQualifier : (knockoutPreds[prev1.id]?.qualifier || "");
+               if (prev2) pAway = prev2.isFinished ? prev2.realQualifier : (knockoutPreds[prev2.id]?.qualifier || "");
            }
            nodes.push({
                id: realMatch ? realMatch.id : `dummy_${round}_${i}`,

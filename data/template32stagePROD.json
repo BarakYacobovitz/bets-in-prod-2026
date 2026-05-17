@@ -1,0 +1,162 @@
+[
+  {
+    "id": "match_73",
+    "stage": "KNOCKOUT",
+    "roundName": "32 הגדולות",
+    "homeTeam": "סגנית בית A",
+    "awayTeam": "סגנית בית B",
+    "homePlaceholder": "2A",
+    "awayPlaceholder": "2B",
+    "isFinished": false
+  },
+  {
+    "id": "match_74",
+    "stage": "KNOCKOUT",
+    "roundName": "32 הגדולות",
+    "homeTeam": "מנצחת בית E",
+    "awayTeam": "מקום 3 (A/B/C/D/F)",
+    "homePlaceholder": "1E",
+    "awayPlaceholder": "3_ABCDF",
+    "isFinished": false
+  },
+  {
+    "id": "match_75",
+    "stage": "KNOCKOUT",
+    "roundName": "32 הגדולות",
+    "homeTeam": "מנצחת בית F",
+    "awayTeam": "סגנית בית C",
+    "homePlaceholder": "1F",
+    "awayPlaceholder": "2C",
+    "isFinished": false
+  },
+  {
+    "id": "match_76",
+    "stage": "KNOCKOUT",
+    "roundName": "32 הגדולות",
+    "homeTeam": "מנצחת בית C",
+    "awayTeam": "סגנית בית F",
+    "homePlaceholder": "1C",
+    "awayPlaceholder": "2F",
+    "isFinished": false
+  },
+  {
+    "id": "match_77",
+    "stage": "KNOCKOUT",
+    "roundName": "32 הגדולות",
+    "homeTeam": "מנצחת בית I",
+    "awayTeam": "מקום 3 (C/D/F/G/H)",
+    "homePlaceholder": "1I",
+    "awayPlaceholder": "3_CDFGH",
+    "isFinished": false
+  },
+  {
+    "id": "match_78",
+    "stage": "KNOCKOUT",
+    "roundName": "32 הגדולות",
+    "homeTeam": "סגנית בית E",
+    "awayTeam": "סגנית בית I",
+    "homePlaceholder": "2E",
+    "awayPlaceholder": "2I",
+    "isFinished": false
+  },
+  {
+    "id": "match_79",
+    "stage": "KNOCKOUT",
+    "roundName": "32 הגדולות",
+    "homeTeam": "מנצחת בית A",
+    "awayTeam": "מקום 3 (C/E/F/H/I)",
+    "homePlaceholder": "1A",
+    "awayPlaceholder": "3_CEFHI",
+    "isFinished": false
+  },
+  {
+    "id": "match_80",
+    "stage": "KNOCKOUT",
+    "roundName": "32 הגדולות",
+    "homeTeam": "מנצחת בית L",
+    "awayTeam": "מקום 3 (E/H/I/J/K)",
+    "homePlaceholder": "1L",
+    "awayPlaceholder": "3_EHIJK",
+    "isFinished": false
+  },
+  {
+    "id": "match_81",
+    "stage": "KNOCKOUT",
+    "roundName": "32 הגדולות",
+    "homeTeam": "מנצחת בית D",
+    "awayTeam": "מקום 3 (B/E/F/I/J)",
+    "homePlaceholder": "1D",
+    "awayPlaceholder": "3_BEFIJ",
+    "isFinished": false
+  },
+  {
+    "id": "match_82",
+    "stage": "KNOCKOUT",
+    "roundName": "32 הגדולות",
+    "homeTeam": "מנצחת בית G",
+    "awayTeam": "מקום 3 (A/E/H/I/J)",
+    "homePlaceholder": "1G",
+    "awayPlaceholder": "3_AEHIJ",
+    "isFinished": false
+  },
+  {
+    "id": "match_83",
+    "stage": "KNOCKOUT",
+    "roundName": "32 הגדולות",
+    "homeTeam": "סגנית בית K",
+    "awayTeam": "סגנית בית L",
+    "homePlaceholder": "2K",
+    "awayPlaceholder": "2L",
+    "isFinished": false
+  },
+  {
+    "id": "match_84",
+    "stage": "KNOCKOUT",
+    "roundName": "32 הגדולות",
+    "homeTeam": "מנצחת בית H",
+    "awayTeam": "סגנית בית J",
+    "homePlaceholder": "1H",
+    "awayPlaceholder": "2J",
+    "isFinished": false
+  },
+  {
+    "id": "match_85",
+    "stage": "KNOCKOUT",
+    "roundName": "32 הגדולות",
+    "homeTeam": "מנצחת בית B",
+    "awayTeam": "מקום 3 (E/F/G/I/J)",
+    "homePlaceholder": "1B",
+    "awayPlaceholder": "3_EFGIJ",
+    "isFinished": false
+  },
+  {
+    "id": "match_86",
+    "stage": "KNOCKOUT",
+    "roundName": "32 הגדולות",
+    "homeTeam": "מנצחת בית J",
+    "awayTeam": "סגנית בית H",
+    "homePlaceholder": "1J",
+    "awayPlaceholder": "2H",
+    "isFinished": false
+  },
+  {
+    "id": "match_87",
+    "stage": "KNOCKOUT",
+    "roundName": "32 הגדולות",
+    "homeTeam": "מנצחת בית K",
+    "awayTeam": "מקום 3 (D/E/I/J/L)",
+    "homePlaceholder": "1K",
+    "awayPlaceholder": "3_DEIJL",
+    "isFinished": false
+  },
+  {
+    "id": "match_88",
+    "stage": "KNOCKOUT",
+    "roundName": "32 הגדולות",
+    "homeTeam": "סגנית בית D",
+    "awayTeam": "סגנית בית G",
+    "homePlaceholder": "2D",
+    "awayPlaceholder": "2G",
+    "isFinished": false
+  }
+]

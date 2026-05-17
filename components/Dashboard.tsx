@@ -237,6 +237,7 @@ export default function Dashboard({ userId, userName, setActiveTab, setPredictio
       const myData = allUsers.find(u => u.id === userId);
       if (myData) {
         setUserStats({
+          id: myData.id,
           points: myData.totalPoints || 0,
           rank: myData.displayRank || 0,
           koPoints: myData.knockoutPoints || 0,
