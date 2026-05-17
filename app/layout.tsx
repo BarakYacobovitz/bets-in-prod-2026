@@ -33,7 +33,23 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           {children}
         </main>
 
-        <Toaster position="bottom-center" />
+       <Toaster 
+  position="top-center"
+  toastOptions={{
+    // זמן ברירת מחדל לכל הודעה - 3 שניות
+    duration: 3000,
+    style: {
+      background: '#1e293b', // צבע כהה שמתאים לאפליקציה (slate-800)
+      color: '#fff',
+      border: '1px solid #334155',
+      direction: 'rtl',
+    },
+    // אפשר גם לתת זמן שונה להודעות שגיאה
+    error: {
+      duration: 4000,
+    },
+  }} 
+/>
       </body>
     </html>
   );

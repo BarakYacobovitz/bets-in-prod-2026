@@ -129,51 +129,6 @@ export default function Dashboard({ userId, userName, setActiveTab, setPredictio
   const [bonusQuestionsList, setBonusQuestionsList] = useState<any[]>([]);
   const [prizes, setPrizes] = useState<any>(null);
   const [showPodiumState, setShowPodiumState] = useState(true);
-  // --- States for AI Analyst ---
-  const [aiQuery, setAiQuery] = useState("");
-  const [aiResponse, setAiResponse] = useState("");
-  const [isAiLoading, setIsAiLoading] = useState(false);
-  // --- Function to fetch AI answer ---
-  // --- Function to fetch AI answer ---
-  const handleAskAnalyst = async () => {
-    if (!aiQuery.trim()) return;
-    
-    setIsAiLoading(true);
-    setAiResponse(""); 
-    
-    try {
-      // 1. אוספים את המידע שכבר קיים אצלנו בלקוח (חוסך קריאה לשרת ולמסד הנתונים!)
-      const contextData = {
-        userName: safeUserName,
-        myPoints: userStats.points,
-        // לוקחים רק את ה-5 הראשונים בטבלה כדי לחסוך טוקנים
-        leaderboardTop5: allUsersList.slice(0, 5).map(u => ({ name: u.name, pts: u.totalPoints || 0 })) 
-      };
-
-      // 2. שולחים את השאלה יחד עם הקונטקסט
-      const res = await fetch('/api/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          message: aiQuery,
-          context: contextData
-        })
-      });
-      
-      const data = await res.json();
-      
-      if (data.reply) {
-        setAiResponse(data.reply);
-      } else {
-        setAiResponse("תקלה בתקשורת עם ה-VAR. נסה שוב.");
-      }
-    } catch (error) {
-      console.error("Error asking analyst:", error);
-      setAiResponse("האנליסט יצא להפסקת קפה, נסה שוב מאוחר יותר.");
-    } finally {
-      setIsAiLoading(false);
-    }
-  };
   const [nowMs, setNowMs] = useState(Date.now());
   const [liveBonusQs, setLiveBonusQs] = useState<any[]>([]);
   const [liveBonusAns, setLiveBonusAns] = useState<any>({});
@@ -988,7 +943,7 @@ const renderedMagazineContent = useMemo(() => {
       `}} />
 
         {/* אולפן שולחני - מופיע ממסכי XL ומעלה (1280px+) */}
-        <div className="hidden xl:block fixed bottom-0 left-4 z-[60] w-[480px] pointer-events-none origin-bottom-left">
+        <div className="hidden xl:block fixed bottom-0 left-4 z-[60] w-[320px] pointer-events-none origin-bottom-left">
 
          {/* המסך טלוויזיה */}
          <div className="absolute bottom-[80%] left-1/2 -translate-x-1/2 w-[85%] bg-slate-950 border-[4px] border-slate-800 rounded-3xl shadow-[0_25px_50px_rgba(0,0,0,0.8),0_0_30px_rgba(59,130,246,0.2)] pointer-events-auto overflow-hidden flex flex-col z-0 transition-transform duration-500 hover:scale-[1.02]">
@@ -1027,7 +982,7 @@ const renderedMagazineContent = useMemo(() => {
                <div className="relative transition-all duration-300 group-hover:-translate-y-4 group-focus:-translate-y-4 group-hover:rotate-6 group-focus:rotate-6 group-hover:scale-110 group-focus:scale-110">
                  {/* הנה ההילה האדומה שחזרה! */}
                  <div className="absolute inset-0 bg-red-600 rounded-full blur-2xl opacity-0 group-hover:opacity-80 group-focus:opacity-80 transition-opacity duration-300 scale-125 z-0"></div>
-                 <img src="/donaldIcon-removebg.png" alt="Trump" className="w-36 relative z-10 object-contain transition-all duration-300 group-hover:animate-rage group-focus:animate-rage filter group-hover:drop-shadow-[0_0_20px_rgba(225,29,72,1)] group-focus:drop-shadow-[0_0_20px_rgba(225,29,72,1)]" />
+                 <img src="/donaldIcon-removebg.png" alt="Trump" className="w-24 relative z-10 object-contain transition-all duration-300 group-hover:animate-rage group-focus:animate-rage filter group-hover:drop-shadow-[0_0_20px_rgba(225,29,72,1)] group-focus:drop-shadow-[0_0_20px_rgba(225,29,72,1)]" />
                </div>
             </div>
 
@@ -1039,7 +994,7 @@ const renderedMagazineContent = useMemo(() => {
                      <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-0 h-0 border-l-[8px] border-l-transparent border-r-[8px] border-r-transparent border-t-[8px] border-t-blue-500"></div>
                   </div>
                </div>
-               <img src="/candianIcon-removebg.png" alt="Canadian" className="w-36 object-contain drop-shadow-xl transition-all duration-300 group-hover:-translate-y-4 group-focus:-translate-y-4 group-hover:scale-110 group-focus:scale-110" />
+               <img src="/candianIcon-removebg.png" alt="Canadian" className="w-24 object-contain drop-shadow-xl transition-all duration-300 group-hover:-translate-y-4 group-focus:-translate-y-4 group-hover:scale-110 group-focus:scale-110" />
             </div>
 
             {/* Mexican */}
@@ -1050,15 +1005,9 @@ const renderedMagazineContent = useMemo(() => {
                      <div className="absolute -bottom-2 left-6 w-0 h-0 border-l-[8px] border-l-transparent border-r-[8px] border-r-transparent border-t-[8px] border-t-emerald-500"></div>
                   </div>
                </div>
-               <img src="/maxicanIcon-removebg.png" alt="Mexican" className="w-36 object-contain drop-shadow-xl -scale-x-100 transition-all duration-300 group-hover:-translate-y-4 group-focus:-translate-y-4 group-hover:-rotate-6 group-focus:-rotate-6 group-hover:scale-110 group-focus:scale-110 origin-bottom" />
+               <img src="/maxicanIcon-removebg.png" alt="Mexican" className="w-24 object-contain drop-shadow-xl -scale-x-100 transition-all duration-300 group-hover:-translate-y-4 group-focus:-translate-y-4 group-hover:-rotate-6 group-focus:-rotate-6 group-hover:scale-110 group-focus:scale-110 origin-bottom" />
             </div>
          </div>
-         {/* הוספת הטאבלט של האנליסט לשולחן */}
-<div className="relative group cursor-pointer pb-2 z-40 shrink-0 pointer-events-auto" onClick={() => setIsChatOpen(true)}>
-   <div className="absolute inset-0 bg-cyan-500 rounded-full blur-xl opacity-20 group-hover:opacity-50 transition-opacity"></div>
-   <img src="/ai-monitor.png" alt="AI Analyst" className="w-24 object-contain drop-shadow-[0_0_15px_rgba(34,211,238,0.4)] group-hover:scale-110 transition-transform" />
-</div>
-
          {/* שולחן האולפן */}
          <img src="/panel-removebg.png" alt="Studio Desk" className="relative z-30 w-full object-contain drop-shadow-[0_-8px_20px_rgba(0,0,0,0.8)] pointer-events-none" />
       </div>
@@ -1108,7 +1057,8 @@ const renderedMagazineContent = useMemo(() => {
       )}
 
     <div className="flex lg:grid lg:grid-cols-2 items-stretch overflow-x-auto snap-x snap-mandatory gap-4 md:gap-8 pb-4 md:pb-0 custom-scrollbar -mx-4 px-4 md:mx-0 md:px-0 shrink-0 w-full"> 
-        <div className="w-[calc(100vw-32px)] lg:w-auto shrink-0 snap-center rounded-3xl p-6 shadow-2xl relative overflow-hidden bg-slate-900 border border-slate-700 flex flex-col min-h-full min-w-0">         <img src="tunnel.png" alt="Bets in Prod Tunnel" className="absolute inset-0 w-full h-full object-cover z-0 opacity-40 transition-all duration-1000 pointer-events-none" />
+        <div className="w-[calc(100vw-32px)] lg:w-auto shrink-0 snap-center rounded-3xl p-6 shadow-2xl relative overflow-hidden bg-slate-900 border border-slate-700 flex flex-col min-h-full min-w-0">        
+           <img src="tunnel.png" alt="Bets in Prod Tunnel" className="absolute inset-0 w-full h-full object-cover z-0 opacity-40 transition-all duration-1000 pointer-events-none" />
             <div className="absolute inset-0 z-0 bg-gradient-to-l from-slate-950/90 via-slate-900/60 to-slate-950/90 pointer-events-none"></div>
             
             <div className="relative z-10 text-right mb-6">
@@ -1344,51 +1294,7 @@ const renderedMagazineContent = useMemo(() => {
                </div>
             )}
           
-            <div className="relative z-10 w-full mb-6">
-  {/* עמדת האנליסט - מחוברת ללוגיקה במלואה */}
-            <div className="relative z-10 w-full mb-6 mt-4">
-              <div className="bg-gradient-to-br from-slate-900 to-blue-950 border border-blue-500/30 rounded-3xl p-4 shadow-xl relative overflow-hidden group">
-                <div className="absolute inset-0 opacity-10 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] pointer-events-none"></div>
-                
-                <div className="flex items-center gap-4 relative z-10 mb-4">
-                  <div className="w-12 h-12 md:w-16 md:h-16 bg-blue-500/10 rounded-2xl flex items-center justify-center border border-blue-500/20 shrink-0 shadow-inner">
-                     <span className="text-2xl md:text-3xl animate-pulse">🤖</span>
-                  </div>
-                  <div className="flex-1">
-                    <h3 className="text-white font-black text-sm md:text-lg">האנליסט של Bets in PROD</h3>
-                    <p className="text-blue-300 text-[10px] md:text-xs font-medium">שאל אותי על מגמות, ניחושים וסטטיסטיקות</p>
-                  </div>
-                </div>
-
-                <div className="relative z-10 flex flex-col gap-3">
-                  <div className="relative">
-                    <input 
-                      type="text" 
-                      value={aiQuery}
-                      onChange={(e) => setAiQuery(e.target.value)}
-                      onKeyDown={(e) => e.key === 'Enter' && handleAskAnalyst()}
-                      placeholder="למשל: כמה הימרו על אנגליה?" 
-                      className="w-full bg-slate-950/80 border border-slate-700 rounded-xl py-3 pr-4 pl-14 text-white text-xs md:text-sm outline-none focus:border-blue-500 transition-all shadow-inner"
-                      disabled={isAiLoading}
-                    />
-                    <button 
-                      onClick={handleAskAnalyst}
-                      disabled={isAiLoading || !aiQuery.trim()}
-                      className="absolute left-1.5 top-1/2 -translate-y-1/2 bg-blue-600 hover:bg-blue-500 disabled:bg-slate-700 text-white p-2 md:px-3 rounded-lg text-[10px] md:text-xs font-bold shadow-lg transition-colors flex items-center justify-center min-w-[40px]"
-                    >
-                      {isAiLoading ? <span className="animate-spin text-base">⏳</span> : "שאל ➜"}
-                    </button>
-                  </div>
-
-                  {aiResponse && (
-                    <div className="bg-slate-950/80 border border-emerald-500/30 rounded-xl p-4 text-xs md:text-sm text-emerald-50 leading-relaxed shadow-inner animate-fade-in text-right mt-2">
-                       <span className="text-emerald-400 font-black ml-1">האנליסט:</span> {aiResponse}
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-</div>
+           
             {/* כפתור גילוי נאות - ממלא את החור בצורה חכמה ומוסיף ערך */}
             {tournamentState > 0 && (
                <div className="relative z-10 w-full mb-6 flex-1 flex flex-col justify-center min-h-[80px]">
@@ -1544,7 +1450,7 @@ const renderedMagazineContent = useMemo(() => {
             </div>  
          </div>
 
-              <div className="w-[calc(100vw-32px)] lg:w-auto shrink-0 snap-center flex flex-col gap-4 md:gap-6 h-full min-w-0">              <div 
+              <div className="w-[calc(100vw-32px)] lg:w-auto shrink-0 snap-center flex flex-col gap-4 md:gap-6 self-stretch min-w-0">              <div 
                   onClick={() => setShowMagazineModal(true)}
                   className="bg-slate-900 rounded-3xl p-6 shadow-xl relative overflow-hidden border border-slate-700 group cursor-pointer flex flex-col hover:border-blue-500/50 transition-all duration-300 flex-1 min-w-0"      
               >
@@ -1583,7 +1489,7 @@ const renderedMagazineContent = useMemo(() => {
                </div>
             </div>
 {/* אולפן המובייל - עכשיו כחלק מהעמודה */}
-      <div className="xl:hidden w-full mt-4 bg-slate-950/40 rounded-3xl border border-slate-700/50 shadow-inner flex flex-col items-center pt-6 pb-2 overflow-hidden shrink-0">        
+      <div className="xl:hidden w-full max-w-sm mx-auto bg-slate-950/40 rounded-3xl border border-slate-700/50 shadow-inner flex flex-col items-center pt-6 pb-2 overflow-hidden shrink-0">        
         <div className="absolute top-0 right-0 w-full h-1 bg-gradient-to-r from-rose-400 via-amber-400 to-emerald-400"></div>
         
         <div className="mb-2 relative z-30 px-4 py-1.5 bg-slate-900/80 rounded-full border border-slate-700 text-white font-black text-[10px] flex items-center gap-2 shadow-md">

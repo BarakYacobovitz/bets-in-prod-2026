@@ -60,7 +60,7 @@ export default function MatrixPage() {
   const [varQuery, setVarQuery] = useState("");
   const [varResponse, setVarResponse] = useState("");
   const [isVarLoading, setIsVarLoading] = useState(false);
-
+  const [isVarModalOpen, setIsVarModalOpen] = useState(false); // שולט בפתיחת הפופ-אפ
   const [activeTab, setActiveTab] = useState<TabType>("MATCHES");
   const [searchPlayer, setSearchPlayer] = useState("");
   const [searchTeam, setSearchTeam] = useState("");
@@ -334,6 +334,7 @@ const mList: any[] = [];
     document.body.removeChild(link);
   };
   // --- Function to fetch AI answer using Local Matrix State ---
+  // --- Function to fetch AI answer using Local Matrix State (Agentic Pre-filtering) ---
   const handleAskVAR = async () => {
     if (!varQuery.trim()) return;
     
@@ -341,74 +342,142 @@ const mList: any[] = [];
     setVarResponse(""); 
     
     try {
-      // אריזת הקונטקסט מתוך הסטייט המקומי שכבר קיים בדפדפן
       let contextData: any = { activeTab };
+      const q = varQuery.toLowerCase(); // הופכים לאותיות קטנות לחיפוש קל (רלוונטי לאנגלית בעיקר, אבל טוב שיהיה)
 
       if (activeTab === "MATCHES") {
-         // שולחים רק משחקים שכבר נחשפו או ננעלו בטבלה כדי למנוע הדלפת ניחושים
          const exposedMatches = matches.filter(m => tournamentState > 0 && (m.isFinished || checkIsMatchLocked(m, tournamentState)));
-         contextData.data = exposedMatches.map(m => {
-            const predsForMatch = users.map(u => {
-               const p = predictions[u.id]?.[m.id];
-               return p && p.predictedHomeScore !== undefined && p.predictedHomeScore !== "" 
-                 ? `${u.name}: ${p.predictedHomeScore}-${p.predictedAwayScore}${p.qualifier ? ` (עולה: ${p.qualifier})` : ""}` 
-                 : null;
-            }).filter(x => x);
-            return { match: `${m.homeTeam} נגד ${m.awayTeam}`, predictions: predsForMatch };
+
+         const mentionedUsers = users.filter(u => q.includes(u.name.split(" ")[0]));
+         const usersToInclude = mentionedUsers.length > 0 ? mentionedUsers : users;
+
+         const isKnockoutQuery = q.includes("נוקאאוט") || q.includes("נוק אאוט") || q.includes("שמינית") || q.includes("רבע") || q.includes("חצי") || q.includes("גמר");
+         const isGroupsQuery = q.includes("בית") || q.includes("בתים");
+
+         const queryWords = q.split(" ").filter((w: string) => w.length > 2); 
+         
+         // 🚀 שדרוג 1: שליפת לוח המשחקים המלא (כולל עתידיים) אם הוזכרה קבוצה
+         const teamSchedule: any[] = [];
+         if (queryWords.length > 0) {
+            matches.forEach(m => {
+               if (queryWords.some((w: string) => m.homeTeam.includes(w) || m.awayTeam.includes(w))) {
+                  teamSchedule.push(`${m.homeTeam} נגד ${m.awayTeam} (${m.stage === 'KNOCKOUT' ? m.roundName : 'בית '+m.group}) - ${m.isFinished ? 'שוחק' : 'טרם שוחק'}`);
+               }
+            });
+         }
+
+         let relevantMatches = exposedMatches.filter(m => {
+            let matchIsRelevant = false;
+            if (queryWords.some((w: string) => m.homeTeam.includes(w) || m.awayTeam.includes(w))) matchIsRelevant = true;
+            
+            if (isKnockoutQuery && m.stage === "KNOCKOUT") {
+               if (q.includes("שמינית") && m.roundName === "שמינית גמר") matchIsRelevant = true;
+               else if (q.includes("רבע") && m.roundName === "רבע גמר") matchIsRelevant = true;
+               else if (q.includes("חצי") && m.roundName === "חצי גמר") matchIsRelevant = true;
+               else if (q.includes("גמר") && (m.roundName === "גמר" || m.roundName === "מקום שלישי")) matchIsRelevant = true;
+               else if (q.includes("נוקאאוט")) matchIsRelevant = true;
+            }
+            if (isGroupsQuery && m.stage !== "KNOCKOUT") {
+               const groupMatch = q.match(/בית\s*([a-zA-Zא-ת])/);
+               if (groupMatch && m.group?.toLowerCase() === groupMatch[1].toLowerCase()) matchIsRelevant = true;
+               else if (!groupMatch) matchIsRelevant = true; 
+            }
+            return matchIsRelevant;
          });
-      } 
+         
+         // אם לא זוהתה קבוצה או שלב ספציפי, אבל הוזכר שם של משתמש או מילות חיפוש רחבות - נשלח את כל המשחקים!
+         if (relevantMatches.length === 0) {
+            if (mentionedUsers.length > 0 || q.includes("בול") || q.includes("פגע") || q.includes("נקודות") || q.includes("צדק") || q.includes("כל ה")) {
+               relevantMatches = exposedMatches;
+            } else {
+               relevantMatches = exposedMatches.slice(-12); // ברירת מחדל רחבה יותר
+            }
+         }
+
+         // 🚀 שדרוג 2: הוספת תוצאות האמת לנתונים כדי שה-AI יוכל לחשב נקודות
+         const miniDict: any = {};
+         relevantMatches.forEach(m => {
+            const matchKey = `${m.homeTeam}-${m.awayTeam} (${m.stage === 'KNOCKOUT' ? m.roundName : 'בית '+m.group})`;
+            miniDict[matchKey] = {
+               realScore: m.isFinished ? `${m.realHomeScore}-${m.realAwayScore}` : 'טרם שוחק',
+               predictions: {}
+            };
+            usersToInclude.forEach(u => {
+               const p = predictions[u.id]?.[m.id];
+               if (p && p.predictedHomeScore !== undefined && p.predictedHomeScore !== "") {
+                  let predStr = `${p.predictedHomeScore}-${p.predictedAwayScore}`;
+                  if (m.stage === "KNOCKOUT" && p.qualifier) predStr += `(עולה:${p.qualifier})`;
+                  miniDict[matchKey].predictions[u.name.split(" ")[0]] = predStr;
+               }
+            });
+         });
+
+         contextData.data = miniDict;
+         if (teamSchedule.length > 0) contextData.teamSchedule = teamSchedule;
+      }
       else if (activeTab === "BONUS") {
-         // שולחים רק שאלות בונוס שהזמן שלהן עבר או שהשלב שלהן נפתח
          const exposedBonus = bonusQuestions.filter(q => {
              const phase = q.phase || "TOURNAMENT";
              let isExposed = (phase === "KNOCKOUT") ? (tournamentState >= 5) : (tournamentState >= 1);
              if (q.isSurprise) isExposed = nowMs > parseDateTimeLocal(q.closeTime);
              return isExposed;
          });
-         contextData.data = exposedBonus.map(q => {
-             const predsForQ = users.map(u => {
-                const ans = bonusPredictions[u.id]?.[q.id];
-                return ans ? `${u.name}: ${ans}` : null;
-             }).filter(x => x);
-             return { question: q.label || q.questionText, predictions: predsForQ };
+
+         const mentionedUsers = users.filter(u => q.includes(u.name.split(" ")[0]));
+         const usersToInclude = mentionedUsers.length > 0 ? mentionedUsers : users;
+
+         const miniDict: any = {};
+         exposedBonus.forEach(qItem => {
+             const qKey = (qItem.label || qItem.questionText).substring(0, 30); 
+             
+             // 🚀 שדרוג הבונוסים: שליחת תשובת האמת וכמות הנקודות לשאלה
+             const truth = realBonusFull.answers?.[qItem.id];
+             miniDict[qKey] = {
+                pointsWorth: Number(qItem.points) || 0,
+                realAnswer: truth ? (Array.isArray(truth) ? truth.join(", ") : truth) : "טרם נקבע",
+                predictions: {}
+             };
+
+             usersToInclude.forEach(u => {
+                const ans = bonusPredictions[u.id]?.[qItem.id];
+                if (ans) miniDict[qKey].predictions[u.name.split(" ")[0]] = ans;
+             });
          });
-      } 
+         contextData.data = miniDict;
+      }
       else if (activeTab === "QUALIFIERS") {
-         // שולחים את ניחושי העולות מהבתים ומקום 3 אם השלב פתוח
-         const isQualExposed = tournamentState >= 1;
-         if (isQualExposed) {
-            contextData.data = users.map(u => {
+         if (tournamentState >= 1) {
+            const mentionedUsers = users.filter(u => q.includes(u.name.split(" ")[0]));
+            const usersToInclude = mentionedUsers.length > 0 ? mentionedUsers : users;
+
+            const miniDict: any = {};
+            usersToInclude.forEach(u => {
                const uQuals = qualifiersPredictions[u.id] || {};
-               const uThird = thirdPlacePredictions[u.id]?.teams || [];
-               const groupsStr = Object.entries(uQuals).map(([g, val]: any) => `בית ${g}: 1-${val.first || '?'}, 2-${val.second || '?'}`).join(" | ");
-               return {
-                  player: u.name,
-                  groups: groupsStr,
-                  thirdPlaceTeams: uThird.filter((x: string) => x).join(", ")
-               };
+               const groupsStr = Object.entries(uQuals).map(([g, val]: any) => `${g}:${val.first||'-'}/${val.second||'-'}`).join(", ");
+               miniDict[u.name.split(" ")[0]] = groupsStr;
             });
+            contextData.data = miniDict;
          } else {
-            contextData.data = "המידע על המעפילות חסוי בשלב זה.";
+            contextData.data = "מוסתר";
          }
       }
+      // 🏆 הזרקת טבלת דירוג מינימליסטית שתמיד תהיה זמינה ל-VAR בכל הלשוניות!
+      contextData.leaderboard = users.map((u, idx) => ({
+         name: u.name.split(" ")[0],
+         pts: u.totalPoints || 0,
+         rank: idx + 1 // (המשתמשים כבר ממוינים מהגבוה לנמוך ב-page.tsx)
+      }));
 
-      // פנייה ישירה לראוט ה-API
+      // שליחה לשרת 
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          message: varQuery,
-          context: contextData
-        })
+        body: JSON.stringify({ message: varQuery, context: contextData })
       });
       
       const data = await res.json();
-      
-      if (data.reply) {
-         setVarResponse(data.reply);
-      } else {
-         setVarResponse("תקלה בתקשורת עם צוות ה-VAR. נסה שוב.");
-      }
+      if (data.reply) setVarResponse(data.reply);
+      else setVarResponse("תקלה בתקשורת עם צוות ה-VAR. נסה שוב.");
       
     } catch (error) {
       console.error("VAR Error:", error);
@@ -548,56 +617,34 @@ const mList: any[] = [];
            </div>
         )}
       </div>
-      {/* עמדת ה-VAR של המטריקס - מחוברת ללוגיקת הזיכרון המקומי */}
-      <div className="max-w-3xl mx-auto mb-6 relative z-30">
-        <div className="bg-slate-900 border border-indigo-500/30 rounded-2xl p-4 shadow-[0_0_30px_rgba(79,70,229,0.15)] relative overflow-hidden group">
-          <div className="absolute top-0 right-0 w-2 h-full bg-indigo-500"></div>
-          <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-10 pointer-events-none"></div>
-          
-          <div className="flex flex-col md:flex-row gap-4 items-center relative z-10">
-            
-            <div className="flex items-center gap-3 shrink-0 w-full md:w-auto">
-              <div className="w-12 h-12 bg-indigo-950 border border-indigo-500/40 rounded-xl flex items-center justify-center shadow-inner">
-                <span className="text-2xl animate-pulse drop-shadow-[0_0_10px_rgba(99,102,241,0.8)]">📺</span>
-              </div>
-              <div>
-                <h3 className="text-white font-black tracking-wide flex items-center gap-1.5">
-                  עמדת VAR <span className="text-[10px] bg-rose-600 text-white px-1.5 rounded uppercase tracking-widest font-black">AI</span>
-                </h3>
-                <div className="text-indigo-300 text-[10px] font-bold">חפש ונתח נתונים מתוך הטבלה</div>
-              </div>
-            </div>
-
-            <div className="flex-1 w-full flex gap-2">
-              <input 
-                type="text" 
-                value={varQuery}
-                onChange={(e) => setVarQuery(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleAskVAR()}
-                placeholder={activeTab === "MATCHES" ? "למשל: כמה הימרו על 2-1 לאנגליה?" : activeTab === "BONUS" ? "למשל: מי אמר שטראמפ יזכה?" : "למשל: מי שם את ברזיל במקום הראשון?"} 
-                className="w-full bg-slate-950 border border-slate-700 text-white rounded-xl py-2 px-4 text-sm outline-none focus:border-indigo-500 shadow-inner text-right"
-                disabled={isVarLoading}
-              />
-              <button 
-                onClick={handleAskVAR}
-                disabled={isVarLoading || !varQuery.trim()}
-                className="bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-700 text-white px-5 rounded-xl font-bold transition-all shrink-0 flex items-center justify-center min-w-[70px]"
-              >
-                {isVarLoading ? <span className="animate-spin text-base">⏳</span> : "שאל ➜"}
-              </button>
-            </div>
-          </div>
-
-          {/* תצוגת התשובה החכמה של ה-VAR */}
-          {varResponse && (
-            <div className="mt-3 pt-3 border-t border-slate-800 text-indigo-100 text-xs md:text-sm font-medium leading-relaxed bg-indigo-950/40 p-3 rounded-xl border-r-4 border-r-indigo-500 relative z-10 animate-fade-in-up text-right">
-              <span className="font-black text-indigo-400 ml-2">VAR:</span>
-              {varResponse}
-            </div>
-          )}
-        </div>
+{/* 🔍 שורת הפעלה מהירה ל-VAR */}
+      <div className="w-full max-w-4xl mx-auto mb-6 bg-slate-950 border border-slate-800 rounded-2xl p-3 flex gap-3 shadow-inner" dir="rtl">
+        <input
+          type="text"
+          value={varQuery}
+          onChange={(e) => setVarQuery(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && varQuery.trim()) {
+              setIsVarModalOpen(true);
+              handleAskVAR();
+            }
+          }}
+          placeholder="שלח אירוע לבדיקת שופטי המסך... (לדוגמה: מה דקל הימר על מקסיקו?)"
+          className="flex-1 bg-black text-blue-400 font-mono text-sm px-4 py-3 rounded-xl border border-slate-800 focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/30 outline-none transition-all placeholder-slate-700"
+        />
+        <button
+          onClick={() => {
+            if (varQuery.trim()) {
+              setIsVarModalOpen(true);
+              handleAskVAR();
+            }
+          }}
+          className="bg-rose-950/40 hover:bg-rose-900/60 text-rose-400 font-bold px-6 py-3 rounded-xl font-mono text-xs border border-rose-900/50 shadow-md transition-all uppercase tracking-wider whitespace-nowrap active:scale-95"
+        >
+          🚨 שלח לבדיקה
+        </button>
       </div>
-      <div className="max-w-[98vw] mx-auto bg-slate-900/80 rounded-2xl border border-slate-700 shadow-2xl overflow-hidden">
+<div className="max-w-[98vw] mx-auto bg-slate-900/80 rounded-2xl border border-slate-700 shadow-2xl overflow-hidden">
          <div className="overflow-auto max-h-[65vh] w-full custom-scrollbar">
             <table className="w-max min-w-full text-center border-collapse text-sm">
                
@@ -873,6 +920,105 @@ const mList: any[] = [];
             </table>
          </div>
       </div>
+      {/* ========================================== */}
+{/* 🚨 מודל פריצת שידור - עמדת VAR אצטדיון 🚨 */}
+{/* ========================================== */}
+{isVarModalOpen && (
+  <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/85 p-4 backdrop-blur-md animate-fade-in" dir="rtl">
+    
+    {/* הזרקת האנימציה של קו הסריקה בטלוויזיה */}
+    <style dangerouslySetInnerHTML={{__html: `
+      @keyframes scanline {
+        0% { transform: translateY(-100%); }
+        100% { transform: translateY(260px); }
+      }
+      .animate-scanline {
+        animation: scanline 3s infinite linear;
+      }
+    `}} />
+
+    {/* גוף המודל */}
+    <div className="bg-slate-900 border-4 border-gray-800 rounded-2xl w-full max-w-lg flex flex-col shadow-[0_0_50px_rgba(225,29,72,0.3)] relative overflow-hidden">
+      
+      {/* כפתור סגירה עליון קטן */}
+      <button 
+        onClick={() => { setIsVarModalOpen(false); setVarQuery(""); setVarResponse(""); }}
+        className="absolute top-3 left-3 z-50 w-8 h-8 flex items-center justify-center rounded-full bg-black/50 text-gray-400 hover:text-white transition-colors text-sm border border-white/10"
+      >
+        ✕
+      </button>
+
+      {/* 📺 חצי עליון: המוניטור עם תמונת השופט והאפקטים */}
+      <div className="relative h-[240px] w-full bg-black shrink-0 border-b-4 border-gray-800">
+        {/* תמונת השופט שלקחת מהמגרש */}
+        <img 
+          src="/var-referee.jpg" 
+          alt="VAR Check" 
+          className="w-full h-full object-cover opacity-80"
+        />
+
+        {/* אפקט פסי סריקה (Scanlines) כמו מסך טלוויזיה ישן */}
+        <div className="absolute inset-0 pointer-events-none bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:100%_4px] opacity-70"></div>
+        
+        {/* קו הלייזר הכחול שיורד ועולה (אנימציית הסריקה) */}
+        <div className="absolute inset-x-0 h-0.5 bg-cyan-500/40 shadow-[0_0_10px_rgba(6,182,212,0.8)] opacity-70 animate-scanline"></div>
+
+        {/* באנר סטטוס שידור עליון */}
+        <div className="absolute top-4 right-4 bg-black/70 backdrop-blur-sm border border-red-500/30 px-3 py-1 rounded-md flex items-center gap-2">
+          <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse shadow-[0_0_8px_rgba(239,68,68,1)]"></span>
+          <span className="text-red-400 font-mono font-black text-[10px] tracking-widest uppercase">LIVE REVIEW</span>
+        </div>
+
+        {/* כתובית בזמן טעינה */}
+        {isVarLoading && (
+          <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center gap-2 text-center">
+            <div className="w-8 h-8 border-2 border-cyan-500 border-t-transparent rounded-full animate-spin"></div>
+            <div className="text-cyan-400 font-mono text-xs tracking-wider uppercase mt-1 bg-black/40 px-3 py-1 rounded border border-cyan-500/20">
+              מפענח זוויות צילום ונתוני טבלה...
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* 🏟️ חצי תחתון: לוח פסק הדין של האצטדיון */}
+      <div className="bg-[#050507] p-6 flex-1 flex flex-col justify-between min-h-[180px]">
+        
+        <div className="space-y-2">
+          <div className="text-[10px] font-black text-slate-500 tracking-wider uppercase font-mono">
+            שאילתת שופט: "{varQuery}"
+          </div>
+          
+          <div className="w-full h-px bg-slate-800 my-2"></div>
+
+          {/* מקום התשובה */}
+          {!isVarLoading && varResponse && (
+            <div className="text-emerald-400 font-mono text-base sm:text-lg leading-relaxed bg-emerald-950/10 p-4 border-r-4 border-emerald-500 rounded-l shadow-inner animate-fade-in">
+              <span className="text-white font-black block text-xs uppercase tracking-wider mb-1.5 opacity-60">החלטה סופית:</span>
+              {varResponse}
+            </div>
+          )}
+
+          {/* מצב המתנה (למקרה שהמודל נפתח מסיבה כלשהי בלי טעינה) */}
+          {!isVarLoading && !varResponse && (
+            <div className="text-slate-600 font-mono text-sm text-center py-6">
+              ממתין להעברת הנתונים מחדר הבקרה...
+            </div>
+          )}
+        </div>
+
+        {/* כפתור סגירה תחתון - חזרה למגרש */}
+        {!isVarLoading && varResponse && (
+          <button
+            onClick={() => { setIsVarModalOpen(false); setVarQuery(""); setVarResponse(""); }}
+            className="w-full mt-6 bg-gradient-to-r from-slate-900 to-slate-800 hover:from-slate-800 hover:to-slate-700 text-slate-300 font-black py-3 rounded-xl border border-slate-700 text-sm transition-all text-center active:scale-95 shadow-lg font-mono"
+          >
+            ✓ חזרה למגרש
+          </button>
+        )}
+      </div>
+    </div>
+  </div>
+)}
     </div>
   );
 }
