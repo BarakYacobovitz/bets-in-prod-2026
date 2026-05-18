@@ -342,36 +342,38 @@ const mList: any[] = [];
     setVarResponse(""); 
     
     try {
-      // 🛡️ בניית ה-Context בתוך הפונקציה (פתרון ה-ReferenceError)
+      // 1. בניית ה-Context בתוך הפונקציה
       const contextData = {
         activeTab: activeTab,
         leaderboard: users,
         leaderboardTop5: users.slice(0, 5),
-        // מעבירים את הנתונים לפי מה שמוצג כרגע למשתמש
         data: activeTab === "MATCHES" ? filteredMatches : 
               activeTab === "BONUS" ? filteredBonusQuestions : 
               qualifiersPredictions,
-        todayPredictions: predictions // שליחת הניחושים ל-VAR
+        todayPredictions: predictions
       };
 
+      // 2. שליחה לשרת
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message: varQuery, context: contextData })
       });
       
-      const rawText = await res.text();
+      // 3. קריאה בודדת של ה-JSON (זה משחרר את ה-Stream)
+      const data = await res.json();
       
+      // 4. בדיקת שגיאה
       if (!res.ok) {
-         throw new Error(`Server returned ${res.status}`);
+         throw new Error(data.error || `Server returned ${res.status}`);
       }
 
-      const data = JSON.parse(rawText);
-      setVarResponse(data.reply || "אין תשובה מה-AI.");
+      // 5. עדכון המסך
+      setVarResponse(data.reply || "השופטים קיבלו תשובה ריקה.");
       
     } catch (error: any) {
       console.error("VAR Error:", error);
-      setVarResponse(`ה-VAR שבת מפעילות. תקלה: ${error.message}`);
+      setVarResponse(`ה-VAR שבת מפעילות. תקלה טכנית: ${error.message}`);
     } finally {
       setIsVarLoading(false);
     }
