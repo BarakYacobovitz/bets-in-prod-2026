@@ -60,29 +60,51 @@ export default function MatchCard({ match, userId, tournamentState = 0 }: { matc
 
     setSaveStatus("saving");
     const timer = setTimeout(async () => {
-      
-      // --- 🛡️ חגורת הבטיחות הרמטית לפני השמירה (Pre-flight Check) ---
-      // 1. מחלצים את זמן המשחק האמיתי למאיות שנייה
-      let matchStartTime = Infinity;
-      if (match.matchDate) {
-        const [datePart, timePart] = match.matchDate.split(" ");
-        if (datePart && timePart) {
-          const [day, month, year] = datePart.split("/");
-          const [hours, minutes] = timePart.split(":");
-          matchStartTime = new Date(Number(year), Number(month) - 1, Number(day), Number(hours), Number(minutes)).getTime();
-        }
-      }
-
-      // 2. הבדיקה הקריטית: האם השעון עכשיו עבר את שעת פתיחת המשחק?
-      if (Date.now() >= matchStartTime || match.isFinished) {
-        toast.error("זמן פציעות! המשחק כבר התחיל ולכן הניחוש לא נשמר.");
-        setSaveStatus("idle");
-        isUserAction.current = false;
-        return; // ⛔ העסק נעצר כאן! אין פנייה למסד הנתונים!
-      }
-      // -------------------------------------------------------------
-
       try {
+        // 1. 🛡️ שליפה אגרסיבית של סטטוס הטורניר העדכני ביותר ישירות מהשרת (עוקף פרופס ישנים)
+        const systemSnap = await getDocs(query(collection(db, "settings"))); // או getDoc נקודתי:
+        const systemDocRef = doc(db, "settings", "system");
+        const systemSnapShot = await getDoc(systemDocRef);
+        
+        const freshTournamentState = systemSnapShot.exists() ? (Number(systemSnapShot.data().tournamentState) || 0) : 0;
+
+        // 2. חישוב דינמי של נעילה ידנית לפי המצב העדכני ביותר ב-DB
+        let isCurrentManualLocked = false;
+        if (match.stage !== "KNOCKOUT") {
+          const md = Number(match.matchday) || 1; 
+          if (md === 1 && freshTournamentState >= 1) isCurrentManualLocked = true;
+          if (md === 2 && freshTournamentState >= 2) isCurrentManualLocked = true;
+          if (md === 3 && freshTournamentState >= 3) isCurrentManualLocked = true;
+        } else {
+          if (match.roundName === "32 הגדולות" && freshTournamentState >= 5) isCurrentManualLocked = true;
+          else if (match.roundName === "שמינית גמר" && freshTournamentState >= 7) isCurrentManualLocked = true;
+          else if (match.roundName === "רבע גמר" && freshTournamentState >= 9) isCurrentManualLocked = true;
+          else if (match.roundName === "חצי גמר" && freshTournamentState >= 11) isCurrentManualLocked = true;
+          else if ((match.roundName === "גמר" || match.roundName === "מקום שלישי") && freshTournamentState >= 13) isCurrentManualLocked = true;
+        }
+
+        // 3. חילוץ שעת המשחק לבדיקת זמן אמת (למקרה שהזמן עבר)
+        let matchStartTime = Infinity;
+        if (match.matchDate) {
+          const [datePart, timePart] = match.matchDate.split(" ");
+          if (datePart && timePart) {
+            const [day, month, year] = datePart.split("/");
+            const [hours, minutes] = timePart.split(":");
+            matchStartTime = new Date(Number(year), Number(month) - 1, Number(day), Number(hours), Number(minutes)).getTime();
+          }
+        }
+
+        // 4. חסימה קשיחה: אם הסטטוס ננעל בשרת או שהזמן עבר - זורקים אותו החוצה!
+        if (isCurrentManualLocked || Date.now() >= matchStartTime || match.isFinished) {
+          toast.error("המחזור ננעל או שהמשחק כבר התחיל! הניחוש הנוכחי לא נשמר. 🔒");
+          setSaveStatus("idle");
+          isUserAction.current = false;
+          // אנחנו מרעננים קלות את הסטטוס המקומי כדי שההקלדה שלו תימחק והשדה יינעל
+          window.location.reload(); 
+          return; // ⛔ עוצרים כאן! לא מתבצע setDoc למסד הנתונים!
+        }
+
+        // 5. אם הכל תקין והשער פתוח - שומרים כרגיל
         const collectionName = match.stage === "KNOCKOUT" ? "predictions_knockout" : "predictions_matches";
         const docRef = doc(db, collectionName, `${userId}_${match.id}`);
         const payload: any = { 
