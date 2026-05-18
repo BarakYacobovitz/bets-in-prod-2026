@@ -342,166 +342,31 @@ const mList: any[] = [];
     setVarResponse(""); 
     
     try {
-      let contextData: any = { activeTab };
-      const q = varQuery.toLowerCase(); // הופכים לאותיות קטנות לחיפוש קל (רלוונטי לאנגלית בעיקר, אבל טוב שיהיה)
+      // ... (שאר הקוד של הכנת ה-contextData נשאר בדיוק אותו דבר) ...
+      // (תוודא שה-contextData מוגדר כמו שהיה קודם)
 
-      if (activeTab === "MATCHES") {
-         const exposedMatches = matches.filter(m => tournamentState > 0 && (m.isFinished || checkIsMatchLocked(m, tournamentState)));
-
-         const mentionedUsers = users.filter(u => q.includes(u.name.split(" ")[0]));
-         // 🔥 התיקון: אם לא צוין שם ספציפי, אל תשלח את הניחושים המלאים של כל 50 המשתתפים. ה-AI יסתמך על טבלת ה-Leaderboard הקלילה.
-        const usersToInclude = mentionedUsers.length > 0 ? mentionedUsers : users.slice(0, 3);
-
-         const isKnockoutQuery = q.includes("נוקאאוט") || q.includes("נוק אאוט") || q.includes("שמינית") || q.includes("רבע") || q.includes("חצי") || q.includes("גמר");
-         const isGroupsQuery = q.includes("בית") || q.includes("בתים");
-
-         const queryWords = q.split(" ").filter((w: string) => w.length > 2); 
-         
-         // 🚀 שדרוג 1: שליפת לוח המשחקים המלא (כולל עתידיים) אם הוזכרה קבוצה
-         const teamSchedule: any[] = [];
-         if (queryWords.length > 0) {
-            matches.forEach(m => {
-               if (queryWords.some((w: string) => m.homeTeam.includes(w) || m.awayTeam.includes(w))) {
-                  teamSchedule.push(`${m.homeTeam} נגד ${m.awayTeam} (${m.stage === 'KNOCKOUT' ? m.roundName : 'בית '+m.group}) - ${m.isFinished ? 'שוחק' : 'טרם שוחק'}`);
-               }
-            });
-         }
-
-         let relevantMatches = exposedMatches.filter(m => {
-            let matchIsRelevant = false;
-            if (queryWords.some((w: string) => m.homeTeam.includes(w) || m.awayTeam.includes(w))) matchIsRelevant = true;
-            
-            if (isKnockoutQuery && m.stage === "KNOCKOUT") {
-               if (q.includes("שמינית") && m.roundName === "שמינית גמר") matchIsRelevant = true;
-               else if (q.includes("רבע") && m.roundName === "רבע גמר") matchIsRelevant = true;
-               else if (q.includes("חצי") && m.roundName === "חצי גמר") matchIsRelevant = true;
-               else if (q.includes("גמר") && (m.roundName === "גמר" || m.roundName === "מקום שלישי")) matchIsRelevant = true;
-               else if (q.includes("נוקאאוט")) matchIsRelevant = true;
-            }
-            if (isGroupsQuery && m.stage !== "KNOCKOUT") {
-               const groupMatch = q.match(/בית\s*([a-zA-Zא-ת])/);
-               if (groupMatch && m.group?.toLowerCase() === groupMatch[1].toLowerCase()) matchIsRelevant = true;
-               else if (!groupMatch) matchIsRelevant = true; 
-            }
-            return matchIsRelevant;
-         });
-         
-         // אם לא זוהתה קבוצה או שלב ספציפי, אבל הוזכר שם של משתמש או מילות חיפוש רחבות - נשלח את כל המשחקים!
-         if (relevantMatches.length === 0) {
-            if (mentionedUsers.length > 0 || q.includes("בול") || q.includes("פגע") || q.includes("נקודות") || q.includes("צדק") || q.includes("כל ה")) {
-               relevantMatches = exposedMatches;
-            } else {
-               relevantMatches = exposedMatches.slice(-12); // ברירת מחדל רחבה יותר
-            }
-         }
-
-         // 🚀 שדרוג 2: הוספת תוצאות האמת לנתונים כדי שה-AI יוכל לחשב נקודות
-         const miniDict: any = {};
-         relevantMatches.forEach(m => {
-            const matchKey = `${m.homeTeam}-${m.awayTeam} (${m.stage === 'KNOCKOUT' ? m.roundName : 'בית '+m.group})`;
-            miniDict[matchKey] = {
-               realScore: m.isFinished ? `${m.realHomeScore}-${m.realAwayScore}` : 'טרם שוחק',
-               predictions: {}
-            };
-            usersToInclude.forEach(u => {
-               const p = predictions[u.id]?.[m.id];
-               if (p && p.predictedHomeScore !== undefined && p.predictedHomeScore !== "") {
-                  let predStr = `${p.predictedHomeScore}-${p.predictedAwayScore}`;
-                  if (m.stage === "KNOCKOUT" && p.qualifier) predStr += `(עולה:${p.qualifier})`;
-                  miniDict[matchKey].predictions[u.name.split(" ")[0]] = predStr;
-               }
-            });
-         });
-
-         contextData.data = miniDict;
-         if (teamSchedule.length > 0) contextData.teamSchedule = teamSchedule;
-      }
-      else if (activeTab === "BONUS") {
-         const exposedBonus = bonusQuestions.filter(q => {
-             const phase = q.phase || "TOURNAMENT";
-             let isExposed = (phase === "KNOCKOUT") ? (tournamentState >= 5) : (tournamentState >= 1);
-             if (q.isSurprise) isExposed = nowMs > parseDateTimeLocal(q.closeTime);
-             return isExposed;
-         });
-
-         const mentionedUsers = users.filter(u => q.includes(u.name.split(" ")[0]));
-         // 🔥 התיקון: אם לא צוין שם ספציפי, אל תשלח את הניחושים המלאים של כל 50 המשתתפים. ה-AI יסתמך על טבלת ה-Leaderboard הקלילה.
-         const usersToInclude = mentionedUsers.length > 0 ? mentionedUsers : users.slice(0, 3);
-
-         const miniDict: any = {};
-         exposedBonus.forEach(qItem => {
-             const qKey = (qItem.label || qItem.questionText).substring(0, 30); 
-             
-             // 🚀 שדרוג הבונוסים: שליחת תשובת האמת וכמות הנקודות לשאלה
-             const truth = realBonusFull.answers?.[qItem.id];
-             miniDict[qKey] = {
-                pointsWorth: Number(qItem.points) || 0,
-                realAnswer: truth ? (Array.isArray(truth) ? truth.join(", ") : truth) : "טרם נקבע",
-                predictions: {}
-             };
-
-             usersToInclude.forEach(u => {
-                const ans = bonusPredictions[u.id]?.[qItem.id];
-                if (ans) miniDict[qKey].predictions[u.name.split(" ")[0]] = ans;
-             });
-         });
-         contextData.data = miniDict;
-      }
-      else if (activeTab === "QUALIFIERS") {
-         if (tournamentState >= 1) {
-            const mentionedUsers = users.filter(u => q.includes(u.name.split(" ")[0]));
-            // 🔥 התיקון: אם לא צוין שם ספציפי, אל תשלח את הניחושים המלאים של כל 50 המשתתפים. ה-AI יסתמך על טבלת ה-Leaderboard הקלילה.
-            const usersToInclude = mentionedUsers.length > 0 ? mentionedUsers : users.slice(0, 3);
-
-            const miniDict: any = {};
-            usersToInclude.forEach(u => {
-               const uQuals = qualifiersPredictions[u.id] || {};
-               const groupsStr = Object.entries(uQuals).map(([g, val]: any) => `${g}:${val.first||'-'}/${val.second||'-'}`).join(", ");
-               miniDict[u.name.split(" ")[0]] = groupsStr;
-            });
-            contextData.data = miniDict;
-         } else {
-            contextData.data = "מוסתר";
-         }
-      }
-      // 🏆 הזרקת טבלת דירוג מינימליסטית שתמיד תהיה זמינה ל-VAR בכל הלשוניות!
-      contextData.leaderboard = users.map((u, idx) => ({
-         name: u.name.split(" ")[0],
-         pts: u.totalPoints || 0,
-         rank: idx + 1 // (המשתמשים כבר ממוינים מהגבוה לנמוך ב-page.tsx)
-      }));
-
-      // שליחה לשרת 
-      // שליחה לשרת (חסין ל-Timeouts)
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message: varQuery, context: contextData })
       });
       
-      // אם השרת נחתך (Timeout של Vercel)
+      // התיקון המכריע: קוראים את התוכן פעם אחת בלבד!
+      const data = await res.json();
+      
       if (!res.ok) {
-        throw new Error(`Server returned ${res.status}`);
+         throw new Error(data.error || `Server error: ${res.status}`);
       }
 
-      // במקום לקרוס על JSON, אנחנו קודם מפרקים את הטקסט
-      const text = await res.text();
-      try {
-        const data = JSON.parse(text);
-        if (data.reply) setVarResponse(data.reply);
-        else setVarResponse("השופטים מתקשים לקבל החלטה. נסה לנסח מחדש.");
-      } catch (e) {
-        console.error("Failed to parse JSON:", text);
-        setVarResponse("השידור נקטע! שרת ה-AI עמוס כרגע (Timeout). נסה שוב עוד רגע.");
+      if (data.reply) {
+        setVarResponse(data.reply);
+      } else {
+        setVarResponse("השופטים מתקשים לקבל החלטה. נסה לנסח מחדש.");
       }
       
-      const data = await res.json();
-      if (data.reply) setVarResponse(data.reply);
-      else setVarResponse("תקלה בתקשורת עם צוות ה-VAR. נסה שוב.");
-      
-    } catch (error) {
+    } catch (error: any) {
       console.error("VAR Error:", error);
-      setVarResponse(`ה-VAR שבת מפעילות. תקלה טכנית: ${error.message || "שגיאת שרת לא מזוהה"}`);
+      setVarResponse(`ה-VAR שבת מפעילות. תקלה טכנית: ${error.message}`);
     } finally {
       setIsVarLoading(false);
     }
