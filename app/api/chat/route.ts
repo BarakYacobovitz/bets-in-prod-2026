@@ -8,6 +8,16 @@ export async function POST(req: Request) {
     const body = await req.json();
     const { message, context } = body;
 
+    // בדיקת הגנה: בוא נראה אם המפתח קיים בכלל בשרת
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+       return NextResponse.json({ reply: "שגיאת שרת: המפתח (API KEY) לא מוגדר בשרת!" }, { status: 500 });
+    }
+    // בדיקה נוספת: אולי הוא ריק?
+    if (apiKey.length < 10) {
+       return NextResponse.json({ reply: `המפתח שהוגדר קצר מדי: ${apiKey}` }, { status: 500 });
+    }
+
     if (!message || !context) {
       return NextResponse.json({ error: 'Missing message or context' }, { status: 400 });
     }
