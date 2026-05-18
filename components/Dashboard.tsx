@@ -141,12 +141,35 @@ export default function Dashboard({ userId, userName, setActiveTab, setPredictio
     mexican: '"Ay caramba! איזה בול!" 🌮'
   });
   useEffect(() => {
+    // 1. האזנה רגילה של פיירבייס (תעבוד רוב הזמן)
     const unsubSys = onSnapshot(doc(db, "settings", "system"), (docSnap) => {
       if (docSnap.exists()) {
         setTournamentState(Number(docSnap.data().tournamentState) || 0);
       }
     });
-    return () => unsubSys();
+
+    // 2. פתרון מיוחד למובייל (iOS/Android) - כשהמסך נדלק או חוזרים מהרקע
+    const handleWakeUp = async () => {
+      if (document.visibilityState === 'visible') {
+         try {
+           // אנחנו עושים getDoc יזום כדי לעקוף "הירדמות" של ה-WebSocket
+           const snap = await getDoc(doc(db, "settings", "system"));
+           if (snap.exists()) {
+             setTournamentState(Number(snap.data().tournamentState) || 0);
+           }
+         } catch (e) {
+           console.error("שגיאה בהתעוררות משינה:", e);
+         }
+      }
+    };
+
+    // מאזין לאירוע חזרה למסך
+    document.addEventListener('visibilitychange', handleWakeUp);
+
+    return () => {
+      unsubSys();
+      document.removeEventListener('visibilitychange', handleWakeUp);
+    };
   }, []);
   const isBannerInit = useRef(false);
 

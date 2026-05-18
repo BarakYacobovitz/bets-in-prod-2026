@@ -3,6 +3,7 @@ import { useState, useEffect, useRef } from "react";
 import { doc, setDoc, collection, query, where, getDocs, onSnapshot } from "firebase/firestore";
 import { db } from "../app/firebase";
 import { getFlagUrl } from "../app/utils/flags";
+import toast from "react-hot-toast";
 
 export default function MatchCard({ match, userId, tournamentState = 0 }: { match: any, userId: string, tournamentState?: number }) {
   
@@ -59,6 +60,28 @@ export default function MatchCard({ match, userId, tournamentState = 0 }: { matc
 
     setSaveStatus("saving");
     const timer = setTimeout(async () => {
+      
+      // --- 🛡️ חגורת הבטיחות הרמטית לפני השמירה (Pre-flight Check) ---
+      // 1. מחלצים את זמן המשחק האמיתי למאיות שנייה
+      let matchStartTime = Infinity;
+      if (match.matchDate) {
+        const [datePart, timePart] = match.matchDate.split(" ");
+        if (datePart && timePart) {
+          const [day, month, year] = datePart.split("/");
+          const [hours, minutes] = timePart.split(":");
+          matchStartTime = new Date(Number(year), Number(month) - 1, Number(day), Number(hours), Number(minutes)).getTime();
+        }
+      }
+
+      // 2. הבדיקה הקריטית: האם השעון עכשיו עבר את שעת פתיחת המשחק?
+      if (Date.now() >= matchStartTime || match.isFinished) {
+        toast.error("זמן פציעות! המשחק כבר התחיל ולכן הניחוש לא נשמר.");
+        setSaveStatus("idle");
+        isUserAction.current = false;
+        return; // ⛔ העסק נעצר כאן! אין פנייה למסד הנתונים!
+      }
+      // -------------------------------------------------------------
+
       try {
         const collectionName = match.stage === "KNOCKOUT" ? "predictions_knockout" : "predictions_matches";
         const docRef = doc(db, collectionName, `${userId}_${match.id}`);
