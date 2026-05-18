@@ -342,7 +342,6 @@ const mList: any[] = [];
     setVarResponse(""); 
     
     try {
-      // 1. בניית ה-Context בתוך הפונקציה
       const contextData = {
         activeTab: activeTab,
         leaderboard: users,
@@ -353,61 +352,23 @@ const mList: any[] = [];
         todayPredictions: predictions
       };
 
-      // 2. שליחה לשרת
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message: varQuery, context: contextData })
       });
       
-      // 3. קריאה בודדת של ה-JSON (זה משחרר את ה-Stream)
-      const data = await res.json();
-      
-      // 4. בדיקת שגיאה
-      if (!res.ok) {
-         throw new Error(data.error || `Server returned ${res.status}`);
-      }
-
-      // 5. עדכון המסך
-      setVarResponse(data.reply || "השופטים קיבלו תשובה ריקה.");
-      
-    } catch (error: any) {
-      console.error("VAR Error:", error);
-      setVarResponse(`ה-VAR שבת מפעילות. תקלה טכנית: ${error.message}`);
-    } finally {
-      setIsVarLoading(false);
-    }
-  };
-    
-    setIsVarLoading(true);
-    setVarResponse(""); 
-    
-    try {
-      // ... (שאר הקוד של הכנת ה-contextData נשאר בדיוק אותו דבר) ...
-      // (תוודא שה-contextData מוגדר כמו שהיה קודם)
-
-      const res = await fetch('/api/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: varQuery, context: contextData })
-      });
-      
-      // התיקון המכריע: קוראים את התוכן פעם אחת בלבד!
       const data = await res.json();
       
       if (!res.ok) {
          throw new Error(data.error || `Server error: ${res.status}`);
       }
 
-      if (data.reply) {
-        setVarResponse(data.reply);
-      } else {
-        setVarResponse("השופטים מתקשים לקבל החלטה. נסה לנסח מחדש.");
-      }
+      setVarResponse(data.reply || "השופטים קיבלו תשובה ריקה מה-AI.");
       
     } catch (error: any) {
       console.error("VAR Error:", error);
-      setVarResponse(`ה-VAR שבת מפעילות. תקלה טכנית: ${error.message}`);
+      setVarResponse(`ה-VAR שבת מפעילות. תקלה: ${error.message}`);
     } finally {
       setIsVarLoading(false);
     }
