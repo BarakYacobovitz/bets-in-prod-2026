@@ -141,34 +141,40 @@ export default function Dashboard({ userId, userName, setActiveTab, setPredictio
     mexican: '"Ay caramba! איזה בול!" 🌮'
   });
   useEffect(() => {
-    // 1. האזנה רגילה של פיירבייס (תעבוד רוב הזמן)
+    // 1. האזנה בזמן אמת (עובד מיידית באנדרואיד ומחשב)
     const unsubSys = onSnapshot(doc(db, "settings", "system"), (docSnap) => {
       if (docSnap.exists()) {
         setTournamentState(Number(docSnap.data().tournamentState) || 0);
       }
     });
 
-    // 2. פתרון מיוחד למובייל (iOS/Android) - כשהמסך נדלק או חוזרים מהרקע
-    const handleWakeUp = async () => {
-      if (document.visibilityState === 'visible') {
-         try {
-           // אנחנו עושים getDoc יזום כדי לעקוף "הירדמות" של ה-WebSocket
-           const snap = await getDoc(doc(db, "settings", "system"));
-           if (snap.exists()) {
-             setTournamentState(Number(snap.data().tournamentState) || 0);
-           }
-         } catch (e) {
-           console.error("שגיאה בהתעוררות משינה:", e);
+    // פונקציית גיבוי שמושכת את הנתון בכוח, עוקפת את צינור ה-WebSocket
+    const forceFetchState = async () => {
+       try {
+         const snap = await getDoc(doc(db, "settings", "system"));
+         if (snap.exists()) {
+           setTournamentState((prevState: number) => {
+              const serverState = Number(snap.data().tournamentState) || 0;
+              // אם תפסנו שהמסך לא מעודכן מול השרת - אנחנו מעדכנים בכוח!
+              return serverState !== prevState ? serverState : prevState;
+           });
          }
-      }
+       } catch (e) { console.error("Shadow fetch failed", e); }
     };
 
-    // מאזין לאירוע חזרה למסך
+    // 2. טיפול ביציאה ממצב שינה / חזרה מאפליקציה אחרת באייפון
+    const handleWakeUp = () => {
+      if (document.visibilityState === 'visible') forceFetchState();
+    };
     document.addEventListener('visibilitychange', handleWakeUp);
+
+    // 3. גיבוי צללים: בדיקה אקטיבית כל 10 שניות (מחסל את בעיית הניתוק השקט של אפל)
+    const fallbackInterval = setInterval(forceFetchState, 10000);
 
     return () => {
       unsubSys();
       document.removeEventListener('visibilitychange', handleWakeUp);
+      clearInterval(fallbackInterval);
     };
   }, []);
   const isBannerInit = useRef(false);
