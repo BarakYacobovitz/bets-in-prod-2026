@@ -342,14 +342,22 @@ const mList: any[] = [];
     setVarResponse(""); 
     
     try {
-      // 🛡️ הגנה: בוא נגדיר contextData מקומי אם הוא לא קיים בגלובל
-      // אם יש לך משתנה אחר ב-page.tsx שמחזיק את הנתונים, תחליף את ה-{} בשם שלו
-      const dataToSend = typeof contextData !== 'undefined' ? contextData : { activeTab: "MATCHES" };
+      // 🛡️ בניית ה-Context בתוך הפונקציה (פתרון ה-ReferenceError)
+      const contextData = {
+        activeTab: activeTab,
+        leaderboard: users,
+        leaderboardTop5: users.slice(0, 5),
+        // מעבירים את הנתונים לפי מה שמוצג כרגע למשתמש
+        data: activeTab === "MATCHES" ? filteredMatches : 
+              activeTab === "BONUS" ? filteredBonusQuestions : 
+              qualifiersPredictions,
+        todayPredictions: predictions // שליחת הניחושים ל-VAR
+      };
 
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: varQuery, context: dataToSend })
+        body: JSON.stringify({ message: varQuery, context: contextData })
       });
       
       const rawText = await res.text();
