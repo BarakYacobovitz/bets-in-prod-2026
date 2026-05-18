@@ -501,7 +501,7 @@ const mList: any[] = [];
       
     } catch (error) {
       console.error("VAR Error:", error);
-      setVarResponse("ה-VAR שבת מפעילות, כנראה מישהו ניתק את הסיב באולפן.");
+      setVarResponse(`ה-VAR שבת מפעילות. תקלה טכנית: ${error.message || "שגיאת שרת לא מזוהה"}`);
     } finally {
       setIsVarLoading(false);
     }
