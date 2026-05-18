@@ -349,7 +349,8 @@ const mList: any[] = [];
          const exposedMatches = matches.filter(m => tournamentState > 0 && (m.isFinished || checkIsMatchLocked(m, tournamentState)));
 
          const mentionedUsers = users.filter(u => q.includes(u.name.split(" ")[0]));
-         const usersToInclude = mentionedUsers.length > 0 ? mentionedUsers : users;
+         // 🔥 התיקון: אם לא צוין שם ספציפי, אל תשלח את הניחושים המלאים של כל 50 המשתתפים. ה-AI יסתמך על טבלת ה-Leaderboard הקלילה.
+        const usersToInclude = mentionedUsers.length > 0 ? mentionedUsers : users.slice(0, 3);
 
          const isKnockoutQuery = q.includes("נוקאאוט") || q.includes("נוק אאוט") || q.includes("שמינית") || q.includes("רבע") || q.includes("חצי") || q.includes("גמר");
          const isGroupsQuery = q.includes("בית") || q.includes("בתים");
@@ -424,7 +425,8 @@ const mList: any[] = [];
          });
 
          const mentionedUsers = users.filter(u => q.includes(u.name.split(" ")[0]));
-         const usersToInclude = mentionedUsers.length > 0 ? mentionedUsers : users;
+         // 🔥 התיקון: אם לא צוין שם ספציפי, אל תשלח את הניחושים המלאים של כל 50 המשתתפים. ה-AI יסתמך על טבלת ה-Leaderboard הקלילה.
+         const usersToInclude = mentionedUsers.length > 0 ? mentionedUsers : users.slice(0, 3);
 
          const miniDict: any = {};
          exposedBonus.forEach(qItem => {
@@ -448,7 +450,8 @@ const mList: any[] = [];
       else if (activeTab === "QUALIFIERS") {
          if (tournamentState >= 1) {
             const mentionedUsers = users.filter(u => q.includes(u.name.split(" ")[0]));
-            const usersToInclude = mentionedUsers.length > 0 ? mentionedUsers : users;
+            // 🔥 התיקון: אם לא צוין שם ספציפי, אל תשלח את הניחושים המלאים של כל 50 המשתתפים. ה-AI יסתמך על טבלת ה-Leaderboard הקלילה.
+            const usersToInclude = mentionedUsers.length > 0 ? mentionedUsers : users.slice(0, 3);
 
             const miniDict: any = {};
             usersToInclude.forEach(u => {
@@ -469,11 +472,28 @@ const mList: any[] = [];
       }));
 
       // שליחה לשרת 
+      // שליחה לשרת (חסין ל-Timeouts)
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message: varQuery, context: contextData })
       });
+      
+      // אם השרת נחתך (Timeout של Vercel)
+      if (!res.ok) {
+        throw new Error(`Server returned ${res.status}`);
+      }
+
+      // במקום לקרוס על JSON, אנחנו קודם מפרקים את הטקסט
+      const text = await res.text();
+      try {
+        const data = JSON.parse(text);
+        if (data.reply) setVarResponse(data.reply);
+        else setVarResponse("השופטים מתקשים לקבל החלטה. נסה לנסח מחדש.");
+      } catch (e) {
+        console.error("Failed to parse JSON:", text);
+        setVarResponse("השידור נקטע! שרת ה-AI עמוס כרגע (Timeout). נסה שוב עוד רגע.");
+      }
       
       const data = await res.json();
       if (data.reply) setVarResponse(data.reply);
