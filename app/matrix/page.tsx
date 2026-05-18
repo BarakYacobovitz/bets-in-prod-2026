@@ -342,6 +342,37 @@ const mList: any[] = [];
     setVarResponse(""); 
     
     try {
+      // 🛡️ הגנה: בוא נגדיר contextData מקומי אם הוא לא קיים בגלובל
+      // אם יש לך משתנה אחר ב-page.tsx שמחזיק את הנתונים, תחליף את ה-{} בשם שלו
+      const dataToSend = typeof contextData !== 'undefined' ? contextData : { activeTab: "MATCHES" };
+
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: varQuery, context: dataToSend })
+      });
+      
+      const rawText = await res.text();
+      
+      if (!res.ok) {
+         throw new Error(`Server returned ${res.status}`);
+      }
+
+      const data = JSON.parse(rawText);
+      setVarResponse(data.reply || "אין תשובה מה-AI.");
+      
+    } catch (error: any) {
+      console.error("VAR Error:", error);
+      setVarResponse(`ה-VAR שבת מפעילות. תקלה: ${error.message}`);
+    } finally {
+      setIsVarLoading(false);
+    }
+  };
+    
+    setIsVarLoading(true);
+    setVarResponse(""); 
+    
+    try {
       // ... (שאר הקוד של הכנת ה-contextData נשאר בדיוק אותו דבר) ...
       // (תוודא שה-contextData מוגדר כמו שהיה קודם)
 
