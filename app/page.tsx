@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
-import { collection, getDocs, doc, getDoc } from "firebase/firestore";
+import { collection, getDocs, doc, getDoc, onSnapshot } from "firebase/firestore"; // תוודא ש-onSnapshot מופיע כאן
 import { onAuthStateChanged } from "firebase/auth";
 import { auth, db } from "./firebase";
 import GroupsView from "../components/GroupsView";
@@ -27,6 +27,16 @@ export default function Home() {
   const [matches, setMatches] = useState<any[]>([]);
   const [groups, setGroups] = useState<any>({});
   const [tournamentState, setTournamentState] = useState<number>(0);
+  // --- הוסף את זה כאן ---
+  useEffect(() => {
+    const unsub = onSnapshot(doc(db, "settings", "system"), (docSnap) => {
+      if (docSnap.exists()) {
+        const newState = Number(docSnap.data().tournamentState) || 0;
+        setTournamentState(newState); 
+      }
+    });
+    return () => unsub();
+  }, []);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
