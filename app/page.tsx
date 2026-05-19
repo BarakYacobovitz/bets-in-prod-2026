@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
-import { collection, getDocs, doc, getDoc, onSnapshot } from "firebase/firestore"; // תוודא ש-onSnapshot מופיע כאן
+import { collection, getDocs, doc, getDoc, setDoc, onSnapshot } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth, db } from "./firebase";
 import GroupsView from "../components/GroupsView";
@@ -11,156 +11,274 @@ import Dashboard from "../components/Dashboard";
 import Leaderboard from "../components/Leaderboard";
 import Login from "../components/Login";
 import Rules from "../components/Rules";
+import "driver.js/dist/driver.css";
+import { driver } from "driver.js";
 
-// החלוקה ההיררכית שלנו
 type MainTab = "DASHBOARD" | "PREDICTIONS" | "LEADERBOARD" | "RULES";
 type PredictionTab = "MATCHES" | "QUALIFIERS" | "THIRD_PLACE" | "BONUS" | "KNOCKOUT";
 
 export default function Home() {
+  // ==========================================
+  // 1. הגדרת כל ה-States (שוחזרו במלעם)
+  // ==========================================
   const [user, setUser] = useState<any>(null);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
-
-  // הסטייט המאוחד! עכשיו הכל עובד על activeTab
   const [activeTab, setActiveTab] = useState<MainTab>("DASHBOARD");
   const [predictionTab, setPredictionTab] = useState<PredictionTab>("MATCHES");
-  
   const [matches, setMatches] = useState<any[]>([]);
   const [groups, setGroups] = useState<any>({});
   const [tournamentState, setTournamentState] = useState<number>(0);
-  // --- הוסף את זה כאן ---
-  useEffect(() => {
-    const unsub = onSnapshot(doc(db, "settings", "system"), (docSnap) => {
-      if (docSnap.exists()) {
-        const newState = Number(docSnap.data().tournamentState) || 0;
-        setTournamentState(newState); 
-      }
-    });
-    return () => unsub();
-  }, []);
   const [isLoading, setIsLoading] = useState(true);
 
+  // ==========================================
+  // 2. אפקט מאזין אותנטיקציה (Auth Listener)
+  // ==========================================
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-      if (currentUser) {
-        // המשתמש התחבר לגוגל, אבל אנחנו לא מכניסים אותו עדיין!
-        // נוודא ש-Login.tsx סיים לייצר לו כרטיסייה ב-Firestore
-        const userDocRef = doc(db, "users", currentUser.uid);
-        let docSnap = await getDoc(userDocRef);
-        let attempts = 0;
-        
-        // לולאת המתנה (Polling) - בודק כל חצי שנייה אם הכרטיסייה כבר נוצרה (עד 5 שניות)
-        while (!docSnap.exists() && attempts < 10) {
-          await new Promise(resolve => setTimeout(resolve, 500));
-          docSnap = await getDoc(userDocRef);
-          attempts++;
-        }
-
-        if (docSnap.exists()) {
-          setUser(currentUser); // הכל מוכן, הנהג יכול להיכנס!
-        } else {
-          // אם עברו 5 שניות ואין כרטיסייה, משהו נכשל. ננתק אותו כדי למנוע באגים.
-          await auth.signOut();
-          setUser(null);
-        }
-      } else {
-        setUser(null);
-      }
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser);
       setIsCheckingAuth(false);
     });
-    
     return () => unsubscribe();
   }, []);
-  useEffect(() => {
-  // אם אנחנו בשלב הנוקאאוט (4 ומעלה) - הטאב הדיפולטיבי יהיה נוקאאוט
-  if (tournamentState >= 4) {
-    setPredictionTab("KNOCKOUT");
-  } else {
-    // אחרת (שלב הבתים) - הטאב הדיפולטיבי יהיה בתים
-    setPredictionTab("MATCHES");
-  }
-}, [tournamentState]);
 
+  // ==========================================
+  // 3. אפקט האזנה חיה לסטטוס המערכת (Live Sync)
+  // ==========================================
   useEffect(() => {
-    if (!user) return;
-    const fetchData = async () => {
+    const unsubSys = onSnapshot(doc(db, "settings", "system"), (docSnap) => {
+      if (docSnap.exists()) {
+        setTournamentState(Number(docSnap.data().tournamentState) || 0);
+      }
+    });
+    return () => unsubSys();
+  }, []);
+
+  // ==========================================
+  // 4. אפקט מדריך משתמש דינמי (Walkthrough עם הגנות)
+  // ==========================================
+  useEffect(() => {
+    if (!user?.uid) return;
+
+    const checkAndRunOnboarding = async () => {
       try {
-        const matchesSnap = await getDocs(collection(db, "matches"));
-        const matchesData: any[] = [];
-        const groupsData: any = {};
+        const userDocRef = doc(db, "users", user.uid);
+        const userSnap = await getDoc(userDocRef);
 
-        matchesSnap.forEach((doc) => {
-          const m = { id: doc.id, ...doc.data() };
-          matchesData.push(m);
-          if (m.stage !== "KNOCKOUT" && m.group) {
-            if (!groupsData[m.group]) groupsData[m.group] = new Set();
-            groupsData[m.group].add(m.homeTeam);
-            groupsData[m.group].add(m.awayTeam);
-          }
-        });
-
-        matchesData.sort((a, b) => String(a.id).localeCompare(String(b.id)));     
-        setMatches(matchesData);
-        setGroups(groupsData);
-
-        const systemSnap = await getDoc(doc(db, "settings", "system"));
-        if (systemSnap.exists()) {
-          setTournamentState(systemSnap.data().tournamentState || 0);
+        // בדיקה האם המשתמש כבר השלים את הסיור בעבר
+        if (userSnap.exists() && userSnap.data().onboardingCompleted) {
+          return; 
         }
+
+  const runOnboarding = () => {
+  const driverObj = driver({
+  showProgress: true,
+  // הורדנו את החצים כדי למנוע את עיוות ה-RTL
+  nextBtnText: "הבא", 
+  prevBtnText: "הקודם",
+  doneBtnText: "יאללה לשחק! ⚽",
+  popoverClass: 'custom-football-tour',
+  allowClose: false,
+  steps: [
+    {
+      element: '#nav-dashboard',
+      popover: { 
+        title: 'ברוכים הבאים ל-PROD! 🏟️', 
+        description: 'כאן בלוח הבקרה תראה את הדירוג שלך, הודעות מההנהלה ואת "הראדאר" שמעדכן מה קורה היום במגרש.'
+      }
+    },
+    {
+      element: '#tour-progress-ring',
+      popover: { 
+        title: 'מד המשימות שלך 🎯', 
+        description: 'המטרה היא תמיד להיות על 100%! המד מראה כמה מהניחושים הפתוחים כרגע כבר מילאת.' 
+      }
+    },
+    {
+      element: '#tour-timer',
+      popover: { 
+        title: 'שעון נעילה ⏳', 
+        description: 'שים לב מתי ננעל השלב הבא. אחרי האיפוס, לא תוכל לשנות ניחושים לאותו מחזור!' 
+      }
+    },
+    {
+      element: '#nav-predictions',
+      popover: { 
+        title: 'זירת הניחושים ⚽', 
+        description: 'כאן מרוויחים את הנקודות. בוא נכנס פנימה ונראה איך זה עובד...',
+        onNextClick: () => {
+          // המשתמש לוחץ "הבא", ואנחנו פותחים לו את טאב המשחקים לפני שהזרקור זז!
+          setActiveTab("PREDICTIONS");
+          setPredictionTab("MATCHES");
+          setTimeout(() => driverObj.moveNext(), 300);
+        }
+      }
+    },
+    {
+      element: '#tab-matches', 
+      popover: { 
+        title: 'שלב הבתים 🌍', 
+        description: 'זה הטאב בו תזין את תוצאות המשחקים ותבחר את העולות מכל בית.' 
+      }
+    },
+    {
+      element: '#first-match-card', // 💡 הנה הצלילה פנימה לכרטיס המשחק!
+      popover: { 
+        title: 'איך מנחשים? ✍️', 
+        description: 'פשוט מקלידים את התוצאה בתיבות. המערכת שומרת אוטומטית ברגע ההקלדה.',
+        onNextClick: () => {
+          // מכינים את הרקע לצעד הבא - מעבירים לטאב מקום 3
+          setPredictionTab("THIRD_PLACE");
+          setTimeout(() => driverObj.moveNext(), 300);
+        }
+      }
+    },
+    {
+      element: '#tab-third',
+      popover: { 
+        title: 'מעפילות ממקום שלישי 🥉', 
+        description: 'במונדיאל הזה, 8 הנבחרות הטובות ביותר מהמקום השלישי עולות גם הן! כאן תוכל לבחור מי לדעתך יעלו.',
+        onNextClick: () => {
+          // מכינים את הרקע לטאב הבונוסים
+          setPredictionTab("BONUS");
+          setTimeout(() => driverObj.moveNext(), 300);
+        }
+      }
+    },
+    {
+      element: '#tab-bonus',
+      popover: { 
+        title: 'שאלות הבונוס 🎁', 
+        description: 'זה השובר שוויון של הטורניר. נקודות על אלופה, מלכי שערים ועוד.',
+      }
+    },
+    {
+      element: '#first-bonus-card', // 💡 צלילה פנימה לתוך השאלה הראשונה
+      popover: { 
+        title: 'איך עונים? 💡', 
+        description: 'חלק מהשאלות פתוחות מתחילת הטורניר, וחלקן "שאלות הפתעה" שנפתחות לזמן מוגבל. שים לב לזמני הנעילה.',
+        onNextClick: () => {
+          // לפני הצעד הבא, מעבירים ללידרבורד
+          setActiveTab("LEADERBOARD");
+          setTimeout(() => driverObj.moveNext(), 400);
+        }
+      }
+    },
+    {
+      element: '#nav-leaderboard',
+      popover: { 
+        title: 'דירוג וליגות 🏆', 
+        description: 'רוצה לראות איפה אתה עומד מול כולם? זה המקום.' 
+      }
+    },
+    {
+      element: '#private-leagues-section',
+      popover: { 
+        title: 'ליגות פרטיות 👥', 
+        description: 'כאן תוכל לפתוח ליגה סגורה לחברים ולהוכיח להם מי המלך של המגרש. שיהיה בהצלחה!' 
+      }
+    }
+  ],
+  onDestroyStarted: () => {
+    if (!driverObj.hasNextStep()) {
+      driverObj.destroy();
+    } else {
+      const forceQuit = window.confirm("רגע, עוד לא סיימנו את הסיור! בטוח שאתה רוצה לצאת?");
+      if (forceQuit) {
+        driverObj.destroy();
+      }
+    }
+  },
+  onDestroyed: async () => {
+    if (user?.uid) {
+      try {
+        const userDocRef = doc(db, "users", user.uid);
+        await setDoc(userDocRef, { onboardingCompleted: true }, { merge: true });
+      } catch (error) {
+        console.error("שגיאה בשמירת סטטוס סיור:", error);
+      }
+    }
+  }
+});
+
+  driverObj.drive();
+};
+
+        runOnboarding();
+      } catch (error) {
+        console.error("שגיאה בבדיקת סטטוס משתמש:", error);
+      }
+    };
+
+    checkAndRunOnboarding();
+  }, [user]);
+
+  // ==========================================
+  // 5. אפקט טעינת הנתונים מה-DB (משחקים ובתים)
+  // ==========================================
+  useEffect(() => {
+    const fetchAllData = async () => {
+      try {
+        setIsLoading(true);
+        const matchesSnap = await getDocs(collection(db, "matches"));
+        const matchesList = matchesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        setMatches(matchesList);
+
+        const groupsSnap = await getDocs(collection(db, "groups"));
+        const groupsData: any = {};
+        groupsSnap.docs.forEach(doc => {
+          groupsData[doc.id] = doc.data();
+        });
+        setGroups(groupsData);
       } catch (error) {
         console.error("Error fetching data:", error);
       } finally {
         setIsLoading(false);
       }
     };
-    fetchData();
+
+    if (user) {
+      fetchAllData();
+    }
   }, [user]);
 
-  // האזנה לאירועי ניווט חיצוניים (כמו מה-Navbar)
-  useEffect(() => {
-    const handleTabChange = (e: any) => {
-      if (e.detail) {
-        setActiveTab(e.detail);
-        // אם מנווטים לטאב כלשהו, נוודא שאנחנו גוללים למעלה שיהיה נוח
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-      }
-    };
+  // ==========================================
+  // 6. מסכי טעינה ומסך התחברות
+  // ==========================================
+  if (isCheckingAuth || isLoading) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center text-white font-sans">
+        <div className="animate-pulse text-xl font-black">טוען נתונים...</div>
+      </div>
+    );
+  }
 
-    window.addEventListener("changeTab", handleTabChange);
+  if (!user) {
+    return <Login />;
+  }
 
-    // בדיקה: האם הגענו לדף ויש לנו טאב שמור ב-SessionStorage? (למשל כי עשינו ריענון)
-    const startupTab = sessionStorage.getItem("startupTab");
-    if (startupTab) {
-      setActiveTab(startupTab as MainTab);
-      sessionStorage.removeItem("startupTab");
-    }
-
-    return () => window.removeEventListener("changeTab", handleTabChange);
-  }, []);
-  if (isCheckingAuth) return <div className="min-h-screen bg-slate-950 flex items-center justify-center text-blue-400 font-bold">טוען נתונים...</div>;
-  if (!user) return <Login />;
-  if (isLoading) return <div className="min-h-screen bg-slate-950 flex items-center justify-center text-blue-400 font-bold">מכין את המגרש... ⚽</div>;
-
+  // ==========================================
+  // 7. תצוגת ה-HTML המקורית והמעודכנת (עם ה-IDs)
+  // ==========================================
   return (
-    <div className="min-h-screen bg-slate-950 pt-08 pb-12 px-4 font-sans" dir="rtl">
+    <div className="min-h-screen bg-slate-950 pt-8 pb-12 px-4 font-sans" dir="rtl">
       <div className="max-w-5xl mx-auto">
         
-{/* ========================================== */}
-        {/* תפריט ראשי עליון - גרסה קומפקטית ללא גלילה */}
-        {/* ========================================== */}
+        {/* תפריט ראשי עליון */}
         <div className="flex bg-slate-900 p-1.5 rounded-2xl border border-slate-800 shadow-lg mb-6 max-w-3xl mx-auto z-40 relative md:justify-center gap-1">
-           
            <button 
+             id="nav-dashboard"
              onClick={() => setActiveTab("DASHBOARD")}
              className={`flex-1 py-3 px-1 rounded-xl font-black whitespace-nowrap text-[11px] sm:text-sm transition-all flex items-center justify-center gap-1.5 ${activeTab === "DASHBOARD" ? "bg-blue-600 text-white shadow-md" : "text-slate-400 hover:text-blue-400 hover:bg-blue-500/10"}`}
            >
              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4 sm:w-5 sm:h-5 shrink-0">
-               <path d="M3.34 16a10 10 0 1 1 17.32 0" />
+               <path d="M3.34 16 a10 10 0 1 1 17.32 0" />
                <path d="m12 14 4-4" />
              </svg>
              <span>דשבורד</span>
            </button>
 
            <button 
+             id="nav-predictions"
              onClick={() => setActiveTab("PREDICTIONS")}
              className={`flex-1 py-3 px-1 rounded-xl font-black whitespace-nowrap text-[11px] sm:text-sm transition-all flex items-center justify-center gap-1.5 ${activeTab === "PREDICTIONS" ? "bg-purple-600 text-white shadow-md" : "text-slate-400 hover:text-purple-400 hover:bg-purple-500/10"}`}
            >
@@ -172,6 +290,7 @@ export default function Home() {
            </button>
 
            <button 
+             id="nav-leaderboard"
              onClick={() => setActiveTab("LEADERBOARD")}
              className={`flex-1 py-3 px-1 rounded-xl font-black whitespace-nowrap text-[11px] sm:text-sm transition-all flex items-center justify-center gap-1.5 ${activeTab === "LEADERBOARD" ? "bg-amber-500 text-slate-900 shadow-md" : "text-slate-400 hover:text-amber-400 hover:bg-amber-500/10"}`} 
            >
@@ -185,6 +304,7 @@ export default function Home() {
            </button>
 
            <button 
+             id="nav-rules"
              onClick={() => setActiveTab("RULES")}
              className={`flex-1 py-3 px-1 rounded-xl font-black whitespace-nowrap text-[11px] sm:text-sm transition-all flex items-center justify-center gap-1.5 ${activeTab === "RULES" ? "bg-emerald-600 text-white shadow-md" : "text-slate-400 hover:text-emerald-400 hover:bg-emerald-500/10"}`}
            >
@@ -198,89 +318,86 @@ export default function Home() {
              <span>חוקים</span>
            </button>
         </div>
-{/* ========================================== */}
-{/* תפריט ניחושים דינמי - משימה 1 מהבקלוג */}
-{/* ========================================== */}
-{activeTab === "PREDICTIONS" && (
-   <div className="flex overflow-x-auto gap-2 mb-8 pb-2 custom-scrollbar bg-slate-900/50 p-2 rounded-2xl border border-slate-800 max-w-4xl mx-auto md:justify-center">
-      
-      {/* 1. נוק-אאוט: מופיע ראשון רק אם השלב פתוח (4+) */}
-      {tournamentState >= 4 && (
-        <button 
-          onClick={() => setPredictionTab("KNOCKOUT")}
-          className={`px-5 py-2.5 rounded-xl font-bold whitespace-nowrap transition-all text-sm flex items-center justify-center gap-2 ${predictionTab === "KNOCKOUT" ? "bg-pink-600 text-white shadow-lg shadow-pink-500/20" : "text-slate-400 hover:bg-slate-800 hover:text-slate-300"}`}
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
-            <path d="M14.5 17.5L3 6V3h3l11.5 11.5" /><path d="M13 19l6-6" /><path d="M16 16l4 4" /><path d="M19 21l2-2" /><path d="M6.5 12.5L3 16v3h3l3.5-3.5" /><path d="M21 3v3l-3.5 3.5" /><path d="M18 5l-4 4" />
-          </svg>
-          נוק-אאוט
-        </button>
-      )}
 
-      {/* 2. בונוסים: מופיע שני אם אנחנו בנוק-אאוט (כדי שיהיה נגיש) */}
-      {tournamentState >= 4 && (
-        <button 
-          onClick={() => setPredictionTab("BONUS")}
-          className={`px-5 py-2.5 rounded-xl font-bold whitespace-nowrap transition-all text-sm flex items-center justify-center gap-2 ${predictionTab === "BONUS" ? "bg-amber-500 text-slate-900 shadow-lg shadow-amber-500/20" : "text-slate-400 hover:bg-slate-800 hover:text-slate-300"}`}
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
-            <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
-          </svg>
-          בונוסים
-        </button>
-      )}
+        {/* תפריט ניחושים דינמי */}
+        {activeTab === "PREDICTIONS" && (
+           <div className="flex overflow-x-auto gap-2 mb-8 pb-2 custom-scrollbar bg-slate-900/50 p-2 rounded-2xl border border-slate-800 max-w-4xl mx-auto md:justify-center">
+              {tournamentState >= 4 && (
+                <button 
+                  id="tab-knockout"
+                  onClick={() => setPredictionTab("KNOCKOUT")}
+                  className={`px-5 py-2.5 rounded-xl font-bold whitespace-nowrap transition-all text-sm flex items-center justify-center gap-2 ${predictionTab === "KNOCKOUT" ? "bg-pink-600 text-white shadow-lg shadow-pink-500/20" : "text-slate-400 hover:bg-slate-800 hover:text-slate-300"}`}
+                >
+                  נוק-אאוט
+                </button>
+              )}
 
-      {/* 3. בתים: מופיע ראשון כשאנחנו בבתים, ושלישי כשאנחנו בנוק-אאוט */}
-      <button 
-        onClick={() => setPredictionTab("MATCHES")}
-        className={`px-5 py-2.5 rounded-xl font-bold whitespace-nowrap transition-all text-sm flex items-center justify-center gap-2 ${predictionTab === "MATCHES" ? "bg-blue-600 text-white shadow-lg shadow-blue-500/20" : "text-slate-400 hover:bg-slate-800 hover:text-slate-300"}`}
-      >
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
-          <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /><polyline points="9 22 9 12 15 12 15 22" />
-        </svg>
-        בתים
-      </button>
-      
-      {/* 4. מעפילות מקום 3: תמיד יופיע אחרי הבתים */}
-      <button 
-        onClick={() => setPredictionTab("THIRD_PLACE")}
-        className={`px-5 py-2.5 rounded-xl font-bold whitespace-nowrap transition-all text-sm flex items-center justify-center gap-2 ${predictionTab === "THIRD_PLACE" ? "bg-teal-600 text-white shadow-lg shadow-teal-500/20" : "text-slate-400 hover:bg-slate-800 hover:text-slate-300"}`}
-      >
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
-          <circle cx="12" cy="15" r="5" /><path d="M8.21 13.89L7 3h2l1 5h4l1-5h2l-1.21 10.89" />
-        </svg>
-        מעפילות מקום 3
-      </button>
+              {tournamentState >= 4 && (
+                <button 
+                  id="tab-bonus"
+                  onClick={() => setPredictionTab("BONUS")}
+                  className={`px-5 py-2.5 rounded-xl font-bold whitespace-nowrap transition-all text-sm flex items-center justify-center gap-2 ${predictionTab === "BONUS" ? "bg-amber-500 text-slate-900 shadow-lg shadow-amber-500/20" : "text-slate-400 hover:bg-slate-800 hover:text-slate-300"}`}
+                >
+                  בונוסים
+                </button>
+              )}
 
-      {/* 5. בונוסים: מופיע אחרון רק כשאנחנו בשלב הבתים */}
-      {tournamentState < 4 && (
-        <button 
-          onClick={() => setPredictionTab("BONUS")}
-          className={`px-5 py-2.5 rounded-xl font-bold whitespace-nowrap transition-all text-sm flex items-center justify-center gap-2 ${predictionTab === "BONUS" ? "bg-amber-500 text-slate-900 shadow-lg shadow-amber-500/20" : "text-slate-400 hover:bg-slate-800 hover:text-slate-300"}`}
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
-            <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
-          </svg>
-          בונוסים
-        </button>
-      )}
-   </div>
-)}
-        {/* ========================================== */}
+              <button 
+                id="tab-matches"
+                onClick={() => setPredictionTab("MATCHES")}
+                className={`px-5 py-2.5 rounded-xl font-bold whitespace-nowrap transition-all text-sm flex items-center justify-center gap-2 ${predictionTab === "MATCHES" ? "bg-blue-600 text-white shadow-lg shadow-blue-500/20" : "text-slate-400 hover:bg-slate-800 hover:text-slate-300"}`}
+              >
+                בתים
+              </button>
+              
+              <button 
+                id="tab-third"
+                onClick={() => setPredictionTab("THIRD_PLACE")}
+                className={`px-5 py-2.5 rounded-xl font-bold whitespace-nowrap transition-all text-sm flex items-center justify-center gap-2 ${predictionTab === "THIRD_PLACE" ? "bg-teal-600 text-white shadow-lg shadow-teal-500/20" : "text-slate-400 hover:bg-slate-800 hover:text-slate-300"}`}
+              >
+                מעפילות מקום 3
+              </button>
+
+              {tournamentState < 4 && (
+                <button 
+                  id="tab-bonus"
+                  onClick={() => setPredictionTab("BONUS")}
+                  className={`px-5 py-2.5 rounded-xl font-bold whitespace-nowrap transition-all text-sm flex items-center justify-center gap-2 ${predictionTab === "BONUS" ? "bg-amber-500 text-slate-900 shadow-lg shadow-amber-500/20" : "text-slate-400 hover:bg-slate-800 hover:text-slate-300"}`}
+                >
+                  בונוסים
+                </button>
+              )}
+           </div>
+        )}
+
         {/* תוכן העמודים */}
-        {/* ========================================== */}
         <div className="animate-fade-in-up mt-4">
-           {activeTab === "DASHBOARD" && <Dashboard userId={user.uid} tournamentState={tournamentState} matches={matches} setActiveTab={setActiveTab} setPredictionTab={setPredictionTab} />}
-           {activeTab === "LEADERBOARD" && <Leaderboard currentUserId={user.uid} tournamentState={tournamentState} />}
-           {activeTab === "RULES" && <Rules />}
-           {activeTab === "PREDICTIONS" && (
-             <>
-               {predictionTab === "MATCHES" && <GroupsView matches={matches} groups={groups} userId={user.uid} tournamentState={tournamentState} />}
-               {predictionTab === "THIRD_PLACE" && <ThirdPlaceQualifiers groups={groups} userId={user.uid} tournamentState={tournamentState} />}
-               {predictionTab === "BONUS" && <BonusQuestions userId={user.uid} tournamentState={tournamentState} groups={groups} />}
-               {predictionTab === "KNOCKOUT" && tournamentState >= 4 && <KnockoutView matches={matches.filter(m => m.stage === "KNOCKOUT")} userId={user.uid} tournamentState={tournamentState} />}
-             </>
-           )}
+            {activeTab === "DASHBOARD" && (
+                <div id="dashboard-content">
+                    <Dashboard userId={user.uid} tournamentState={tournamentState} matches={matches} setActiveTab={setActiveTab} setPredictionTab={setPredictionTab} />
+                </div>
+            )}
+            
+            {activeTab === "LEADERBOARD" && (
+                <div id="leaderboard-content">
+                    <Leaderboard currentUserId={user.uid} tournamentState={tournamentState} />
+                </div>
+            )}
+            
+            {activeTab === "RULES" && (
+                <div id="rules-content">
+                    <Rules />
+                </div>
+            )}
+
+            {activeTab === "PREDICTIONS" && (
+                <div id="predictions-content">
+                    {predictionTab === "MATCHES" && <GroupsView matches={matches} groups={groups} userId={user.uid} tournamentState={tournamentState} />}
+                    {predictionTab === "THIRD_PLACE" && <ThirdPlaceQualifiers groups={groups} userId={user.uid} tournamentState={tournamentState} />}
+                    {predictionTab === "BONUS" && <BonusQuestions userId={user.uid} tournamentState={tournamentState} groups={groups} />}
+                    {predictionTab === "KNOCKOUT" && tournamentState >= 4 && <KnockoutView matches={matches.filter(m => m.stage === "KNOCKOUT")} userId={user.uid} tournamentState={tournamentState} />}
+                </div>
+            )}
         </div>
 
       </div>

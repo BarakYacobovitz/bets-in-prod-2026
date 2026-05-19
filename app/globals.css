@@ -80,4 +80,119 @@ body {
 .animate-bounce-slow {
   animation: bounce-slow 2s ease-in-out infinite;
 }
+/* עיצוב Popover הטור של Driver.js */
+.custom-football-tour {
+  background: #0f172a !important; /* רקע כהה עמוק */
+  color: #f8fafc !important;
+  border: 1px solid #334155 !important;
+  border-radius: 20px !important;
+  padding: 20px !important;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 0 15px rgba(59, 130, 246, 0.3) !important;
+  animation: tour-pop-in 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.driver-popover-title {
+  font-family: 'Assistant', sans-serif;
+  font-weight: 900 !important;
+  font-size: 20px !important;
+  color: #60a5fa !important; /* כחול בהיר */
+  margin-bottom: 8px !important;
+  text-align: right !important;
+}
+
+.driver-popover-description {
+  font-size: 15px !important;
+  line-height: 1.6 !important;
+  text-align: right !important;
+  color: #cbd5e1 !important;
+}
+
+.driver-popover-footer button {
+  background-color: #1e293b !important;
+  color: white !important;
+  border: 1px solid #475569 !important;
+  text-shadow: none !important;
+  border-radius: 10px !important;
+  transition: all 0.2s !important;
+}
+
+.driver-popover-footer .driver-next-btn {
+  background: linear-gradient(to right, #2563eb, #7c3aed) !important; /* גרדיאנט כחול-סגול */
+  border: none !important;
+  font-weight: bold !important;
+}
+
+.driver-popover-footer .driver-next-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.4) !important;
+}
+
+@keyframes tour-pop-in {
+  from { opacity: 0; transform: scale(0.9) translateY(10px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+/* עיצוב הזרקור (Spotlight) */
+.driver-active-element {
+  outline: 4px solid rgba(59, 130, 246, 0.5) !important;
+  border-radius: 12px !important;
+}
+/* --- עיצוב חלון הסיור (Driver.js) --- */
+.driver-popover.custom-football-tour {
+  background-color: #0f172a !important; /* רקע כהה תואם לאפליקציה */
+  border: 1px solid #334155 !important;
+  border-radius: 24px !important;
+  padding: 24px !important;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 20px rgba(59, 130, 246, 0.3) !important;
+  color: #f8fafc !important;
+  font-family: inherit !important;
+}
+
+.driver-popover.custom-football-tour .driver-popover-title {
+  font-size: 22px !important;
+  font-weight: 900 !important;
+  color: #60a5fa !important; /* כחול בהיר */
+  margin-bottom: 10px !important;
+}
+
+.driver-popover.custom-football-tour .driver-popover-description {
+  font-size: 15px !important;
+  color: #cbd5e1 !important;
+  line-height: 1.6 !important;
+}
+
+.driver-popover.custom-football-tour .driver-popover-footer button {
+  border-radius: 12px !important;
+  font-weight: 900 !important;
+  padding: 8px 16px !important;
+  text-shadow: none !important;
+  border: none !important;
+  transition: all 0.2s !important;
+}
+
+/* כפתור "הבא" / "סיום" */
+.driver-popover.custom-football-tour .driver-popover-next-btn {
+  background: linear-gradient(to right, #2563eb, #7c3aed) !important;
+  color: white !important;
+}
+.driver-popover.custom-football-tour .driver-popover-next-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 15px rgba(37, 99, 235, 0.5) !important;
+}
+
+/* כפתור "קודם" */
+.driver-popover.custom-football-tour .driver-popover-prev-btn {
+  background: #1e293b !important;
+  color: #94a3b8 !important;
+  border: 1px solid #334155 !important;
+}
+.driver-popover.custom-football-tour .driver-popover-prev-btn:hover {
+  background: #334155 !important;
+  color: white !important;
+}
+
+/* חץ הבועה (משולש קטן) */
+.driver-popover.custom-football-tour .driver-popover-arrow {
+  border-color: #0f172a !important;
+}
 

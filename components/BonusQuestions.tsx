@@ -884,8 +884,16 @@ const regularQuestions = filteredQuestions.filter(q => !q.isDouble && !q.isSurpr
                   </div>
                   
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                     {regularQuestions.map(q => renderQuestionCard(q))}
-                  </div>
+                  {regularQuestions.map((q, index) => (
+                     <div 
+                       key={q.id} 
+                       id={index === 0 ? "first-bonus-card" : undefined} 
+                       className="w-full h-full"
+                      >
+                     {renderQuestionCard(q)}
+                       </div>
+                     ))}
+                    </div>
                </div>
             )}
 

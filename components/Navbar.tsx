@@ -551,7 +551,7 @@ export default function Navbar() {
               const needsAttention = progressPercent < 50;
 
               return (
-                 <div className="flex flex-col items-center justify-center cursor-default shrink-0" title={`${totalRequiredTasks - missingMatchesToday} מתוך ${totalRequiredTasks} הושלמו`}>
+                 <div id="tour-progress-ring" className="flex flex-col items-center justify-center cursor-default shrink-0" title={`${totalRequiredTasks - missingMatchesToday} מתוך ${totalRequiredTasks} הושלמו`}>
                     <div className={`relative w-10 h-10 md:w-14 md:h-14 flex items-center justify-center drop-shadow-md transition-transform ${needsAttention ? 'animate-pulse drop-shadow-[0_0_8px_rgba(225,29,72,0.6)]' : 'group-hover:scale-105'}`}>
                        <svg className="absolute w-full h-full transform -rotate-90" viewBox="0 0 40 40">
                           <circle cx="20" cy="20" r="16" stroke="currentColor" strokeWidth="3.5" fill="transparent" className="text-slate-800" />
@@ -572,7 +572,7 @@ export default function Navbar() {
           })()}
 
           {targetTime ? (
-            <div className={`flex flex-col items-center justify-center px-3 py-1.5 md:px-5 md:py-2 rounded-xl border transition-colors duration-500 shrink-0 ${isNoMoreBets ? 'bg-rose-950/40 border-rose-500/50 shadow-[0_0_10px_rgba(225,29,72,0.2)]' : 'bg-[#0f1115] border-slate-700/60 shadow-[inset_0_4px_10px_rgba(0,0,0,0.6)]'}`}>
+            <div id="tour-timer" className={`flex flex-col items-center justify-center px-3 py-1.5 md:px-5 md:py-2 rounded-xl border transition-colors duration-500 shrink-0 ${isNoMoreBets ? 'bg-rose-950/40 border-rose-500/50 shadow-[0_0_10px_rgba(225,29,72,0.2)]' : 'bg-[#0f1115] border-slate-700/60 shadow-[inset_0_4px_10px_rgba(0,0,0,0.6)]'}`}>
                <span className="text-[8px] md:text-[10px] font-bold text-slate-500 mb-1 uppercase tracking-widest">
                  <span className="hidden md:inline">{nextNameFull}</span>
                  <span className="inline md:hidden">{nextNameShort}</span>

@@ -353,8 +353,16 @@ export default function GroupsView({ matches, groups, userId, tournamentState }:
           </div>
         </div>
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-          {matchdayMatches.map(match => <MatchCard key={match.id} match={match} userId={userId} tournamentState={tournamentState} />)}
-        </div>
+              {matchdayMatches.map((match, index) => (
+            <div 
+               key={match.id} 
+                id={dayIndex === 1 && index === 0 ? "first-match-card" : undefined}
+               className="w-full"
+              >
+              <MatchCard match={match} userId={userId} tournamentState={tournamentState} />
+         </div>
+  ))}
+</div>
       </div>
     );
   };

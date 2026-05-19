@@ -871,7 +871,10 @@ const getPrizeForRank = (rank: number, board: string, allUsers: any[]) => {
            <div className={`absolute top-0 right-0 w-64 h-64 rounded-full blur-3xl pointer-events-none -mr-20 -mt-20 ${activeBoard === "GENERAL" ? "bg-amber-500/10" : activeBoard === "LEAGUES" ? "bg-blue-500/10" : "bg-emerald-500/10"}`}></div>
            
            {/* כותרת הטבלה ופאנל שליטה פנימי לליגות */}
-           <div className="flex flex-col md:flex-row justify-between items-center mb-2 px-6 md:px-10 relative z-10">
+           <div 
+                id="private-leagues-section"
+                className="flex flex-col md:flex-row justify-between items-center mb-2 px-6 md:px-10 relative z-10"
+            >
               <h2 className="text-2xl md:text-3xl font-extrabold text-white text-center md:text-right">
                 {activeBoard === "GENERAL" ? "טבלת הדירוג הכללי" : activeBoard === "KNOCKOUT" ? "טבלת שלב הנוק-אאוט" : `ליגה: ${myLeagues.find(l => l.id === selectedLeagueId)?.name || "פרטית"}`}
               </h2>
