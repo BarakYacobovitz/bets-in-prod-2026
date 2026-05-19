@@ -753,7 +753,7 @@ const getPrizeForRank = (rank: number, board: string, allUsers: any[]) => {
         )}
 
         {/* ליגות פרטיות - תמיד כחול (Blue) */}
-        <button 
+        <button id="private-leagues-section"
           onClick={() => setActiveBoard("LEAGUES")} 
           className={`px-6 py-3 rounded-xl font-black whitespace-nowrap transition-all text-sm flex items-center justify-center gap-2 ${activeBoard === "LEAGUES" ? "bg-blue-600 text-white shadow-lg shadow-blue-500/20" : "text-slate-400 hover:bg-slate-800 hover:text-blue-400"}`}
         >
@@ -872,7 +872,6 @@ const getPrizeForRank = (rank: number, board: string, allUsers: any[]) => {
            
            {/* כותרת הטבלה ופאנל שליטה פנימי לליגות */}
            <div 
-                id="private-leagues-section"
                 className="flex flex-col md:flex-row justify-between items-center mb-2 px-6 md:px-10 relative z-10"
             >
               <h2 className="text-2xl md:text-3xl font-extrabold text-white text-center md:text-right">

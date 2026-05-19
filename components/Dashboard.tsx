@@ -1117,7 +1117,7 @@ const renderedMagazineContent = useMemo(() => {
 
 {tournamentState === 0 ? (
                /* --- מצ  ב 0: כרטיס טיסה VIP ממוקד --- */
-               <div className="relative z-10 w-full mb-8 group">
+               <div id="betting-pass-ticket" className="relative z-10 w-full mb-8 group">
                   <div className={`bg-gradient-to-br ${userStats.hasPaid ? 'from-emerald-900/40 via-slate-900 to-emerald-900/20 border-emerald-500/40' : 'from-slate-900 via-blue-950 to-slate-900 border-blue-500/30'} rounded-3xl border shadow-2xl overflow-hidden relative transition-all duration-500`}>
                      
                      {/* אפקט גזירה/כרטיס משומש במידה ושילם */}
