@@ -476,14 +476,14 @@ export default function GroupsView({ matches, groups, userId, tournamentState }:
                    )}
                </div>
 
-               <div className="flex bg-slate-950 p-1 rounded-xl border border-slate-800 shadow-inner z-10">
-                  <button 
+               <div id="first-group-qualifiers" className="flex bg-slate-950 p-1 rounded-xl border border-slate-800 shadow-inner z-10">
+                  <button id="btn-switch-to-matches"
                     onClick={() => setViewMode("MATCHES")} 
                     className={`px-3 py-1 rounded-lg font-bold text-[10px] transition-all flex items-center gap-1 ${viewMode === "MATCHES" ? "bg-blue-600 text-white shadow-sm" : "text-slate-400 hover:text-white"}`}
                   >
                     <span>⚽</span> משחקים
                   </button>
-                  <button 
+                  <button id="btn-switch-to-qualifiers" 
                     onClick={() => setViewMode("QUALIFIERS")} 
                     className={`px-3 py-1 rounded-lg font-bold text-[10px] transition-all flex items-center gap-1 ${viewMode === "QUALIFIERS" ? "bg-purple-600 text-white shadow-sm" : "text-slate-400 hover:text-white"}`}
                   >

@@ -82,8 +82,8 @@ export default function Home() {
     {
       element: '#nav-dashboard',
       popover: { 
-        title: 'ברוכים הבאים ל-PROD! 🏟️', 
-        description: 'כאן בלוח הבקרה תראה את הדירוג שלך, הודעות מההנהלה ואת "הראדאר" שמעדכן מה קורה היום במגרש.'
+        title: 'ברוכים הבאים ל- bets in PROD! באתי לעשות לכם onboarding, אני מסביר רק פעם אחת אז תקשיבו טוב!🏟️ ', 
+        description: 'כאן בדשבורד תראו את הדירוג שלך, הודעות מההנהלה ואת "הראדאר" שמעדכן מה קורה היום במגרש. אם אתם בסלולר גלישה שמאלה תציג לכם את הטור היומי ויהיו פה עוד הרבה הפתעות'
       }
     },
     {
@@ -97,7 +97,7 @@ export default function Home() {
       element: '#tour-timer',
       popover: { 
         title: 'שעון נעילה ⏳', 
-        description: 'שים לב מתי ננעל השלב הבא. אחרי האיפוס, לא תוכל לשנות ניחושים לאותו מחזור!' 
+        description: 'שים לב מתי ננעל השלב הקרוב. אחרי האיפוס, לא תוכל לשנות ניחושים לאותו מחזור!' 
       }
     },
     {
@@ -121,12 +121,26 @@ export default function Home() {
       }
     },
     {
-      element: '#first-match-card', // 💡 הנה הצלילה פנימה לכרטיס המשחק!
+      element: '#first-match-card', 
       popover: { 
-        title: 'איך מנחשים? ✍️', 
+        title: 'איך מנחשים תוצאה? ✍️', 
         description: 'פשוט מקלידים את התוצאה בתיבות. המערכת שומרת אוטומטית ברגע ההקלדה.',
         onNextClick: () => {
-          // מכינים את הרקע לצעד הבא - מעבירים לטאב מקום 3
+          // 💡 הקסם קורה כאן: המערכת לוחצת אוטומטית על כפתור המעפילות בתוך GroupsView!
+          document.getElementById('btn-switch-to-qualifiers')?.click();
+          
+          // מחכים רגע שריאקט יפתח את הטאב, ואז עוברים לצעד הבא שמצביע על התוכן
+          setTimeout(() => driverObj.moveNext(), 250);
+        }
+     }
+    },
+    {
+      element: '#first-group-qualifiers', // 💡 הצעד החדש שהוספנו!
+      popover: { 
+        title: 'העולות לשמינית 🥇🥈', 
+        description: 'בכל בית תצטרך לנחש אילו נבחרות יסיימו במקום הראשון והשני. פגיעה במיקום המדויק שווה המון נקודות!',
+        onNextClick: () => {
+          // רק אחרי ההסבר על העולות, נעביר את המשתמש לטאב המקום השלישי
           setPredictionTab("THIRD_PLACE");
           setTimeout(() => driverObj.moveNext(), 300);
         }
@@ -138,7 +152,6 @@ export default function Home() {
         title: 'מעפילות ממקום שלישי 🥉', 
         description: 'במונדיאל הזה, 8 הנבחרות הטובות ביותר מהמקום השלישי עולות גם הן! כאן תוכל לבחור מי לדעתך יעלו.',
         onNextClick: () => {
-          // מכינים את הרקע לטאב הבונוסים
           setPredictionTab("BONUS");
           setTimeout(() => driverObj.moveNext(), 300);
         }
@@ -155,7 +168,7 @@ export default function Home() {
       element: '#first-bonus-card', // 💡 צלילה פנימה לתוך השאלה הראשונה
       popover: { 
         title: 'איך עונים? 💡', 
-        description: 'חלק מהשאלות פתוחות מתחילת הטורניר, וחלקן "שאלות הפתעה" שנפתחות לזמן מוגבל. שים לב לזמני הנעילה.',
+        description: 'חלק מהשאלות פתוחות מתחילת הטורניר,שימו לב שיש שאלות לכל שלב וגם כלליות לכל הטורניר ולכל הנוקאאוט בנוסף שימו לב שיש גם שאלות דאבל ששוות כפול, פה גם תופיע שאלת ההפתעה.',
         onNextClick: () => {
           // לפני הצעד הבא, מעבירים ללידרבורד
           setActiveTab("LEADERBOARD");
@@ -174,7 +187,7 @@ export default function Home() {
       element: '#private-leagues-section',
       popover: { 
         title: 'ליגות פרטיות 👥', 
-        description: 'כאן תוכל לפתוח ליגה סגורה לחברים ולהוכיח להם מי המלך של המגרש. שיהיה בהצלחה!' 
+        description: 'כאן תוכל לפתוח בטאב ליגה פרטית לפתוח ליגה סגורה לחברים ולהוכיח להם מי המלך של המגרש. שיהיה בהצלחה!' 
       }
     }
   ],
