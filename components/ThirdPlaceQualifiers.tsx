@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect, useRef } from "react";
-import { doc, getDoc, setDoc, collection, getDocs } from "firebase/firestore";
+import { doc, getDoc, setDoc, collection, getDocs, onSnapshot  } from "firebase/firestore";
 import { db } from "../app/firebase";
 import toast from "react-hot-toast";
 import { getFlagUrl } from "../app/utils/flags";
@@ -8,6 +8,16 @@ import { getFlagUrl } from "../app/utils/flags";
 export default function ThirdPlaceQualifiers({ groups, userId, tournamentState = 0 }: any) {
   const groupNames = Object.keys(groups).sort();
   const [activeGroup, setActiveGroup] = useState(groupNames[0] || "A");
+  const [localTournamentState, setLocalTournamentState] = useState(tournamentState);
+
+  useEffect(() => {
+    const unsubSys = onSnapshot(doc(db, "settings", "system"), (docSnap) => {
+      if (docSnap.exists()) {
+        setLocalTournamentState(Number(docSnap.data().tournamentState) || 0);
+      }
+    });
+    return () => unsubSys();
+  }, []);
 
   const [selectedTeams, setSelectedTeams] = useState<string[]>([]);
   const [userQualifiers, setUserQualifiers] = useState<any>({});
@@ -124,7 +134,7 @@ export default function ThirdPlaceQualifiers({ groups, userId, tournamentState =
     setSelectedTeams((prev) => prev.filter((t) => t !== team));
   };
 
-  const isLocked = tournamentState >= 1;
+  const isLocked = localTournamentState >= 1;
 
   const handleRandomizeThirdPlace = async () => {
     if (isLocked) return;

@@ -21,7 +21,17 @@ export default function GroupsView({ matches, groups, userId, tournamentState }:
 
   const [activeGroup, setActiveGroup] = useState(getInitialGroup());
   const [viewMode, setViewMode] = useState<"MATCHES" | "QUALIFIERS">("MATCHES");
-  
+  // הוסף את השורות האלו כאן:
+  const [localTournamentState, setLocalTournamentState] = useState(tournamentState);
+
+  useEffect(() => {
+    const unsubSys = onSnapshot(doc(db, "settings", "system"), (docSnap) => {
+      if (docSnap.exists()) {
+        setLocalTournamentState(Number(docSnap.data().tournamentState) || 0);
+      }
+    });
+    return () => unsubSys();
+  }, []);
   const [qualifiers, setQualifiers] = useState<any>({});
   const [realQualifiers, setRealQualifiers] = useState<any>({}); 
   
@@ -83,6 +93,7 @@ export default function GroupsView({ matches, groups, userId, tournamentState }:
     }, 800);
     return () => clearTimeout(timer);
   }, [qualifiers, userId]);
+  
 
   // מנגנון הניווט והגלילה החכם שמגיע מהדשבורד!
   useEffect(() => {
@@ -151,16 +162,17 @@ export default function GroupsView({ matches, groups, userId, tournamentState }:
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  
   const activeMatches = matches.filter((m: any) => m.group === activeGroup);
   const activeTeams = groups[activeGroup] ? Array.from(groups[activeGroup]) : [];
-  const isQualifiersLocked = tournamentState >= 1;
+  const isQualifiersLocked = localTournamentState >= 1;
 
   const isAnyGroupMatchLocked = activeMatches.some((m: any) => {
     if (m.isFinished) return true;
     const md = Number(m.matchday) || 1;
-    if (md === 1 && tournamentState >= 1) return true;
-    if (md === 2 && tournamentState >= 2) return true;
-    if (md === 3 && tournamentState >= 3) return true;
+    if (md === 1 && localTournamentState >= 1) return true;
+    if (md === 2 && localTournamentState >= 2) return true;
+    if (md === 3 && localTournamentState >= 3) return true;
     return false;
   });
   const canRandomizeGroupMatches = activeMatches.length > 0 && !isAnyGroupMatchLocked;

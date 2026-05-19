@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect, useRef } from "react";
-import { doc, getDoc, setDoc, collection, getDocs } from "firebase/firestore";
+import { doc, getDoc, setDoc, collection, getDocs, onSnapshot } from "firebase/firestore";
 import { db } from "../app/firebase";
 import { getFlagUrl } from "../app/utils/flags";
 import AutocompleteInput from "./AutocompleteInput";
@@ -67,7 +67,17 @@ export default function BonusQuestions({ userId, tournamentState: propTournament
   const [realBonusAnswers, setRealBonusAnswers] = useState<any>({});
   
   const [tournamentState, setTournamentState] = useState<number>(propTournamentState || 0);
-  
+  // 1. הוספת האזנה חיה לסטטוס הטורניר
+  const [localTournamentState, setLocalTournamentState] = useState(tournamentState);
+
+    useEffect(() => {
+        const unsubSys = onSnapshot(doc(db, "settings", "system"), (docSnap) => {
+        if (docSnap.exists()) {
+           setLocalTournamentState(Number(docSnap.data().tournamentState) || 0);
+        }
+  });
+  return () => unsubSys();
+}, []);
   const [bonusCategory, setBonusCategory] = useState<string>("TOURNAMENT");
   const [knockoutRound, setKnockoutRound] = useState<string>("ALL");
   const [weightTab, setWeightTab] = useState<string>("REGULAR");
@@ -208,7 +218,7 @@ export default function BonusQuestions({ userId, tournamentState: propTournament
       return nowMs < open || nowMs > close; 
     }
 
-    const state = tournamentState;
+    const state = localTournamentState;
     if (state === 0) return false;
     if (q.phase === "TOURNAMENT" || q.phase === "GROUPS") return state >= 1;
     if (q.phase === "KNOCKOUT") {
