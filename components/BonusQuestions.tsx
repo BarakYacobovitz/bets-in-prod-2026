@@ -266,7 +266,23 @@ if (!q.knockoutRound || q.knockoutRound === "" || q.knockoutRound === "ALL" || q
        if (q.hasAllOption) opts.push("כל הנבחרות");
        ans = opts[Math.floor(Math.random() * opts.length)];
        
-    } else if (["CUSTOM", "CLUB", "MATCH"].includes(currentAnswerType)) {
+    } else if (currentAnswerType === "MATCH") {
+       // שליפת משחק אקראי מתוך מאגר המשחקים הטעון
+       const relevantMatches = allMatches.filter(m => {
+          if (q.phase === "GROUPS") return m.stage !== "KNOCKOUT";
+          if (q.phase === "KNOCKOUT") {
+              return m.stage === "KNOCKOUT" && (!q.knockoutRound || q.knockoutRound === "ALL" || m.roundName === q.knockoutRound);
+          }
+          return true; 
+       });
+       
+       if (relevantMatches.length > 0) {
+          const randM = relevantMatches[Math.floor(Math.random() * relevantMatches.length)];
+          ans = `${randM.homeTeam} - ${randM.awayTeam}`;
+       }
+       
+    } else if (["CUSTOM", "CLUB"].includes(currentAnswerType)) {
+       // כאן הסרנו את המילה "MATCH" כדי שלא תתנגש!
        const opts = q.possibleOptions ? q.possibleOptions.split(",").map((s:string)=>s.trim()).filter(Boolean) : [];
        if (opts.length > 0) ans = opts[Math.floor(Math.random() * opts.length)];
 
@@ -281,6 +297,9 @@ if (!q.knockoutRound || q.knockoutRound === "" || q.knockoutRound === "ALL" || q
       isUserAction.current = true;
       setAnswers((prev: any) => ({ ...prev, [q.id]: ans }));
       toast.success(`הוגרלה תשובה! 🎲`, { id: `rand_${q.id}` });
+    } else {
+      // אם אין משחקים רלוונטיים עדיין, נקפיץ שגיאה כדי שתדע
+      toast.error(`לא נמצאו אפשרויות להגרלה`, { id: `rand_${q.id}` });
     }
   };
 
@@ -313,7 +332,21 @@ if (!q.knockoutRound || q.knockoutRound === "" || q.knockoutRound === "ALL" || q
                        if (q.hasAllOption) opts.push("כל הנבחרות");
                        ans = opts[Math.floor(Math.random() * opts.length)];
                        
-                    }  else if (["CUSTOM", "CLUB", "MATCH"].includes(currentAnswerType)) {
+                    } else if (currentAnswerType === "MATCH") {
+                       // סינון חכם של משחקים לפי שלב השאלה
+                       const relevantMatches = allMatches.filter(m => {
+                          if (q.phase === "GROUPS") return m.stage !== "KNOCKOUT";
+                          if (q.phase === "KNOCKOUT") {
+                              return m.stage === "KNOCKOUT" && (!q.knockoutRound || q.knockoutRound === "ALL" || m.roundName === q.knockoutRound);
+                          }
+                          return true; 
+                       });
+                       if (relevantMatches.length > 0) {
+                          const randM = relevantMatches[Math.floor(Math.random() * relevantMatches.length)];
+                          ans = `${randM.homeTeam} - ${randM.awayTeam}`;
+                       }
+                       
+                    } else if (["CUSTOM", "CLUB"].includes(currentAnswerType)) {
                        const opts = q.possibleOptions ? q.possibleOptions.split(",").map((s:string)=>s.trim()).filter(Boolean) : [];
                        if (opts.length > 0) ans = opts[Math.floor(Math.random() * opts.length)];
 
@@ -821,15 +854,31 @@ const regularQuestions = filteredQuestions.filter(q => !q.isDouble && !q.isSurpr
                                    if (q.hasNoneOption) opts.push("אף נבחרת");
                                    if (q.hasAllOption) opts.push("כל הנבחרות");
                                    ans = opts[Math.floor(Math.random() * opts.length)];
-                                } else if (["CUSTOM", "CLUB", "MATCH"].includes(currentAnswerType)) {
+                                   
+                                } else if (currentAnswerType === "MATCH") {
+                                   const relevantMatches = allMatches.filter(m => {
+                                      if (q.phase === "GROUPS") return m.stage !== "KNOCKOUT";
+                                      if (q.phase === "KNOCKOUT") {
+                                          return m.stage === "KNOCKOUT" && (!q.knockoutRound || q.knockoutRound === "ALL" || m.roundName === q.knockoutRound);
+                                      }
+                                      return true; 
+                                   });
+                                   if (relevantMatches.length > 0) {
+                                      const randM = relevantMatches[Math.floor(Math.random() * relevantMatches.length)];
+                                      ans = `${randM.homeTeam} - ${randM.awayTeam}`;
+                                   }
+                                   
+                                } else if (["CUSTOM", "CLUB"].includes(currentAnswerType)) {
                                    const opts = q.possibleOptions ? q.possibleOptions.split(",").map((s:string)=>s.trim()).filter(Boolean) : [];
                                    if (opts.length > 0) ans = opts[Math.floor(Math.random() * opts.length)];
+                                   
                                 } else if (currentAnswerType === "PLAYER") {
                                    ans = TOP_PLAYERS_NAMES[Math.floor(Math.random() * TOP_PLAYERS_NAMES.length)];
+                                   
                                 } else if (currentAnswerType === "NUMBER_PURE" || currentAnswerType === "NUMBER_MINUTE") {
                                    ans = Math.floor(Math.random() * 15 + 1).toString();
-                                }
-                                if (ans) { newAnswers[q.id] = ans; hasChanges = true; }
+                                } 
+                                       if (ans) { newAnswers[q.id] = ans; hasChanges = true; }
                               }
                             });
             
