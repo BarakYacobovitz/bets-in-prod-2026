@@ -348,6 +348,13 @@ const calculateMatchPoints = (predH: string, predA: string, predQ: string) => {
     return true;
   });
 
+  const isContradiction = 
+    isKnockout && 
+    homeScore !== "" && awayScore !== "" && qualifier !== "" &&
+    ((Number(homeScore) > Number(awayScore) && qualifier === match.awayTeam) ||
+     (Number(awayScore) > Number(homeScore) && qualifier === match.homeTeam));
+    
+
   return (
     <>
       <div id={`match-${match.id}`} className={`rounded-2xl p-4 sm:p-5 w-full max-w-lg mx-auto relative ${cardStyle}`} dir="rtl">
@@ -480,6 +487,11 @@ const calculateMatchPoints = (predH: string, predA: string, predQ: string) => {
               מי תעלה לשלב הבא?
             </label>
             
+            {isContradiction && (
+              <div className="mb-3 text-[10px] font-bold text-rose-500 bg-rose-500/10 border border-rose-500/20 py-1.5 px-2 rounded-lg text-center animate-pulse flex items-center justify-center gap-1.5">
+                <span>⚠️</span> שים לב: סימנת עולה שסותרת את תוצאת המשחק שבחרת!
+              </div>
+            )}
             <div className="flex gap-2">
               <button
                 type="button" 

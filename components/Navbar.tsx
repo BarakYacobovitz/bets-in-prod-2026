@@ -248,11 +248,12 @@ export default function Navbar() {
       }
 
       // בניית מערך ההתראות המפורט
+      // בניית מערך ההתראות המפורט - מעודכן ללא נתיבי שגיאה
       const newAlerts = [];
-      if (mMissing > 0) newAlerts.push({ type: 'MATCH', count: mMissing, text: `חסר ניחוש ל-${mMissing} משחקים`, href: '/predictions' });
-      if (qMissing > 0) newAlerts.push({ type: 'QUAL', count: qMissing, text: `חסר ניחוש מעפילה ל-${qMissing} בתים`, href: '/qualifiers' });
-      if (tMissing > 0) newAlerts.push({ type: 'THIRD', count: 1, text: 'חסרה מעפילה מהמקום ה-3', href: '/third-place' });
-      if (bMissing > 0) newAlerts.push({ type: 'BONUS', count: bMissing, text: `חסרה תשובה ל-${bMissing} שאלות בונוס`, href: '/bonus' });
+      if (mMissing > 0) newAlerts.push({ type: 'MATCH', count: mMissing, text: `חסר ניחוש ל-${mMissing} משחקים`, targetTab: 'PREDICTIONS', innerTabId: 'matches' });
+      if (qMissing > 0) newAlerts.push({ type: 'QUAL', count: qMissing, text: `חסר ניחוש מעפילה ל-${qMissing} בתים`, targetTab: 'PREDICTIONS', innerTabId: 'matches' });
+      if (tMissing > 0) newAlerts.push({ type: 'THIRD', count: 1, text: 'חסרה מעפילה מהמקום ה-3', targetTab: 'PREDICTIONS', innerTabId: 'third' });
+      if (bMissing > 0) newAlerts.push({ type: 'BONUS', count: bMissing, text: `חסרה תשובה ל-${bMissing} שאלות בונוס`, targetTab: 'PREDICTIONS', innerTabId: 'bonus' });
 
       setAlertDetails(newAlerts);
       setMissingNormalTasks(missing);
@@ -646,27 +647,54 @@ export default function Navbar() {
 
                          {/* התראות פירוט חוסרים (השינוי החדש!) */}
                          {alertDetails.map((alert, idx) => (
-                            <Link 
+                            <button 
                                key={idx}
-                               href={alert.href}
-                               onClick={() => setShowNotifMenu(false)}
+                               onClick={(e) => { 
+                                 e.preventDefault();
+                                 setShowNotifMenu(false); 
+                                 if (window.location.pathname === '/') {
+                                    // 1. מעבר לטאב ניחושים הראשי
+                                    window.dispatchEvent(new CustomEvent("changeTab", { detail: alert.targetTab || "PREDICTIONS" }));
+                                    // 2. לחיצה חכמה על הטאב הפנימי הספציפי אחרי חלקיק שנייה!
+                                    if (alert.innerTabId) {
+                                       setTimeout(() => {
+                                          const btn = document.getElementById(`tab-${alert.innerTabId}`) || document.getElementById(`tab-${alert.innerTabId}-knockout`);
+                                          if (btn) btn.click();
+                                       }, 100);
+                                    }
+                                 } else {
+                                    sessionStorage.setItem("startupTab", alert.targetTab || "PREDICTIONS");
+                                    window.location.href = "/";
+                                 }
+                               }}
                                className="w-full text-right text-[11px] font-bold text-amber-400 bg-amber-950/30 hover:bg-amber-900/40 p-2.5 rounded-xl border border-amber-500/20 flex items-center gap-2 transition-all active:scale-95 shadow-sm"
                             >
                                <span className="animate-pulse text-xs">⚠️</span> {alert.text}
-                            </Link>
+                            </button>
                          ))}
                          
                          {/* שאלות הפתעה */}
                          {activeSurpriseAlert > 0 && (
-                            <Link 
-                               href="/bonus"
-                               onClick={() => setShowNotifMenu(false)}
+                            <button 
+                               onClick={(e) => {
+                                 e.preventDefault();
+                                 setShowNotifMenu(false);
+                                 if (window.location.pathname === '/') {
+                                    window.dispatchEvent(new CustomEvent("changeTab", { detail: "PREDICTIONS" }));
+                                    setTimeout(() => {
+                                       const btn = document.getElementById('tab-bonus') || document.getElementById('tab-bonus-knockout');
+                                       if (btn) btn.click();
+                                    }, 100);
+                                 } else {
+                                    sessionStorage.setItem("startupTab", "PREDICTIONS");
+                                    window.location.href = "/";
+                                 }
+                               }}
                                className="w-full text-right text-[11px] font-bold text-purple-400 bg-purple-950/30 hover:bg-purple-900/40 p-2.5 rounded-xl border border-purple-500/20 flex items-center gap-2 transition-all active:scale-95 shadow-sm"
                             >
                                <span className="animate-pulse text-xs">🎁</span> יש {activeSurpriseAlert} שאלות הפתעה פתוחות!
-                            </Link>
+                            </button>
                          )}
-                         
                          {totalNotifs === 0 && ptsDiff <= 0 && <div className="text-xs font-medium text-slate-500 text-center py-4">אין התראות חדשות.</div>}
                       </div>
                    </div>
