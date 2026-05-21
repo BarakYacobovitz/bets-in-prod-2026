@@ -346,16 +346,19 @@ const mList: any[] = [];
         rank: idx + 1, name: u.name || "שחקן", totalPoints: u.totalPoints || 0
       }));
 
-      // מעבירים ל-VAR את כל הלוח, מנותק ממה שמוצג כרגע במסך
       const allMatchesSchedule = matches.map(m => {
         const isLocked = m.isFinished || checkIsMatchLocked(m, tournamentState);
         return {
-          id: m.id, homeTeam: m.homeTeam, awayTeam: m.awayTeam,
+          id: m.id, 
+          homeTeam: m.homeTeam, 
+          awayTeam: m.awayTeam,
+          matchName: `${m.homeTeam} נגד ${m.awayTeam}`, 
           stage: m.stage === "KNOCKOUT" ? m.roundName : `מחזור ${m.matchday}`,
-          matchDate: m.matchDate || "טרם נקבע", isLocked: isLocked,
+          matchDate: m.matchDate || "טרם נקבע", 
+          isLocked: isLocked,
           isFinished: !!m.isFinished,
-          realHomeScore: m.isFinished ? m.realHomeScore : null,
-          realAwayScore: m.isFinished ? m.realAwayScore : null,
+          // הגדרה מפורשת של בית וחוץ כדי למנוע היפוך טקסט!
+          realScoreText: m.isFinished ? `בית (${m.homeTeam}): ${m.realHomeScore}, חוץ (${m.awayTeam}): ${m.realAwayScore}` : "טרם הסתיים",
           realQualifier: m.isFinished ? (m.realQualifier || null) : null
         };
       });
@@ -387,7 +390,6 @@ const mList: any[] = [];
               const p = userPreds[m.id];
               if (p && p.predictedHomeScore !== undefined && p.predictedHomeScore !== "") {
                 
-                // חישוב הנקודות המדויק למשחק הזה כדי להאכיל את ה-AI בכפית!
                 let earnedPts = 0;
                 if (m.isFinished) {
                    const rH = Number(m.realHomeScore); const rA = Number(m.realAwayScore);
@@ -402,8 +404,8 @@ const mList: any[] = [];
                    }
                 }
 
-                exposedUserProfiles[u.name].matchPredictions[`${m.homeTeam} נגד ${m.awayTeam}`] = {
-                  prediction: `${p.predictedHomeScore}-${p.predictedAwayScore}`, 
+                exposedUserProfiles[u.name].matchPredictions[m.matchName] = {
+                  predictionText: `בית (${m.homeTeam}): ${p.predictedHomeScore}, חוץ (${m.awayTeam}): ${p.predictedAwayScore}`, 
                   qualifierPredicted: p.qualifier || null,
                   pointsEarnedInThisMatch: m.isFinished ? earnedPts : "המשחק טרם הסתיים"
                 };
@@ -421,20 +423,30 @@ const mList: any[] = [];
         });
       });
 
+      // ההוראות המשודרגות של ה-VAR: מילון מושגים + דיסקליימר
       const systemInstructions = `אתה "פרשן ה-VAR", ה-AI הרשמי של ליגת "Bets in PROD".
 
-חוקי ברזל חמורים:
-1. קודם כל עובדות!: התחל כל תשובה במתן המידע היבש והמדויק שהמשתמש ביקש (תוצאות, ניחושים).
-2. הנתונים קובעים: קיבלת עבור כל ניחוש את שדה pointsEarnedInThisMatch. השתמש בו כדי לענות כמה נקודות המשתמש הרוויח! אל תחשב בעצמך.
-3. רק לאחר שסיפקת את העובדות במלואן, מותר לך להוסיף משפט של פרשנות עוקצנית. אל תבלבל את המשתמש עם סרקזם לפני התשובה האמיתית.
-4. לוח המשחקים (allMatchesSchedule): אתה רואה את כל המשחקים. אם מישהו שואל מתי המשחק הבא, תענה.
-5. ספוילרים: הניחושים של המשתמשים (exposedUserProfiles) כוללים רק משחקים שכבר ננעלו להצבעה. אם הניחוש לא מופיע שם, ענה שההימור חסוי.
+חוקי עיצוב ופורמט חובה (התשובה מרונדרת כ-HTML ישיר):
+1. טבלאות HTML: אם המשתמש מבקש רשימה, חובה להשתמש בטבלת HTML תקנית. מחלקות Tailwind חובה:
+   - עבור ה-<table>: "w-full text-right border-collapse my-3 bg-black/60 rounded-xl overflow-hidden text-xs sm:text-sm shadow-inner"
+   - עבור <th>: "bg-slate-800 text-slate-300 p-2 font-black border-b border-slate-700 text-center"
+   - עבור <td>: "p-2 border-b border-slate-800/60 text-emerald-400 font-mono text-center"
+2. למניעת היפוך RTL: כשאתה מציג תוצאה בטבלה, תכתוב אותה במפורש עם שמות הקבוצות, למשל: "אלג'יריה 0 - 4 ארגנטינה". הנתונים מגיעים אליך בפורמט מפורש של "בית" ו"חוץ" כדי שלא תתבלבל לעולם!
+3. מילון מושגים וז'רגון (קריטי!):
+   - "בול" (או פגיעה בול / תוצאה מדויקת): הניחוש היה זהה לחלוטין לתוצאת האמת (שווה לרוב 15 נק' בשלב הבתים).
+   - "כיוון" (או מגמה / פגיעה חלקית): המשתמש צדק רק בזהות המנצחת או תיקו, אבל לא בתוצאה המדויקת (שווה לרוב 5 נק').
+   - "פגיעה": מילה דו-משמעית. אם המשתמש שואל "כמה פגיעות יש ל...", תניח שהוא מתכוון ל*כל משחק שהניב נקודות* (גם בול וגם כיוון). חובה להוסיף בתחילת התשובה דיסקליימר קטן עטוף ב-<small>: "(הנחתי שהתכוונת לכל משחק שהניב נקודות. אם התכוונת רק לתוצאות מדויקות, בקש לראות 'בולים')".
+4. מבנה התשובה:
+   - פסק דין יבש ועובדתי (כולל הדיסקליימר אם השאלה כללה את המילה 'פגיעה').
+   - טבלה ב-HTML.
+   - עקיצה סרקסטית בסוף עטופה בדיוק בזה: 
+     <div className="text-sm text-emerald-200 font-bold mt-4 bg-emerald-900/30 p-3 rounded-xl border border-emerald-500/30 shadow-sm flex items-center gap-2"><span>🎙️</span> הפאנצ' שלך כאן...</div>
+5. אפס המצאות בתוצאות: קח את תוצאות האמת וניחושי המשתמשים אך ורק מהשדות realScoreText ו-predictionText. אל תמציא לעולם.
 
 נתונים למענה:
-- לוח המשחקים המלא: ${JSON.stringify(allMatchesSchedule)}
-- שאלות בונוס: ${JSON.stringify(allBonusQuestionsSchedule)}
-- דירוג השחקנים: ${JSON.stringify(fullLeaderboard)}
-- הניחושים המותרים (עם חישוב נקודות למשחק): ${JSON.stringify(exposedUserProfiles)}`;
+- לוח המשחקים: ${JSON.stringify(allMatchesSchedule)}
+- דירוג: ${JSON.stringify(fullLeaderboard)}
+- ניחושים (עם חישוב נקודות למשחק): ${JSON.stringify(exposedUserProfiles)}`;
 
       const res = await fetch('/api/chat', {
         method: 'POST',
@@ -983,11 +995,14 @@ const mList: any[] = [];
           
           <div className="w-full h-px bg-slate-800 my-2"></div>
 
-          {/* מקום התשובה */}
+         {/* מקום התשובה המעודכן - תמיכה ברנדור HTML וטבלאות */}
           {!isVarLoading && varResponse && (
-            <div className="text-emerald-400 font-mono text-base sm:text-lg leading-relaxed bg-emerald-950/10 p-4 border-r-4 border-emerald-500 rounded-l shadow-inner animate-fade-in">
-              <span className="text-white font-black block text-xs uppercase tracking-wider mb-1.5 opacity-60">החלטה סופית:</span>
-              {varResponse}
+            <div className="text-emerald-400 font-mono text-base sm:text-lg leading-relaxed bg-emerald-950/10 p-4 border-r-4 border-emerald-500 rounded-l shadow-inner animate-fade-in w-full overflow-x-auto">
+              <span className="text-white font-black block text-xs uppercase tracking-wider mb-2 opacity-60">החלטה סופית:</span>
+              <div 
+                dangerouslySetInnerHTML={{ __html: varResponse }} 
+                className="text-sm sm:text-base text-emerald-300 w-full"
+              />
             </div>
           )}
 
