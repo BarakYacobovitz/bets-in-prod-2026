@@ -334,8 +334,7 @@ const mList: any[] = [];
     link.click();
     document.body.removeChild(link);
   };
-  // --- Function to fetch AI answer using Local Matrix State (Aligned Context Firewall) ---
-  // --- Function to fetch AI answer using Local Matrix State (Forced Stringified Prompt) ---
+  // --- Function to fetch AI answer using Local Matrix State (Smart Firewall & Factual Prompt) ---
   const handleAskVAR = async () => {
     if (!varQuery.trim()) return;
     
@@ -347,12 +346,14 @@ const mList: any[] = [];
         rank: idx + 1, name: u.name || "שחקן", totalPoints: u.totalPoints || 0
       }));
 
+      // מעבירים ל-VAR את כל הלוח, מנותק ממה שמוצג כרגע במסך
       const allMatchesSchedule = matches.map(m => {
         const isLocked = m.isFinished || checkIsMatchLocked(m, tournamentState);
         return {
           id: m.id, homeTeam: m.homeTeam, awayTeam: m.awayTeam,
           stage: m.stage === "KNOCKOUT" ? m.roundName : `מחזור ${m.matchday}`,
           matchDate: m.matchDate || "טרם נקבע", isLocked: isLocked,
+          isFinished: !!m.isFinished,
           realHomeScore: m.isFinished ? m.realHomeScore : null,
           realAwayScore: m.isFinished ? m.realAwayScore : null,
           realQualifier: m.isFinished ? (m.realQualifier || null) : null
@@ -378,14 +379,33 @@ const mList: any[] = [];
       const exposedUserProfiles: any = {};
       users.forEach(u => {
         exposedUserProfiles[u.name] = { totalPoints: u.totalPoints || 0, matchPredictions: {}, bonusAnswers: {} };
+
         const userPreds = predictions[u.id];
         if (userPreds) {
           allMatchesSchedule.forEach(m => {
             if (lockedMatchIds.has(m.id)) {
               const p = userPreds[m.id];
               if (p && p.predictedHomeScore !== undefined && p.predictedHomeScore !== "") {
+                
+                // חישוב הנקודות המדויק למשחק הזה כדי להאכיל את ה-AI בכפית!
+                let earnedPts = 0;
+                if (m.isFinished) {
+                   const rH = Number(m.realHomeScore); const rA = Number(m.realAwayScore);
+                   const pH = Number(p.predictedHomeScore); const pA = Number(p.predictedAwayScore);
+                   if (Math.sign(pH - pA) === Math.sign(rH - rA)) {
+                      earnedPts += 5;
+                      if (pH === rH && pA === rA) earnedPts += 10;
+                   }
+                   if (m.stage !== "מחזור 1" && m.stage !== "מחזור 2" && m.stage !== "מחזור 3" && p.qualifier === m.realQualifier && p.qualifier) {
+                      const qMap: any = { "32 הגדולות": 5, "שמינית גמר": 10, "רבע גמר": 15, "חצי גמר": 20, "גמר": 25, "מקום שלישי": 10 };
+                      earnedPts += (qMap[m.stage] || 0);
+                   }
+                }
+
                 exposedUserProfiles[u.name].matchPredictions[`${m.homeTeam} נגד ${m.awayTeam}`] = {
-                  prediction: `${p.predictedHomeScore}-${p.predictedAwayScore}`, qualifierPredicted: p.qualifier || null
+                  prediction: `${p.predictedHomeScore}-${p.predictedAwayScore}`, 
+                  qualifierPredicted: p.qualifier || null,
+                  pointsEarnedInThisMatch: m.isFinished ? earnedPts : "המשחק טרם הסתיים"
                 };
               }
             }
@@ -401,31 +421,25 @@ const mList: any[] = [];
         });
       });
 
-      // הזרקה *קשיחה וישירה* של הנתונים כטקסט אל תוך הפרומפט! השרת לא יכול לסנן את זה.
       const systemInstructions = `אתה "פרשן ה-VAR", ה-AI הרשמי של ליגת "Bets in PROD".
-חוקי ברזל חמורים למענה:
-1. קודם כל עובדות ומספרים!: תמיד תפתח את התשובה בנתונים היבשים והמדויקים שהמשתמש ביקש. רק אחרי שסיפקת את העובדות המלאות, מותר לך להוסיף שורת סיכום עוקצנית.
-2. הכרת הלו"ז: נתתי לך את רשימת המשחקים המלאה. אם משתמש שואל על משחק (למשל קטאר נגד שוויץ או ספרד), הוא קיים ברשימה - חפש אותו שם!
-3. ספוילרים וניחושים: רשימת הניחושים שקיבלת ("הניחושים של כולם") מכילה **אך ורק** ניחושים שחוקי לחשוף! אם הניחוש מופיע שם, חובה עליך להציג אותו למשתמש ואסור לך להגיד שהוא חסוי.
 
-הנה מסד הנתונים המלא שלך (השתמש בו!):
-- טבלת הליגה: ${JSON.stringify(fullLeaderboard)}
-- לוח משחקים ותוצאות אמת: ${JSON.stringify(allMatchesSchedule.map(m => ({home: m.homeTeam, away: m.awayTeam, stage: m.stage, score: m.isFinished ? m.realHomeScore+'-'+m.realAwayScore : 'טרם'})))}
-- הניחושים של כולם (מסודר לפי שם משתמש!): ${JSON.stringify(exposedUserProfiles)}`;
+חוקי ברזל חמורים:
+1. קודם כל עובדות!: התחל כל תשובה במתן המידע היבש והמדויק שהמשתמש ביקש (תוצאות, ניחושים).
+2. הנתונים קובעים: קיבלת עבור כל ניחוש את שדה pointsEarnedInThisMatch. השתמש בו כדי לענות כמה נקודות המשתמש הרוויח! אל תחשב בעצמך.
+3. רק לאחר שסיפקת את העובדות במלואן, מותר לך להוסיף משפט של פרשנות עוקצנית. אל תבלבל את המשתמש עם סרקזם לפני התשובה האמיתית.
+4. לוח המשחקים (allMatchesSchedule): אתה רואה את כל המשחקים. אם מישהו שואל מתי המשחק הבא, תענה.
+5. ספוילרים: הניחושים של המשתמשים (exposedUserProfiles) כוללים רק משחקים שכבר ננעלו להצבעה. אם הניחוש לא מופיע שם, ענה שההימור חסוי.
 
-      // שולחים לשרת מבנה "ריק" של משתנים ישנים כדי שלא יקרוס, ואת הטקסט המלא שלנו
-      const contextData = {
-        activeTab: activeTab,
-        leaderboard: [],
-        todayPredictions: {},
-        data: [],
-        systemInstructions: systemInstructions
-      };
+נתונים למענה:
+- לוח המשחקים המלא: ${JSON.stringify(allMatchesSchedule)}
+- שאלות בונוס: ${JSON.stringify(allBonusQuestionsSchedule)}
+- דירוג השחקנים: ${JSON.stringify(fullLeaderboard)}
+- הניחושים המותרים (עם חישוב נקודות למשחק): ${JSON.stringify(exposedUserProfiles)}`;
 
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: varQuery, context: contextData })
+        body: JSON.stringify({ message: varQuery, context: { systemInstructions } })
       });
       
       const data = await res.json();
