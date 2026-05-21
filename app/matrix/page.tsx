@@ -337,7 +337,6 @@ const mList: any[] = [];
   // --- Function to fetch AI answer using Local Matrix State (Smart Firewall & Factual Prompt) ---
   const handleAskVAR = async () => {
     if (!varQuery.trim()) return;
-    
     setIsVarLoading(true);
     setVarResponse(""); 
     
@@ -346,107 +345,72 @@ const mList: any[] = [];
         rank: idx + 1, name: u.name || "שחקן", totalPoints: u.totalPoints || 0
       }));
 
+      // מעבירים ל-VAR לוח משחקים נקי עם הגדרה מפורשת של תוצאות
       const allMatchesSchedule = matches.map(m => {
         const isLocked = m.isFinished || checkIsMatchLocked(m, tournamentState);
         return {
           id: m.id, 
-          homeTeam: m.homeTeam, 
-          awayTeam: m.awayTeam,
-          matchName: `${m.homeTeam} נגד ${m.awayTeam}`, 
-          stage: m.stage === "KNOCKOUT" ? m.roundName : `מחזור ${m.matchday}`,
-          matchDate: m.matchDate || "טרם נקבע", 
-          isLocked: isLocked,
+          matchName: `${m.homeTeam} נגד ${m.awayTeam}`,
           isFinished: !!m.isFinished,
-          // הגדרה מפורשת של בית וחוץ כדי למנוע היפוך טקסט!
-          realScoreText: m.isFinished ? `בית (${m.homeTeam}): ${m.realHomeScore}, חוץ (${m.awayTeam}): ${m.realAwayScore}` : "טרם הסתיים",
-          realQualifier: m.isFinished ? (m.realQualifier || null) : null
+          // מונע מה-AI להתבלבל בגלל RTL: כותבים במפורש מי בבית ומי בחוץ
+          realScoreText: m.isFinished ? `${m.homeTeam} ${m.realHomeScore} - ${m.realAwayScore} ${m.awayTeam}` : "טרם שוחק"
         };
       });
 
-      const allBonusQuestionsSchedule = bonusQuestions.map(q => {
-        const phase = q.phase || "TOURNAMENT";
-        let isBonusExposed = (phase === "KNOCKOUT") ? (tournamentState >= 5) : (tournamentState >= 1);
-        if (q.isSurprise) {
-          const closeTimeMs = parseDateTimeLocal(q.closeTime);
-          isBonusExposed = nowMs > closeTimeMs;
-        }
-        return {
-          id: q.id, questionText: q.label || q.questionText, phase: phase,
-          isLocked: isBonusExposed, realAnswer: isBonusExposed ? (realBonusFull.answers?.[q.id] || null) : null
-        };
-      });
-
-      const lockedMatchIds = new Set(allMatchesSchedule.filter(m => m.isLocked).map(m => m.id));
-      const lockedBonusIds = new Set(allBonusQuestionsSchedule.filter(q => q.isLocked).map(q => q.id));
-
+      // בניית הפרופילים רק למשחקים רלוונטיים (שיש בהם ניחוש)
       const exposedUserProfiles: any = {};
       users.forEach(u => {
-        exposedUserProfiles[u.name] = { totalPoints: u.totalPoints || 0, matchPredictions: {}, bonusAnswers: {} };
-
         const userPreds = predictions[u.id];
-        if (userPreds) {
-          allMatchesSchedule.forEach(m => {
-            if (lockedMatchIds.has(m.id)) {
-              const p = userPreds[m.id];
-              if (p && p.predictedHomeScore !== undefined && p.predictedHomeScore !== "") {
-                
-                let earnedPts = 0;
-                if (m.isFinished) {
-                   const rH = Number(m.realHomeScore); const rA = Number(m.realAwayScore);
-                   const pH = Number(p.predictedHomeScore); const pA = Number(p.predictedAwayScore);
-                   if (Math.sign(pH - pA) === Math.sign(rH - rA)) {
-                      earnedPts += 5;
-                      if (pH === rH && pA === rA) earnedPts += 10;
-                   }
-                   if (m.stage !== "מחזור 1" && m.stage !== "מחזור 2" && m.stage !== "מחזור 3" && p.qualifier === m.realQualifier && p.qualifier) {
-                      const qMap: any = { "32 הגדולות": 5, "שמינית גמר": 10, "רבע גמר": 15, "חצי גמר": 20, "גמר": 25, "מקום שלישי": 10 };
-                      earnedPts += (qMap[m.stage] || 0);
-                   }
-                }
+        if (!userPreds) return;
 
-                exposedUserProfiles[u.name].matchPredictions[m.matchName] = {
-                  predictionText: `בית (${m.homeTeam}): ${p.predictedHomeScore}, חוץ (${m.awayTeam}): ${p.predictedAwayScore}`, 
-                  qualifierPredicted: p.qualifier || null,
-                  pointsEarnedInThisMatch: m.isFinished ? earnedPts : "המשחק טרם הסתיים"
-                };
-              }
+        let userStats: any = { matchPredictions: [] };
+        matches.forEach(m => {
+          if ((m.isFinished || checkIsMatchLocked(m, tournamentState)) && userPreds[m.id]) {
+            const p = userPreds[m.id];
+            // מחשבים את הנקודות כאן בקוד, לא נותנים ל-AI לנחש!
+            let earnedPts = 0;
+            if (m.isFinished) {
+               const rH = Number(m.realHomeScore); const rA = Number(m.realAwayScore);
+               const pH = Number(p.predictedHomeScore); const pA = Number(p.predictedAwayScore);
+               if (Math.sign(pH - pA) === Math.sign(rH - rA)) {
+                  earnedPts += 5; // כיוון
+                  if (pH === rH && pA === rA) earnedPts += 10; // בול
+               }
             }
-          });
-        }
-        bonusQuestions.forEach(q => {
-          if (lockedBonusIds.has(q.id)) {
-            const bData = bonusPredictions[u.id];
-            if (bData && bData[q.id] !== undefined && bData[q.id] !== "--") {
-              exposedUserProfiles[u.name].bonusAnswers[q.label || q.questionText] = String(bData[q.id]);
+            
+            // שולחים ל-AI רק אם המשחק רלוונטי (או היה ניחוש או יש ניקוד)
+            if (p.predictedHomeScore !== undefined || earnedPts > 0) {
+               userStats.matchPredictions.push({
+                  match: `${m.homeTeam} נגד ${m.awayTeam}`,
+                  pred: `${p.predictedHomeScore}-${p.predictedAwayScore}`,
+                  real: m.isFinished ? `${m.realHomeScore}-${m.realAwayScore}` : "טרם שוחק",
+                  points: earnedPts
+               });
             }
           }
         });
+        if (userStats.matchPredictions.length > 0) exposedUserProfiles[u.name] = userStats;
       });
 
-      // ההוראות המשודרגות של ה-VAR: מילון מושגים + דיסקליימר
-      const systemInstructions = `אתה "פרשן ה-VAR", ה-AI הרשמי של ליגת "Bets in PROD".
+      const systemInstructions = `אתה "פרשן ה-VAR". 
+חוקים קריטיים:
+חוקי זהות וזיהוי משתמש:
+1. אם המשתמש שואל על "אני", "עליי", "מה איתי", "הניחושים שלי" - התייחס אך ורק למשתמש "${currentUserName}".
+2. אם המשתמש שואל על שם ספציפי (למשל "מה עם ברק?"), חפש אותו ב-JSON שקיבלת וענה עליו.
+3. אם השאלה כללית (למשל "מי מוביל בטבלה?", "מה התוצאות של אתמול?"), ענה תשובה כללית.
+4. אם המשתמש שואל על מישהו שלא קיים ב-JSON, תגיד בעדינות שאין לך נתונים עליו.
+חוקים נוספים:
+1. איסור חישוב: אל תחשב נקודות! קרא את שדה ה-'points' מה-JSON בלבד.
+2. דאטה בלבד: אם משחק לא מופיע ב-JSON, הוא לא רלוונטי. אל תמציא משחקים.
+3. טבלה מעוצבת: השתמש אך ורק ב-HTML עם Tailwind (<table>, <tr>, <th>, <td>).
+   עבור ה-<table>: "w-full text-right border-collapse my-3 bg-black/60 rounded-xl overflow-hidden text-xs shadow-inner"
+   עבור <thead>: "sticky top-0 bg-slate-800 z-10" 
+   עבור <th>: "text-slate-300 p-2 font-black border-b border-slate-700 text-center"
+4. מילון: 'בול' = 15 נק', 'כיוון' = 5 נק', 'נפילה' = 0 נק'.
+5. דיסקליימר: אם המשתמש שאל על "פגיעות", הוסף בתחילת התשובה ב-<small>: "(התשובה כוללת את כל המשחקים שהניבו נקודות, בולים וכיוונים)".
+6.אם יש יותר מ-8 משחקים ברשימה, אל תייצר טבלה אחת ארוכה. פצל את המידע לשתי טבלאות נפרדות לפי קטגוריות: 'משחקי בול (15 נק')' ו-'משחקי כיוון (5 נק')  '. זה עוזר למשתמש לסרוק את הנתונים בלי לאבד את הריכוז."
 
-חוקי עיצוב ופורמט חובה (התשובה מרונדרת כ-HTML ישיר):
-1. טבלאות HTML: אם המשתמש מבקש רשימה, חובה להשתמש בטבלת HTML תקנית. מחלקות Tailwind חובה:
-   - עבור ה-<table>: "w-full text-right border-collapse my-3 bg-black/60 rounded-xl overflow-hidden text-xs sm:text-sm shadow-inner"
-   - עבור <th>: "bg-slate-800 text-slate-300 p-2 font-black border-b border-slate-700 text-center"
-   - עבור <td>: "p-2 border-b border-slate-800/60 text-emerald-400 font-mono text-center"
-2. למניעת היפוך RTL: כשאתה מציג תוצאה בטבלה, תכתוב אותה במפורש עם שמות הקבוצות, למשל: "אלג'יריה 0 - 4 ארגנטינה". הנתונים מגיעים אליך בפורמט מפורש של "בית" ו"חוץ" כדי שלא תתבלבל לעולם!
-3. מילון מושגים וז'רגון (קריטי!):
-   - "בול" (או פגיעה בול / תוצאה מדויקת): הניחוש היה זהה לחלוטין לתוצאת האמת (שווה לרוב 15 נק' בשלב הבתים).
-   - "כיוון" (או מגמה / פגיעה חלקית): המשתמש צדק רק בזהות המנצחת או תיקו, אבל לא בתוצאה המדויקת (שווה לרוב 5 נק').
-   - "פגיעה": מילה דו-משמעית. אם המשתמש שואל "כמה פגיעות יש ל...", תניח שהוא מתכוון ל*כל משחק שהניב נקודות* (גם בול וגם כיוון). חובה להוסיף בתחילת התשובה דיסקליימר קטן עטוף ב-<small>: "(הנחתי שהתכוונת לכל משחק שהניב נקודות. אם התכוונת רק לתוצאות מדויקות, בקש לראות 'בולים')".
-4. מבנה התשובה:
-   - פסק דין יבש ועובדתי (כולל הדיסקליימר אם השאלה כללה את המילה 'פגיעה').
-   - טבלה ב-HTML.
-   - עקיצה סרקסטית בסוף עטופה בדיוק בזה: 
-     <div className="text-sm text-emerald-200 font-bold mt-4 bg-emerald-900/30 p-3 rounded-xl border border-emerald-500/30 shadow-sm flex items-center gap-2"><span>🎙️</span> הפאנצ' שלך כאן...</div>
-5. אפס המצאות בתוצאות: קח את תוצאות האמת וניחושי המשתמשים אך ורק מהשדות realScoreText ו-predictionText. אל תמציא לעולם.
-
-נתונים למענה:
-- לוח המשחקים: ${JSON.stringify(allMatchesSchedule)}
-- דירוג: ${JSON.stringify(fullLeaderboard)}
-- ניחושים (עם חישוב נקודות למשחק): ${JSON.stringify(exposedUserProfiles)}`;
+נתוני ה-JSON שקיבלת: ${JSON.stringify(exposedUserProfiles)}`;
 
       const res = await fetch('/api/chat', {
         method: 'POST',
@@ -455,12 +419,9 @@ const mList: any[] = [];
       });
       
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || `Server error: ${res.status}`);
-      setVarResponse(data.reply || "השופטים קיבלו תשובה ריקה מה-AI.");
-      
-    } catch (error: any) {
-      console.error("VAR Error:", error);
-      setVarResponse(`ה-VAR שבת מפעילות. תקלה: ${error.message}`);
+      setVarResponse(data.reply);
+    } catch (error) {
+      setVarResponse("ה-VAR נתקל בשגיאה טכנית. תבדוק שהקבוצות לא רדופות רוחות.");
     } finally {
       setIsVarLoading(false);
     }
@@ -931,99 +892,50 @@ const mList: any[] = [];
 {isVarModalOpen && (
   <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/85 p-4 backdrop-blur-md animate-fade-in" dir="rtl">
     
-    {/* הזרקת האנימציה של קו הסריקה בטלוויזיה */}
-    <style dangerouslySetInnerHTML={{__html: `
-      @keyframes scanline {
-        0% { transform: translateY(-100%); }
-        100% { transform: translateY(260px); }
-      }
-      .animate-scanline {
-        animation: scanline 3s infinite linear;
-      }
-    `}} />
-
-    {/* גוף המודל */}
-    <div className="bg-slate-900 border-4 border-gray-800 rounded-2xl w-full max-w-lg flex flex-col shadow-[0_0_50px_rgba(225,29,72,0.3)] relative overflow-hidden">
+    {/* המעטפת הראשית - גובה מקסימלי 90% מהמסך */}
+    <div className="relative bg-slate-900 border-4 border-gray-800 rounded-2xl w-full max-w-lg flex flex-col max-h-[90vh] shadow-2xl overflow-hidden">
       
-      {/* כפתור סגירה עליון קטן */}
+      {/* כפתור ה-X - נשאר למעלה */}
       <button 
         onClick={() => { setIsVarModalOpen(false); setVarQuery(""); setVarResponse(""); }}
-        className="absolute top-3 left-3 z-50 w-8 h-8 flex items-center justify-center rounded-full bg-black/50 text-gray-400 hover:text-white transition-colors text-sm border border-white/10"
+        className="absolute top-3 left-3 z-50 w-8 h-8 flex items-center justify-center rounded-full bg-black/50 text-gray-400 hover:text-white transition-colors border border-white/10"
       >
         ✕
       </button>
 
-      {/* 📺 חצי עליון: המוניטור עם תמונת השופט והאפקטים */}
-      <div className="relative h-[240px] w-full bg-black shrink-0 border-b-4 border-gray-800">
-        {/* תמונת השופט שלקחת מהמגרש */}
-        <img 
-          src="/var-referee.jpg" 
-          alt="VAR Check" 
-          className="w-full h-full object-cover opacity-80"
-        />
-
-        {/* אפקט פסי סריקה (Scanlines) כמו מסך טלוויזיה ישן */}
+      {/* 📺 תמונה למעלה (shrink-0 מונע ממנה להשתנות) */}
+      <div className="relative h-[200px] w-full bg-black shrink-0 border-b-4 border-gray-800">
+        <img src="/var-referee.jpg" alt="VAR" className="w-full h-full object-cover opacity-80" />
+        {/* אפקט סריקה מעל התמונה */}
         <div className="absolute inset-0 pointer-events-none bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:100%_4px] opacity-70"></div>
-        
-        {/* קו הלייזר הכחול שיורד ועולה (אנימציית הסריקה) */}
-        <div className="absolute inset-x-0 h-0.5 bg-cyan-500/40 shadow-[0_0_10px_rgba(6,182,212,0.8)] opacity-70 animate-scanline"></div>
-
-        {/* באנר סטטוס שידור עליון */}
-        <div className="absolute top-4 right-4 bg-black/70 backdrop-blur-sm border border-red-500/30 px-3 py-1 rounded-md flex items-center gap-2">
-          <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse shadow-[0_0_8px_rgba(239,68,68,1)]"></span>
-          <span className="text-red-400 font-mono font-black text-[10px] tracking-widest uppercase">LIVE REVIEW</span>
-        </div>
-
-        {/* כתובית בזמן טעינה */}
-        {isVarLoading && (
-          <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center gap-2 text-center">
-            <div className="w-8 h-8 border-2 border-cyan-500 border-t-transparent rounded-full animate-spin"></div>
-            <div className="text-cyan-400 font-mono text-xs tracking-wider uppercase mt-1 bg-black/40 px-3 py-1 rounded border border-cyan-500/20">
-              מפענח זוויות צילום ונתוני טבלה...
-            </div>
-          </div>
-        )}
       </div>
 
-      {/* 🏟️ חצי תחתון: לוח פסק הדין של האצטדיון */}
-      <div className="bg-[#050507] p-6 flex-1 flex flex-col justify-between min-h-[180px]">
-        
-        <div className="space-y-2">
-          <div className="text-[10px] font-black text-slate-500 tracking-wider uppercase font-mono">
+      {/* 📜 אזור התוכן הגולל ( flex-1 + overflow-y-auto) */}
+      <div className="bg-[#050507] p-6 flex-1 overflow-y-auto custom-scrollbar">
+         <div className="text-[10px] font-black text-slate-500 tracking-wider uppercase font-mono mb-3">
             שאילתת שופט: "{varQuery}"
-          </div>
-          
-          <div className="w-full h-px bg-slate-800 my-2"></div>
-
-         {/* מקום התשובה המעודכן - תמיכה ברנדור HTML וטבלאות */}
-          {!isVarLoading && varResponse && (
-            <div className="text-emerald-400 font-mono text-base sm:text-lg leading-relaxed bg-emerald-950/10 p-4 border-r-4 border-emerald-500 rounded-l shadow-inner animate-fade-in w-full overflow-x-auto">
-              <span className="text-white font-black block text-xs uppercase tracking-wider mb-2 opacity-60">החלטה סופית:</span>
-              <div 
-                dangerouslySetInnerHTML={{ __html: varResponse }} 
-                className="text-sm sm:text-base text-emerald-300 w-full"
-              />
-            </div>
-          )}
-
-          {/* מצב המתנה (למקרה שהמודל נפתח מסיבה כלשהי בלי טעינה) */}
-          {!isVarLoading && !varResponse && (
-            <div className="text-slate-600 font-mono text-sm text-center py-6">
-              ממתין להעברת הנתונים מחדר הבקרה...
-            </div>
-          )}
-        </div>
-
-        {/* כפתור סגירה תחתון - חזרה למגרש */}
-        {!isVarLoading && varResponse && (
-          <button
-            onClick={() => { setIsVarModalOpen(false); setVarQuery(""); setVarResponse(""); }}
-            className="w-full mt-6 bg-gradient-to-r from-slate-900 to-slate-800 hover:from-slate-800 hover:to-slate-700 text-slate-300 font-black py-3 rounded-xl border border-slate-700 text-sm transition-all text-center active:scale-95 shadow-lg font-mono"
-          >
-            ✓ חזרה למגרש
-          </button>
-        )}
+         </div>
+         
+         {!isVarLoading && varResponse ? (
+           <div 
+             dangerouslySetInnerHTML={{ __html: varResponse }} 
+             className="text-emerald-400 font-mono text-sm leading-relaxed"
+           />
+         ) : (
+           <div className="text-center py-10 text-slate-500 animate-pulse">מפענח נתונים...</div>
+         )}
       </div>
+
+      {/* 🔘 כפתור החזרה למטה - תמיד נגיש */}
+      <div className="bg-[#050507] p-4 border-t border-slate-800 shrink-0">
+        <button
+          onClick={() => { setIsVarModalOpen(false); setVarQuery(""); setVarResponse(""); }}
+          className="w-full bg-slate-800 hover:bg-slate-700 text-slate-300 font-black py-3 rounded-xl border border-slate-700 text-sm transition-all active:scale-95"
+        >
+          ✓ חזרה למגרש
+        </button>
+      </div>
+
     </div>
   </div>
 )}

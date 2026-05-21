@@ -195,4 +195,18 @@ body {
 .driver-popover.custom-football-tour .driver-popover-arrow {
   border-color: #0f172a !important;
 }
+/* עיצוב גלילה יוקרתי */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: #050507;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #10b981; /* ירוק-אזמרגד של ה-VAR */
+  border-radius: 10px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #059669;
+}
 
