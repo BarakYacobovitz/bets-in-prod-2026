@@ -4,6 +4,7 @@ import { collection, getDocs, getDoc, doc } from "firebase/firestore";
 import { db } from "../firebase";
 import Link from "next/link";
 import { getFlagUrl } from "../utils/flags";
+import toast from "react-hot-toast";
 
 type TabType = "MATCHES" | "QUALIFIERS" | "BONUS";
 
@@ -333,8 +334,8 @@ const mList: any[] = [];
     link.click();
     document.body.removeChild(link);
   };
-  // --- Function to fetch AI answer using Local Matrix State (Smart Schedule, Bonuses & Qualifiers Analyzer) ---
-  // --- Function to fetch AI answer using Local Matrix State (Smart Firewall & Factual Prompt) ---
+  // --- Function to fetch AI answer using Local Matrix State (Aligned Context Firewall) ---
+  // --- Function to fetch AI answer using Local Matrix State (Forced Stringified Prompt) ---
   const handleAskVAR = async () => {
     if (!varQuery.trim()) return;
     
@@ -346,7 +347,6 @@ const mList: any[] = [];
         rank: idx + 1, name: u.name || "שחקן", totalPoints: u.totalPoints || 0
       }));
 
-      // מעבירים ל-VAR את כל הלוח, בלי קשר למה שמפולטר כרגע במסך!
       const allMatchesSchedule = matches.map(m => {
         const isLocked = m.isFinished || checkIsMatchLocked(m, tournamentState);
         return {
@@ -378,7 +378,6 @@ const mList: any[] = [];
       const exposedUserProfiles: any = {};
       users.forEach(u => {
         exposedUserProfiles[u.name] = { totalPoints: u.totalPoints || 0, matchPredictions: {}, bonusAnswers: {} };
-
         const userPreds = predictions[u.id];
         if (userPreds) {
           allMatchesSchedule.forEach(m => {
@@ -402,24 +401,31 @@ const mList: any[] = [];
         });
       });
 
-      // ההוראות המשודרגות של ה-VAR: עובדות תחילה!
+      // הזרקה *קשיחה וישירה* של הנתונים כטקסט אל תוך הפרומפט! השרת לא יכול לסנן את זה.
       const systemInstructions = `אתה "פרשן ה-VAR", ה-AI הרשמי של ליגת "Bets in PROD".
+חוקי ברזל חמורים למענה:
+1. קודם כל עובדות ומספרים!: תמיד תפתח את התשובה בנתונים היבשים והמדויקים שהמשתמש ביקש. רק אחרי שסיפקת את העובדות המלאות, מותר לך להוסיף שורת סיכום עוקצנית.
+2. הכרת הלו"ז: נתתי לך את רשימת המשחקים המלאה. אם משתמש שואל על משחק (למשל קטאר נגד שוויץ או ספרד), הוא קיים ברשימה - חפש אותו שם!
+3. ספוילרים וניחושים: רשימת הניחושים שקיבלת ("הניחושים של כולם") מכילה **אך ורק** ניחושים שחוקי לחשוף! אם הניחוש מופיע שם, חובה עליך להציג אותו למשתמש ואסור לך להגיד שהוא חסוי.
 
-חוקי ברזל חמורים:
-1. קודם כל עובדות!: התחל כל תשובה במתן המידע היבש והמדויק שהמשתמש ביקש. רק לאחר שסיפקת את העובדות (תוצאה, נתון, או ניחוש), מותר לך להוסיף משפט של פרשנות עוקצנית או דאחקה. אל תבלבל את המשתמש עם סרקזם לפני התשובה האמיתית.
-2. לוח המשחקים (allMatchesSchedule): אתה רואה את כל המשחקים (גם אלו שעוד לא ננעלו). אם מישהו שואל על משחק שקיים במערך (למשל קטאר נגד שוויץ), תגיד לו בדיוק מתי הוא ובאיזה שלב.
-3. ספוילרים: הניחושים של המשתמשים (exposedUserProfiles) כוללים רק משחקים שכבר ננעלו להצבעה (isLocked: true). אם משתמש שואל על ניחוש למשחק שעדיין פתוח, ענה לו שהניחושים חסויים כרגע.
+הנה מסד הנתונים המלא שלך (השתמש בו!):
+- טבלת הליגה: ${JSON.stringify(fullLeaderboard)}
+- לוח משחקים ותוצאות אמת: ${JSON.stringify(allMatchesSchedule.map(m => ({home: m.homeTeam, away: m.awayTeam, stage: m.stage, score: m.isFinished ? m.realHomeScore+'-'+m.realAwayScore : 'טרם'})))}
+- הניחושים של כולם (מסודר לפי שם משתמש!): ${JSON.stringify(exposedUserProfiles)}`;
 
-נתונים למענה:
-- לוח המשחקים המלא: ${JSON.stringify(allMatchesSchedule)}
-- שאלות בונוס: ${JSON.stringify(allBonusQuestionsSchedule)}
-- דירוג השחקנים: ${JSON.stringify(fullLeaderboard)}
-- הניחושים המותרים לחשיפה (לפי משתמש): ${JSON.stringify(exposedUserProfiles)}`;
+      // שולחים לשרת מבנה "ריק" של משתנים ישנים כדי שלא יקרוס, ואת הטקסט המלא שלנו
+      const contextData = {
+        activeTab: activeTab,
+        leaderboard: [],
+        todayPredictions: {},
+        data: [],
+        systemInstructions: systemInstructions
+      };
 
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: varQuery, context: { systemInstructions } })
+        body: JSON.stringify({ message: varQuery, context: contextData })
       });
       
       const data = await res.json();
@@ -606,15 +612,35 @@ const mList: any[] = [];
                            <div className="flex flex-col items-center gap-1.5">
                               <span className="text-[9px] text-slate-500 font-bold bg-slate-950 px-1.5 py-0.5 rounded border border-slate-800">{m.stage === "KNOCKOUT" ? m.roundName : `מחזור ${m.matchday}`}</span>
                               <div className="flex items-center gap-1.5">
-                                 <div className="flex flex-col items-center w-8 cursor-help transition-transform hover:scale-110 active:scale-95" title={m.homeTeam}>
-                                 <img src={getFlagUrl(m.homeTeam)} className="w-5 h-4 object-cover rounded-sm mb-1 shadow-sm" alt={m.homeTeam} />
-                                 <span className="text-[9px] font-black text-slate-200 truncate w-full text-center">{m.homeTeam.substring(0,3)}</span>
-                                  </div>
-                                   <span className="text-slate-600 text-xs font-black">-</span>
-                                     <div className="flex flex-col items-center w-8 cursor-help transition-transform hover:scale-110 active:scale-95" title={m.awayTeam}>
-                                     <img src={getFlagUrl(m.awayTeam)} className="w-5 h-4 object-cover rounded-sm mb-1 shadow-sm" alt={m.awayTeam} />
-                                     <span className="text-[9px] font-black text-slate-200 truncate w-full text-center">{m.awayTeam.substring(0,3)}</span>
-                               </div>
+                                 {/* --- קבוצת בית עם טולטיפ מובנה --- */}
+                                 <div className="group relative flex flex-col items-center w-8 cursor-pointer transition-transform hover:scale-110 active:scale-95 select-none">
+                                    {getFlagUrl(m.homeTeam) && <img src={getFlagUrl(m.homeTeam)!} className="w-5 h-4 object-cover rounded-sm mb-1 shadow-sm" alt={m.homeTeam} />}
+                                    <span className="text-[9px] font-black text-slate-200 truncate w-full text-center">{m.homeTeam.substring(0,3)}</span>
+                                    
+                                    {/* הבועה המרחפת */}
+                                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 px-2.5 py-1 bg-slate-800 text-white text-[11px] font-black rounded-lg border border-slate-600 shadow-2xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-[100] pointer-events-none whitespace-nowrap">
+                                      {m.homeTeam}
+                                      {/* חץ משולש קטן בתחתית הבועה */}
+                                      <div className="absolute top-full left-1/2 -translate-x-1/2 border-[4px] border-transparent border-t-slate-600"></div>
+                                      <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-[2px] border-[4px] border-transparent border-t-slate-800"></div>
+                                    </div>
+                                 </div>
+                                 
+                                 <span className="text-slate-600 text-xs font-black">-</span>
+                                 
+                                 {/* --- קבוצת חוץ עם טולטיפ מובנה --- */}
+                                 <div className="group relative flex flex-col items-center w-8 cursor-pointer transition-transform hover:scale-110 active:scale-95 select-none">
+                                    {getFlagUrl(m.awayTeam) && <img src={getFlagUrl(m.awayTeam)!} className="w-5 h-4 object-cover rounded-sm mb-1 shadow-sm" alt={m.awayTeam} />}
+                                    <span className="text-[9px] font-black text-slate-200 truncate w-full text-center">{m.awayTeam.substring(0,3)}</span>
+                                    
+                                    {/* הבועה המרחפת */}
+                                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 px-2.5 py-1 bg-slate-800 text-white text-[11px] font-black rounded-lg border border-slate-600 shadow-2xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-[100] pointer-events-none whitespace-nowrap">
+                                      {m.awayTeam}
+                                      {/* חץ משולש קטן בתחתית הבועה */}
+                                      <div className="absolute top-full left-1/2 -translate-x-1/2 border-[4px] border-transparent border-t-slate-600"></div>
+                                      <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-[2px] border-[4px] border-transparent border-t-slate-800"></div>
+                                    </div>
+                                 </div>
                               </div>
                               {m.isFinished && (
                                 <div className="text-[10px] text-emerald-400 font-black bg-emerald-900/30 px-2 py-0.5 rounded border border-emerald-500/20 mt-1 flex flex-col items-center justify-center gap-0.5 w-full">
