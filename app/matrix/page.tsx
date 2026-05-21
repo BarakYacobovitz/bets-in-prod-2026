@@ -334,6 +334,7 @@ const mList: any[] = [];
     document.body.removeChild(link);
   };
   // --- Function to fetch AI answer using Local Matrix State (Smart Schedule, Bonuses & Qualifiers Analyzer) ---
+  // --- Function to fetch AI answer using Local Matrix State (Smart Firewall & Factual Prompt) ---
   const handleAskVAR = async () => {
     if (!varQuery.trim()) return;
     
@@ -341,102 +342,43 @@ const mList: any[] = [];
     setVarResponse(""); 
     
     try {
-      // 1. טבלת הדירוג המלאה של כל המשתמשים בליגה
       const fullLeaderboard = users.map((u, idx) => ({
-        rank: idx + 1,
-        name: u.name || "שחקן",
-        totalPoints: u.totalPoints || 0
+        rank: idx + 1, name: u.name || "שחקן", totalPoints: u.totalPoints || 0
       }));
 
-      // 2. לוח המשחקים המלא: ה-AI מכיר את כל הלו"ז, אך כל משחק מסומן אם הוא נעול או פתוח
+      // מעבירים ל-VAR את כל הלוח, בלי קשר למה שמפולטר כרגע במסך!
       const allMatchesSchedule = matches.map(m => {
         const isLocked = m.isFinished || checkIsMatchLocked(m, tournamentState);
         return {
-          id: m.id,
-          homeTeam: m.homeTeam,
-          awayTeam: m.awayTeam,
+          id: m.id, homeTeam: m.homeTeam, awayTeam: m.awayTeam,
           stage: m.stage === "KNOCKOUT" ? m.roundName : `מחזור ${m.matchday}`,
-          matchDate: m.matchDate || "טרם נקבע",
-          isLocked: isLocked,
+          matchDate: m.matchDate || "טרם נקבע", isLocked: isLocked,
           realHomeScore: m.isFinished ? m.realHomeScore : null,
           realAwayScore: m.isFinished ? m.realAwayScore : null,
           realQualifier: m.isFinished ? (m.realQualifier || null) : null
         };
       });
 
-      // 3. לוח שאלות הבונוס המלא: ה-AI מכיר את כל השאלות, אך מודע לסטטוס הנעילה שלהן
       const allBonusQuestionsSchedule = bonusQuestions.map(q => {
         const phase = q.phase || "TOURNAMENT";
         let isBonusExposed = (phase === "KNOCKOUT") ? (tournamentState >= 5) : (tournamentState >= 1);
-        
         if (q.isSurprise) {
           const closeTimeMs = parseDateTimeLocal(q.closeTime);
           isBonusExposed = nowMs > closeTimeMs;
         }
-
         return {
-          id: q.id,
-          questionText: q.label || q.questionText,
-          phase: phase,
-          isSurprise: !!q.isSurprise,
-          points: q.points || 0,
-          isLocked: isBonusExposed,
-          realAnswer: isBonusExposed ? (realBonusFull.answers?.[q.id] || null) : null
+          id: q.id, questionText: q.label || q.questionText, phase: phase,
+          isLocked: isBonusExposed, realAnswer: isBonusExposed ? (realBonusFull.answers?.[q.id] || null) : null
         };
       });
 
-      // חומות האש לשליפת ניחושים ותשובות
       const lockedMatchIds = new Set(allMatchesSchedule.filter(m => m.isLocked).map(m => m.id));
       const lockedBonusIds = new Set(allBonusQuestionsSchedule.filter(q => q.isLocked).map(q => q.id));
 
-      // 4. בניית פרופילי הניחושים והמדדים המלאים לכל משתמש
       const exposedUserProfiles: any = {};
-
       users.forEach(u => {
-        // מנוע חישוב חכם לביצועי העולות מהבתים של המשתמש
-        const qualifiersPerformance = { exactHits: 0, partialHits: 0, groups: {} as Record<string, any> };
-        
-        if (tournamentState >= 1 && qualifiersPredictions[u.id]) {
-          const uGroups = qualifiersPredictions[u.id];
-          Object.keys(uGroups).forEach(g => {
-            const pred = uGroups[g];
-            const real = realQualifiers[g];
-            let firstStatus = "unknown";
-            let secondStatus = "unknown";
-            
-            if (real) {
-              if (pred.first) {
-                if (pred.first === real.first) { firstStatus = "exact"; qualifiersPerformance.exactHits++; }
-                else if (pred.first === real.second) { firstStatus = "partial"; qualifiersPerformance.partialHits++; }
-                else firstStatus = "miss";
-              }
-              if (pred.second) {
-                if (pred.second === real.second) { secondStatus = "exact"; qualifiersPerformance.exactHits++; }
-                else if (pred.second === real.first) { secondStatus = "partial"; qualifiersPerformance.partialHits++; }
-                else secondStatus = "miss";
-              }
-            }
-            
-            qualifiersPerformance.groups[g] = {
-              predictedFirst: pred.first || null,
-              predictedSecond: pred.second || null,
-              firstStatus,
-              secondStatus
-            };
-          });
-        }
+        exposedUserProfiles[u.name] = { totalPoints: u.totalPoints || 0, matchPredictions: {}, bonusAnswers: {} };
 
-        // יצירת רשומת המשתמש החשופה עבור ה-AI
-        exposedUserProfiles[u.name] = {
-          currentRank: users.findIndex(user => user.id === u.id) + 1,
-          totalPoints: u.totalPoints || 0,
-          matchPredictions: {},
-          groupQualifiers: tournamentState >= 1 ? qualifiersPerformance : "מוסתר/טרם ננעל",
-          thirdPlaceTeams: tournamentState >= 1 ? (thirdPlacePredictions[u.id]?.teams || []) : [],
-          bonusAnswers: {}
-        };
-
-        // א. הזרקת ניחושי משחקים שננעלו בלבד
         const userPreds = predictions[u.id];
         if (userPreds) {
           allMatchesSchedule.forEach(m => {
@@ -444,15 +386,12 @@ const mList: any[] = [];
               const p = userPreds[m.id];
               if (p && p.predictedHomeScore !== undefined && p.predictedHomeScore !== "") {
                 exposedUserProfiles[u.name].matchPredictions[`${m.homeTeam} נגד ${m.awayTeam}`] = {
-                  prediction: `${p.predictedHomeScore}-${p.predictedAwayScore}`,
-                  qualifierPredicted: p.qualifier || null
+                  prediction: `${p.predictedHomeScore}-${p.predictedAwayScore}`, qualifierPredicted: p.qualifier || null
                 };
               }
             }
           });
         }
-
-        // ב. הזרקת תשובות לשאלות בונוס שננעלו בלבד
         bonusQuestions.forEach(q => {
           if (lockedBonusIds.has(q.id)) {
             const bData = bonusPredictions[u.id];
@@ -463,26 +402,20 @@ const mList: any[] = [];
         });
       });
 
-      // 5. פרומפט ההפעלה וההנחיות ל-AI
-      const systemInstructions = `אתה "פרשן ה-VAR", ה-AI הרשמי והסרקסטי של ליגת הניחושים "Bets in PROD" (מהמרים בייצור).
-התפקיד שלך: לנתח את מצב הליגה, לענות על שאלות, לעקוץ מהמרים על נפילות, ולשמור באדיקות על חוקי חשיפת המידע.
+      // ההוראות המשודרגות של ה-VAR: עובדות תחילה!
+      const systemInstructions = `אתה "פרשן ה-VAR", ה-AI הרשמי של ליגת "Bets in PROD".
 
-חוקי הפעלה והנחיות קריטיות (חומת אש):
-1. לוח המשחקים (allMatchesSchedule) ולוח הבונוסים (allBonusQuestionsSchedule): אתה רואה את כל המשחקים והשאלות שקיימים במערכת. מותר לך לענות על שאלות כלליות לגביהם (למשל: "מתי המשחק של ברזיל" או "אילו שאלות בונוס קיימות בשלב הבתים").
-2. הגנה על ניחושים וספוילרים: רשימת הניחושים והתשובות של המשתמשים (exposedUserProfiles) מכילה אך ורק נתונים עבור משחקים ושאלות בונוס שכבר ננעלו (isLocked: true).
-3. אם משתמש שואל אותך על ניחוש/תשובה של מישהו למשחק או שאלת בונוס שמסומנים כ-isLocked: false, המידע חסוי ואינו נגיש לך! ענה מיד בציניות: "ההימור/השאלה הזו עדיין פתוחה חביבי! הניחושים של כולם חסויים כרגע, אתה לא תוציא ממני ספוילרים ב-PROD!".
-4. ניתוח עולות מהבתים (groupQualifiers): קיבלת אובייקט מפורט לכל משתמש המכיל את כמות הפגיעות המדויקות שלו (exactHits) והפגיעות החלקיות/הצלבות (partialHits). השתמש בזה כדי לנתח ולהבין כמה המשתמש הרוויח או הפסיד משלב העולות!
-5. אם שואלים על שלבים או משחקים שעדיין לא הוקמו בכלל במערכת (ולכן לא מופיעים בלוחות שקיבלת), הסבר בטבעיות: "השלב או המשחק הזה עדיין לא הוקמו בכלל במערכת, תנו לקבוצות לעלות קודם!".
-6. ענה תמיד קצר, קולע, ובעברית זורמת ועוקצנית של חבר'ה שאוהבים כדורגל, בשילוב אימוג'ים מתאימים.
+חוקי ברזל חמורים:
+1. קודם כל עובדות!: התחל כל תשובה במתן המידע היבש והמדויק שהמשתמש ביקש. רק לאחר שסיפקת את העובדות (תוצאה, נתון, או ניחוש), מותר לך להוסיף משפט של פרשנות עוקצנית או דאחקה. אל תבלבל את המשתמש עם סרקזם לפני התשובה האמיתית.
+2. לוח המשחקים (allMatchesSchedule): אתה רואה את כל המשחקים (גם אלו שעוד לא ננעלו). אם מישהו שואל על משחק שקיים במערך (למשל קטאר נגד שוויץ), תגיד לו בדיוק מתי הוא ובאיזה שלב.
+3. ספוילרים: הניחושים של המשתמשים (exposedUserProfiles) כוללים רק משחקים שכבר ננעלו להצבעה (isLocked: true). אם משתמש שואל על ניחוש למשחק שעדיין פתוח, ענה לו שהניחושים חסויים כרגע.
 
-הנתונים שלך לניתוח:
-- טבלת הדירוג: ${JSON.stringify(fullLeaderboard)}
+נתונים למענה:
 - לוח המשחקים המלא: ${JSON.stringify(allMatchesSchedule)}
-- לוח שאלות הבונוס המלא: ${JSON.stringify(allBonusQuestionsSchedule)}
-- פרופילי המשתמשים, הניחושים וביצועי העולות החשופים: ${JSON.stringify(exposedUserProfiles)}
-`;
+- שאלות בונוס: ${JSON.stringify(allBonusQuestionsSchedule)}
+- דירוג השחקנים: ${JSON.stringify(fullLeaderboard)}
+- הניחושים המותרים לחשיפה (לפי משתמש): ${JSON.stringify(exposedUserProfiles)}`;
 
-      // 6. שליחת המידע המרוכז ל-API של הצ'אט
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -490,11 +423,7 @@ const mList: any[] = [];
       });
       
       const data = await res.json();
-      
-      if (!res.ok) {
-         throw new Error(data.error || `Server error: ${res.status}`);
-      }
-
+      if (!res.ok) throw new Error(data.error || `Server error: ${res.status}`);
       setVarResponse(data.reply || "השופטים קיבלו תשובה ריקה מה-AI.");
       
     } catch (error: any) {
@@ -677,19 +606,15 @@ const mList: any[] = [];
                            <div className="flex flex-col items-center gap-1.5">
                               <span className="text-[9px] text-slate-500 font-bold bg-slate-950 px-1.5 py-0.5 rounded border border-slate-800">{m.stage === "KNOCKOUT" ? m.roundName : `מחזור ${m.matchday}`}</span>
                               <div className="flex items-center gap-1.5">
-                                 {/* קבוצת בית עם טולטיפ */}
                                  <div className="flex flex-col items-center w-8 cursor-help transition-transform hover:scale-110 active:scale-95" title={m.homeTeam}>
-                                    <img src={getFlagUrl(m.homeTeam)} className="w-5 h-4 object-cover rounded-sm mb-1 shadow-sm" alt={m.homeTeam} />
-                                    <span className="text-[9px] font-black text-slate-200 truncate w-full text-center">{m.homeTeam.substring(0,3)}</span>
-                                 </div>
-                                 
-                                 <span className="text-slate-600 text-xs font-black">-</span>
-                                 
-                                 {/* קבוצת חוץ עם טולטיפ */}
-                                 <div className="flex flex-col items-center w-8 cursor-help transition-transform hover:scale-110 active:scale-95" title={m.awayTeam}>
-                                    <img src={getFlagUrl(m.awayTeam)} className="w-5 h-4 object-cover rounded-sm mb-1 shadow-sm" alt={m.awayTeam} />
-                                    <span className="text-[9px] font-black text-slate-200 truncate w-full text-center">{m.awayTeam.substring(0,3)}</span>
-                                 </div>
+                                 <img src={getFlagUrl(m.homeTeam)} className="w-5 h-4 object-cover rounded-sm mb-1 shadow-sm" alt={m.homeTeam} />
+                                 <span className="text-[9px] font-black text-slate-200 truncate w-full text-center">{m.homeTeam.substring(0,3)}</span>
+                                  </div>
+                                   <span className="text-slate-600 text-xs font-black">-</span>
+                                     <div className="flex flex-col items-center w-8 cursor-help transition-transform hover:scale-110 active:scale-95" title={m.awayTeam}>
+                                     <img src={getFlagUrl(m.awayTeam)} className="w-5 h-4 object-cover rounded-sm mb-1 shadow-sm" alt={m.awayTeam} />
+                                     <span className="text-[9px] font-black text-slate-200 truncate w-full text-center">{m.awayTeam.substring(0,3)}</span>
+                               </div>
                               </div>
                               {m.isFinished && (
                                 <div className="text-[10px] text-emerald-400 font-black bg-emerald-900/30 px-2 py-0.5 rounded border border-emerald-500/20 mt-1 flex flex-col items-center justify-center gap-0.5 w-full">
