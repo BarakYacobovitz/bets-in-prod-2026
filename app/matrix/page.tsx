@@ -591,8 +591,8 @@ const mList: any[] = [];
                
                <thead>
                   <tr className="bg-slate-950">
-                     <th className="sticky top-0 right-0 z-30 bg-slate-950 border-b-2 border-l border-slate-700 p-4 min-w-[150px] shadow-xl">
-                        <div className="font-black text-slate-300">דירוג \ שחקן</div>
+                     <th className="sticky top-0 right-0 z-40 bg-slate-950 border-b-2 border-l border-slate-700 p-4 min-w-[150px] shadow-xl">
+                              <div className="font-black text-slate-300">דירוג \ שחקן</div>
                      </th>
                      
                      {activeTab === "MATCHES" && filteredMatches.map(m => (
@@ -709,12 +709,13 @@ const mList: any[] = [];
                   {filteredUsers.map((u, idx) => (
                     <tr key={u.id} className="hover:bg-slate-800/50 transition-colors group">
                       
-                      <td className="sticky right-0 z-10 bg-slate-950 group-hover:bg-slate-900 border-b border-l border-slate-700/80 p-3 shadow-xl transition-colors">
-                        <div className="flex items-center justify-between gap-3">
-                          <span className="text-[10px] text-slate-500 font-mono">{idx + 1}.</span>
-                          <span className="font-bold text-white text-xs truncate max-w-[80px]" title={u.name}>{u.name}</span>
-                          <span className="bg-amber-500/10 text-amber-400 text-[10px] px-2 py-0.5 rounded border border-amber-500/20">{u.totalPoints || 0}</span>
-                        </div>
+                      {/* בשורת ה-TD של שם השחקן בתוך ה-tbody */}
+                      <td className="sticky right-0 z-30 bg-slate-950 group-hover:bg-slate-900 border-b border-l border-slate-700/80 p-3 shadow-xl transition-colors">
+                          <div className="flex items-center justify-between gap-3">
+                            <span className="text-[10px] text-slate-500 font-mono">{idx + 1}.</span>
+                            <span className="font-bold text-white text-xs truncate max-w-[80px]" title={u.name}>{u.name}</span>
+                            <span className="bg-amber-500/10 text-amber-400 text-[10px] px-2 py-0.5 rounded border border-amber-500/20">{u.totalPoints || 0}</span>
+                          </div>
                       </td>
 
                       {activeTab === "MATCHES" && filteredMatches.map(m => {
