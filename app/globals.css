@@ -209,4 +209,7 @@ body {
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
   background: #059669;
 }
+.ios-scroll {
+  -webkit-overflow-scrolling: touch;
+}
 

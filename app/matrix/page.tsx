@@ -402,10 +402,11 @@ const mList: any[] = [];
 חוקים נוספים:
 1. איסור חישוב: אל תחשב נקודות! קרא את שדה ה-'points' מה-JSON בלבד.
 2. דאטה בלבד: אם משחק לא מופיע ב-JSON, הוא לא רלוונטי. אל תמציא משחקים.
-3. טבלה מעוצבת: השתמש אך ורק ב-HTML עם Tailwind (<table>, <tr>, <th>, <td>).
-   עבור ה-<table>: "w-full text-right border-collapse my-3 bg-black/60 rounded-xl overflow-hidden text-xs shadow-inner"
-   עבור <thead>: "sticky top-0 bg-slate-800 z-10" 
-   עבור <th>: "text-slate-300 p-2 font-black border-b border-slate-700 text-center"
+3. טבלה מעוצבת ו-Sticky Header (קריטי): 
+   השתמש אך ורק ב-HTML עם Tailwind. 
+   - עבור ה-<table>: "w-full text-right border-collapse my-3 bg-black/60 rounded-xl overflow-hidden text-xs shadow-inner"
+   - עבור ה-<thead>: "sticky top-0 z-20 bg-slate-800" (זה מה שגורם לשמות לא להיעלם!)
+   - עבור ה-<th>: "text-slate-300 p-2 font-black border-b border-slate-700 text-center"
 4. מילון: 'בול' = 15 נק', 'כיוון' = 5 נק', 'נפילה' = 0 נק'.
 5. דיסקליימר: אם המשתמש שאל על "פגיעות", הוסף בתחילת התשובה ב-<small>: "(התשובה כוללת את כל המשחקים שהניבו נקודות, בולים וכיוונים)".
 6.אם יש יותר מ-8 משחקים ברשימה, אל תייצר טבלה אחת ארוכה. פצל את המידע לשתי טבלאות נפרדות לפי קטגוריות: 'משחקי בול (15 נק')' ו-'משחקי כיוון (5 נק')  '. זה עוזר למשתמש לסרוק את הנתונים בלי לאבד את הריכוז."
@@ -886,16 +887,15 @@ const mList: any[] = [];
             </table>
          </div>
       </div>
-      {/* ========================================== */}
+{/* ========================================== */}
 {/* 🚨 מודל פריצת שידור - עמדת VAR אצטדיון 🚨 */}
 {/* ========================================== */}
 {isVarModalOpen && (
   <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/85 p-4 backdrop-blur-md animate-fade-in" dir="rtl">
     
-    {/* המעטפת הראשית - גובה מקסימלי 90% מהמסך */}
     <div className="relative bg-slate-900 border-4 border-gray-800 rounded-2xl w-full max-w-lg flex flex-col max-h-[90vh] shadow-2xl overflow-hidden">
       
-      {/* כפתור ה-X - נשאר למעלה */}
+      {/* כפתור ה-X נשאר קבוע */}
       <button 
         onClick={() => { setIsVarModalOpen(false); setVarQuery(""); setVarResponse(""); }}
         className="absolute top-3 left-3 z-50 w-8 h-8 flex items-center justify-center rounded-full bg-black/50 text-gray-400 hover:text-white transition-colors border border-white/10"
@@ -903,15 +903,13 @@ const mList: any[] = [];
         ✕
       </button>
 
-      {/* 📺 תמונה למעלה (shrink-0 מונע ממנה להשתנות) */}
-      <div className="relative h-[200px] w-full bg-black shrink-0 border-b-4 border-gray-800">
+      {/* תמונה למעלה - קבועה */}
+      <div className="relative h-[150px] w-full bg-black shrink-0 border-b-4 border-gray-800">
         <img src="/var-referee.jpg" alt="VAR" className="w-full h-full object-cover opacity-80" />
-        {/* אפקט סריקה מעל התמונה */}
-        <div className="absolute inset-0 pointer-events-none bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:100%_4px] opacity-70"></div>
       </div>
 
-      {/* 📜 אזור התוכן הגולל ( flex-1 + overflow-y-auto) */}
-      <div className="bg-[#050507] p-6 flex-1 overflow-y-auto custom-scrollbar">
+      {/* כאן נמצא הקסם של האייפון: ios-scroll + custom-scrollbar */}
+      <div className="bg-[#050507] p-4 flex-1 overflow-y-auto custom-scrollbar ios-scroll">
          <div className="text-[10px] font-black text-slate-500 tracking-wider uppercase font-mono mb-3">
             שאילתת שופט: "{varQuery}"
          </div>
@@ -926,7 +924,7 @@ const mList: any[] = [];
          )}
       </div>
 
-      {/* 🔘 כפתור החזרה למטה - תמיד נגיש */}
+      {/* כפתור תחתון */}
       <div className="bg-[#050507] p-4 border-t border-slate-800 shrink-0">
         <button
           onClick={() => { setIsVarModalOpen(false); setVarQuery(""); setVarResponse(""); }}
