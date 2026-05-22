@@ -8,6 +8,8 @@ export async function POST(req: Request) {
     const body = await req.json();
     const { message, context } = body;
 
+    console.log("DEBUG - Received context keys:", Object.keys(context || {}));
+    console.log("DEBUG - Received message:", message);
     // בדיקת הגנה: בוא נראה אם המפתח קיים בכלל בשרת
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
@@ -69,15 +71,20 @@ export async function POST(req: Request) {
     return NextResponse.json({ reply: responseText });
 
   } catch (error: any) {
-    console.error('Error generating bot response:', error);
+    // 1. מדפיסים את השגיאה האמיתית והמלאה ללוגים של השרת (Vercel/Console)
+    // כך רק אתה רואה את המידע הטכני:
+    console.error('🔥 VAR API Critical Error:', error.message || error);
     
-    // זיהוי שגיאת עומס/מכסה מול גוגל - שיהיה מצחיק!
+    // 2. זיהוי שגיאת עומס/מכסה מול גוגל - עדיין שומרים על ההודעה המצחיקה
     if (error.status === 429 || error.message?.includes('429') || error.message?.includes('Quota')) {
       return NextResponse.json({ 
         reply: 'שמע, ה-VAR קורס פה מהעומס! 🥵 שלחת יותר מדי שאלות ברצף. תן לי חצי דקה לנשום ונסה שוב.' 
       });
     }
 
-    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+    // 3. התיקון: מחזירים הודעה ידידותית למשתמש הקצה, בלי להלחיץ
+    return NextResponse.json({ 
+      reply: 'צוות ה-VAR חווה כרגע ניתוק בקשר מול האצטדיון 📺🔌. נסה לשלוח את הבדיקה שוב בעוד מספר רגעים!' 
+    });
   }
 }

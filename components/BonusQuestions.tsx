@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { doc, getDoc, setDoc, collection, getDocs, onSnapshot } from "firebase/firestore";
 import { db } from "../app/firebase";
 import { getFlagUrl } from "../app/utils/flags";
@@ -404,7 +404,52 @@ if (!q.knockoutRound || q.knockoutRound === "" || q.knockoutRound === "ALL" || q
 const regularQuestions = filteredQuestions.filter(q => !q.isDouble && !q.isSurprise);
   const doubleQuestions = filteredQuestions.filter(q => q.isDouble && !q.isSurprise);
   const surpriseQuestions = filteredQuestions.filter(q => q.isSurprise);
+// --- חישוב מדדי התקדמות (Progress Bars) ---
+  const getActiveKnockoutRound = () => {
+    const state = localTournamentState;
+    if (state < 5) return "32 הגדולות";
+    if (state >= 5 && state < 7) return "שמינית גמר";
+    if (state >= 7 && state < 9) return "רבע גמר";
+    if (state >= 9 && state < 11) return "חצי גמר";
+    return "גמר";
+  };
 
+  const activeKnockoutRound = getActiveKnockoutRound();
+
+  const progressStats = useMemo(() => {
+    const stats = {
+      TOURNAMENT: { total: 0, answered: 0 },
+      GROUPS: { total: 0, answered: 0 },
+      KNOCKOUT: { total: 0, answered: 0 }
+    };
+
+    const isAnswered = (qId: string) => !!answers[qId] && String(answers[qId]).trim() !== "";
+
+    questions.forEach(q => {
+      // לא סופרים שאלות הפתעה במד ההתקדמות הרגיל כי הן לא תמיד זמינות
+      if (q.isSurprise) return; 
+
+      const answered = isAnswered(q.id) ? 1 : 0;
+      
+      if (q.phase === "TOURNAMENT") {
+        stats.TOURNAMENT.total++;
+        stats.TOURNAMENT.answered += answered;
+      } else if (q.phase === "GROUPS") {
+        stats.GROUPS.total++;
+        stats.GROUPS.answered += answered;
+      } else if (q.phase === "KNOCKOUT") {
+        const qRound = (!q.knockoutRound || q.knockoutRound === "" || q.knockoutRound === "ALL" || q.knockoutRound.includes("כללי")) ? "ALL" : q.knockoutRound;
+        
+        // הלוגיקה שביקשת: שאלות כלליות + השלב הספציפי שבו אנו נמצאים
+        if (qRound === "ALL" || qRound === activeKnockoutRound) {
+          stats.KNOCKOUT.total++;
+          stats.KNOCKOUT.answered += answered;
+        }
+      }
+    });
+
+    return stats;
+  }, [questions, answers, activeKnockoutRound]);
   // פונקציית עזר שמרנדרת כרטיסיית שאלה בודדת - עברה "דיאטה" קלה כדי לחסוך מקום בגלילה
   const renderQuestionCard = (q: any) => {
     const locked = isQuestionLocked(q);
@@ -732,49 +777,94 @@ const regularQuestions = filteredQuestions.filter(q => !q.isDouble && !q.isSurpr
   return (
     <>
 {/* ========================================== */}
-      {/* 1. טאבים ראשיים - חכמים (עם אייקונים וקטוריים) */}
+      {/* 1. טאבים ראשיים - חכמים (עם מדי התקדמות) */}
       {/* ========================================== */}
       <div className="flex overflow-x-auto custom-scrollbar gap-2 mb-6 pb-2 mt-2 bg-slate-900/50 p-2 rounded-2xl border border-slate-800 max-w-3xl mx-auto md:justify-center">
          
+         {/* ---- טאב: כל הטורניר ---- */}
          <button 
            onClick={() => { setBonusCategory("TOURNAMENT"); setKnockoutRound("ALL"); }} 
-           className={`flex flex-1 items-center justify-center gap-2 min-w-[120px] px-4 py-3 rounded-xl font-black whitespace-nowrap transition-all text-sm ${bonusCategory === "TOURNAMENT" ? "bg-amber-500 text-slate-900 shadow-lg shadow-amber-500/20" : "text-slate-400 hover:bg-slate-800 hover:text-amber-400"}`}
+           className={`flex flex-col flex-1 items-center justify-center gap-2 min-w-[120px] px-2 py-2.5 rounded-xl font-black whitespace-nowrap transition-all text-sm ${bonusCategory === "TOURNAMENT" ? "bg-amber-500 text-slate-900 shadow-lg shadow-amber-500/20" : "bg-slate-950/50 text-slate-400 hover:bg-slate-800 hover:text-amber-400 border border-slate-800"}`}
          >
-           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
-             <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/>
-           </svg>
-           <span>כל הטורניר</span>
-           {tournamentState >= 1 && (
-             <span className="opacity-70 bg-slate-950/20 p-1 rounded-md mr-1 border border-slate-900/10">
-               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-3 h-3"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+           <div className="flex items-center justify-center gap-1.5">
+             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
+               <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/>
+             </svg>
+             <span>כל הטורניר</span>
+             {tournamentState >= 1 && (
+               <span className="opacity-70 bg-slate-950/20 p-1 rounded-md mr-1 border border-slate-900/10">
+                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-3 h-3"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+               </span>
+             )}
+           </div>
+           
+           <div className="w-full max-w-[100px] flex flex-col gap-1 items-center">
+             <div className={`w-full h-1.5 rounded-full overflow-hidden shadow-inner ${bonusCategory === "TOURNAMENT" ? "bg-amber-900/20" : "bg-slate-900"}`}>
+                <div 
+                  className={`h-full transition-all duration-700 ${progressStats.TOURNAMENT.answered === progressStats.TOURNAMENT.total && progressStats.TOURNAMENT.total > 0 ? (bonusCategory === "TOURNAMENT" ? 'bg-slate-900' : 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]') : (bonusCategory === "TOURNAMENT" ? 'bg-slate-800' : 'bg-amber-500')}`}
+                  style={{ width: `${progressStats.TOURNAMENT.total > 0 ? (progressStats.TOURNAMENT.answered / progressStats.TOURNAMENT.total) * 100 : 0}%` }}
+                ></div>
+             </div>
+             <span className={`text-[9px] font-mono tracking-widest ${bonusCategory === "TOURNAMENT" ? "text-slate-800 font-bold" : "text-slate-500"}`}>
+               {progressStats.TOURNAMENT.answered}/{progressStats.TOURNAMENT.total}
              </span>
-           )}
+           </div>
          </button>
 
+         {/* ---- טאב: שלב הבתים ---- */}
          <button 
            onClick={() => { setBonusCategory("GROUPS"); setKnockoutRound("ALL"); }} 
-           className={`flex flex-1 items-center justify-center gap-2 min-w-[120px] px-4 py-3 rounded-xl font-black whitespace-nowrap transition-all text-sm ${bonusCategory === "GROUPS" ? "bg-blue-600 text-white shadow-lg shadow-blue-500/20" : "text-slate-400 hover:bg-slate-800 hover:text-blue-400"}`}
+           className={`flex flex-col flex-1 items-center justify-center gap-2 min-w-[120px] px-2 py-2.5 rounded-xl font-black whitespace-nowrap transition-all text-sm ${bonusCategory === "GROUPS" ? "bg-blue-600 text-white shadow-lg shadow-blue-500/20" : "bg-slate-950/50 text-slate-400 hover:bg-slate-800 hover:text-blue-400 border border-slate-800"}`}
          >
-           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
-             <rect width="7" height="7" x="3" y="3" rx="1"/><rect width="7" height="7" x="14" y="3" rx="1"/><rect width="7" height="7" x="14" y="14" rx="1"/><rect width="7" height="7" x="3" y="14" rx="1"/>
-           </svg>
-           <span>שלב הבתים</span>
-           {tournamentState >= 1 && (
-             <span className="opacity-70 bg-slate-950/20 p-1 rounded-md mr-1 border border-slate-900/10">
-               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-3 h-3"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+           <div className="flex items-center justify-center gap-1.5">
+             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
+               <rect width="7" height="7" x="3" y="3" rx="1"/><rect width="7" height="7" x="14" y="3" rx="1"/><rect width="7" height="7" x="14" y="14" rx="1"/><rect width="7" height="7" x="3" y="14" rx="1"/>
+             </svg>
+             <span>שלב הבתים</span>
+             {tournamentState >= 1 && (
+               <span className="opacity-70 bg-slate-950/20 p-1 rounded-md mr-1 border border-slate-900/10">
+                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-3 h-3"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+               </span>
+             )}
+           </div>
+
+           <div className="w-full max-w-[100px] flex flex-col gap-1 items-center">
+             <div className={`w-full h-1.5 rounded-full overflow-hidden shadow-inner ${bonusCategory === "GROUPS" ? "bg-blue-900/40" : "bg-slate-900"}`}>
+                <div 
+                  className={`h-full transition-all duration-700 ${progressStats.GROUPS.answered === progressStats.GROUPS.total && progressStats.GROUPS.total > 0 ? (bonusCategory === "GROUPS" ? 'bg-white' : 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]') : (bonusCategory === "GROUPS" ? 'bg-blue-200' : 'bg-blue-500')}`}
+                  style={{ width: `${progressStats.GROUPS.total > 0 ? (progressStats.GROUPS.answered / progressStats.GROUPS.total) * 100 : 0}%` }}
+                ></div>
+             </div>
+             <span className={`text-[9px] font-mono tracking-widest ${bonusCategory === "GROUPS" ? "text-blue-100 font-bold" : "text-slate-500"}`}>
+               {progressStats.GROUPS.answered}/{progressStats.GROUPS.total}
              </span>
-           )}
+           </div>
          </button>
 
+         {/* ---- טאב: נוק-אאוט ---- */}
          {tournamentState >= 4 && (
            <button 
              onClick={() => setBonusCategory("KNOCKOUT")} 
-             className={`flex flex-1 items-center justify-center gap-2 min-w-[120px] px-4 py-3 rounded-xl font-black whitespace-nowrap transition-all text-sm ${bonusCategory === "KNOCKOUT" ? "bg-pink-600 text-white shadow-lg shadow-pink-500/20" : "text-slate-400 hover:bg-slate-800 hover:text-pink-400"}`}
+             className={`flex flex-col flex-1 items-center justify-center gap-2 min-w-[120px] px-2 py-2.5 rounded-xl font-black whitespace-nowrap transition-all text-sm ${bonusCategory === "KNOCKOUT" ? "bg-pink-600 text-white shadow-lg shadow-pink-500/20" : "bg-slate-950/50 text-slate-400 hover:bg-slate-800 hover:text-pink-400 border border-slate-800"}`}
            >
-             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
-               <polyline points="14.5 17.5 3 6 3 3 6 3 17.5 14.5"/><line x1="13" x2="19" y1="19" y2="13"/><line x1="16" x2="20" y1="16" y2="20"/><line x1="19" x2="21" y1="21" y2="19"/><polyline points="14.5 6.5 18 3 21 3 21 6 17.5 9.5"/><line x1="5" x2="9" y1="14" y2="18"/><line x1="7" x2="4" y1="17" y2="20"/><line x1="3" x2="5" y1="19" y2="21"/>
-             </svg>
-             <span>נוק-אאוט</span>
+             <div className="flex items-center justify-center gap-1.5">
+               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
+                 <polyline points="14.5 17.5 3 6 3 3 6 3 17.5 14.5"/><line x1="13" x2="19" y1="19" y2="13"/><line x1="16" x2="20" y1="16" y2="20"/><line x1="19" x2="21" y1="21" y2="19"/><polyline points="14.5 6.5 18 3 21 3 21 6 17.5 9.5"/><line x1="5" x2="9" y1="14" y2="18"/><line x1="7" x2="4" y1="17" y2="20"/><line x1="3" x2="5" y1="19" y2="21"/>
+               </svg>
+               <span>נוק-אאוט</span>
+             </div>
+
+             <div className="w-full max-w-[100px] flex flex-col gap-1 items-center">
+               <div className={`w-full h-1.5 rounded-full overflow-hidden shadow-inner ${bonusCategory === "KNOCKOUT" ? "bg-pink-900/40" : "bg-slate-900"}`}>
+                  <div 
+                    className={`h-full transition-all duration-700 ${progressStats.KNOCKOUT.answered === progressStats.KNOCKOUT.total && progressStats.KNOCKOUT.total > 0 ? (bonusCategory === "KNOCKOUT" ? 'bg-white' : 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]') : (bonusCategory === "KNOCKOUT" ? 'bg-pink-200' : 'bg-pink-500')}`}
+                    style={{ width: `${progressStats.KNOCKOUT.total > 0 ? (progressStats.KNOCKOUT.answered / progressStats.KNOCKOUT.total) * 100 : 0}%` }}
+                  ></div>
+               </div>
+               <span className={`text-[9px] font-mono tracking-widest ${bonusCategory === "KNOCKOUT" ? "text-pink-100 font-bold" : "text-slate-500"}`}>
+                 {progressStats.KNOCKOUT.answered}/{progressStats.KNOCKOUT.total}
+               </span>
+             </div>
            </button>
          )}
       </div>
