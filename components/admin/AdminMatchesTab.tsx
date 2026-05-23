@@ -297,7 +297,7 @@ function AdminMatchRow({ match, allMatches, isSaving, justSaved, onSave, onClear
       fetchThirdPlace();
     }
   }, [isEditingDetails, match.roundName]);
-
+  
   useEffect(() => {
     setEditData({
       homeTeam: match.homeTeam || "",
@@ -309,6 +309,23 @@ function AdminMatchRow({ match, allMatches, isSaving, justSaved, onSave, onClear
   }, [match]);
 
   const isKnockout = match.stage === "KNOCKOUT";
+  useEffect(() => {
+    if (isKnockout && homeInput !== "" && awayInput !== "") {
+      const hScore = parseInt(homeInput);
+      const aScore = parseInt(awayInput);
+      
+      if (!isNaN(hScore) && !isNaN(aScore)) {
+         if (hScore > aScore) {
+           setQualifierInput(match.homeTeam);
+         } else if (aScore > hScore) {
+           setQualifierInput(match.awayTeam);
+         } else {
+           // במקרה של תיקו (הארכה/פנדלים), מאפסים כדי להכריח אותך ללחוץ ידנית מי עלתה
+           setQualifierInput(""); 
+         }
+      }
+    }
+  }, [homeInput, awayInput, isKnockout, match.homeTeam, match.awayTeam]);
 
   // תוספת 1: פונקציה לייצור הרשימה הנפתחת מהשלב הקודם
   const getRelevantTeams = () => {

@@ -126,6 +126,17 @@ export default function AdminMagazineTab() {
     <div className="animate-fade-in-up grid grid-cols-1 xl:grid-cols-2 gap-8 p-4">
       <div className="bg-slate-900 p-6 rounded-3xl border border-slate-800 shadow-xl flex flex-col h-full">
          <h3 className="text-xl font-black text-white mb-6">✍️ עורך הטור היומי</h3>
+         <div className="flex flex-col mb-6">
+  <label className="block text-slate-400 text-sm font-bold mb-2">🖼️ תמונה/וידאו ראשית (לינק)</label>
+  <input 
+    type="text" 
+    value={dashMediaUrl} 
+    onChange={(e) => setDashMediaUrl(e.target.value)}
+    placeholder="הכנס לינק... (השאר ריק כדי להעלים את האיש המתרגש לנצח)" 
+    className="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-slate-200 text-sm outline-none focus:border-blue-500 transition-colors" 
+    dir="ltr" 
+  />
+</div>
          <div className="space-y-6 flex-1 flex flex-col">
            <div className="flex flex-col">
              <label className="block text-slate-400 text-sm font-bold mb-2">📝 תקציר / כותרת משנה</label>

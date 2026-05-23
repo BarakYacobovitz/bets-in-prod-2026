@@ -18,7 +18,7 @@ const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 
 export const db = getFirestore(app);
 export const auth = getAuth(app);
-
+console.log("🔥 Firebase Initialized for Project:", firebaseConfig.projectId);
 // ייצוא בטוח של שירות ההודעות (רץ רק בדפדפן הלקוח ולא בשרת SSR)
 export const messaging = async () => {
   if (typeof window !== "undefined") {
