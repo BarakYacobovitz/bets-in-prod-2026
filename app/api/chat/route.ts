@@ -1,15 +1,15 @@
 import { NextResponse } from 'next/server';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '', {
+    baseUrl: "https://generativelanguage.googleapis.com/v1" 
+});
 
 export async function POST(req: Request) {
   try {
     const body = await req.json();
     const { message, context } = body;
 
-    console.log("DEBUG - Received context keys:", Object.keys(context || {}));
-    console.log("DEBUG - Received message:", message);
     // בדיקת הגנה: בוא נראה אם המפתח קיים בכלל בשרת
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
@@ -24,7 +24,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Missing message or context' }, { status: 400 });
     }
 
-    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+    const model = genAI.getGenerativeModel({ model: "gemini-3.1-flash-lite" });
     let prompt = "";
 
     // ==========================================

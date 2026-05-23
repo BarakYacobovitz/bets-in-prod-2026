@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState, useMemo } from "react";
 import { collection, getDocs, getDoc, doc } from "firebase/firestore";
-import { db } from "../firebase";
+import { auth, db } from "../firebase";
 import Link from "next/link";
 import { getFlagUrl } from "../utils/flags";
 import toast from "react-hot-toast";
@@ -341,6 +341,9 @@ const mList: any[] = [];
     setVarResponse(""); 
     
     try {
+      const currentUserId = auth?.currentUser?.uid;
+      const currentUserObj = users.find(u => u.id === currentUserId);
+      const actualUserName = currentUserObj?.name || "שחקן אורח";
       const fullLeaderboard = users.map((u, idx) => ({
         rank: idx + 1, name: u.name || "שחקן", totalPoints: u.totalPoints || 0
       }));
@@ -395,7 +398,7 @@ const mList: any[] = [];
       const systemInstructions = `אתה "פרשן ה-VAR". 
 חוקים קריטיים:
 חוקי זהות וזיהוי משתמש:
-1. אם המשתמש שואל על "אני", "עליי", "מה איתי", "הניחושים שלי" - התייחס אך ורק למשתמש "${currentUserName}".
+1. המשתמש שפונה אליך כרגע הוא "${actualUserName}". אם הוא שואל "מה מצבי?", "הניחושים שלי", "איך הייתי" - סרוק את ה-JSON והצג אך ורק את הנתונים של ${actualUserName}!
 2. אם המשתמש שואל על שם ספציפי (למשל "מה עם ברק?"), חפש אותו ב-JSON שקיבלת וענה עליו.
 3. אם השאלה כללית (למשל "מי מוביל בטבלה?", "מה התוצאות של אתמול?"), ענה תשובה כללית.
 4. אם המשתמש שואל על מישהו שלא קיים ב-JSON, תגיד בעדינות שאין לך נתונים עליו.
