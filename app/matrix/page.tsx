@@ -586,17 +586,17 @@ const mList: any[] = [];
         </button>
       </div>
 <div className="max-w-[98vw] mx-auto bg-slate-900/80 rounded-2xl border border-slate-700 shadow-2xl overflow-hidden">
-         <div className="overflow-auto max-h-[65vh] w-full custom-scrollbar">
+         <div className="overflow-auto max-h-[65vh] w-full custom-scrollbar snap-x snap-mandatory" style={{ WebkitOverflowScrolling: 'touch' }}>
             <table className="w-max min-w-full text-center border-collapse text-sm">
                
                <thead>
                   <tr className="bg-slate-950">
-                     <th className="sticky top-0 right-0 z-40 bg-slate-950 border-b-2 border-l border-slate-700 p-4 min-w-[150px] shadow-xl">
+                     <th className="sticky top-0 right-0 z-40 bg-slate-950 border-b-2 border-l border-slate-700 p-4 min-w-[150px] shadow-xl isolate will-change-transform">
                               <div className="font-black text-slate-300">דירוג \ שחקן</div>
                      </th>
                      
                      {activeTab === "MATCHES" && filteredMatches.map(m => (
-                        <th key={m.id} className="sticky top-0 z-20 bg-slate-900 border-b-2 border-l border-slate-700/50 p-2 min-w-[110px]">
+                        <th key={m.id} className="sticky top-0 z-20 bg-slate-900 border-b-2 border-l border-slate-700/50 p-2 min-w-[110px] snap-start">
                            <div className="flex flex-col items-center gap-1.5">
                               <span className="text-[9px] text-slate-500 font-bold bg-slate-950 px-1.5 py-0.5 rounded border border-slate-800">{m.stage === "KNOCKOUT" ? m.roundName : `מחזור ${m.matchday}`}</span>
                               <div className="flex items-center gap-1.5">
@@ -710,7 +710,7 @@ const mList: any[] = [];
                     <tr key={u.id} className="hover:bg-slate-800/50 transition-colors group">
                       
                       {/* בשורת ה-TD של שם השחקן בתוך ה-tbody */}
-                      <td className="sticky right-0 z-30 bg-slate-950 group-hover:bg-slate-900 border-b border-l border-slate-700/80 p-3 shadow-xl transition-colors">
+                      <td className="sticky right-0 z-30 bg-slate-950 group-hover:bg-slate-900 border-b border-l border-slate-700/80 p-3 shadow-xl transition-colors isolate will-change-transform">
                           <div className="flex items-center justify-between gap-3">
                             <span className="text-[10px] text-slate-500 font-mono">{idx + 1}.</span>
                             <span className="font-bold text-white text-xs truncate max-w-[80px]" title={u.name}>{u.name}</span>
@@ -724,7 +724,7 @@ const mList: any[] = [];
                         
                         const isMatchExposed = tournamentState > 0 && (m.isFinished || checkIsMatchLocked(m, tournamentState));
                         
-                        let tdClass = "border-b border-l border-slate-800/50 p-2 text-sm font-mono tracking-widest text-center transition-colors ";
+                        let tdClass = "border-b border-l border-slate-800/50 p-2 text-sm font-mono tracking-widest text-center transition-colors snap-start ";
                         
                         if (!isMatchExposed) return <td key={m.id} className={tdClass}><span className="text-slate-600 text-xs">🔒</span></td>;
                         if (!p || p.predictedHomeScore === undefined || p.predictedHomeScore === "") return <td key={m.id} className={tdClass}><span className="text-rose-500/40 text-xs">--</span></td>;
@@ -857,7 +857,7 @@ const mList: any[] = [];
                         const isLead = leaders.some((t:any) => String(t).trim().toLowerCase() === answerText.trim().toLowerCase());
                         const isMiss = losers.some((t:any) => String(t).trim().toLowerCase() === answerText.trim().toLowerCase()) || (isLocked && !isHit);
 
-                        let tdClass = "border-b border-l border-slate-800/50 p-2 text-[11px] font-bold text-center transition-colors ";
+                        let tdClass = "border-b border-l border-slate-800/50 p-2 text-[11px] font-bold text-center transition-colors snap-start";
                         
                         if (!isExposed) return <td key={q.id} className={tdClass}><span className="text-slate-600 text-[10px]">🔒 מוסתר</span></td>;
                         if (answerText === "--") return <td key={q.id} className={tdClass}><span className="text-rose-500/40">--</span></td>;
