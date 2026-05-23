@@ -11,16 +11,54 @@ export default function GroupsView({ matches, groups, userId, tournamentState }:
   const groupNames = Object.keys(groups).sort();
   
   // פונקציה חכמה שבודקת אם המשתמש נשלח לבית ספציפי מהדשבורד
-  const getInitialGroup = () => {
-    if (typeof window !== "undefined") {
-      const targetGroup = sessionStorage.getItem("targetGroup");
-      if (targetGroup && groupNames.includes(targetGroup)) return targetGroup;
-    }
-    return groupNames[0] || "A";
-  };
+  // 1. פונקציית אתחול חכמה לבית - יודעת לחלץ את הבית גם מתוך מזהה משחק!
+const getInitialGroup = () => {
+  if (typeof window !== "undefined") {
+    const targetGroup = sessionStorage.getItem("targetGroup");
+    if (targetGroup && groupNames.includes(targetGroup)) return targetGroup;
 
-  const [activeGroup, setActiveGroup] = useState(getInitialGroup());
-  const [viewMode, setViewMode] = useState<"MATCHES" | "QUALIFIERS">("MATCHES");
+    // הגנה: אם לחצו על משחק מהפיד, נמצא באיזה בית הוא נמצא לפי רשימת המשחקים שקיבלנו ב-props
+    const scrollToMatchId = sessionStorage.getItem("scrollToMatch");
+    if (scrollToMatchId && matches) {
+      const targetMatch = matches.find((m: any) => m.id === scrollToMatchId);
+      if (targetMatch && targetMatch.group && groupNames.includes(targetMatch.group)) {
+        return targetMatch.group;
+      }
+    }
+  }
+  return groupNames[0] || "A";
+};
+
+// 2. פונקציית אתחול חכמה למצב התצוגה (משחקים או מעפילות)
+const getInitialViewMode = () => {
+  if (typeof window !== "undefined") {
+    const savedMode = sessionStorage.getItem("groupsViewMode");
+    if (savedMode === "MATCHES" || savedMode === "QUALIFIERS") return savedMode;
+  }
+  return "MATCHES";
+};
+
+// עדכון ה-States שישתמשו בפונקציות החדשות:
+const [activeGroup, setActiveGroup] = useState(getInitialGroup());
+const [viewMode, setViewMode] = useState<"MATCHES" | "QUALIFIERS">(getInitialViewMode());
+useEffect(() => {
+  const matchId = sessionStorage.getItem("scrollToMatch");
+  if (matchId) {
+    // נותנים ל-DOM חלקיק שנייה להתרנדר עם הבית החדש
+    setTimeout(() => {
+      const element = document.getElementById(`match-${matchId}`);
+      if (element) {
+        element.scrollIntoView({ behavior: "smooth", block: "center" });
+        
+        // מנקים את הסשן כדי שבמעברים הבאים הדף לא יקפוץ סתם
+        sessionStorage.removeItem("scrollToMatch");
+        sessionStorage.removeItem("targetMatchday");
+        sessionStorage.removeItem("targetGroup");
+        sessionStorage.removeItem("groupsViewMode");
+      }
+    }, 350);
+  }
+}, [activeGroup, viewMode]);
   // הוסף את השורות האלו כאן:
   const [localTournamentState, setLocalTournamentState] = useState(tournamentState);
 
@@ -357,7 +395,7 @@ export default function GroupsView({ matches, groups, userId, tournamentState }:
             <div 
                key={match.id} 
                 id={dayIndex === 1 && index === 0 ? "first-match-card" : undefined}
-               className="w-full"
+               className="scroll-mt-24"
               >
               <MatchCard match={match} userId={userId} tournamentState={tournamentState} />
          </div>
