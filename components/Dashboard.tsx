@@ -586,9 +586,19 @@ export default function Dashboard({ userId, userName, setActiveTab, setPredictio
             const rH = Number(match.realHomeScore); const rA = Number(match.realAwayScore);
             if(!isNaN(pH) && !isNaN(pA) && !isNaN(rH) && !isNaN(rA)) {
               if(Math.sign(pH-pA) === Math.sign(rH-rA)) {
-                const exact = (pH===rH && pA===rA);
-                feed.push({ id: `gm_${match.id}`, matchId: match.id, matchday: match.matchday, icon: exact ? '🎯' : '✅', title: `${match.homeTeam} נגד ${match.awayTeam}`, desc: exact ? `פגיעה בול! (${pH}-${pA})` : `כיוון נכון`, points: exact ? 15 : 5, ts: parseDate(match.matchDate) });
-              }
+                  const exact = (pH===rH && pA===rA);
+                  feed.push({ 
+                    id: `gm_${match.id}`, 
+                    matchId: match.id, 
+                    matchday: match.matchday, 
+                    group: match.group, // ◄◄ הוסף את השורה הזו כדי שהפיד יכיר את הבית של המשחק
+                    icon: exact ? '🎯' : '✅', 
+                    title: `${match.homeTeam} נגד ${match.awayTeam}`, 
+                    desc: exact ? `פגיעה בול! (${pH}-${pA})` : `כיוון נכון`, 
+                    points: exact ? 15 : 5, 
+                    ts: parseDate(match.matchDate) 
+                  });
+                }
             }
           }
         });
@@ -1614,10 +1624,15 @@ const renderedMagazineContent = useMemo(() => {
                <div className="overflow-y-auto custom-scrollbar flex-1 p-4 md:p-6 space-y-3 bg-slate-900/30">
                   {isFeedLoading ? <div className="text-center py-12 text-slate-500 animate-pulse font-bold text-sm">שולף קבלות...</div> : displayFeed.length === 0 ? <div className="flex flex-col items-center justify-center py-16 opacity-50 h-full"><span className="text-4xl mb-3">🕸️</span><span className="text-slate-400 text-sm font-bold">הקופה ריקה בינתיים.</span></div> : (!showFullHistory && ptsDiff <= 0) ? <div className="flex flex-col items-center justify-center py-16 text-center px-4 h-full"><span className="text-5xl mb-4 opacity-80">📭</span><span className="text-slate-300 font-bold text-lg mb-2">לא נרשמו הכנסות חדשות</span><p className="text-slate-500 text-sm mb-4 leading-relaxed">אל תדאג, המשחקים הבאים מעבר לפינה.</p><button onClick={() => setShowFullHistory(true)} className="text-blue-400 text-sm font-bold underline hover:text-blue-300">הצג את כל הקבלות שאספתי</button></div> : displayFeed.map((item, idx) => {
                     const handleFeedClick = () => {
-                      if (item.id.startsWith("gm_")) { 
-                         sessionStorage.setItem("targetMatchday", item.matchday || "1");
-                         sessionStorage.setItem("scrollToMatch", item.matchId);
-                         setActiveTab("PREDICTIONS"); if(setPredictionTab) setPredictionTab("MATCHES");
+                     if (item.id.startsWith("gm_")) { 
+                        sessionStorage.setItem("targetMatchday", item.matchday || "1");
+                        sessionStorage.setItem("scrollToMatch", item.matchId);
+                        if (item.group) {
+                            sessionStorage.setItem("targetGroup", item.group); // ◄◄ מעדכן את הבית הנכון
+                        }
+                        sessionStorage.setItem("groupsViewMode", "MATCHES"); // ◄◄ מוודא שמציג משחקים ולא מעפילות
+                        setActiveTab("PREDICTIONS"); 
+                        if(setPredictionTab) setPredictionTab("MATCHES");
                       }
                       else if (item.id.startsWith("ko_") || item.id.startsWith("qko_")) { 
                          sessionStorage.setItem("scrollToMatch", item.matchId);

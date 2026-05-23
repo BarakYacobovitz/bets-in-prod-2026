@@ -12,22 +12,26 @@ export default function GroupsView({ matches, groups, userId, tournamentState }:
   
   // פונקציה חכמה שבודקת אם המשתמש נשלח לבית ספציפי מהדשבורד
   // 1. פונקציית אתחול חכמה לבית - יודעת לחלץ את הבית גם מתוך מזהה משחק!
-const getInitialGroup = () => {
-  if (typeof window !== "undefined") {
-    const targetGroup = sessionStorage.getItem("targetGroup");
-    if (targetGroup && groupNames.includes(targetGroup)) return targetGroup;
-
-    // הגנה: אם לחצו על משחק מהפיד, נמצא באיזה בית הוא נמצא לפי רשימת המשחקים שקיבלנו ב-props
-    const scrollToMatchId = sessionStorage.getItem("scrollToMatch");
-    if (scrollToMatchId && matches) {
-      const targetMatch = matches.find((m: any) => m.id === scrollToMatchId);
-      if (targetMatch && targetMatch.group && groupNames.includes(targetMatch.group)) {
-        return targetMatch.group;
+// פונקציה חכמה שבודקת אם המשתמש נשלח לבית ספציפי מהדשבורד
+  const getInitialGroup = () => {
+    if (typeof window !== "undefined") {
+      // 1. עדיפות ראשונה: אם הגענו מפיד מעפילות או פיד משחקים מעודכן
+      const targetGroup = sessionStorage.getItem("targetGroup");
+      const scrollToMatchId = sessionStorage.getItem("scrollToMatch");
+      
+      // הגנה: אם לחצנו על משחק בפיד, נוודא שהבית שלו תואם למה שיש במשחק בפועל (עוקף זיכרון מלוכלך)
+      if (scrollToMatchId && matches) {
+        const targetMatch = matches.find((m: any) => m.id === scrollToMatchId);
+        if (targetMatch && targetMatch.group && groupNames.includes(targetMatch.group)) {
+          return targetMatch.group;
+        }
       }
+
+      if (targetGroup && groupNames.includes(targetGroup)) return targetGroup;
     }
-  }
-  return groupNames[0] || "A";
-};
+    return groupNames[0] || "A";
+  };
+  
 
 // 2. פונקציית אתחול חכמה למצב התצוגה (משחקים או מעפילות)
 const getInitialViewMode = () => {
@@ -56,7 +60,7 @@ useEffect(() => {
         sessionStorage.removeItem("targetGroup");
         sessionStorage.removeItem("groupsViewMode");
       }
-    }, 350);
+    }, 400);
   }
 }, [activeGroup, viewMode]);
   // הוסף את השורות האלו כאן:
