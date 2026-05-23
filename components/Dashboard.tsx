@@ -1623,11 +1623,21 @@ const renderedMagazineContent = useMemo(() => {
                          sessionStorage.setItem("scrollToMatch", item.matchId);
                          setActiveTab("PREDICTIONS"); if(setPredictionTab) setPredictionTab("KNOCKOUT");
                       }
-                      else if (item.id.startsWith("q1_") || item.id.startsWith("q2_")) { 
-                         setActiveTab("PREDICTIONS"); if(setPredictionTab) setPredictionTab("QUALIFIERS");
+                      else if (item.id.startsWith("q1") || item.id.startsWith("q2")) { 
+                      // חותך את האות של הבית מה-ID (למשל מ-"q1_A" או "q1s_B")
+                        const groupLetter = item.id.split("_")[1]; 
+   
+                        sessionStorage.setItem("groupsViewMode", "QUALIFIERS");
+                        sessionStorage.setItem("targetGroup", groupLetter);
+   
+                         setActiveTab("PREDICTIONS"); 
+                         if(setPredictionTab) setPredictionTab("MATCHES"); 
+                          window.scrollTo({top:0, behavior:'smooth'});
                       }
                       else if (item.id.startsWith("t3_")) { 
-                         setActiveTab("PREDICTIONS"); if(setPredictionTab) setPredictionTab("THIRD_PLACE");
+                          setActiveTab("PREDICTIONS"); 
+                          if(setPredictionTab) setPredictionTab("THIRD_PLACE");
+                          window.scrollTo({top:0, behavior:'smooth'});
                       }
                       else if (item.id.startsWith("b_")) { 
                          sessionStorage.setItem("scrollToBonus", item.qId);

@@ -315,22 +315,23 @@ const getPrizeForRank = (rank: number, board: string, allUsers: any[]) => {
           בטוח שברצונך לעזוב את הליגה '{leagueName}'?
         </span>
         <div className="flex gap-2">
-          <button 
-            onClick={async () => {
-              toast.dismiss(t.id);
-              try {
-                await updateDoc(doc(db, "mini_leagues", leagueId), { members: arrayRemove(currentUserId) });
-                toast.success("עזבת את הליגה.");
-                setSelectedLeagueId(null);
-                setActiveBoard("GENERAL");
-              } catch (e) {
-                toast.error("שגיאה בביצוע הפעולה.");
-              }
-            }} 
-            className="bg-rose-600 hover:bg-rose-700 text-white px-3 py-1.5 rounded-lg text-xs font-black transition-all active:scale-95"
-          >
-            כן, עזוב
-          </button>
+ <button 
+  onClick={async () => {
+    toast.dismiss(t.id); // קודם כל מעלימים את שאלת האישור
+    try {
+      await updateDoc(doc(db, "mini_leagues", leagueId), { members: arrayRemove(currentUserId) });
+      setSelectedLeagueId(null);
+      setActiveBoard("GENERAL");
+      // נותנים ל-UI שנייה לנשום לפני שמקפיצים את ההצלחה
+      setTimeout(() => toast.success("עזבת את הליגה."), 100); 
+    } catch (e) {
+      setTimeout(() => toast.error("שגיאה בביצוע הפעולה."), 100);
+    }
+  }} 
+  className="bg-rose-600 hover:bg-rose-700 text-white px-3 py-1.5 rounded-lg text-xs font-black transition-all active:scale-95"
+>
+  כן, עזוב
+</button>
           <button 
             onClick={() => toast.dismiss(t.id)} 
             className="bg-slate-200 hover:bg-slate-300 text-slate-800 px-3 py-1.5 rounded-lg text-xs font-bold transition-all"
