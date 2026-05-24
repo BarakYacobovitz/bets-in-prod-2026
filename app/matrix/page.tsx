@@ -712,13 +712,18 @@ const mList: any[] = [];
                     <tr key={u.id} className="hover:bg-slate-800/50 transition-colors group">
                       
                       {/* בשורת ה-TD של שם השחקן בתוך ה-tbody */}
-                      <td className="sticky right-0 z-30 bg-slate-950 group-hover:bg-slate-900 bg-clip-padding border-b border-l border-slate-700/80 p-3 shadow-xl transition-colors [-webkit-transform:translateZ(0)]">                          <div className="flex items-center justify-between gap-3">
-                            <span className="text-[10px] text-slate-500 font-mono">{idx + 1}.</span>
-                            <span className="font-bold text-white text-xs truncate max-w-[80px]" title={u.name}>{u.name}</span>
-                            <span className="bg-amber-500/10 text-amber-400 text-[10px] px-2 py-0.5 rounded border border-amber-500/20">{u.totalPoints || 0}</span>
-                          </div>
-                      </td>
-
+                      <td className="sticky right-0 z-30 bg-slate-950 group-hover:bg-slate-900 bg-clip-padding border-b border-l border-slate-700/80 p-3 shadow-xl transition-colors [transform:translateZ(0)] [backface-visibility:hidden]">
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="text-[10px] text-slate-500 font-mono">{idx + 1}.</span>
+                        {/* הוספתי display: block או inline-block כדי למנוע ממנו להתכווץ */}
+                        <span className="font-bold text-white text-xs truncate max-w-[80px] inline-block" title={u.name}>
+                          {u.name}
+                        </span>
+                        <span className="bg-amber-500/10 text-amber-400 text-[10px] px-2 py-0.5 rounded border border-amber-500/20">
+                          {u.totalPoints || 0}
+                        </span>
+                      </div>
+                    </td>
                       {activeTab === "MATCHES" && filteredMatches.map(m => {
                         const uData = predictions[u.id];
                         const p = uData ? uData[m.id] : null;
