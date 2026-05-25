@@ -592,16 +592,14 @@ const mList: any[] = [];
 <div className="max-w-[98vw] mx-auto bg-slate-900/80 rounded-2xl border border-slate-700 shadow-2xl">
   
   {/* 2. הסרנו את התכונה הישנה של WebkitOverflowScrolling והוספנו relative */}
-  <div className="overflow-auto max-h-[65vh] w-full custom-scrollbar relative [-webkit-transform:translate3d(0,0,0)] [perspective:1000px]">
+  <div className="overflow-auto max-h-[65vh] w-full custom-scrollbar bg-slate-900 rounded-b-2xl">
     
     {/* 3. שינינו ל-border-separate יחד עם border-spacing-0 במקום collapse */}
-    <table className="w-max min-w-full text-center border-separate border-spacing-0 text-sm">
+          <table className="w-max min-w-full text-center border-separate border-spacing-0 text-sm">
                <thead>
                   <tr className="bg-slate-950">
-                    <th className="sticky top-0 right-0 z-50 p-0 border-b-2 border-l border-slate-700 bg-slate-950">
-                        <div className="bg-slate-950 p-4 min-w-[150px] w-full h-full shadow-xl [-webkit-transform:translate3d(0,0,0)] flex items-center justify-center">
-                            <span className="font-black text-slate-300">דירוג \ שחקן</span>
-                        </div>
+                    <th className="sticky top-0 right-0 z-[60] bg-slate-950 bg-clip-padding border-b-2 border-l border-slate-700 p-4 min-w-[150px] shadow-xl m-0">
+                      <div className="font-black text-slate-300">דירוג \ שחקן</div>
                     </th>
                      
                      {activeTab === "MATCHES" && filteredMatches.map(m => (
@@ -719,19 +717,18 @@ const mList: any[] = [];
                     <tr key={u.id} className="hover:bg-slate-800/50 transition-colors group">
                       
                       {/* בשורת ה-TD של שם השחקן - ביטלנו פדינג והעברנו ל-div פנימי */}
-                    <td className="sticky right-0 z-40 p-0 border-b border-l border-slate-700/80 bg-slate-950 transition-colors group-hover:bg-slate-900 outline-none">
-                      <div className="w-full h-full min-h-[48px] p-3 shadow-xl [-webkit-transform:translate3d(0,0,0)] flex items-center justify-between gap-3">
-                        <span className="text-[10px] text-slate-500 font-mono shrink-0">{idx + 1}.</span>
-                        
-                        {/* 👈 התיקון הקריטי: הורדנו truncate. אנחנו חותכים את הטקסט בעצמנו (עד 12 תווים) ומאפשרים overflow-visible */}
-                        <span className="font-bold text-white text-xs whitespace-nowrap overflow-visible flex-1 text-right ml-2" title={u.name}>
-                          {u.name ? (u.name.length > 12 ? u.name.substring(0, 12) + '...' : u.name) : "שחקן אורח"}
-                        </span>
-                        
-                        <span className="bg-amber-500/10 text-amber-400 text-[10px] px-2 py-0.5 rounded border border-amber-500/20 shrink-0">
-                          {u.totalPoints || 0}
-                        </span>
-                      </div>
+                    <td className="sticky right-0 z-50 bg-slate-950 group-hover:bg-slate-900 bg-clip-padding border-b border-l border-slate-700/80 p-0 m-0 outline-none transition-colors">
+                          <div className="w-full h-full min-h-[48px] p-3 flex items-center justify-between gap-2">
+                            <span className="text-[10px] text-slate-500 font-mono shrink-0">{idx + 1}.</span>
+                            
+                            <span className="font-bold text-white text-xs whitespace-nowrap flex-1 text-right ml-2" title={u.name}>
+                              {u.name ? (u.name.length > 12 ? u.name.substring(0, 12) + '...' : u.name) : "שחקן אורח"}
+                            </span>
+                            
+                            <span className="bg-amber-500/10 text-amber-400 text-[10px] px-2 py-0.5 rounded border border-amber-500/20 shrink-0">
+                              {u.totalPoints || 0}
+                            </span>
+                          </div>
                     </td>
                       {activeTab === "MATCHES" && filteredMatches.map(m => {
                         const uData = predictions[u.id];
