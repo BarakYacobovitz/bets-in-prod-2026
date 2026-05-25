@@ -588,14 +588,21 @@ const mList: any[] = [];
           🚨 שלח לבדיקה
         </button>
       </div>
-<div className="max-w-[98vw] mx-auto bg-slate-900/80 rounded-2xl border border-slate-700 shadow-2xl overflow-hidden">
-         <div className="overflow-auto max-h-[65vh] w-full custom-scrollbar" style={{ WebkitOverflowScrolling: 'touch' }}>
-            <table className="w-max min-w-full text-center border-collapse text-sm">
-               
+{/* 1. הסרנו את ה-overflow-hidden מהעוטף החיצוני */}
+<div className="max-w-[98vw] mx-auto bg-slate-900/80 rounded-2xl border border-slate-700 shadow-2xl">
+  
+  {/* 2. הסרנו את התכונה הישנה של WebkitOverflowScrolling והוספנו relative */}
+  <div className="overflow-auto max-h-[65vh] w-full custom-scrollbar relative [-webkit-transform:translate3d(0,0,0)] [perspective:1000px]">
+    
+    {/* 3. שינינו ל-border-separate יחד עם border-spacing-0 במקום collapse */}
+    <table className="w-max min-w-full text-center border-separate border-spacing-0 text-sm">
                <thead>
                   <tr className="bg-slate-950">
-                    <th className="sticky top-0 right-0 z-40 bg-slate-950 bg-clip-padding border-b-2 border-l border-slate-700 p-4 min-w-[150px] shadow-xl [-webkit-transform:translateZ(0)]">                              <div className="font-black text-slate-300">דירוג \ שחקן</div>
-                     </th>
+                    <th className="sticky top-0 right-0 z-50 p-0 border-b-2 border-l border-slate-700 bg-slate-950">
+                        <div className="bg-slate-950 p-4 min-w-[150px] w-full h-full shadow-xl [-webkit-transform:translate3d(0,0,0)] flex items-center justify-center">
+                            <span className="font-black text-slate-300">דירוג \ שחקן</span>
+                        </div>
+                    </th>
                      
                      {activeTab === "MATCHES" && filteredMatches.map(m => (
                         <th key={m.id} className="sticky top-0 z-20 bg-slate-900 border-b-2 border-l border-slate-700/50 p-2 min-w-[110px]">
@@ -711,15 +718,17 @@ const mList: any[] = [];
                   {filteredUsers.map((u, idx) => (
                     <tr key={u.id} className="hover:bg-slate-800/50 transition-colors group">
                       
-                      {/* בשורת ה-TD של שם השחקן בתוך ה-tbody */}
-                      <td className="sticky right-0 z-30 bg-slate-950 group-hover:bg-slate-900 bg-clip-padding border-b border-l border-slate-700/80 p-3 shadow-xl transition-colors [transform:translateZ(0)] [backface-visibility:hidden]">
-                      <div className="flex items-center justify-between gap-3">
-                        <span className="text-[10px] text-slate-500 font-mono">{idx + 1}.</span>
-                        {/* הוספתי display: block או inline-block כדי למנוע ממנו להתכווץ */}
-                        <span className="font-bold text-white text-xs truncate max-w-[80px] inline-block" title={u.name}>
-                          {u.name}
+                      {/* בשורת ה-TD של שם השחקן - ביטלנו פדינג והעברנו ל-div פנימי */}
+                    <td className="sticky right-0 z-40 p-0 border-b border-l border-slate-700/80 bg-slate-950 transition-colors group-hover:bg-slate-900 outline-none">
+                      <div className="w-full h-full min-h-[48px] p-3 shadow-xl [-webkit-transform:translate3d(0,0,0)] flex items-center justify-between gap-3">
+                        <span className="text-[10px] text-slate-500 font-mono shrink-0">{idx + 1}.</span>
+                        
+                        {/* 👈 התיקון הקריטי: הורדנו truncate. אנחנו חותכים את הטקסט בעצמנו (עד 12 תווים) ומאפשרים overflow-visible */}
+                        <span className="font-bold text-white text-xs whitespace-nowrap overflow-visible flex-1 text-right ml-2" title={u.name}>
+                          {u.name ? (u.name.length > 12 ? u.name.substring(0, 12) + '...' : u.name) : "שחקן אורח"}
                         </span>
-                        <span className="bg-amber-500/10 text-amber-400 text-[10px] px-2 py-0.5 rounded border border-amber-500/20">
+                        
+                        <span className="bg-amber-500/10 text-amber-400 text-[10px] px-2 py-0.5 rounded border border-amber-500/20 shrink-0">
                           {u.totalPoints || 0}
                         </span>
                       </div>
