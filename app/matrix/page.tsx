@@ -598,12 +598,12 @@ const mList: any[] = [];
           <table className="w-max min-w-full text-center border-separate border-spacing-0 text-sm">
                <thead>
                   <tr className="bg-slate-950">
-                    <th className="sticky top-0 right-0 z-[60] bg-slate-950 bg-clip-padding border-b-2 border-l border-slate-700 p-4 min-w-[150px] shadow-xl m-0">
+                    <th className="sticky right-0 top-0 z-[60] bg-slate-950 border-b-2 border-l border-slate-700 p-4 min-w-[150px] m-0 shadow-xl">
                       <div className="font-black text-slate-300">דירוג \ שחקן</div>
                     </th>
                      
                      {activeTab === "MATCHES" && filteredMatches.map(m => (
-                        <th key={m.id} className="sticky top-0 z-20 bg-slate-900 border-b-2 border-l border-slate-700/50 p-2 min-w-[110px]">
+                        <th key={m.id} className="sticky top-0 z-20 bg-slate-900 bg-clip-padding border-b-2 border-l border-slate-700/50 p-2 min-w-[110px]">
                            <div className="flex flex-col items-center gap-1.5">
                               <span className="text-[9px] text-slate-500 font-bold bg-slate-950 px-1.5 py-0.5 rounded border border-slate-800">{m.stage === "KNOCKOUT" ? m.roundName : `מחזור ${m.matchday}`}</span>
                               <div className="flex items-center gap-1.5">
@@ -717,18 +717,19 @@ const mList: any[] = [];
                     <tr key={u.id} className="hover:bg-slate-800/50 transition-colors group">
                       
                       {/* בשורת ה-TD של שם השחקן - ביטלנו פדינג והעברנו ל-div פנימי */}
-                    <td className="sticky right-0 z-50 bg-slate-950 group-hover:bg-slate-900 bg-clip-padding border-b border-l border-slate-700/80 p-0 m-0 outline-none transition-colors">
-                          <div className="w-full h-full min-h-[48px] p-3 flex items-center justify-between gap-2">
-                            <span className="text-[10px] text-slate-500 font-mono shrink-0">{idx + 1}.</span>
-                            
-                            <span className="font-bold text-white text-xs whitespace-nowrap flex-1 text-right ml-2" title={u.name}>
-                              {u.name ? (u.name.length > 12 ? u.name.substring(0, 12) + '...' : u.name) : "שחקן אורח"}
-                            </span>
-                            
-                            <span className="bg-amber-500/10 text-amber-400 text-[10px] px-2 py-0.5 rounded border border-amber-500/20 shrink-0">
-                              {u.totalPoints || 0}
-                            </span>
-                          </div>
+                    <td className="sticky right-0 z-[50] bg-slate-950 bg-clip-padding border-b border-l border-slate-700/80 p-3 m-0 outline-none transition-colors">
+                        {/* הוספנו פה transform כדי להכריח את האייפון לצייר את הטקסט, וביטלנו h-full */}
+                        <div className="flex items-center justify-between gap-2 min-w-[120px] [transform:translateZ(0)]">
+                          <span className="text-[10px] text-slate-500 font-mono shrink-0">{idx + 1}.</span>
+                          
+                          <span className="font-bold text-white text-xs text-right flex-1 whitespace-nowrap" title={u.name}>
+                            {u.name ? (u.name.length > 12 ? u.name.substring(0, 12) + '...' : u.name) : "שחקן אורח"}
+                          </span>
+                          
+                          <span className="bg-amber-500/10 text-amber-400 text-[10px] px-2 py-0.5 rounded border border-amber-500/20 shrink-0">
+                            {u.totalPoints || 0}
+                          </span>
+                        </div>
                     </td>
                       {activeTab === "MATCHES" && filteredMatches.map(m => {
                         const uData = predictions[u.id];
