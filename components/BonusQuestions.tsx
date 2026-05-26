@@ -296,12 +296,12 @@ if (!q.knockoutRound || q.knockoutRound === "" || q.knockoutRound === "ALL" || q
     if (ans) {
       isUserAction.current = true;
       setAnswers((prev: any) => ({ ...prev, [q.id]: ans }));
-      toast.success(`הוגרלה תשובה! 🎲`, { id: `rand_${q.id}` , duration: 2500 });
-      
-      
+      toast.success(`הוגרלה תשובה! 🎲`, { id: `rand_${q.id}` });
+      setTimeout(() => toast.dismiss(`rand_${q.id}`), 2000); // חיסול ממוקד לאייפון
     } else {
       // אם אין משחקים רלוונטיים עדיין, נקפיץ שגיאה כדי שתדע
-      toast.error(`לא נמצאו אפשרויות ל לה`, { id: `rand_${q.id}`, duration: 2500  });
+      toast.error(`לא מצאתי אופציות להגרלה`, { id: `rand_${q.id}` });
+      setTimeout(() => toast.dismiss(`rand_${q.id}`), 2000); // חיסול ממוקד לאייפון
     }
   };
 

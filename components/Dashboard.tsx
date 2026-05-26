@@ -1523,6 +1523,7 @@ const renderedMagazineContent = useMemo(() => {
                {dailyMediaUrl && (
                   <div className="relative z-10 mb-5 w-full h-48 md:h-56 rounded-xl overflow-hidden border border-slate-700/50 shadow-inner bg-slate-950/80 flex items-center justify-center shrink-0">
                      {dailyMediaUrl.match(/\.(jpeg|jpg|gif|png|webp)$/i) != null ? (
+                      
                         <img src={dailyMediaUrl} alt="Magazine Cover" className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-500" />
                      ) : (
                       <video src={dailyMediaUrl} autoPlay loop muted playsInline className="w-full max-w-full h-full object-contain opacity-80 group-hover:opacity-100 transition-opacity" />
@@ -1534,7 +1535,7 @@ const renderedMagazineContent = useMemo(() => {
                   <h2 className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400 mb-2 shrink-0">המהדורה המרכזית</h2>
                   
                   <div 
-                     className="text-slate-300 text-sm font-medium leading-relaxed mb-6 line-clamp-5 flex-1 whitespace-pre-wrap break-words [&_b]:text-amber-400 [&_strong]:text-amber-400 [&_mark]:px-1.5 [&_mark]:rounded [&_mark.yellow]:bg-amber-500/20 [&_mark.yellow]:text-amber-300 [&_mark.green]:bg-emerald-500/20 [&_mark.green]:text-emerald-300 [&_mark.red]:bg-rose-500/20 [&_mark.red]:text-rose-400 [&_a]:text-cyan-400 [&_a]:underline [&_video]:max-w-full [&_video]:max-h-[140px] [&_video]:object-contain [&_iframe]:max-w-full [&_iframe]:h-[140px] [&_img]:max-w-full [&_img]:max-h-[140px] [&_img]:object-contain"
+                     className="text-slate-300 text-sm font-medium leading-relaxed mb-6  flex-1 whitespace-pre-wrap break-words [&_b]:text-amber-400 [&_strong]:text-amber-400 [&_mark]:px-1.5 [&_mark]:rounded [&_mark.yellow]:bg-amber-500/20 [&_mark.yellow]:text-amber-300 [&_mark.green]:bg-emerald-500/20 [&_mark.green]:text-emerald-300 [&_mark.red]:bg-rose-500/20 [&_mark.red]:text-rose-400 [&_a]:text-cyan-400 [&_a]:underline [&_video]:max-w-full [&_video]:max-h-[140px] [&_video]:object-contain [&_iframe]:max-w-full [&_iframe]:h-[140px] [&_img]:max-w-full [&_img]:max-h-[140px] [&_img]:object-contain"
                      dangerouslySetInnerHTML={{ __html: dailySubtext || "אין עדכונים מיוחדים הבוקר. שווה לעקוב במהלך היום!" }} 
                   />
                   
@@ -1984,9 +1985,9 @@ const renderedMagazineContent = useMemo(() => {
 
                  {dailySubtext && (
                     <div 
-                      className="text-slate-300 text-base md:text-lg leading-relaxed mb-6 font-medium whitespace-pre-wrap italic border-r-4 border-slate-600 pr-4 [&_b]:text-amber-400 [&_strong]:text-amber-400 [&_mark]:px-1.5 [&_mark]:rounded [&_mark.yellow]:!bg-amber-500/20 [&_mark.yellow]:!text-amber-300 [&_mark.green]:!bg-emerald-500/20 [&_mark.green]:!text-emerald-300 [&_mark.red]:!bg-rose-500/20 [&_mark.red]:!text-rose-400 [&_a]:text-cyan-400 [&_a]:underline"
-                      dangerouslySetInnerHTML={{ __html: dailySubtext }}
-                    />
+                        className="w-full h-full !p-0 !m-0 leading-tight [&_p]:text-lg [&_h1]:text-3xl [&_h2]:text-2xl [&_ul]:space-y-2"
+                        dangerouslySetInnerHTML={{ __html: dailySubtext }} 
+                      />
                  )}
 
                  {renderedMagazineContent}

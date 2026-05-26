@@ -211,5 +211,13 @@ body {
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
   background: #059669;
 }
+@keyframes carouselSlide {
+    0%, 30% { transform: translateY(0%); }
+    33%, 63% { transform: translateY(-180px); }
+    66%, 100% { transform: translateY(-360px); }
+  }
+  .animate-carousel-slide {
+    animation: carouselSlide 12s infinite ease-in-out;
+  }
 
 
