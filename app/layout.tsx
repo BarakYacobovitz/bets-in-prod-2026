@@ -1,7 +1,20 @@
 import './globals.css';
-import { Toaster } from 'react-hot-toast';
+import toast, { Toaster } from 'react-hot-toast';
 import Navbar from '../components/Navbar'; 
-
+// --- תחילת הפתרון לתיקון באג ה-Hover באייפון ---
+const originalSuccess = toast.success;
+toast.success = (message, options) => {
+  // קוראים להודעה הרגילה ושומרים את המזהה שלה
+  const toastId = originalSuccess(message, options);
+  
+  // מכריחים את המערכת להעלים את הטוסט אחרי 3 שניות, 
+  // ועוקפים את מנגנון עצירת-הזמן של הספרייה.
+  setTimeout(() => {
+    toast.dismiss(toastId);
+  }, 3000);
+  
+  return toastId;
+};
 // 1. הגדרת צבע הרקע של שורת הסטטוס בטלפון (השוליים העליונים באייפון/אנדרואיד)
 export const viewport = {
   themeColor: '#0f172a',
