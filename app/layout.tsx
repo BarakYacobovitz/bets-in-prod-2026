@@ -34,22 +34,41 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         </main>
 
        <Toaster 
-  position="top-center"
-  toastOptions={{
-    // זמן ברירת מחדל לכל הודעה - 3 שניות
-    duration: 3000,
-    style: {
-      background: '#1e293b', // צבע כהה שמתאים לאפליקציה (slate-800)
-      color: '#fff',
-      border: '1px solid #334155',
-      direction: 'rtl',
-    },
-    // אפשר גם לתת זמן שונה להודעות שגיאה
-    error: {
-      duration: 4000,
-    },
-  }} 
-/>
+            position="top-center"
+            toastOptions={{
+              // 1. הגדרות גלובליות לכל הטוסטים במערכת (שאלות, שגיאות, וכו')
+              duration: 3000,
+              style: {
+                background: '#1e293b',
+                color: '#fff',
+                border: '1px solid #334155',
+                direction: 'rtl',
+                // שים לב: הסרנו מכאן את ה-pointerEvents כדי לאפשר לחיצות!
+              },
+              
+              // 2. הגדרות ספציפיות *רק* ל-toast.success
+              success: {
+                style: {
+                  background: '#1e293b',
+                  color: '#fff',
+                  border: '1px solid #10b981', // אפשר אפילו לתת מסגרת ירקרקה להצלחה
+                  direction: 'rtl',
+                  pointerEvents: 'none', // הופך רק את הודעות ההצלחה לרואות ואינן נראות למגע
+                },
+              },
+
+              // 3. הגדרות ספציפיות לשגיאות
+              error: {
+                duration: 4000,
+                style: {
+                  background: '#1e293b',
+                  color: '#fff',
+                  border: '1px solid #ef4444', // מסגרת אדומה לשגיאות
+                  direction: 'rtl',
+                }
+              },
+            }} 
+          />
       </body>
     </html>
   );

@@ -296,10 +296,12 @@ if (!q.knockoutRound || q.knockoutRound === "" || q.knockoutRound === "ALL" || q
     if (ans) {
       isUserAction.current = true;
       setAnswers((prev: any) => ({ ...prev, [q.id]: ans }));
-      toast.success(`הוגרלה תשובה! 🎲`, { id: `rand_${q.id}` });
+      toast.success(`הוגרלה תשובה! 🎲`, { id: `rand_${q.id}` , duration: 2500 });
+      
+      
     } else {
       // אם אין משחקים רלוונטיים עדיין, נקפיץ שגיאה כדי שתדע
-      toast.error(`לא נמצאו אפשרויות להגרלה`, { id: `rand_${q.id}` });
+      toast.error(`לא נמצאו אפשרויות ל לה`, { id: `rand_${q.id}`, duration: 2500  });
     }
   };
 
@@ -369,11 +371,11 @@ if (!q.knockoutRound || q.knockoutRound === "" || q.knockoutRound === "ALL" || q
                   await setDoc(doc(db, "predictions_bonus", userId), { answers: newAnswers, updatedAt: new Date() }, { merge: true });
                   toast.success("הוגרלו ונשמרו תשובות בהצלחה 🎲", { id: "randomizeBonus" });
                 } else {
-                  toast.error("אין שאלות פתוחות להגרלה", { id: "randomizeBonus" });
+                  toast.error("אין שאלות פתוחות להגרלה", { id: "randomizeBonus", duration: 2500  }, );
                 }
               } catch(e) { 
                 console.error(e); 
-                toast.error("שגיאה בשמירת ההגרלה", { id: "randomizeBonus" });
+                toast.error("שגיאה בשמירת ההגרלה", { id: "randomizeBonus", duration: 2500  });
               } 
               finally { setIsRandomizing(false); }
             }} 

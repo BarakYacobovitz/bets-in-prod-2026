@@ -167,7 +167,9 @@ export default function ThirdPlaceQualifiers({ groups, userId, tournamentState =
               });
 
               setSelectedTeams(newSelectedTeams);
-              toast.success("🎲 8 נבחרות הוגרלו בהצלחה!");
+              toast.success("8 נבחרות הוגרלו בהצלחה!", { 
+                duration: 2500 // כופה על ההודעה להיעלם אחרי 2.5 שניות
+              });
             } catch (e) {
               console.error(e);
               toast.error("שגיאה בביצוע ההגרלה.");
