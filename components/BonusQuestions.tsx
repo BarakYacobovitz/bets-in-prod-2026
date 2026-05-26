@@ -978,11 +978,14 @@ const regularQuestions = filteredQuestions.filter(q => !q.isDouble && !q.isSurpr
                               setAnswers(newAnswers);
                               await setDoc(doc(db, "predictions_bonus", userId), { answers: newAnswers, updatedAt: new Date() }, { merge: true });
                               toast.success("הוגרלו ונשמרו תשובות 🎲", { id: "randomizeBonus" });
+                              setTimeout(() => toast.dismiss("randomizeBonus"), 2500); // 👈 הקסם של iOS
                             } else {
                               toast.error("אין שאלות פתוחות להגרלה", { id: "randomizeBonus" });
+                              setTimeout(() => toast.dismiss("randomizeBonus"), 2500); // 👈 הקסם של iOS
                             }
                           } catch(e) { 
                             toast.error("שגיאה בשמירת ההגרלה", { id: "randomizeBonus" });
+                            setTimeout(() => toast.dismiss("randomizeBonus"), 2500); // 👈 הקסם של iOS
                           } finally { setIsRandomizing(false); }
                         }} 
                         className="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold"
