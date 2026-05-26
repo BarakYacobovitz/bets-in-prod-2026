@@ -1,9 +1,9 @@
 "use client";
 import { useState, useEffect, useRef } from "react";
 import { doc, getDoc, setDoc, collection, getDocs } from "firebase/firestore";
-import { db } from "../app/firebase";
+import { db } from "../../app/firebase";
 import toast from "react-hot-toast";
-import { getFlagUrl } from "../app/utils/flags"; 
+import { getFlagUrl } from "../../app/utils/flags"; 
 
 export default function ThirdPlaceQualifiers({ groups, userId, tournamentState = 0 }: any) {
   const groupNames = Object.keys(groups).sort();
@@ -82,15 +82,17 @@ export default function ThirdPlaceQualifiers({ groups, userId, tournamentState =
       setSelectedTeams(prev => prev.filter(t => t !== team));
     } else {
       if (selectedTeams.length >= 8 && !selectedTeams.find(t => Array.from(groups[groupName] as Set<string>).includes(t))) {
-        toast.error("כבר בחרת 8 נבחרות! בטל בחירה קיימת (X בסלוט למעלה) כדי לבחור אחרת.");
+        const errId = toast.error("כבר בחרת 8 נבחרות! בטל בחירה קיימת (X בסלוט למעלה) כדי לבחור אחרת.");
+        setTimeout(() => toast.dismiss(errId), 3000);
         return;
       }
 
       if (checkIsAlreadyAdvanced(team)) {
-        toast('שמנו לב שכבר העלית את הנבחרת הזו ממקום 1/2. זכותך לגדר סיכונים, אבל שים לב!', { 
+        const warnId = toast('שמנו לב שכבר העלית את הנבחרת הזו ממקום 1/2. זכותך לגדר סיכונים, אבל שים לב!', { 
           icon: '⚠️', 
           style: { background: '#334155', color: '#fbbf24', border: '1px solid #fbbf24' } 
         });
+        setTimeout(() => toast.dismiss(warnId), 3500);
       }
 
       const teamsInThisGroup = Array.from(groups[groupName] as any[]);
@@ -127,7 +129,8 @@ export default function ThirdPlaceQualifiers({ groups, userId, tournamentState =
                const randomFour = shuffled.slice(0, 4);
                setSelectedTeams(randomFour);
                setIsRandomizing(false);
-               toast.success("🎲 הוגרלו 4 נבחרות אקראיות!");
+               const successId = toast.success("🎲 הוגרלו 4 נבחרות אקראיות!");
+               setTimeout(() => toast.dismiss(successId), 2500); 
             }, 600);
           }} className="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition-all active:scale-95">כן, הגרל</button>
           <button onClick={() => toast.dismiss(t.id)} className="bg-slate-200 hover:bg-slate-300 text-slate-800 px-3 py-1.5 rounded-lg text-xs font-bold transition-all">בטל</button>

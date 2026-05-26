@@ -305,44 +305,51 @@ useEffect(() => {
         
         <div className="flex gap-2">
           <button 
-            onClick={async () => {
+            onClick={() => {
+              // 1. משמידים את שאלת האישור
               toast.dismiss(t.id);
-              const groupTeams = groups[activeGroup] || [];
+              
+              // 2. מנתקים מגע כדי שהאייפון לא ייתקע על ההודעות הבאות
+              setTimeout(async () => {
+                const groupTeams = groups[activeGroup] || [];
 
-              if (viewMode === "MATCHES") {
-                toast.loading("מגריל ושומר במסד הנתונים...", { id: "randomize" });
-                try {
-                  const gMatches = matches.filter((m: any) => m.group === activeGroup);
-                  const promises = gMatches.map((m: any) => {
-                    const home = Math.floor(Math.random() * 4).toString();
-                    const away = Math.floor(Math.random() * 4).toString();
-                    
-                    // שמירה ישירה לפיירבייס לכל משחק שהוגרל
-                    return setDoc(doc(db, "predictions_matches", `${userId}_${m.id}`), {
-                      userId: userId,
-                      matchId: m.id,
-                      predictedHomeScore: home,
-                      predictedAwayScore: away,
-                      updatedAt: new Date()
-                    }, { merge: true });
+                if (viewMode === "MATCHES") {
+                  toast.loading("מגריל ושומר במסד הנתונים...", { id: "randomize" });
+                  try {
+                    const gMatches = matches.filter((m: any) => m.group === activeGroup);
+                    const promises = gMatches.map((m: any) => {
+                      const home = Math.floor(Math.random() * 4).toString();
+                      const away = Math.floor(Math.random() * 4).toString();
+                      
+                      return setDoc(doc(db, "predictions_matches", `${userId}_${m.id}`), {
+                        userId: userId,
+                        matchId: m.id,
+                        predictedHomeScore: home,
+                        predictedAwayScore: away,
+                        updatedAt: new Date()
+                      }, { merge: true });
+                    });
+
+                    await Promise.all(promises);
+                    toast.success(`הוגרלו ונשמרו תוצאות לבית ${activeGroup} 🎲`, { id: "randomize" });
+                    setTimeout(() => toast.dismiss("randomize"), 2500); // 👈 כפיית סגירה
+
+                  } catch (e) {
+                    console.error(e);
+                    toast.error("שגיאה בשמירת ההגרלה", { id: "randomize" });
+                    setTimeout(() => toast.dismiss("randomize"), 2500); // 👈 כפיית סגירה
+                  }
+                } else {
+                  isUserAction.current = true; 
+                  const shuffled = [...groupTeams].sort(() => 0.5 - Math.random());
+                  setQualifiers({
+                    ...qualifiers,
+                    [activeGroup]: { first: shuffled[0], second: shuffled[1] }
                   });
-
-                  await Promise.all(promises);
-                  toast.success(`הוגרלו ונשמרו תוצאות לבית ${activeGroup} 🎲`, { id: "randomize" });
-                } catch (e) {
-                  console.error(e);
-                  toast.error("שגיאה בשמירת ההגרלה", { id: "randomize" });
+                  const successId = toast.success(`הוגרלו עולות לבית ${activeGroup} 🎲`);
+                  setTimeout(() => toast.dismiss(successId), 2500); // 👈 כפיית סגירה
                 }
-              } else {
-                // דיווח שמדובר בפעולת משתמש כדי להפעיל את ה-useEffect של השמירה
-                isUserAction.current = true; 
-                const shuffled = [...groupTeams].sort(() => 0.5 - Math.random());
-                setQualifiers({
-                  ...qualifiers,
-                  [activeGroup]: { first: shuffled[0], second: shuffled[1] }
-                });
-                toast.success(`הוגרלו עולות לבית ${activeGroup} 🎲`);
-              }
+              }, 100); // 👈 סיום ניתוק המגע
             }} 
             className="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold"
           >

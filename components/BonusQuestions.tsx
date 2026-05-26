@@ -314,70 +314,79 @@ if (!q.knockoutRound || q.knockoutRound === "" || q.knockoutRound === "ALL" || q
         </span>
         <div className="flex gap-2">
           <button 
-            onClick={async () => {
+            onClick={() => {
+              // 1. מעיפים את שאלת האישור מיד
               toast.dismiss(t.id);
-              setIsRandomizing(true);
-              toast.loading("מגריל ושומר במסד הנתונים...", { id: "randomizeBonus" });
-              try {
-                const newAnswers = { ...answers };
-                let hasChanges = false;
+              
+              // 2. השהיית ניתוק-המגע הקריטית של אפל
+              setTimeout(async () => {
+                setIsRandomizing(true);
+                toast.loading("מגריל ושומר במסד הנתונים...", { id: "randomizeBonus" });
                 
-                activeQuestionsList.forEach(q => {
-                  if (!isQuestionLocked(q)) {
-                    let ans = "";
-                    const currentAnswerType = q.answerType || "TEAM";
+                try {
+                  const newAnswers = { ...answers };
+                  let hasChanges = false;
+                  
+                  // שימוש במערך השאלות המסונן התקין במקום במשתנה שלא היה קיים
+                  filteredQuestions.forEach(q => {
+                    if (!isQuestionLocked(q)) {
+                      let ans = "";
+                      const currentAnswerType = q.answerType || "TEAM";
 
-                    if (currentAnswerType === "TEAM") {
-                       let opts = q.specificTeams ? q.specificTeams.split(",").map((s:string)=>s.trim()).filter(Boolean) : allTeams;
-                       if (opts.length === 0) opts = allTeams;
-                       if (q.hasNoneOption) opts.push("אף נבחרת");
-                       if (q.hasAllOption) opts.push("כל הנבחרות");
-                       ans = opts[Math.floor(Math.random() * opts.length)];
-                       
-                    } else if (currentAnswerType === "MATCH") {
-                       // סינון חכם של משחקים לפי שלב השאלה
-                       const relevantMatches = allMatches.filter(m => {
-                          if (q.phase === "GROUPS") return m.stage !== "KNOCKOUT";
-                          if (q.phase === "KNOCKOUT") {
-                              return m.stage === "KNOCKOUT" && (!q.knockoutRound || q.knockoutRound === "ALL" || m.roundName === q.knockoutRound);
-                          }
-                          return true; 
-                       });
-                       if (relevantMatches.length > 0) {
-                          const randM = relevantMatches[Math.floor(Math.random() * relevantMatches.length)];
-                          ans = `${randM.homeTeam} - ${randM.awayTeam}`;
-                       }
-                       
-                    } else if (["CUSTOM", "CLUB"].includes(currentAnswerType)) {
-                       const opts = q.possibleOptions ? q.possibleOptions.split(",").map((s:string)=>s.trim()).filter(Boolean) : [];
-                       if (opts.length > 0) ans = opts[Math.floor(Math.random() * opts.length)];
+                      if (currentAnswerType === "TEAM") {
+                         let opts = q.specificTeams ? q.specificTeams.split(",").map((s:string)=>s.trim()).filter(Boolean) : allTeams;
+                         if (opts.length === 0) opts = allTeams;
+                         if (q.hasNoneOption) opts.push("אף נבחרת");
+                         if (q.hasAllOption) opts.push("כל הנבחרות");
+                         ans = opts[Math.floor(Math.random() * opts.length)];
+                         
+                      } else if (currentAnswerType === "MATCH") {
+                         const relevantMatches = allMatches.filter(m => {
+                            if (q.phase === "GROUPS") return m.stage !== "KNOCKOUT";
+                            if (q.phase === "KNOCKOUT") {
+                                return m.stage === "KNOCKOUT" && (!q.knockoutRound || q.knockoutRound === "ALL" || m.roundName === q.knockoutRound);
+                            }
+                            return true; 
+                         });
+                         if (relevantMatches.length > 0) {
+                            const randM = relevantMatches[Math.floor(Math.random() * relevantMatches.length)];
+                            ans = `${randM.homeTeam} - ${randM.awayTeam}`;
+                         }
+                         
+                      } else if (["CUSTOM", "CLUB"].includes(currentAnswerType)) {
+                         const opts = q.possibleOptions ? q.possibleOptions.split(",").map((s:string)=>s.trim()).filter(Boolean) : [];
+                         if (opts.length > 0) ans = opts[Math.floor(Math.random() * opts.length)];
 
-                    } else if (currentAnswerType === "PLAYER") {
-                       ans = TOP_PLAYERS_NAMES[Math.floor(Math.random() * TOP_PLAYERS_NAMES.length)];
+                      } else if (currentAnswerType === "PLAYER") {
+                         ans = TOP_PLAYERS_NAMES[Math.floor(Math.random() * TOP_PLAYERS_NAMES.length)];
 
-                    } else if (currentAnswerType === "NUMBER_PURE" || currentAnswerType === "NUMBER_MINUTE") {
-                       ans = Math.floor(Math.random() * 15 + 1).toString();
+                      } else if (currentAnswerType === "NUMBER_PURE" || currentAnswerType === "NUMBER_MINUTE") {
+                         ans = Math.floor(Math.random() * 15 + 1).toString();
+                      }
+                      
+                      if (ans) {
+                        newAnswers[q.id] = ans;
+                        hasChanges = true;
+                      }
                     }
-                    
-                    if (ans) {
-                      newAnswers[q.id] = ans;
-                      hasChanges = true;
-                    }
+                  });
+
+                  if (hasChanges) {
+                    setAnswers(newAnswers);
+                    await setDoc(doc(db, "predictions_bonus", userId), { answers: newAnswers, updatedAt: new Date() }, { merge: true });
+                    toast.success("הוגרלו ונשמרו תשובות בהצלחה 🎲", { id: "randomizeBonus" });
+                    setTimeout(() => toast.dismiss("randomizeBonus"), 2500); // כפיית מחיקה לאייפון
+                  } else {
+                    toast.error("אין שאלות פתוחות להגרלה", { id: "randomizeBonus" });
+                    setTimeout(() => toast.dismiss("randomizeBonus"), 2500); // כפיית מחיקה לאייפון
                   }
-                });
-
-                if (hasChanges) {
-                  setAnswers(newAnswers);
-                  await setDoc(doc(db, "predictions_bonus", userId), { answers: newAnswers, updatedAt: new Date() }, { merge: true });
-                  toast.success("הוגרלו ונשמרו תשובות בהצלחה 🎲", { id: "randomizeBonus" });
-                } else {
-                  toast.error("אין שאלות פתוחות להגרלה", { id: "randomizeBonus", duration: 2500  }, );
-                }
-              } catch(e) { 
-                console.error(e); 
-                toast.error("שגיאה בשמירת ההגרלה", { id: "randomizeBonus", duration: 2500  });
-              } 
-              finally { setIsRandomizing(false); }
+                } catch(e) { 
+                  console.error(e); 
+                  toast.error("שגיאה בשמירת ההגרלה", { id: "randomizeBonus" });
+                  setTimeout(() => toast.dismiss("randomizeBonus"), 2500); // כפיית מחיקה לאייפון
+                } 
+                finally { setIsRandomizing(false); }
+              }, 100); // <-- סיום ה-setTimeout הקצרצר
             }} 
             className="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold"
           >
@@ -918,85 +927,7 @@ const regularQuestions = filteredQuestions.filter(q => !q.isDouble && !q.isSurpr
          {/* כפתור הגרלה - עכשיו מגריל את כל השאלות שמוצגות בעמוד! */}
          {filteredQuestions.some(q => !isQuestionLocked(q)) && (
             <button 
-              onClick={() => {
-                // העתקנו את לוגיקת ההגרלה לפה כדי שתעבוד על filteredQuestions
-                toast((t) => (
-                  <div className="flex flex-col gap-3 text-right" dir="rtl">
-                    <span className="font-bold text-slate-800 text-sm">
-                      האם להגריל תשובות לכל השאלות הפתוחות בקטגוריה זו? <br/>
-                      <span className="text-xs text-rose-600 font-bold">(שים לב: פעולה זו תדרוס ניחושים קיימים!)</span>
-                    </span>
-                    <div className="flex gap-2">
-                      <button 
-                        onClick={async () => {
-                          toast.dismiss(t.id);
-                          setIsRandomizing(true);
-                          toast.loading("מגריל ושומר...", { id: "randomizeBonus" });
-                          try {
-                            const newAnswers = { ...answers };
-                            let hasChanges = false;
-                            
-                            filteredQuestions.forEach(q => {
-                              if (!isQuestionLocked(q)) {
-                                let ans = "";
-                                const currentAnswerType = q.answerType || "TEAM";
-                                if (currentAnswerType === "TEAM") {
-                                   let opts = q.specificTeams ? q.specificTeams.split(",").map((s:string)=>s.trim()).filter(Boolean) : allTeams;
-                                   if (opts.length === 0) opts = allTeams;
-                                   if (q.hasNoneOption) opts.push("אף נבחרת");
-                                   if (q.hasAllOption) opts.push("כל הנבחרות");
-                                   ans = opts[Math.floor(Math.random() * opts.length)];
-                                   
-                                } else if (currentAnswerType === "MATCH") {
-                                   const relevantMatches = allMatches.filter(m => {
-                                      if (q.phase === "GROUPS") return m.stage !== "KNOCKOUT";
-                                      if (q.phase === "KNOCKOUT") {
-                                          return m.stage === "KNOCKOUT" && (!q.knockoutRound || q.knockoutRound === "ALL" || m.roundName === q.knockoutRound);
-                                      }
-                                      return true; 
-                                   });
-                                   if (relevantMatches.length > 0) {
-                                      const randM = relevantMatches[Math.floor(Math.random() * relevantMatches.length)];
-                                      ans = `${randM.homeTeam} - ${randM.awayTeam}`;
-                                   }
-                                   
-                                } else if (["CUSTOM", "CLUB"].includes(currentAnswerType)) {
-                                   const opts = q.possibleOptions ? q.possibleOptions.split(",").map((s:string)=>s.trim()).filter(Boolean) : [];
-                                   if (opts.length > 0) ans = opts[Math.floor(Math.random() * opts.length)];
-                                   
-                                } else if (currentAnswerType === "PLAYER") {
-                                   ans = TOP_PLAYERS_NAMES[Math.floor(Math.random() * TOP_PLAYERS_NAMES.length)];
-                                   
-                                } else if (currentAnswerType === "NUMBER_PURE" || currentAnswerType === "NUMBER_MINUTE") {
-                                   ans = Math.floor(Math.random() * 15 + 1).toString();
-                                } 
-                                       if (ans) { newAnswers[q.id] = ans; hasChanges = true; }
-                              }
-                            });
-            
-                            if (hasChanges) {
-                              setAnswers(newAnswers);
-                              await setDoc(doc(db, "predictions_bonus", userId), { answers: newAnswers, updatedAt: new Date() }, { merge: true });
-                              toast.success("הוגרלו ונשמרו תשובות 🎲", { id: "randomizeBonus" });
-                              setTimeout(() => toast.dismiss("randomizeBonus"), 2500); // 👈 הקסם של iOS
-                            } else {
-                              toast.error("אין שאלות פתוחות להגרלה", { id: "randomizeBonus" });
-                              setTimeout(() => toast.dismiss("randomizeBonus"), 2500); // 👈 הקסם של iOS
-                            }
-                          } catch(e) { 
-                            toast.error("שגיאה בשמירת ההגרלה", { id: "randomizeBonus" });
-                            setTimeout(() => toast.dismiss("randomizeBonus"), 2500); // 👈 הקסם של iOS
-                          } finally { setIsRandomizing(false); }
-                        }} 
-                        className="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold"
-                      >
-                        כן, דרוס והגרל הכל
-                      </button>
-                      <button onClick={() => toast.dismiss(t.id)} className="bg-slate-200 hover:bg-slate-300 text-slate-800 px-3 py-1.5 rounded-lg text-xs font-bold">ביטול</button>
-                    </div>
-                  </div>
-                ), { duration: Infinity });
-              }} 
+              onClick={handleRandomizeCategory}
               disabled={isRandomizing} 
               className="bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-[11px] font-bold py-1.5 px-3 rounded-lg border border-slate-600 flex items-center gap-1.5 transition-all shadow-sm disabled:opacity-50 active:scale-95"
             >

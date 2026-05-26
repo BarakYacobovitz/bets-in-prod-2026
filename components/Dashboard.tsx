@@ -336,23 +336,38 @@ export default function Dashboard({ userId, userName, setActiveTab, setPredictio
   };
 
   const handleClearNemesis = () => {
-  toast((t) => (
-    <div className="flex flex-col gap-3 text-right" dir="rtl">
-      <span className="font-bold text-slate-800">בטוח שאתה רוצה לבטל את היריבות?</span>
-      <div className="flex gap-2">
-        <button onClick={async () => {
-          toast.dismiss(t.id);
-          try {
-            await updateDoc(doc(db, "users", userId), { nemesisId: null });
-            setNemesisInput("");
-            toast.success("היריבות בוטלה. שלום חברות!");
-          } catch (e) { toast.error("שגיאה בביטול יריב."); }
-        }} className="bg-rose-500 hover:bg-rose-600 text-white px-3 py-1.5 rounded-lg text-sm font-bold transition-colors">כן, בטל</button>
-        <button onClick={() => toast.dismiss(t.id)} className="bg-slate-200 hover:bg-slate-300 text-slate-800 px-3 py-1.5 rounded-lg text-sm font-bold transition-colors">לא, התחרטתי</button>
+    toast((t) => (
+      <div className="flex flex-col gap-3 text-right" dir="rtl">
+        <span className="font-bold text-slate-800">בטוח שאתה רוצה לבטל את היריבות?</span>
+        <div className="flex gap-2">
+          <button onClick={() => {
+            // 1. משמידים את שאלת האישור מיד
+            toast.dismiss(t.id);
+            
+            // 2. מנתקים מגע עם השהיה קלה של 100ms
+            setTimeout(async () => {
+              try {
+                await updateDoc(doc(db, "users", userId), { nemesisId: null });
+                setNemesisInput("");
+                
+                // 3. מציגים הצלחה וכופים השמדה כדי שלא ייתקע באייפון
+                const successId = toast.success("היריבות בוטלה. שלום חברות!");
+                setTimeout(() => toast.dismiss(successId), 2500);
+                
+              } catch (e) { 
+                // כופים השמדה גם על שגיאות
+                const errId = toast.error("שגיאה בביטול יריב."); 
+                setTimeout(() => toast.dismiss(errId), 3000);
+              }
+            }, 100); // 👈 הקסם של אפל
+            
+          }} className="bg-rose-500 hover:bg-rose-600 text-white px-3 py-1.5 rounded-lg text-sm font-bold transition-colors">כן, בטל</button>
+          
+          <button onClick={() => toast.dismiss(t.id)} className="bg-slate-200 hover:bg-slate-300 text-slate-800 px-3 py-1.5 rounded-lg text-sm font-bold transition-colors">לא, התחרטתי</button>
+        </div>
       </div>
-    </div>
-  ), { duration: Infinity });
-};
+    ), { duration: Infinity });
+  };
 
   useEffect(() => {
     if (!userId) return;
