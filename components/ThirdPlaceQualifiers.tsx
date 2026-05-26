@@ -106,15 +106,17 @@ export default function ThirdPlaceQualifiers({ groups, userId, tournamentState =
         selectedTeams.length >= 8 &&
         !selectedTeams.find((t) => Array.from(groups[groupName] as Set<string>).includes(t))
       ) {
-        toast.error("כבר בחרת 8 נבחרות! בטל בחירה קיימת (X בסלוט למעלה) כדי לבחור אחרת.");
+        const errId = toast.error("כבר בחרת 8 נבחרות! בטל בחירה קיימת (X בסלוט למעלה) כדי לבחור אחרת.");
+        setTimeout(() => toast.dismiss(errId), 3000);
         return;
       }
 
       if (checkIsAlreadyAdvanced(team)) {
-        toast("שמנו לב שכבר העלית את הנבחרת הזו ממקום 1/2. זכותך לגדר סיכונים, אבל שים לב!", {
+        const warnId = toast("שמנו לב שכבר העלית את הנבחרת הזו ממקום 1/2. זכותך לגדר סיכונים, אבל שים לב!", {
           icon: "⚠️",
           style: { background: "#334155", color: "#fbbf24", border: "1px solid #fbbf24" },
         });
+        setTimeout(() => toast.dismiss(warnId), 3000);
       }
 
       const teamsInThisGroup = Array.from(groups[groupName] as any[]);
@@ -167,9 +169,8 @@ export default function ThirdPlaceQualifiers({ groups, userId, tournamentState =
               });
 
               setSelectedTeams(newSelectedTeams);
-              toast.success("8 נבחרות הוגרלו בהצלחה!", { 
-                duration: 2500 // כופה על ההודעה להיעלם אחרי 2.5 שניות
-              });
+              const successId = toast.success("8 נבחרות הוגרלו בהצלחה!");
+              setTimeout(() => toast.dismiss(successId), 2500);
             } catch (e) {
               console.error(e);
               toast.error("שגיאה בביצוע ההגרלה.");
