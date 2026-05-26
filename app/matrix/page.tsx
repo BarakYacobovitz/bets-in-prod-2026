@@ -598,7 +598,7 @@ const mList: any[] = [];
           <table className="w-max min-w-full text-center border-separate border-spacing-0 text-sm">
                <thead>
                   <tr className="bg-slate-950">
-                    <th className="sticky right-0 top-0 z-[60] bg-slate-950 bg-clip-padding border-b-2 border-l border-slate-700 p-4 min-w-[150px] m-0 shadow-xl will-change-transform transform-gpu">
+                    <th className="sticky right-0 top-0 z-[60] bg-slate-950 bg-clip-padding border-b-2 border-l border-slate-700 p-4 w-[150px] max-w-[150px] min-w-[150px] m-0 shadow-xl will-change-transform transform-gpu">
                       <div className="font-black text-slate-300">דירוג \ שחקן</div>
                     </th>
                      
@@ -717,9 +717,9 @@ const mList: any[] = [];
                     <tr key={u.id} className="hover:bg-slate-800/50 transition-colors group">
                       
                       {/* בשורת ה-TD של שם השחקן - ביטלנו פדינג והעברנו ל-div פנימי */}
-                    <td className="sticky right-0 z-[50] bg-slate-950 bg-clip-padding border-b border-l border-slate-700/80 p-3 m-0 outline-none transition-colors will-change-transform transform-gpu">
+                    <td className="sticky right-0 z-[50] bg-slate-950 bg-clip-padding border-b border-l border-slate-700/80 p-3 m-0 w-[150px] max-w-[150px] min-w-[150px] outline-none transition-colors will-change-transform" style={{ transform: 'translate3d(0, 0, 0)', WebkitTransform: 'translate3d(0, 0, 0)' }}>
                         {/* הוספנו פה transform כדי להכריח את האייפון לצייר את הטקסט, וביטלנו h-full */}
-                        <div className="flex items-center justify-between gap-2 min-w-[120px]">
+                        <div className="flex items-center justify-between gap-2 w-full">
                           <span className="text-[10px] text-slate-500 font-mono shrink-0">{idx + 1}.</span>
                           
                           <span className="font-bold text-white text-xs text-right flex-1 whitespace-nowrap" title={u.name}>

@@ -1,7 +1,9 @@
 @import "tailwindcss";
 html,
 body {
-  background-color: #020617 !important; /* צבע ה-slate-950 */
+  background-color: #020617 !important;
+  overscroll-behavior: none;
+  -webkit-overflow-scrolling: touch;
 }
 :root {
   --background: #ffffff;
@@ -209,17 +211,5 @@ body {
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
   background: #059669;
 }
-.ios-scroll {
-  -webkit-overflow-scrolling: touch;
-}
-.sticky-column-fix {
-  position: sticky;
-  left: 0;
-  z-index: 20;
-  /* הפתרון לקסם של ספארי: */
-  will-change: transform; 
-  -webkit-transform: translateZ(0);
-  background-clip: padding-box;
-  background-color: inherit; /* שומר על צבע הרקע של הטבלה */
-}
+
 

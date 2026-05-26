@@ -35,14 +35,14 @@ export const metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="he" dir="rtl" className="bg-slate-950">
-      <body className="bg-slate-950 text-slate-200 min-h-[100dvh] flex flex-col">
+      <body className="bg-slate-950 text-slate-200 h-[100dvh] flex flex-col overflow-hidden relative">
         
         
         {/* זה הבר העליון היחיד שצריך להיות כאן! */}
         <Navbar />
         
         {/* תוכן העמוד המשתנה */}
-        <main className="flex-1">
+        <main className="flex-1 overflow-y-auto overscroll-contain">
           {children}
         </main>
 
