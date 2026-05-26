@@ -788,28 +788,10 @@ export default function Dashboard({ userId, userName, setActiveTab, setPredictio
   };
 const renderedMagazineContent = useMemo(() => {
     return (
-      <div className="text-slate-200 text-base md:text-lg leading-relaxed whitespace-pre-wrap
-                      [&_div]:w-full
-                      [&_b]:text-amber-400 [&_strong]:text-amber-400
-                      [&_i]:text-slate-400 [&_u]:underline [&_u]:decoration-blue-400 [&_u]:underline-offset-4
-                      [&_h1]:text-2xl md:[&_h1]:text-3xl [&_h1]:font-black [&_h1]:mb-4 [&_h1]:mt-6 [&_h1]:text-transparent [&_h1]:bg-clip-text [&_h1]:bg-gradient-to-r [&_h1]:from-blue-400 [&_h1]:to-emerald-400
-                      [&_h2]:text-xl md:[&_h2]:text-2xl [&_h2]:font-bold [&_h2]:mb-3 [&_h2]:mt-6 [&_h2]:text-blue-300
-                      [&_h3]:text-lg md:[&_h3]:text-xl [&_h3]:font-bold [&_h3]:mb-2 [&_h3]:mt-4 [&_h3]:text-emerald-300
-                      [&_h4]:text-base md:[&_h4]:text-lg [&_h4]:font-bold [&_h4]:mb-2 [&_h4]:mt-4 [&_h4]:text-slate-300
-                      [&_mark]:px-1.5 [&_mark]:rounded [&_mark]:font-bold
-                      [&_mark.yellow]:!bg-amber-500/20 [&_mark.yellow]:!text-amber-300
-                      [&_mark.green]:!bg-emerald-500/20 [&_mark.green]:!text-emerald-300
-                      [&_mark.blue]:!bg-blue-500/20 [&_mark.blue]:!text-blue-300
-                      [&_mark.red]:!bg-rose-500/20 [&_mark.red]:!text-rose-400
-                      [&_blockquote]:border-r-4 [&_blockquote]:border-emerald-500 [&_blockquote]:bg-slate-800/50 [&_blockquote]:p-5 [&_blockquote]:rounded-l-2xl [&_blockquote]:my-6 [&_blockquote]:italic [&_blockquote]:text-slate-300
-                      [&_ul]:list-disc [&_ul]:list-inside [&_ul]:space-y-2 [&_ul]:my-4 [&_ul]:text-slate-300
-                      [&_hr]:border-slate-700 [&_hr]:my-8
-                      [&_img]:block [&_img]:mx-auto [&_img]:rounded-2xl [&_img]:shadow-lg [&_img]:my-6 [&_img]:max-h-[300px] md:[&_img]:max-h-[400px] [&_img]:w-auto [&_img]:max-w-full [&_img]:object-contain [&_img]:border [&_img]:border-slate-700
-                      [&_video]:block [&_video]:mx-auto [&_video]:rounded-2xl [&_video]:shadow-lg [&_video]:my-6 [&_video]:max-h-[300px] md:[&_video]:max-h-[400px] [&_video]:w-auto [&_video]:max-w-full [&_video]:object-contain [&_video]:border [&_video]:border-slate-700 [&_video]:bg-slate-950
-                      [&_iframe]:block [&_iframe]:w-full [&_iframe]:aspect-video [&_iframe]:rounded-2xl [&_iframe]:shadow-[0_10px_30px_rgba(0,0,0,0.5)] [&_iframe]:my-6 [&_iframe]:border [&_iframe]:border-slate-700 [&_iframe]:mx-auto [&_iframe]:relative [&_iframe]:z-10
-                      [&_a]:text-cyan-400 [&_a]:underline hover:[&_a]:text-cyan-300" 
-           dangerouslySetInnerHTML={{ __html: dailyMessage || "הודעות הנהלה, עדכונים חמים, וכל מה שצריך לדעת כדי לא להישאר מאחור." }} 
-      />
+      <div 
+          className="w-full text-white text-lg md:text-xl font-medium leading-relaxed [&_p]:mb-4 [&_h1]:text-3xl [&_h1]:font-black [&_h1]:text-amber-400 [&_h2]:text-2xl [&_h2]:font-bold [&_h2]:text-blue-300"
+          dangerouslySetInnerHTML={{ __html: dailyMessage || "" }} 
+        />
     );
   }, [dailyMessage]);
   if (isLoading) return <div className="flex justify-center items-center h-64"><div className="animate-spin text-5xl text-blue-500">⚽</div></div>;
