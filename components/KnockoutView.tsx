@@ -1,7 +1,7 @@
 "use client";
 import React, { useState, useEffect } from "react";
 import MatchCard from "./MatchCard";
-import { collection, query, where, onSnapshot } from "firebase/firestore";
+import { collection, query, where, onSnapshot, doc, setDoc } from "firebase/firestore";
 import Image from "next/image"; 
 import { db } from "../app/firebase";
 import { getFlagUrl } from "../app/utils/flags"; 
@@ -67,19 +67,43 @@ export default function KnockoutView({ matches, userId, tournamentState }: { mat
       <div className="flex flex-col gap-3 text-right" dir="rtl">
         <span className="font-bold text-slate-800 text-sm">האם להגריל ניחושים אקראיים לשלב {activeRound}?</span>
         <div className="flex gap-2">
-          <button onClick={() => {
-            toast.dismiss(t.id);
-            setTimeout(() => {
-               const newPreds = { ...knockoutPreds };
-               roundMatches.forEach(m => {
-                  const hScore = Math.floor(Math.random() * 4);
-                  const aScore = Math.floor(Math.random() * 4);
-                  let qual = hScore > aScore ? m.homeTeam : aScore > hScore ? m.awayTeam : (Math.random() > 0.5 ? m.homeTeam : m.awayTeam);
-                  newPreds[m.id] = { predictedHomeScore: hScore, predictedAwayScore: aScore, qualifier: qual };
-               });
-               setKnockoutPreds(newPreds);
-               toast.success("🎲 הניחושים הוגרלו!");
-            }, 600);
+          <button onClick={async () => {
+            toast.dismiss(t.id); // מעלים את שאלת האישור
+            
+            // מציגים הודעת טעינה כדי שהמשתמש לא ילחץ פעמיים
+            const loadingId = toast.loading("מגריל ושומר נתונים...");
+            
+            try {
+              // שומרים את כל המשחקים המוגרלים ישירות ל-Firebase!
+              const promises = roundMatches.map(m => {
+                 const hScore = Math.floor(Math.random() * 4).toString();
+                 const aScore = Math.floor(Math.random() * 4).toString();
+                 let qual = Number(hScore) > Number(aScore) ? m.homeTeam : Number(aScore) > Number(hScore) ? m.awayTeam : (Math.random() > 0.5 ? m.homeTeam : m.awayTeam);
+                 
+                 return setDoc(doc(db, "predictions_knockout", `${userId}_${m.id}`), {
+                    userId: userId,
+                    matchId: m.id,
+                    predictedHomeScore: hScore,
+                    predictedAwayScore: aScore,
+                    qualifier: qual,
+                    roundName: m.roundName,
+                    updatedAt: new Date()
+                 }, { merge: true });
+              });
+              
+              await Promise.all(promises);
+              toast.dismiss(loadingId);
+              
+              // הקסם נגד באג הריחוף של האייפון
+              const successId = toast.success("🎲 הניחושים הוגרלו ונשמרו!");
+              setTimeout(() => toast.dismiss(successId), 2500);
+              
+            } catch (e) {
+              console.error(e);
+              toast.dismiss(loadingId);
+              const errId = toast.error("שגיאה בשמירת ההגרלה.");
+              setTimeout(() => toast.dismiss(errId), 3000);
+            }
           }} className="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition-all">כן, הגרל</button>
           <button onClick={() => toast.dismiss(t.id)} className="bg-slate-200 hover:bg-slate-300 text-slate-800 px-3 py-1.5 rounded-lg text-xs font-bold transition-all">בטל</button>
         </div>
