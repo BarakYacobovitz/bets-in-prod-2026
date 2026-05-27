@@ -383,6 +383,9 @@ const getPrizeForRank = (rank: number, board: string, allUsers: any[]) => {
     const myPrevScore = me[prevScoreField] || myScore;
     const myRank = me.displayRank;
     const myPrevRank = me[prevRankField] || myRank;
+    // הגדרת היריב בתוך הבלוק כדי למנוע שגיאות סדר טעינה
+    const myNemesisId = generalUsers.find(u => u.id === currentUserId)?.nemesisId || null;
+    const nemesisUser = myNemesisId ? currentUsers.find(u => u.id === myNemesisId) : null;
     
     const rankDiff = myPrevRank - myRank; 
     const ptsDiff = myScore - myPrevScore;

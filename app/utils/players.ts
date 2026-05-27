@@ -107,22 +107,22 @@ const GROUP_B: Player[] = [
   { name: "אדריאן לאון ברישיץ'", country: "בוסניה", club: "פ.צ. באזל", league: "Swiss Super League" },
   { name: "אניס בורניץ'", country: "בוסניה", club: "קרלסרוהה", league: "2. Bundesliga" },
   { name: "דלש קובאצ'ביץ'", country: "בוסניה", club: "ראקוב צ'נסטוחובה", league: "Ekstraklasa" },
-  // קטר
-  { name: "אכרם עפיף", country: "קטר", club: "אל-סאד", league: "Qatar Stars League" },
-  { name: "אל-מועז עלי", country: "קטר", club: "אל-דוחייל", league: "Qatar Stars League" },
-  { name: "בסאם אל-ראווי", country: "קטר", club: "אל-ריאן", league: "Qatar Stars League" },
-  { name: "בועלאם ח'וח'י", country: "קטר", club: "אל-סאד", league: "Qatar Stars League" },
-  { name: "לוקאס מנדס", country: "קטר", club: "אל-וכרה", league: "Qatar Stars League" },
-  { name: "יוסף עבדוריסאג", country: "קטר", club: "אל-סאד", league: "Qatar Stars League" },
-  { name: "חסן אל-היידוס", country: "קטר", club: "אל-סאד", league: "Qatar Stars League" },
-  { name: "פדרו מיגל", country: "קטר", club: "אל-סאד", league: "Qatar Stars League" },
-  { name: "אחמד פתחי", country: "קטר", club: "אל-ערבי", league: "Qatar Stars League" },
-  { name: "טארק סלמאן", country: "קטר", club: "אל-סאד", league: "Qatar Stars League" },
-  { name: "מוסטפא משעל", country: "קטר", club: "אל-סאד", league: "Qatar Stars League" },
-  { name: "מוחמד ועאד", country: "קטר", club: "אל-סאד", league: "Qatar Stars League" },
-  { name: "עבדאללה אל-אחרק", country: "קטר", club: "קטר אס.סי", league: "Qatar Stars League" },
-  { name: "עיסא ברשאם", country: "קטר", club: "אל-סאד", league: "Qatar Stars League" },
-  { name: "חומאם אחמד", country: "קטר", club: "אל-ע'ראפה", league: "Qatar Stars League" },
+  // קטאר
+  { name: "אכרם עפיף", country: "קטאר", club: "אל-סאד", league: "Qatar Stars League" },
+  { name: "אל-מועז עלי", country: "קטאר", club: "אל-דוחייל", league: "Qatar Stars League" },
+  { name: "בסאם אל-ראווי", country: "קטאר", club: "אל-ריאן", league: "Qatar Stars League" },
+  { name: "בועלאם ח'וח'י", country: "קטאר", club: "אל-סאד", league: "Qatar Stars League" },
+  { name: "לוקאס מנדס", country: "קטאר", club: "אל-וכרה", league: "Qatar Stars League" },
+  { name: "יוסף עבדוריסאג", country: "קטאר", club: "אל-סאד", league: "Qatar Stars League" },
+  { name: "חסן אל-היידוס", country: "קטאר", club: "אל-סאד", league: "Qatar Stars League" },
+  { name: "פדרו מיגל", country: "קטאר", club: "אל-סאד", league: "Qatar Stars League" },
+  { name: "אחמד פתחי", country: "קטאר", club: "אל-ערבי", league: "Qatar Stars League" },
+  { name: "טארק סלמאן", country: "קטאר", club: "אל-סאד", league: "Qatar Stars League" },
+  { name: "מוסטפא משעל", country: "קטאר", club: "אל-סאד", league: "Qatar Stars League" },
+  { name: "מוחמד ועאד", country: "קטאר", club: "אל-סאד", league: "Qatar Stars League" },
+  { name: "עבדאללה אל-אחרק", country: "קטאר", club: "קטאר אס.סי", league: "Qatar Stars League" },
+  { name: "עיסא ברשאם", country: "קטאר", club: "אל-סאד", league: "Qatar Stars League" },
+  { name: "חומאם אחמד", country: "קטאר", club: "אל-ע'ראפה", league: "Qatar Stars League" },
   // שווייץ
   { name: "גרניט ג'אקה", country: "שווייץ", club: "באייר לברקוזן", league: "Bundesliga" },
   { name: "מנואל אקנג'י", country: "שווייץ", club: "מנצ'סטר סיטי", league: "Premier League" },
@@ -208,7 +208,7 @@ const GROUP_C: Player[] = [
   { name: "ג'יימס פורסט", country: "סקוטלנד", club: "סלטיק", league: "Scottish Premiership" }
 ];
 
-const GROUP_D: Player[] = [
+const GROUP_D: Player[] = [ //לא פורסם
   // ארה"ב
   { name: "כריסטיאן פוליסיק", country: "ארה\"ב", club: "מילאן", league: "Serie A" },
   { name: "ווסטון מקני", country: "ארה\"ב", club: "יובנטוס", league: "Serie A" },
@@ -275,7 +275,7 @@ const GROUP_D: Player[] = [
   { name: "אנאס אונאל", country: "טורקיה", club: "בורנמות'", league: "Premier League" }
 ];
 
-const GROUP_E: Player[] = [
+const GROUP_E: Player[] = [ //לא פורסם
   // גרמניה
   { name: "ג'מאל מוסיאלה", country: "גרמניה", club: "באיירן מינכן", league: "Bundesliga" },
   { name: "פלוריאן וירץ", country: "גרמניה", club: "באייר לברקוזן", league: "Bundesliga" },
@@ -342,7 +342,7 @@ const GROUP_E: Player[] = [
   { name: "אלן פרנקו", country: "אקוודור", club: "אתלטיקו מיניירו", league: "Campeonato Brasileiro Série A" }
 ];
 
-const GROUP_F: Player[] = [
+const GROUP_F: Player[] = [ //לא פורסם
   // הולנד
   { name: "וירג'יל ואן דייק", country: "הולנד", club: "ליברפול", league: "Premier League" },
   { name: "צ'אבי סימונס", country: "הולנד", club: "רד בול לייפציג", league: "Bundesliga" },
@@ -375,22 +375,22 @@ const GROUP_F: Player[] = [
   { name: "יוקינארי סוגאווארה", country: "יפן", club: "סאותהמפטון", league: "Premier League" },
   { name: "גנקי הראגוצ'י", country: "יפן", club: "אוראווה רד דיימונדס", league: "J1 League" },
   { name: "קייטו נקאמורה", country: "יפן", club: "ריימס", league: "Ligue 1" },
-  // שוודיה
-  { name: "ויקטור גיוקרס", country: "שוודיה", club: "ספורטינג ליסבון", league: "Primeira Liga" },
-  { name: "אלכסנדר איסאק", country: "שוודיה", club: "ניוקאסל יונייטד", league: "Premier League" },
-  { name: "דיאן קולוסבסקי", country: "שוודיה", club: "טוטנהאם הוטספור", league: "Premier League" },
-  { name: "ויקטור לינדלף", country: "שוודיה", club: "מנצ'סטר יונייטד", league: "Premier League" },
-  { name: "אנתוני אלנגה", country: "שוודיה", club: "נוטינגהאם פורסט", league: "Premier League" },
-  { name: "יספר קרלסון", country: "שוודיה", club: "בולוניה", league: "Serie A" },
-  { name: "רובין אולסן", country: "שוודיה", club: "אסטון וילה", league: "Premier League" },
-  { name: "מתיאס סוונברג", country: "שוודיה", club: "וולפסבורג", league: "Bundesliga" },
-  { name: "ינס קאיוסטה", country: "שוודיה", club: "איפסוויץ' טאון", league: "Premier League" },
-  { name: "הוגו לארסון", country: "שוודיה", club: "איינטרכט פרנקפורט", league: "Bundesliga" },
-  { name: "לוקאס ברגוואל", country: "שוודיה", club: "טוטנהאם הוטספור", league: "Premier League" },
-  { name: "אמיל קראפט", country: "שוודיה", club: "ניוקאסל יונייטד", league: "Premier League" },
-  { name: "גבריאל גודמונדסון", country: "שוודיה", club: "ליל", league: "Ligue 1" },
-  { name: "אמיל הולם", country: "שוודיה", club: "בולוניה", league: "Serie A" },
-  { name: "לודוויג אוגוסטינסון", country: "שוודיה", club: "אנדרלכט", league: "Belgian Pro League" },
+  // שבדיה
+  { name: "ויקטור גיוקרס", country: "שבדיה", club: "ספורטינג ליסבון", league: "Primeira Liga" },
+  { name: "אלכסנדר איסאק", country: "שבדיה", club: "ניוקאסל יונייטד", league: "Premier League" },
+  { name: "דיאן קולוסבסקי", country: "שבדיה", club: "טוטנהאם הוטספור", league: "Premier League" },
+  { name: "ויקטור לינדלף", country: "שבדיה", club: "מנצ'סטר יונייטד", league: "Premier League" },
+  { name: "אנתוני אלנגה", country: "שבדיה", club: "נוטינגהאם פורסט", league: "Premier League" },
+  { name: "יספר קרלסון", country: "שבדיה", club: "בולוניה", league: "Serie A" },
+  { name: "רובין אולסן", country: "שבדיה", club: "אסטון וילה", league: "Premier League" },
+  { name: "מתיאס סוונברג", country: "שבדיה", club: "וולפסבורג", league: "Bundesliga" },
+  { name: "ינס קאיוסטה", country: "שבדיה", club: "איפסוויץ' טאון", league: "Premier League" },
+  { name: "הוגו לארסון", country: "שבדיה", club: "איינטרכט פרנקפורט", league: "Bundesliga" },
+  { name: "לוקאס ברגוואל", country: "שבדיה", club: "טוטנהאם הוטספור", league: "Premier League" },
+  { name: "אמיל קראפט", country: "שבדיה", club: "ניוקאסל יונייטד", league: "Premier League" },
+  { name: "גבריאל גודמונדסון", country: "שבדיה", club: "ליל", league: "Ligue 1" },
+  { name: "אמיל הולם", country: "שבדיה", club: "בולוניה", league: "Serie A" },
+  { name: "לודוויג אוגוסטינסון", country: "שבדיה", club: "אנדרלכט", league: "Belgian Pro League" },
   // תוניסיה
   { name: "יוסף אל-מסאכני", country: "תוניסיה", club: "אל-ערבי", league: "Qatar Stars League" },
   { name: "אליאס סח'ירי", country: "תוניסיה", club: "איינטרכט פרנקפורט", league: "Bundesliga" },
@@ -409,7 +409,7 @@ const GROUP_F: Player[] = [
   { name: "אניס בן סלימאן", country: "תוניסיה", club: "נוריץ' סיטי", league: "Championship" }
 ];
 
-const GROUP_G: Player[] = [
+const GROUP_G: Player[] = [ //לא פורסם
   // בלגיה
   { name: "קווין דה בראונה", country: "בלגיה", club: "מנצ'סטר סיטי", league: "Premier League" },
   { name: "רומלו לוקאקו", country: "בלגיה", club: "נאפולי", league: "Serie A" },
@@ -477,23 +477,34 @@ const GROUP_G: Player[] = [
 ];
 
 const GROUP_H: Player[] = [
-  // ספרד
-  { name: "לאמין ימאל", country: "ספרד", club: "ברצלונה", league: "La Liga" },
-  { name: "רודרי", country: "ספרד", club: "מנצ'סטר סיטי", league: "Premier League" },
-  { name: "פדרי", country: "ספרד", club: "ברצלונה", league: "La Liga" },
-  { name: "ניקו ויליאמס", country: "ספרד", club: "אתלטיק בילבאו", league: "La Liga" },
-  { name: "דני אולמו", country: "ספרד", club: "ברצלונה", league: "La Liga" },
-  { name: "פביאן רואיס", country: "ספרד", club: "פריז סן ז'רמן", league: "Ligue 1" },
-  { name: "דני קרבחאל", country: "ספרד", club: "ריאל מדריד", league: "La Liga" },
-  { name: "אלברו מוראטה", country: "ספרד", club: "מילאן", league: "Serie A" },
-  { name: "איימריק לאפורט", country: "ספרד", club: "אל-נאסר", league: "Saudi Pro League" },
-  { name: "אונאי סימון", country: "ספרד", club: "אתלטיק בילבאו", league: "La Liga" },
-  { name: "מרק קוקורייה", country: "ספרד", club: "צ'לסי", league: "Premier League" },
-  { name: "רובין לה נורמן", country: "ספרד", club: "אתלטיקו מדריד", league: "La Liga" },
-  { name: "מרטין סובימנדי", country: "ספרד", club: "ריאל סוסיאדד", league: "La Liga" },
-  { name: "מיקל אויארסבאל", country: "ספרד", club: "ריאל סוסיאדד", league: "La Liga" },
-  { name: "דויד ראיה", country: "ספרד", club: "ארסנל", league: "Premier League" },
-  // כף ורדה
+  // ספרד רישמי
+{ "name": "אונאי סימון", "country": "ספרד", "club": "אתלטיק בילבאו", "league": "La Liga" },
+    { "name": "דויד ראיה", "country": "ספרד", "club": "ארסנל", "league": "Premier League" },
+    { "name": "ז'ואן גרסיה", "country": "ספרד", "club": "ברצלונה", "league": "La Liga" },
+    { "name": "פדרו פורו", "country": "ספרד", "club": "טוטנהאם", "league": "Premier League" },
+    { "name": "מרקוס יורנטה", "country": "ספרד", "club": "אתלטיקו מדריד", "league": "La Liga" },
+    { "name": "איימריק לאפורט", "country": "ספרד", "club": "אתלטיק בילבאו", "league": "La Liga" },
+    { "name": "פאו קובארסי", "country": "ספרד", "club": "ברצלונה", "league": "La Liga" },
+    { "name": "מארק פוביל", "country": "ספרד", "club": "אתלטיקו מדריד", "league": "La Liga" },
+    { "name": "אריק גרסיה", "country": "ספרד", "club": "ברצלונה", "league": "La Liga" },
+    { "name": "מארק קוקורייה", "country": "ספרד", "club": "צ'לסי", "league": "Premier League" },
+    { "name": "אלכס גרימאלדו", "country": "ספרד", "club": "באייר לברקוזן", "league": "Bundesliga" },
+    { "name": "רודרי", "country": "ספרד", "club": "מנצ'סטר סיטי", "league": "Premier League" },
+    { "name": "מרטין זובימנדי", "country": "ספרד", "club": "ארסנל", "league": "Premier League" },
+    { "name": "פדרי", "country": "ספרד", "club": "ברצלונה", "league": "La Liga" },
+    { "name": "פביאן רואיס", "country": "ספרד", "club": "פ.ס.ז'", "league": "Ligue 1" },
+    { "name": "מיקל מרינו", "country": "ספרד", "club": "ארסנל", "league": "Premier League" },
+    { "name": "גאבי", "country": "ספרד", "club": "ברצלונה", "league": "La Liga" },
+    { "name": "אלכס באנה", "country": "ספרד", "club": "אתלטיקו מדריד", "league": "La Liga" },
+    { "name": "מיקל אויארסבאל", "country": "ספרד", "club": "ריאל סוסיאדד", "league": "La Liga" },
+    { "name": "לאמין ימאל", "country": "ספרד", "club": "ברצלונה", "league": "La Liga" },
+    { "name": "פראן טורס", "country": "ספרד", "club": "ברצלונה", "league": "La Liga" },
+    { "name": "בורחה איגלסיאס", "country": "ספרד", "club": "סלטה ויגו", "league": "La Liga" },
+    { "name": "דני אולמו", "country": "ספרד", "club": "ברצלונה", "league": "La Liga" },
+    { "name": "ויקטור מוניוס", "country": "ספרד", "club": "אוססונה", "league": "La Liga" },
+    { "name": "ניקו וויליאמס", "country": "ספרד", "club": "אתלטיק בילבאו", "league": "La Liga" },
+    { "name": "ירמי פינו", "country": "ספרד", "club": "קריסטל פאלאס", "league": "Premier League" },
+  // כף ורדה לא פורסם
   { name: "גארי רודריגס", country: "כף ורדה", club: "סיוואספור", league: "Süper Lig" },
   { name: "ראיין מנדס", country: "כף ורדה", club: "קוג'אליספור", league: "TFF First League" },
   { name: "לוגאן קוסטה", country: "כף ורדה", club: "ויאריאל", league: "La Liga" },
@@ -509,23 +520,23 @@ const GROUP_H: Player[] = [
   { name: "סטיבן מוריירה", country: "כף ורדה", club: "קולומבוס קרו", league: "MLS" },
   { name: "דלמירו", country: "כף ורדה", club: "אינדיפנדיינטה", league: "Argentine Primera División" },
   { name: "ווזניה", country: "כף ורדה", club: "אראד", league: "Liga I" },
-  // סעודיה
-  { name: "סאלם א-דאווסרי", country: "סעודיה", club: "אל-הילאל", league: "Saudi Pro League" },
-  { name: "סעוד עבד אל-חמיד", country: "סעודיה", club: "רומא", league: "Serie A" },
-  { name: "מוחמד כנו", country: "סעודיה", club: "אל-הילאל", league: "Saudi Pro League" },
-  { name: "פרס אל-בורייכאן", country: "סעודיה", club: "אל-אהלי", league: "Saudi Pro League" },
-  { name: "עלי אל-בולייהי", country: "סעודיה", club: "אל-הילאל", league: "Saudi Pro League" },
-  { name: "יאסר א-שהראני", country: "סעודיה", club: "אל-הילאל", league: "Saudi Pro League" },
-  { name: "עבד א-רחמן ע'ריב", country: "סעודיה", club: "אל-נאסר", league: "Saudi Pro League" },
-  { name: "סמי א-נג'עי", country: "סעודיה", club: "אל-נאסר", league: "Saudi Pro League" },
-  { name: "סאלח א-שהרי", country: "סעודיה", club: "אל-איתיחאד", league: "Saudi Pro League" },
-  { name: "מוחמד אל-עוויס", country: "סעודיה", club: "אל-הילאל", league: "Saudi Pro League" },
-  { name: "נוואף אל-עקידי", country: "סעודיה", club: "אל-נאסר", league: "Saudi Pro League" },
-  { name: "חסן תמבקתי", country: "סעודיה", club: "אל-הילאל", league: "Saudi Pro League" },
-  { name: "עבדאללה אל-ח'ייברי", country: "סעודיה", club: "אל-נאסר", league: "Saudi Pro League" },
-  { name: "סולטאן אל-ע'נאם", country: "סעודיה", club: "אל-נאסר", league: "Saudi Pro League" },
-  { name: "אימן יחיא", country: "סעודיה", club: "אל-נאסר", league: "Saudi Pro League" },
-  // אורוגוואי
+  // ערב הסעודית לא פורסם
+  { name: "סאלם א-דאווסרי", country: "ערב הסעודית", club: "אל-הילאל", league: "Saudi Pro League" },
+  { name: "סעוד עבד אל-חמיד", country: "ערב הסעודית", club: "רומא", league: "Serie A" },
+  { name: "מוחמד כנו", country: "ערב הסעודית", club: "אל-הילאל", league: "Saudi Pro League" },
+  { name: "פרס אל-בורייכאן", country: "ערב הסעודית", club: "אל-אהלי", league: "Saudi Pro League" },
+  { name: "עלי אל-בולייהי", country: "ערב הסעודית", club: "אל-הילאל", league: "Saudi Pro League" },
+  { name: "יאסר א-שהראני", country: "ערב הסעודית", club: "אל-הילאל", league: "Saudi Pro League" },
+  { name: "עבד א-רחמן ע'ריב", country: "ערב הסעודית", club: "אל-נאסר", league: "Saudi Pro League" },
+  { name: "סמי א-נג'עי", country: "ערב הסעודית", club: "אל-נאסר", league: "Saudi Pro League" },
+  { name: "סאלח א-שהרי", country: "ערב הסעודית", club: "אל-איתיחאד", league: "Saudi Pro League" },
+  { name: "מוחמד אל-עוויס", country: "ערב הסעודית", club: "אל-הילאל", league: "Saudi Pro League" },
+  { name: "נוואף אל-עקידי", country: "ערב הסעודית", club: "אל-נאסר", league: "Saudi Pro League" },
+  { name: "חסן תמבקתי", country: "ערב הסעודית", club: "אל-הילאל", league: "Saudi Pro League" },
+  { name: "עבדאללה אל-ח'ייברי", country: "ערב הסעודית", club: "אל-נאסר", league: "Saudi Pro League" },
+  { name: "סולטאן אל-ע'נאם", country: "ערב הסעודית", club: "אל-נאסר", league: "Saudi Pro League" },
+  { name: "אימן יחיא", country: "ערב הסעודית", club: "אל-נאסר", league: "Saudi Pro League" },
+  // אורוגוואי לא פורסם
   { name: "פדריקו ואלוורדה", country: "אורוגוואי", club: "ריאל מדריד", league: "La Liga" },
   { name: "דרווין נונייס", country: "אורוגוואי", club: "ליברפול", league: "Premier League" },
   { name: "רונאלד אראוחו", country: "אורוגוואי", club: "ברצלונה", league: "La Liga" },
@@ -543,7 +554,7 @@ const GROUP_H: Player[] = [
   { name: "פקונדו טורס", country: "אורוגוואי", club: "אורלנדו סיטי", league: "MLS" }
 ];
 
-const GROUP_I: Player[] = [
+const GROUP_I: Player[] = [ // לא פורסם לבית
   // צרפת
   { name: "קיליאן אמבפה", country: "צרפת", club: "ריאל מדריד", league: "La Liga" },
   { name: "אורליאן צ'ואמני", country: "צרפת", club: "ריאל מדריד", league: "La Liga" },
@@ -592,25 +603,25 @@ const GROUP_I: Player[] = [
   { name: "באשאר רסאן", country: "עיראק", club: "אל-מרחייה", league: "Qatar Stars League" },
   { name: "ג'לאל חסן", country: "עיראק", club: "אל-זאוראה", league: "Iraq Stars League" },
   { name: "רבין סולאקה", country: "עיראק", club: "שפילד ונסדיי", league: "Championship" },
-  // נורווגיה
-  { name: "ארלינג הולאנד", country: "נורווגיה", club: "מנצ'סטר סיטי", league: "Premier League" },
-  { name: "מרטין אודגור", country: "נורווגיה", club: "ארסנל", league: "Premier League" },
-  { name: "אלכסנדר סורלות", country: "נורווגיה", club: "אתלטיקו מדריד", league: "La Liga" },
-  { name: "אנטוניו נוסא", country: "נורווגיה", club: "רד בול לייפציג", league: "Bundesliga" },
-  { name: "יורגן סטרנד לארסן", country: "נורווגיה", club: "וולברהמפטון וונדררס", league: "Premier League" },
-  { name: "סנדר ברגה", country: "נורווגיה", club: "פולהאם", league: "Premier League" },
-  { name: "יוליאן ריירסון", country: "נורווגיה", club: "בורוסיה דורטמונד", league: "Bundesliga" },
-  { name: "לאו אוסטיגור", country: "נורווגיה", club: "ראן", league: "Ligue 1" },
-  { name: "אוסקר בוב", country: "נורווגיה", club: "מנצ'סטר סיטי", league: "Premier League" },
-  { name: "פטריק ברג", country: "נורווגיה", club: "בודה/גלימט", league: "Eliteserien" },
-  { name: "כריסטופר אייר", country: "נורווגיה", club: "ברנטפורד", league: "Premier League" },
-  { name: "אוריין ניילנד", country: "נורווגיה", club: "סביליה", league: "La Liga" },
-  { name: "הוגו וטלסן", country: "נורווגיה", club: "קלאב ברוז'", league: "Belgian Pro League" },
-  { name: "דויד מולר קנאוטסן", country: "נורווגיה", club: "וולפסבורג", league: "Bundesliga" },
-  { name: "אנדראס שיידרופ", country: "נורווגיה", club: "בנפיקה", league: "Primeira Liga" }
+  // נורבגיה
+  { name: "ארלינג הולאנד", country: "נורבגיה", club: "מנצ'סטר סיטי", league: "Premier League" },
+  { name: "מרטין אודגור", country: "נורבגיה", club: "ארסנל", league: "Premier League" },
+  { name: "אלכסנדר סורלות", country: "נורבגיה", club: "אתלטיקו מדריד", league: "La Liga" },
+  { name: "אנטוניו נוסא", country: "נורבגיה", club: "רד בול לייפציג", league: "Bundesliga" },
+  { name: "יורגן סטרנד לארסן", country: "נורבגיה", club: "וולברהמפטון וונדררס", league: "Premier League" },
+  { name: "סנדר ברגה", country: "נורבגיה", club: "פולהאם", league: "Premier League" },
+  { name: "יוליאן ריירסון", country: "נורבגיה", club: "בורוסיה דורטמונד", league: "Bundesliga" },
+  { name: "לאו אוסטיגור", country: "נורבגיה", club: "ראן", league: "Ligue 1" },
+  { name: "אוסקר בוב", country: "נורבגיה", club: "מנצ'סטר סיטי", league: "Premier League" },
+  { name: "פטריק ברג", country: "נורבגיה", club: "בודה/גלימט", league: "Eliteserien" },
+  { name: "כריסטופר אייר", country: "נורבגיה", club: "ברנטפורד", league: "Premier League" },
+  { name: "אוריין ניילנד", country: "נורבגיה", club: "סביליה", league: "La Liga" },
+  { name: "הוגו וטלסן", country: "נורבגיה", club: "קלאב ברוז'", league: "Belgian Pro League" },
+  { name: "דויד מולר קנאוטסן", country: "נורבגיה", club: "וולפסבורג", league: "Bundesliga" },
+  { name: "אנדראס שיידרופ", country: "נורבגיה", club: "בנפיקה", league: "Primeira Liga" }
 ];
 
-const GROUP_J: Player[] = [
+const GROUP_J: Player[] = [ //לא פורסם לכל הבית
   // ארגנטינה
   { name: "ליונל מסי", country: "ארגנטינה", club: "אינטר מיאמי", league: "MLS" },
   { name: "לאוטרו מרטינס", country: "ארגנטינה", club: "אינטר מילאנו", league: "Serie A" },
@@ -677,8 +688,8 @@ const GROUP_J: Player[] = [
   { name: "ענאס בני יאסין", country: "ירדן", club: "אל-פיסאלי", league: "Jordanian Pro League" }
 ];
 
-const GROUP_K: Player[] = [
-  // פורטוגל
+const GROUP_K: Player[] = [ //לא פורסם כל הבית
+  // פורטוגל 
   { name: "כריסטיאנו רונאלדו", country: "פורטוגל", club: "אל-נאסר", league: "Saudi Pro League" },
   { name: "ברונו פרננדס", country: "פורטוגל", club: "מנצ'סטר יונייטד", league: "Premier League" },
   { name: "ברנרדו סילבה", country: "פורטוגל", club: "מנצ'סטר סיטי", league: "Premier League" },
@@ -745,70 +756,79 @@ const GROUP_K: Player[] = [
 ];
 
 const GROUP_L: Player[] = [
-  // איטליה
-  { name: "ג'אנלואיג'י דונארומה", country: "איטליה", club: "פריז סן ז'רמן", league: "Ligue 1" },
-  { name: "אלסנדרו באסטוני", country: "איטליה", club: "אינטר מילאנו", league: "Serie A" },
-  { name: "ניקולו בארלה", country: "איטליה", club: "אינטר מילאנו", league: "Serie A" },
-  { name: "פדריקו קייזה", country: "איטליה", club: "ליברפול", league: "Premier League" },
-  { name: "סנדרו טונאלי", country: "איטליה", club: "ניוקאסל יונייטד", league: "Premier League" },
-  { name: "מתאו רטגי", country: "איטליה", club: "אטאלנטה", league: "Serie A" },
-  { name: "ג'אקומו רספאדורי", country: "איטליה", club: "נאפולי", league: "Serie A" },
-  { name: "דוידה פראטזי", country: "איטליה", club: "אינטר מילאנו", league: "Serie A" },
-  { name: "פדריקו דימרקו", country: "איטליה", club: "אינטר מילאנו", league: "Serie A" },
-  { name: "ג'ובאני די לורנצו", country: "איטליה", club: "נאפולי", league: "Serie A" },
-  { name: "ריקרדו קלאפיורי", country: "איטליה", club: "ארסנל", league: "Premier League" },
-  { name: "לורנצו פלגריני", country: "איטליה", club: "רומא", league: "Serie A" },
-  { name: "גוליילמו ויקאריו", country: "איטליה", club: "טוטנהאם הוטספור", league: "Premier League" },
-  { name: "מתיה זקאני", country: "איטליה", club: "לאציו", league: "Serie A" },
-  { name: "מנואל לוקאטלי", country: "איטליה", club: "יובנטוס", league: "Serie A" },
-  // ניגריה
-  { name: "ויקטור אוסימן", country: "ניגריה", club: "גלאטסראיי", league: "Süper Lig" },
-  { name: "אדמולה לוקמן", country: "ניגריה", club: "אטאלנטה", league: "Serie A" },
-  { name: "ויקטור בוניפאס", country: "ניגריה", club: "באייר לברקוזן", league: "Bundesliga" },
-  { name: "סמואל צ'וקוואזה", country: "ניגריה", club: "מילאן", league: "Serie A" },
-  { name: "אלכס איוובי", country: "ניגריה", club: "פולהאם", league: "Premier League" },
-  { name: "וילפרד אנדידי", country: "ניגריה", club: "לסטר סיטי", league: "Premier League" },
-  { name: "קלווין באסי", country: "ניגריה", club: "פולהאם", league: "Premier League" },
-  { name: "סמי אג'אי", country: "ניגריה", club: "ווסט ברומיץ' אלביון", league: "Championship" },
-  { name: "ויליאם טרוסט-אקונג", country: "ניגריה", club: "אל חולוד", league: "Saudi Pro League" },
-  { name: "אולה איינה", country: "ניגריה", club: "נוטינגהאם פורסט", league: "Premier League" },
-  { name: "סטנלי נוואבלי", country: "ניגריה", club: "צ'יפה יונייטד", league: "South African Premier Division" },
-  { name: "טאיבו אווניאי", country: "ניגריה", club: "נוטינגהאם פורסט", league: "Premier League" },
-  { name: "זאידו סאנוסי", country: "ניגריה", club: "פורטו", league: "Primeira Liga" },
-  { name: "רפאל אונידיקה", country: "ניגריה", club: "קלאב ברוז'", league: "Belgian Pro League" },
-  { name: "סיריל דסרס", country: "ניגריה", club: "ריינג'רס", league: "Scottish Premiership" },
-  // קרואטיה
-  { name: "לוקה מודריץ'", country: "קרואטיה", club: "ריאל מדריד", league: "La Liga" },
-  { name: "יושקו גברדיול", country: "קרואטיה", club: "מנצ'סטר סיטי", league: "Premier League" },
-  { name: "מתאו קובאצ'יץ'", country: "קרואטיה", club: "מנצ'סטר סיטי", league: "Premier League" },
-  { name: "מרסלו ברוזוביץ'", country: "קרואטיה", club: "אל-נאסר", league: "Saudi Pro League" },
-  { name: "דומיניק ליבאקוביץ'", country: "קרואטיה", club: "פנרבחצ'ה", league: "Süper Lig" },
-  { name: "אנדריי קרמאריץ'", country: "קרואטיה", club: "הופנהיים", league: "Bundesliga" },
-  { name: "איבן פרישיץ'", country: "קרואטיה", club: "פ.ס.וו איינדהובן", league: "Eredivisie" },
-  { name: "ברונו פטקוביץ'", country: "קרואטיה", club: "דינמו זאגרב", league: "Prva HNL" },
-  { name: "מריו פשאליץ'", country: "קרואטיה", club: "אטאלנטה", league: "Serie A" },
-  { name: "יוסיפ שוטאלו", country: "קרואטיה", club: "אייאקס", league: "Eredivisie" },
-  { name: "בורנה סוסה", country: "קרואטיה", club: "טורינו", league: "Serie A" },
-  { name: "לוברן מאייר", country: "קרואטיה", club: "וולפסבורג", league: "Bundesliga" },
-  { name: "לוקה סוצ'יץ'", country: "קרואטיה", club: "ריאל סוסיאדד", league: "La Liga" },
-  { name: "מרטין בטורינה", country: "קרואטיה", club: "דינמו זאגרב", league: "Prva HNL" },
-  { name: "דומיניק קוטארסקי", country: "קרואטיה", club: "פאוק סלוניקי", league: "Super League Greece" },
-  // אנגליה
-  { name: "הארי קיין", country: "אנגליה", club: "באיירן מינכן", league: "Bundesliga" },
-  { name: "ג'וד בלינגהאם", country: "אנגליה", club: "ריאל מדריד", league: "La Liga" },
-  { name: "פיל פודן", country: "אנגליה", club: "מנצ'סטר סיטי", league: "Premier League" },
-  { name: "דקלאן רייס", country: "אנגליה", club: "ארסנל", league: "Premier League" },
-  { name: "בוקאיו סאקה", country: "אנגליה", club: "ארסנל", league: "Premier League" },
-  { name: "קול פאלמר", country: "אנגליה", club: "צ'לסי", league: "Premier League" },
-  { name: "ג'ורדן פיקפורד", country: "אנגליה", club: "אברטון", league: "Premier League" },
-  { name: "ג'ון סטונס", country: "אנגליה", club: "מנצ'סטר סיטי", league: "Premier League" },
-  { name: "מארק גהי", country: "אנגליה", club: "קריסטל פאלאס", league: "Premier League" },
-  { name: "טרנט אלכסנדר-ארנולד", country: "אנגליה", club: "ליברפול", league: "Premier League" },
-  { name: "קייל ווקר", country: "אנגליה", club: "מנצ'סטר סיטי", league: "Premier League" },
-  { name: "ג'ק גריליש", country: "אנגליה", club: "מנצ'סטר סיטי", league: "Premier League" },
-  { name: "אולי ווטקינס", country: "אנגליה", club: "אסטון וילה", league: "Premier League" },
-  { name: "קובי מאיינו", country: "אנגליה", club: "מנצ'סטר יונייטד", league: "Premier League" },
-  { name: "אנתוני גורדון", country: "אנגליה", club: "ניוקאסל יונייטד", league: "Premier League" }
+  // פנמה לא פורסם
+    { "name": "אורלנדו מוסקרה", "country": "פנמה", "club": "מכבי תל אביב", "league": "Ligat Ha'Al" },
+    { "name": "חוסה קורדובה", "country": "פנמה", "club": "נוריץ' סיטי", "league": "EFL Championship" },
+    { "name": "אנדרסון אנדרדה", "country": "פנמה", "club": "לאסק", "league": "Austrian Bundesliga" },
+    { "name": "מייקל אמיר מוריו", "country": "פנמה", "club": "מרסיי", "league": "Ligue 1" },
+    { "name": "אדאלברטו קאראסקייה", "country": "פנמה", "club": "יוסטון דינמו", "league": "MLS" },
+    { "name": "אנייבל גודוי", "country": "פנמה", "club": "נאשוויל", "league": "MLS" },
+    { "name": "אדגר בארסנס", "country": "פנמה", "club": "מזאטלן", "league": "Liga MX" },
+    { "name": "חוסה לואיס רודריגס", "country": "פנמה", "club": "פמליקאו", "league": "Primeira Liga" },
+    { "name": "חוסה פאחארדו", "country": "פנמה", "club": "אוניברסידד קאתוליקה", "league": "Ecuadorian Serie A" },
+  // גאנה לא פורסם
+    { "name": "ג'וזף וולאקוט", "country": "גאנה", "club": "היברניאן", "league": "Scottish Premiership" },
+    { "name": "מוחמד סליסו", "country": "גאנה", "club": "מונאקו", "league": "Ligue 1" },
+    { "name": "אלכסנדר ג'יקו", "country": "גאנה", "club": "פנרבחצ'ה", "league": "Süper Lig" },
+    { "name": "אלידו סיידו", "country": "גאנה", "club": "ראן", "league": "Ligue 1" },
+    { "name": "ג'ידאון מנסה", "country": "גאנה", "club": "אוקזר", "league": "Ligue 1" },
+    { "name": "תומאס פארטיי", "country": "גאנה", "club": "ארסנל", "league": "Premier League" },
+    { "name": "מוחמד קודוס", "country": "גאנה", "club": "ווסטהאם יונייטד", "league": "Premier League" },
+    { "name": "סאליס עבדול סאמד", "country": "גאנה", "club": "לאנס", "league": "Ligue 1" },
+    { "name": "איניאקי ויליאמס", "country": "גאנה", "club": "אתלטיק בילבאו", "league": "La Liga" },
+    { "name": "אנטואן סמניו", "country": "גאנה", "club": "בורנמות'", "league": "Premier League" },
+    { "name": "ג'ורדן אייו", "country": "גאנה", "club": "לסטר סיטי", "league": "Premier League" },
+  // קרואטיה לא פורסם
+    { "name": "דומיניק ליבאקוביץ'", "country": "קרואטיה", "club": "פנרבחצ'ה", "league": "Süper Lig" },
+    { "name": "יוסיפ סטאנישיץ'", "country": "קרואטיה", "club": "באיירן מינכן", "league": "Bundesliga" },
+    { "name": "יוסיפ שוטאלו", "country": "קרואטיה", "club": "אייאקס", "league": "Eredivisie" },
+    { "name": "מרטין ארליץ'", "country": "קרואטיה", "club": "בולוניה", "league": "Serie A" },
+    { "name": "בורנה סוסה", "country": "קרואטיה", "club": "טורינו", "league": "Serie A" },
+    { "name": "מרסלו ברוזוביץ'", "country": "קרואטיה", "club": "אל-נאסר", "league": "Saudi Pro League" },
+    { "name": "לוברו מאייר", "country": "קרואטיה", "club": "וולפסבורג", "league": "Bundesliga" },
+    { "name": "לוקה מודריץ'", "country": "קרואטיה", "club": "ריאל מדריד", "league": "La Liga" },
+    { "name": "מתאו קובאצ'יץ'", "country": "קרואטיה", "club": "מנצ'סטר סיטי", "league": "Premier League" },
+    { "name": "איבן פרישיץ'", "country": "קרואטיה", "club": "היידוק ספליט", "league": "HNL" },
+    { "name": "אנדריי קרמאריץ'", "country": "קרואטיה", "club": "הופנהיים", "league": "Bundesliga" },
+    { "name": "מריו פאשאליץ'", "country": "קרואטיה", "club": "אטאלנטה", "league": "Serie A" },
+    { "name": "ניקולה ולאשיץ'", "country": "קרואטיה", "club": "טורינו", "league": "Serie A" },
+    { "name": "מרקו פיאצה", "country": "קרואטיה", "club": "דינמו זאגרב", "league": "HNL" },
+    { "name": "מרקו פשאליץ'", "country": "קרואטיה", "club": "רייקה", "league": "HNL" },
+    { "name": "יוסיפ יוראנוביץ'", "country": "קרואטיה", "club": "אוניון ברלין", "league": "Bundesliga" },
+    { "name": "בורנה בארישיץ'", "country": "קרואטיה", "club": "טרבזונספור", "league": "Süper Lig" },
+    { "name": "דומהגוי וידה", "country": "קרואטיה", "club": "א.א.ק אתונה", "league": "Super League Greece" },
+    { "name": "מרטין באטורינה", "country": "קרואטיה", "club": "דינמו זאגרב", "league": "HNL" },
+    { "name": "פטאר סוצ'יץ'", "country": "אנגליה", "club": "דינמו זאגרב", "league": "HNL" },
+    { "name": "איביצה איבושיץ'", "country": "קרואטיה", "club": "פאפוס", "league": "Cypriot First Division" },
+    { "name": "נדליקו לברוביץ'", "country": "קרואטיה", "club": "רייקה", "league": "HNL" },
+    { "name": "אנטה בודימיר", "country": "קרואטיה", "club": "אוסאסונה", "league": "La Liga" },
+    { "name": "ברונו פטקוביץ'", "country": "קרואטיה", "club": "דינמו זאגרב", "league": "HNL" },
+    { "name": "מרין פונגראצ'יץ'", "country": "קרואטיה", "club": "פיורנטינה", "league": "Serie A" },
+    { "name": "בורנה סוסה", "country": "קרואטיה", "club": "טורינו", "league": "Serie A" },
+  // אנגליה סופי
+    { "name": "דן ברן", "country": "אנגליה", "club": "ניוקאסל יונייטד", "league": "Premier League" },
+    { "name": "מארק גהי", "country": "אנגליה", "club": "קריסטל פאלאס", "league": "Premier League" },
+    { "name": "ריס ג'יימס", "country": "אנגליה", "club": "צ'לסי", "league": "Premier League" },
+    { "name": "אזרי קונסה", "country": "אנגליה", "club": "אסטון וילה", "league": "Premier League" },
+    { "name": "טינו ליברמנטו", "country": "אנגליה", "club": "ניוקאסל יונייטד", "league": "Premier League" },
+    { "name": "ניקו אוריילי", "country": "אנגליה", "club": "מנצ'סטר סיטי", "league": "Premier League" },
+    { "name": "ג'ארל קוואנסה", "country": "אנגליה", "club": "ליברפול", "league": "Premier League" },
+    { "name": "ג'ד ספנס", "country": "אנגליה", "club": "טוטנהאם הוטספר", "league": "Premier League" },
+    { "name": "ג'ון סטונס", "country": "אנגליה", "club": "מנצ'סטר סיטי", "league": "Premier League" },
+    { "name": "אליוט אנדרסון", "country": "אנגליה", "club": "נוטינגהאם פורסט", "league": "Premier League" },
+    { "name": "ג'וד בלינגהאם", "country": "אנגליה", "club": "ריאל מדריד", "league": "La Liga" },
+    { "name": "אברצ'י אזה", "country": "אנגליה", "club": "קריסטל פאלאס", "league": "Premier League" },
+    { "name": "ג'ורדן הנדרסון", "country": "אנגליה", "club": "אייאקס", "league": "Eredivisie" },
+    { "name": "קובי מיינו", "country": "אנגליה", "club": "מנצ'סטר יונייטד", "league": "Premier League" },
+    { "name": "דקלן רייס", "country": "אנגליה", "club": "ארסנל", "league": "Premier League" },
+    { "name": "מורגן רוג'רס", "country": "אנגליה", "club": "אסטון וילה", "league": "Premier League" },
+    { "name": "אנתוני גורדון", "country": "אנגליה", "club": "ניוקאסל יונייטד", "league": "Premier League" },
+    { "name": "הארי קיין", "country": "אנגליה", "club": "באיירן מינכן", "league": "Bundesliga" },
+    { "name": "נוני מדואקה", "country": "אנגליה", "club": "צ'לסי", "league": "Premier League" },
+    { "name": "מרכוס רשפורד", "country": "אנגליה", "club": "ברצלונה", "league": "La Liga" },
+    { "name": "בוקאיו סאקה", "country": "אנגליה", "club": "ארסנל", "league": "Premier League" },
+    { "name": "אייוון טוני", "country": "אנגליה", "club": "ברנטפורד", "league": "Premier League" },
+    { "name": "אולי ווטקינס", "country": "אנגליה", "club": "אסטון וילה", "league": "Premier League" }
 ];
 
 export const PLAYERS_DATA: Player[] = [
