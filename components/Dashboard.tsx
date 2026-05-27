@@ -789,12 +789,7 @@ export default function Dashboard({ userId, userName, setActiveTab, setPredictio
 const renderedMagazineContent = useMemo(() => {
     return (
       <div 
-              className="w-full text-slate-100 leading-relaxed font-medium 
-             [&_h1]:text-4xl [&_h1]:font-black [&_h1]:mb-6 [&_h1]:text-amber-400 [&_h1]:text-center 
-             [&_h2]:text-2xl [&_h2]:font-bold [&_h2]:text-blue-300 [&_h2]:mt-8 [&_h2]:mb-4
-             [&_p]:text-lg [&_p]:mb-5 [&_p]:leading-relaxed
-             [&_mark]:bg-blue-900/40 [&_mark]:text-blue-200 [&_mark]:px-1.5 [&_mark]:rounded
-             [&_img]:rounded-2xl [&_img]:my-6 [&_img]:shadow-xl [&_img]:w-full"
+              className="w-full !p-0 !m-0 [&_*]:!m-0 [&_*]:!p-0 [&_p]:text-lg [&_h1]:text-3xl [&_h2]:text-2xl [&_h3]:text-xl"
               dangerouslySetInnerHTML={{ __html: dailyMessage || "המהדורה מתעדכנת..." }} 
       />
     );
