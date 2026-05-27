@@ -1093,8 +1093,9 @@ const renderedMagazineContent = useMemo(() => {
          </div>
       )}
 
-        <div className="relative flex lg:grid lg:grid-cols-2 items-stretch overflow-x-auto snap-x snap-mandatory gap-4 md:gap-8 pb-4 md:pb-0 custom-scrollbar -mx-4 px-4 md:mx-0 md:px-0 shrink-0 w-full">        <div className="min-w-[85%] lg:w-auto shrink-0 snap-center rounded-3xl p-6 shadow-2xl relative overflow-hidden bg-slate-900 border border-slate-700 flex flex-col min-h-full min-w-0">           <img src="tunnel.png" alt="Bets in Prod Tunnel" className="absolute inset-0 w-full h-full object-cover z-0 opacity-40 transition-all duration-1000 pointer-events-none" />
-           <div className="hidden lg:block absolute left-1/2 top-20 bottom-20 w-px bg-gradient-to-b from-rose-500 via-amber-500 to-emerald-500 opacity-30 z-0"></div>
+    <div className="flex lg:grid lg:grid-cols-2 items-stretch overflow-x-auto snap-x snap-mandatory gap-4 md:gap-8 pb-4 md:pb-0 custom-scrollbar -mx-4 px-4 md:mx-0 md:px-0 shrink-0 w-full"> 
+        <div className="w-[calc(100vw-32px)] lg:w-auto shrink-0 snap-center rounded-3xl p-6 shadow-2xl relative overflow-hidden bg-slate-900 border border-slate-700 flex flex-col min-h-full min-w-0">        
+           <img src="tunnel.png" alt="Bets in Prod Tunnel" className="absolute inset-0 w-full h-full object-cover z-0 opacity-40 transition-all duration-1000 pointer-events-none" />
             <div className="absolute inset-0 z-0 bg-gradient-to-l from-slate-950/90 via-slate-900/60 to-slate-950/90 pointer-events-none"></div>
             
             <div className="relative z-10 text-right mb-6">
@@ -1180,14 +1181,22 @@ const renderedMagazineContent = useMemo(() => {
       ) : (
          <div className="flex flex-col md:items-end gap-2">
             <div className="text-lg sm:text-xl md:text-2xl font-black text-rose-500 leading-tight">ממתין להסדר ⚠️</div>
-            <a 
-              href={`https://wa.me/972525583098?text=${encodeURIComponent('היי ברק, אני רוצה להסדיר תשלום עבור Bets in PROD ולהבטיח את מקומי בטיסה! ✈️')}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] md:text-xs font-black px-3 py-2 rounded-xl transition-all flex items-center justify-center gap-2 shadow-lg active:scale-95 w-full md:w-auto"
-            >
-              <span className="text-sm">💬</span> הסדר בוואטסאפ
-            </a>
+            <div className="flex gap-2 w-full md:w-auto">
+               <a 
+                 href={`https://wa.me/972525583098?text=${encodeURIComponent('היי ברק, אני רוצה להסדיר תשלום עבור Bets in PROD ולהבטיח את מקומי בטיסה! ✈️')}`}
+                 target="_blank" rel="noopener noreferrer"
+                 className="bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] md:text-xs font-black px-3 py-2 rounded-xl transition-all flex items-center justify-center gap-1 shadow-lg active:scale-95 flex-1"
+               >
+                 💬 וואטסאפ - להוסיף שם ואימייל
+               </a>
+               <a 
+                 href="https://links.payboxapp.com/gJBV4D6wl3b" 
+                 target="_blank" rel="noopener noreferrer"
+                 className="bg-blue-600 hover:bg-blue-500 text-white text-[10px] md:text-xs font-black px-3 py-2 rounded-xl transition-all flex items-center justify-center gap-1 shadow-lg active:scale-95 flex-1"
+               >
+                 💰 PayBox
+               </a>
+            </div>
          </div>
       )}
    </div>
@@ -1486,11 +1495,10 @@ const renderedMagazineContent = useMemo(() => {
             </div>  
          </div>
 
-              <div className="min-w-[85%] lg:w-auto shrink-0 snap-center flex flex-col gap-4 md:gap-6 self-stretch min-w-0">           
-                <div 
+              <div className="w-[calc(100vw-32px)] lg:w-auto shrink-0 snap-center flex flex-col gap-4 md:gap-6 self-stretch min-w-0">              <div 
                   onClick={() => setShowMagazineModal(true)}
                   className="bg-slate-900 rounded-3xl p-6 shadow-xl relative overflow-hidden border border-slate-700 group cursor-pointer flex flex-col hover:border-blue-500/50 transition-all duration-300 flex-1 min-w-0"      
-                >
+              >
                <div className="absolute inset-0 bg-gradient-to-br from-blue-900/20 to-emerald-900/10 z-0"></div>
                <div className="absolute -bottom-10 -left-10 text-9xl opacity-5 transform -rotate-12 pointer-events-none group-hover:scale-110 transition-transform duration-500">📰</div>
                <div className="absolute top-0 right-0 w-1.5 h-full bg-gradient-to-b from-blue-400 to-emerald-500"></div>
