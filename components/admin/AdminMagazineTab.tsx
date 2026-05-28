@@ -168,15 +168,19 @@ export default function AdminMagazineTab() {
       {/* תצוגה מקדימה נשארת אותו דבר */}
       {/* החלף את כל ה-div של "תצוגה חיה" בקוד הזה */}
         <div className="bg-slate-950 p-6 rounded-3xl border border-slate-800 shadow-xl overflow-hidden h-full sticky top-4">
-          <h3 className="text-lg font-black text-slate-400 mb-4">👁️ תצוגה חיה (כפי שזה יראה בדשבורד)</h3>
+          <h3 className="text-lg font-black text-slate-400 mb-4">👁️ תצוגה חיה (הכתבה המלאה כפי שתופיע בלחיצה)</h3>
           
-          <div className="bg-slate-900 p-6 rounded-3xl border border-slate-700 flex flex-col overflow-hidden">
+          <div className="bg-slate-900 p-6 md:p-8 rounded-3xl border border-slate-700 flex flex-col overflow-hidden shadow-2xl">
               {/* תמונה בתצוגה מקדימה */}
               {dashMediaUrl && (
-                <div className="w-full mb-4 overflow-hidden rounded-2xl border border-slate-800">
-                    <img src={dashMediaUrl} alt="Preview" className="w-full h-auto object-cover" />
-                </div>
-              )}
+              <div className="w-full mb-6 overflow-hidden rounded-2xl border border-slate-800 shadow-lg">
+                  {dashMediaUrl.match(/\.(jpeg|jpg|gif|png|webp)$/i) != null ? (
+                    <img src={dashMediaUrl} alt="Preview" className="w-full h-auto object-cover mx-auto" />
+                  ) : (
+                    <video src={dashMediaUrl} autoPlay loop muted playsInline controls className="w-full h-auto object-cover mx-auto" />
+                  )}
+              </div>
+            )}
 
               {/* התוכן מהאדמין */}
               <div 

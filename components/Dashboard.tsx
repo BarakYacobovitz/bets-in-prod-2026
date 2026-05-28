@@ -1944,15 +1944,7 @@ const renderedMagazineContent = useMemo(() => {
                      )}
                   </div>
                )}
-               
-               {/* התקציר - מעוצב כפתיח (כמו באדמין) */}
-               {dailySubtext && (
-                  <div 
-                     className="w-full text-slate-300 text-lg leading-relaxed mb-8 italic border-r-4 border-slate-600 pr-4" 
-                     dangerouslySetInnerHTML={{ __html: dailySubtext }} 
-                  />
-               )}
-
+              
                {/* המהדורה המלאה! */}
                <div 
                   className="w-full h-full text-slate-200 text-lg leading-relaxed [&_h1]:text-3xl [&_h1]:font-black [&_h1]:text-emerald-400 [&_mark]:bg-emerald-500/20 [&_mark]:text-emerald-300 [&_blockquote]:border-r-4 [&_blockquote]:bg-slate-800/50 [&_blockquote]:p-4" 
