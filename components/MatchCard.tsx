@@ -116,6 +116,18 @@ else if (match.roundName === "גמר" || match.roundName === "מקום שליש�
 
   const isLocked = isManualLocked || match.isFinished;
   const isMissingPrediction = !isLocked && (homeScore === "" || awayScore === "" || (match.stage === "KNOCKOUT" && qualifier === ""));
+  let isUrgent = false;
+  if (match.stage !== "KNOCKOUT") {
+    // בבתים: אם הסטטוס הנוכחי הוא X, המחזור הבא בתור הוא X+1
+    isUrgent = Number(match.matchday) === currentState + 1;
+  } else {
+    // בנוקאאוט: התאמה בין שם השלב לסטטוס שפותח אותו
+    if (match.roundName === "32 הגדולות" && currentState === 4) isUrgent = true;
+    else if (match.roundName === "שמינית גמר" && currentState === 6) isUrgent = true;
+    else if (match.roundName === "רבע גמר" && currentState === 8) isUrgent = true;
+    else if (match.roundName === "חצי גמר" && currentState === 10) isUrgent = true;
+    else if ((match.roundName === "גמר" || match.roundName === "מקום שלישי") && currentState === 12) isUrgent = true;
+  }
   // מנגנון השמירה החדש והחכם - ממוקם כאן כדי שיוכל לגשת ל-isLocked בביטחה
   useEffect(() => {
     if (!isLoaded.current || !isUserAction.current) return;
@@ -375,14 +387,30 @@ const calculateMatchPoints = (predH: string, predA: string, predQ: string) => {
               )}
               
               {/* זמן ושידור (שמאל) */}
-              <div className="flex items-center gap-2">
-                 <div className="text-[10px] sm:text-[11px] font-bold text-slate-300 bg-slate-900/80 px-2.5 py-1.5 rounded-lg border border-slate-700/80 flex items-center gap-1.5 whitespace-nowrap shadow-sm">
-                    <span>🕒</span> {getSmartDateText()}
+              {/* זמן, שידור ואינדיקטור דחיפות (שמאל) */}
+              <div className="flex flex-col items-end gap-1">
+                 <div className="flex items-center gap-2">
+                    <div className="text-[10px] sm:text-[11px] font-bold text-slate-300 bg-slate-900/80 px-2.5 py-1.5 rounded-lg border border-slate-700/80 flex items-center gap-1.5 whitespace-nowrap shadow-sm">
+                       <span>🕒</span> {getSmartDateText()}
+                    </div>
+                    {!isLive && match.broadcastUrl && (
+                       <a href={match.broadcastUrl} target="_blank" rel="noopener noreferrer" title="לינק לשידור" className="w-7 h-7 flex items-center justify-center bg-slate-800 rounded-lg text-slate-400 hover:text-cyan-400 transition-colors border border-slate-700 shadow-sm">
+                          📺
+                       </a>
+                    )}
                  </div>
-                 {!isLive && match.broadcastUrl && (
-                    <a href={match.broadcastUrl} target="_blank" rel="noopener noreferrer" title="לינק לשידור" className="w-7 h-7 flex items-center justify-center bg-slate-800 rounded-lg text-slate-400 hover:text-cyan-400 transition-colors border border-slate-700 shadow-sm">
-                       📺
-                    </a>
+                 
+                 {/* האינדיקטור שלנו מופיע רק אם המשחק עדיין פתוח לניחושים */}
+                 {!isLocked && !isLive && !isWaitingForResult && (
+                    isUrgent ? (
+                       <span className="text-[9px] text-amber-400 font-bold tracking-wide flex items-center gap-1 bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20 shadow-sm mt-0.5">
+                         <span className="animate-pulse">🔥</span> ננעל בקרוב
+                       </span>
+                    ) : (
+                       <span className="text-[9px] text-slate-400 font-bold tracking-wide flex items-center gap-1 bg-slate-800/50 px-1.5 py-0.5 rounded border border-slate-700/50 mt-0.5">
+                         <span>📅</span> מחזור עתידי
+                       </span>
+                    )
                  )}
               </div>
            </div>
