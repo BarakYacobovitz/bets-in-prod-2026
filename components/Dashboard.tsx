@@ -1495,45 +1495,28 @@ const renderedMagazineContent = useMemo(() => {
             </div>  
          </div>
 
-              <div className="w-[calc(100vw-32px)] lg:w-auto shrink-0 snap-center flex flex-col gap-4 md:gap-6 self-stretch min-w-0">              <div 
-                  onClick={() => setShowMagazineModal(true)}
-                  className="bg-slate-900 rounded-3xl p-6 shadow-xl relative overflow-hidden border border-slate-700 group cursor-pointer flex flex-col hover:border-blue-500/50 transition-all duration-300 flex-1 min-w-0"      
-              >
-               <div className="absolute inset-0 bg-gradient-to-br from-blue-900/20 to-emerald-900/10 z-0"></div>
-               <div className="absolute -bottom-10 -left-10 text-9xl opacity-5 transform -rotate-12 pointer-events-none group-hover:scale-110 transition-transform duration-500">📰</div>
-               <div className="absolute top-0 right-0 w-1.5 h-full bg-gradient-to-b from-blue-400 to-emerald-500"></div>
-
-               <div className="relative z-10 flex justify-between items-start mb-4 shrink-0">
-                  <div className="bg-slate-950/80 px-3 py-1.5 rounded-lg border border-slate-800 backdrop-blur-sm text-slate-400 text-xs font-bold">
-                     {new Date().toLocaleDateString('he-IL')}
-                  </div>
-                  <div className="text-3xl drop-shadow-md">📰</div>
-               </div>
-
-               {dailyMediaUrl && (
-                  <div className="relative z-10 mb-5 w-full h-48 md:h-56 rounded-xl overflow-hidden border border-slate-700/50 shadow-inner bg-slate-950/80 flex items-center justify-center shrink-0">
-                     {dailyMediaUrl.match(/\.(jpeg|jpg|gif|png|webp)$/i) != null ? (
-                      
-                        <img src={dailyMediaUrl} alt="Magazine Cover" className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-500" />
-                     ) : (
-                      <video src={dailyMediaUrl} autoPlay loop muted playsInline className="w-full max-w-full h-full object-contain opacity-80 group-hover:opacity-100 transition-opacity" />
-                     )}
-                  </div>
-               )}
-
-               <div className="relative z-10 flex-1 flex flex-col min-w-0">
-                  <h2 className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400 mb-2 shrink-0">המהדורה המרכזית</h2>
-                  
-                  <div 
-                     className="text-slate-300 text-sm font-medium leading-relaxed mb-6  flex-1 whitespace-pre-wrap break-words [&_b]:text-amber-400 [&_strong]:text-amber-400 [&_mark]:px-1.5 [&_mark]:rounded [&_mark.yellow]:bg-amber-500/20 [&_mark.yellow]:text-amber-300 [&_mark.green]:bg-emerald-500/20 [&_mark.green]:text-emerald-300 [&_mark.red]:bg-rose-500/20 [&_mark.red]:text-rose-400 [&_a]:text-cyan-400 [&_a]:underline [&_video]:max-w-full [&_video]:max-h-[140px] [&_video]:object-contain [&_iframe]:max-w-full [&_iframe]:h-[140px] [&_img]:max-w-full [&_img]:max-h-[140px] [&_img]:object-contain"
-                     dangerouslySetInnerHTML={{ __html: dailySubtext || "אין עדכונים מיוחדים הבוקר. שווה לעקוב במהלך היום!" }} 
-                  />
-                  
-                  <button className="bg-slate-800 hover:bg-slate-700 text-white font-bold py-3 w-full rounded-xl border border-slate-600 transition-colors flex justify-center items-center gap-2 text-sm shadow-md group-hover:bg-blue-600 group-hover:border-blue-500 shrink-0 mt-auto">
-                     קרא את המהדורה המלאה <span>👈</span>
-                  </button>
-               </div>
-            </div>
+{/* הנה בלוק המגזין החדש והנקי: */}
+      <div 
+        onClick={() => setShowMagazineModal(true)}
+        className="w-full bg-slate-900 rounded-3xl p-6 shadow-xl border border-slate-700 cursor-pointer hover:border-blue-500/50 transition-all flex flex-col overflow-hidden"
+      >
+        {dailyMediaUrl && (
+          <div className="w-full mb-4 overflow-hidden rounded-2xl border border-slate-800">
+            {dailyMediaUrl.match(/\.(jpeg|jpg|gif|png|webp)$/i) != null ? (
+              <img src={dailyMediaUrl} alt="Magazine" className="w-full h-auto object-cover" />
+            ) : (
+              <video src={dailyMediaUrl} autoPlay loop muted playsInline className="w-full h-auto object-cover" />
+            )}
+          </div>
+        )}
+        <div 
+          className="w-full overflow-hidden [&_img]:w-full [&_img]:h-auto [&_img]:rounded-2xl [&_h1]:text-2xl [&_h2]:text-xl [&_p]:text-sm [&_p]:text-slate-300"
+          dangerouslySetInnerHTML={{ __html: dailySubtext || "אין עדכונים מיוחדים הבוקר." }} 
+        />
+        <button className="mt-4 bg-slate-800 hover:bg-slate-700 text-white font-bold py-3 w-full rounded-xl border border-slate-600 transition-colors text-sm shadow-md">
+           קרא את המהדורה המלאה 👈
+        </button>
+      </div>
 {/* אולפן המובייל - עכשיו כחלק מהעמודה */}
       <div className="xl:hidden w-full max-w-sm mx-auto bg-slate-950/40 rounded-3xl border border-slate-700/50 shadow-inner flex flex-col items-center pt-6 pb-2 overflow-hidden shrink-0">        
         <div className="absolute top-0 right-0 w-full h-1 bg-gradient-to-r from-rose-400 via-amber-400 to-emerald-400"></div>
@@ -1598,8 +1581,6 @@ const renderedMagazineContent = useMemo(() => {
           <img src="/panel-removebg.png" className="relative z-20 w-[110%] max-w-[110%] -ml-[5%] pointer-events-none" />
         </div>
       </div>
-
-         </div>
 
       </div>
       {tournamentState > 0 ? (
@@ -1948,45 +1929,35 @@ const renderedMagazineContent = useMemo(() => {
       {showMagazineModal && (
         <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/85 p-4 backdrop-blur-md animate-fade-in-up" dir="rtl">
           <div className="bg-slate-900 border border-slate-700 p-6 md:p-8 rounded-3xl w-full max-w-3xl max-h-[90vh] flex flex-col shadow-2xl relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-2 h-full bg-gradient-to-b from-blue-400 to-emerald-500"></div>
-            
             <div className="flex justify-between items-start mb-6 border-b border-slate-800 pb-4 pr-4">
-              <div>
-                <h3 className="text-2xl md:text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400 flex items-center gap-3">
-                   <span className="text-white drop-shadow-md">📰</span> המהדורה המרכזית
-                </h3>
-                <div className="text-slate-500 text-sm font-medium mt-1">
-                   {new Date().toLocaleDateString('he-IL')}
-                </div>
-              </div>
-              <button onClick={() => setShowMagazineModal(false)} className="w-10 h-10 flex items-center justify-center rounded-full bg-slate-800 hover:bg-rose-500/20 hover:text-rose-400 text-slate-400 transition-colors font-black text-lg border border-slate-700">✕</button>
+              <h3 className="text-2xl md:text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400">📰 המהדורה המרכזית</h3>
+              <button onClick={() => setShowMagazineModal(false)} className="w-10 h-10 flex items-center justify-center rounded-full bg-slate-800 hover:bg-rose-500/20 text-slate-400 transition-colors border border-slate-700">✕</button>
             </div>
-
             <div className="overflow-y-auto custom-scrollbar flex-1 pr-4 pb-4">
-                 {dailyMediaUrl && (
-                    <div className="w-full rounded-2xl overflow-hidden mb-6 border border-slate-800 shadow-lg">
-                       {dailyMediaUrl.match(/\.(jpeg|jpg|gif|png|webp)$/i) != null ? (
-                          <img src={dailyMediaUrl} alt="Magazine Cover" className="w-full max-h-[300px] md:max-h-[400px] object-contain mx-auto" />
-                       ) : (
-                          <video src={dailyMediaUrl} autoPlay loop muted playsInline controls className="w-full max-h-[300px] md:max-h-[400px] object-contain mx-auto" />
-                       )}
-                    </div>
-                 )}
+               {/* אזור התמונה */}
+               {dailyMediaUrl && (
+                  <div className="w-full rounded-2xl overflow-hidden mb-6 border border-slate-800 shadow-lg">
+                     {dailyMediaUrl.match(/\.(jpeg|jpg|gif|png|webp)$/i) != null ? (
+                        <img src={dailyMediaUrl} alt="Magazine Cover" className="w-full max-h-[400px] object-contain mx-auto" />
+                     ) : (
+                        <video src={dailyMediaUrl} autoPlay loop muted playsInline controls className="w-full max-h-[400px] object-contain mx-auto" />
+                     )}
+                  </div>
+               )}
+               
+               {/* התקציר - מעוצב כפתיח (כמו באדמין) */}
+               {dailySubtext && (
+                  <div 
+                     className="w-full text-slate-300 text-lg leading-relaxed mb-8 italic border-r-4 border-slate-600 pr-4" 
+                     dangerouslySetInnerHTML={{ __html: dailySubtext }} 
+                  />
+               )}
 
-                 {dailySubtext && (
-                    <div 
-                        className="w-full h-full !p-0 !m-0 leading-tight [&_p]:text-lg [&_h1]:text-3xl [&_h2]:text-2xl [&_ul]:space-y-2"
-                        dangerouslySetInnerHTML={{ __html: dailySubtext }} 
-                      />
-                 )}
-
-                 {renderedMagazineContent}
-            </div>
-            
-            <div className="pt-4 mt-2 border-t border-slate-800 flex justify-end">
-               <button onClick={() => setShowMagazineModal(false)} className="bg-slate-800 hover:bg-slate-700 text-white px-6 py-2.5 rounded-xl font-bold transition-colors border border-slate-600">
-                  סגור
-               </button>
+               {/* המהדורה המלאה! */}
+               <div 
+                  className="w-full h-full text-slate-200 text-lg leading-relaxed [&_h1]:text-3xl [&_h1]:font-black [&_h1]:text-emerald-400 [&_mark]:bg-emerald-500/20 [&_mark]:text-emerald-300 [&_blockquote]:border-r-4 [&_blockquote]:bg-slate-800/50 [&_blockquote]:p-4" 
+                  dangerouslySetInnerHTML={{ __html: dailyMessage || "" }} 
+               />
             </div>
           </div>
         </div>
@@ -2161,7 +2132,6 @@ const renderedMagazineContent = useMemo(() => {
         </div>
       )}
 
-
       {showWrappedModal && (
         <WrappedModal 
           onClose={() => setShowWrappedModal(false)}
@@ -2171,6 +2141,6 @@ const renderedMagazineContent = useMemo(() => {
           nemesisData={nemesisData}
         />
       )}
-    </div>
-  );
-}
+    </div> // סגירת ה-div הראשי
+  ); // סגירת ה-return
+} // סגירת ה-Dashboard

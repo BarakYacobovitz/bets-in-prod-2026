@@ -166,13 +166,25 @@ export default function AdminMagazineTab() {
          </div>
       </div>
       {/* תצוגה מקדימה נשארת אותו דבר */}
-      <div className="bg-slate-950 p-6 rounded-3xl border border-slate-800 shadow-xl overflow-hidden h-full sticky top-4">
-         <h3 className="text-lg font-black text-slate-400 mb-4">👁️ תצוגה חיה</h3>
-         <div className="bg-slate-900 p-8 rounded-3xl border border-slate-800 h-full overflow-y-auto">
-            <div className="text-slate-300 text-lg leading-relaxed mb-6 italic border-r-4 border-slate-600 pr-4" dangerouslySetInnerHTML={{ __html: dashSubtext }} />
-            <div className="text-slate-200 text-lg leading-relaxed [&_h1]:text-3xl [&_h1]:font-black [&_h1]:text-emerald-400 [&_mark]:bg-emerald-500/20 [&_mark]:text-emerald-300 [&_blockquote]:border-r-4 [&_blockquote]:bg-slate-800/50 [&_blockquote]:p-4" dangerouslySetInnerHTML={{ __html: dashMsg }} />
-         </div>
-      </div>
+      {/* החלף את כל ה-div של "תצוגה חיה" בקוד הזה */}
+        <div className="bg-slate-950 p-6 rounded-3xl border border-slate-800 shadow-xl overflow-hidden h-full sticky top-4">
+          <h3 className="text-lg font-black text-slate-400 mb-4">👁️ תצוגה חיה (כפי שזה יראה בדשבורד)</h3>
+          
+          <div className="bg-slate-900 p-6 rounded-3xl border border-slate-700 flex flex-col overflow-hidden">
+              {/* תמונה בתצוגה מקדימה */}
+              {dashMediaUrl && (
+                <div className="w-full mb-4 overflow-hidden rounded-2xl border border-slate-800">
+                    <img src={dashMediaUrl} alt="Preview" className="w-full h-auto object-cover" />
+                </div>
+              )}
+
+              {/* התוכן מהאדמין */}
+              <div 
+                className="w-full overflow-hidden [&_img]:w-full [&_img]:h-auto [&_img]:rounded-2xl [&_h1]:text-2xl [&_h2]:text-xl [&_p]:text-sm [&_p]:text-slate-300"
+                dangerouslySetInnerHTML={{ __html: dashSubtext || "אין עדכונים מיוחדים..." }} 
+              />
+          </div>
+        </div>
     </div>
   );
 }
