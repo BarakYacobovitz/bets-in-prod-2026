@@ -213,10 +213,10 @@ export default function AdminMagazineTab() {
               )}
 
               {/* הכתבה המלאה (dashMsg) */}
-              <div 
-                className="w-full h-full text-slate-200 text-base md:text-lg leading-relaxed [&_img]:w-full [&_img]:h-auto [&_img]:rounded-2xl [&_h1]:text-2xl md:[&_h1]:text-3xl [&_h1]:font-black [&_h1]:text-emerald-400 [&_h2]:text-xl md:[&_h2]:text-2xl [&_mark]:bg-emerald-500/20 [&_mark]:text-emerald-300 [&_blockquote]:border-r-4 [&_blockquote]:bg-slate-800/50 [&_blockquote]:p-4"
-                dangerouslySetInnerHTML={{ __html: dashMsg || "<p class='text-slate-500 italic'>הכתבה המלאה ריקה...</p>" }} 
-              />
+                <div 
+                  className="w-full h-full text-slate-200 text-base md:text-lg leading-relaxed [&_img]:max-w-full [&_img]:h-auto [&_img]:rounded-2xl [&_h1]:text-2xl md:[&_h1]:text-3xl [&_h1]:font-black [&_h1]:text-emerald-400 [&_h2]:text-xl md:[&_h2]:text-2xl [&_mark]:bg-emerald-500/20 [&_mark]:text-emerald-300 [&_blockquote]:border-r-4 [&_blockquote]:bg-slate-800/50 [&_blockquote]:p-4"
+                  dangerouslySetInnerHTML={{ __html: dashMsg || "<p class='text-slate-500 italic'>הכתבה המלאה ריקה...</p>" }} 
+                />
            </div>
         </div>
       </div>

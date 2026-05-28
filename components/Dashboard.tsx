@@ -570,6 +570,27 @@ export default function Dashboard({ userId, userName, setActiveTab, setPredictio
                       });
                       }
                }
+                else if (q.answerType === "MATCH") {
+                // מפרקים את התשובה (למשל: "ספרד - גרמניה") לשתי קבוצות
+                const parts = ansStr.split("-").map(s => s.trim());
+                if (parts.length === 2) {
+                    const [teamA, teamB] = parts;
+                    // בודקים האם המשחק הזה בדיוק מופיע ברשימת המשחקים של היום
+                    const isMatchToday = tMatches.some(m => 
+                      (m.homeTeam === teamA && m.awayTeam === teamB) || 
+                      (m.homeTeam === teamB && m.awayTeam === teamA)
+                    );
+                    if (isMatchToday) {
+                      targets.push({
+                          type: "SPECIFIC_MATCH",
+                          teamA: teamA,
+                          teamB: teamB,
+                          questionLabel: q.label,
+                          points: q.points
+                      });
+                    }
+                }
+              }
               else if (noneKeywords.includes(ansStr) && todayTeams.size > 0) {
                  targets.push({ team: "אף נבחרת", questionLabel: q.label, points: q.points, isSurvival: true });
               }
@@ -1874,6 +1895,25 @@ const renderedMagazineContent = useMemo(() => {
                                 </p>
                                </div>
                              </div>
+                          ) : target.type === "SPECIFIC_MATCH" ? (
+                            <div className="flex items-center gap-4 bg-slate-800/90 p-5 rounded-2xl border border-rose-500/30 relative overflow-hidden transition-all shadow-lg text-right">
+                            <div className="absolute top-0 right-0 w-2 h-full bg-rose-500"></div>
+                            <div className="relative z-10 shrink-0">
+                                <div className="relative">
+                                  <span className="text-4xl drop-shadow-md">⚔️</span>
+                                  <span className="absolute -bottom-2 -right-2 bg-slate-900 border border-slate-700 rounded-full w-7 h-7 flex items-center justify-center text-xs">⚽</span>
+                                </div>
+                            </div>
+                            <div className="relative z-10 text-right">
+                                <h4 className="text-white font-bold text-base md:text-lg leading-tight mb-1">
+                                  דע לך שהיום יש את המשחק בין <span className="text-rose-400">{target.teamA}</span> ל-<span className="text-rose-400">{target.teamB}</span>!
+                                </h4>
+                                <p className="text-slate-300 text-xs md:text-sm leading-relaxed">
+                                  אם יהיו בו הרבה שערים תוכל להרוויח בענק בשאלה: <br/>
+                                  <span className="text-slate-400 italic mt-1 inline-block">"{target.questionLabel}"</span>
+                                </p>
+                            </div>
+                          </div>   
                           ) : target.isSurvival ? (
                                     <>
                                       <div className="text-5xl mb-4 drop-shadow-md">🛡️</div>
