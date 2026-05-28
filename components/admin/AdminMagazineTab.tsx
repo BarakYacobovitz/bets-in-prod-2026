@@ -165,30 +165,61 @@ export default function AdminMagazineTab() {
            </button>
          </div>
       </div>
-      {/* תצוגה מקדימה נשארת אותו דבר */}
-      {/* החלף את כל ה-div של "תצוגה חיה" בקוד הזה */}
-        <div className="bg-slate-950 p-6 rounded-3xl border border-slate-800 shadow-xl overflow-hidden h-full sticky top-4">
-          <h3 className="text-lg font-black text-slate-400 mb-4">👁️ תצוגה חיה (הכתבה המלאה כפי שתופיע בלחיצה)</h3>
-          
-          <div className="bg-slate-900 p-6 md:p-8 rounded-3xl border border-slate-700 flex flex-col overflow-hidden shadow-2xl">
-              {/* תמונה בתצוגה מקדימה */}
+      {/* תצוגה מקדימה */}
+      <div className="bg-slate-950 p-6 rounded-3xl border border-slate-800 shadow-xl overflow-y-auto custom-scrollbar h-full max-h-[85vh] sticky top-4">
+        
+        {/* חלק 1: כרטיס הטיזר החיצוני */}
+        <div className="mb-8 pb-8 border-b border-slate-800">
+           <h3 className="text-lg font-black text-slate-400 mb-4">👁️ כרטיס טיזר (כפי שיופיע בדשבורד בחוץ)</h3>
+           <div className="w-full max-w-sm mx-auto bg-slate-900 rounded-3xl p-6 shadow-xl border border-slate-700 hover:border-blue-500/50 transition-all flex flex-col overflow-hidden opacity-80 cursor-not-allowed">
               {dashMediaUrl && (
-              <div className="w-full mb-6 overflow-hidden rounded-2xl border border-slate-800 shadow-lg">
+                <div className="w-full mb-4 overflow-hidden rounded-2xl border border-slate-800">
                   {dashMediaUrl.match(/\.(jpeg|jpg|gif|png|webp)$/i) != null ? (
-                    <img src={dashMediaUrl} alt="Preview" className="w-full h-auto object-cover mx-auto" />
+                    <img src={dashMediaUrl} alt="Magazine" className="w-full h-auto object-cover" />
                   ) : (
-                    <video src={dashMediaUrl} autoPlay loop muted playsInline controls className="w-full h-auto object-cover mx-auto" />
+                    <video src={dashMediaUrl} autoPlay loop muted playsInline className="w-full h-auto object-cover" />
                   )}
-              </div>
-            )}
-
-              {/* התוכן מהאדמין */}
+                </div>
+              )}
               <div 
                 className="w-full overflow-hidden [&_img]:w-full [&_img]:h-auto [&_img]:rounded-2xl [&_h1]:text-2xl [&_h2]:text-xl [&_p]:text-sm [&_p]:text-slate-300"
-                dangerouslySetInnerHTML={{ __html: dashSubtext || "אין עדכונים מיוחדים..." }} 
+                dangerouslySetInnerHTML={{ __html: dashSubtext || "אין עדכונים מיוחדים הבוקר." }} 
               />
-          </div>
+              <button disabled className="mt-4 bg-slate-800 text-slate-500 font-bold py-3 w-full rounded-xl border border-slate-700 text-sm shadow-md">
+                 קרא את המהדורה המלאה 👈
+              </button>
+           </div>
         </div>
+
+        {/* חלק 2: המודל הפנימי (הכתבה המלאה) */}
+        <div>
+           <h3 className="text-lg font-black text-slate-400 mb-4">📰 המודל הפנימי (לאחר לחיצה על הכרטיס)</h3>
+           <div className="bg-slate-900 p-6 md:p-8 rounded-3xl border border-slate-700 flex flex-col overflow-hidden shadow-2xl relative">
+              <div className="absolute top-0 right-0 w-1.5 h-full bg-gradient-to-b from-blue-400 to-emerald-500"></div>
+              
+              <div className="flex justify-between items-start mb-6 border-b border-slate-800 pb-4 pr-2">
+                 <h3 className="text-xl md:text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400">📰 המהדורה המרכזית</h3>
+              </div>
+              
+              {/* תמונה בתצוגה מקדימה פנימית */}
+              {dashMediaUrl && (
+                <div className="w-full mb-6 overflow-hidden rounded-2xl border border-slate-800 shadow-lg">
+                    {dashMediaUrl.match(/\.(jpeg|jpg|gif|png|webp)$/i) != null ? (
+                      <img src={dashMediaUrl} alt="Preview" className="w-full max-h-[300px] object-contain mx-auto" />
+                    ) : (
+                      <video src={dashMediaUrl} autoPlay loop muted playsInline controls className="w-full max-h-[300px] object-contain mx-auto" />
+                    )}
+                </div>
+              )}
+
+              {/* הכתבה המלאה (dashMsg) */}
+              <div 
+                className="w-full h-full text-slate-200 text-base md:text-lg leading-relaxed [&_img]:w-full [&_img]:h-auto [&_img]:rounded-2xl [&_h1]:text-2xl md:[&_h1]:text-3xl [&_h1]:font-black [&_h1]:text-emerald-400 [&_h2]:text-xl md:[&_h2]:text-2xl [&_mark]:bg-emerald-500/20 [&_mark]:text-emerald-300 [&_blockquote]:border-r-4 [&_blockquote]:bg-slate-800/50 [&_blockquote]:p-4"
+                dangerouslySetInnerHTML={{ __html: dashMsg || "<p class='text-slate-500 italic'>הכתבה המלאה ריקה...</p>" }} 
+              />
+           </div>
+        </div>
+      </div>
     </div>
   );
 }

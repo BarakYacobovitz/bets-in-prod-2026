@@ -1498,7 +1498,7 @@ const renderedMagazineContent = useMemo(() => {
 {/* הנה בלוק המגזין החדש והנקי: */}
       <div 
         onClick={() => setShowMagazineModal(true)}
-        className="w-full bg-slate-900 rounded-3xl p-6 shadow-xl border border-slate-700 cursor-pointer hover:border-blue-500/50 transition-all flex flex-col overflow-hidden"
+        className="w-[calc(100vw-32px)] lg:w-auto shrink-0 snap-center min-h-full min-w-0 bg-slate-900 rounded-3xl p-6 shadow-xl border border-slate-700 cursor-pointer hover:border-blue-500/50 transition-all flex flex-col overflow-hidden"
       >
         {dailyMediaUrl && (
           <div className="w-full mb-4 overflow-hidden rounded-2xl border border-slate-800">
