@@ -4,9 +4,9 @@ const flagMap: Record<string, string> = {
   // --- נבחרות מוכרות ---
   "ארגנטינה": "https://flagcdn.com/w40/ar.png",
   "ברזיל": "https://flagcdn.com/w40/br.png",
-  "צרפת": "https://flagcdn.com/w40/fr.png",
+  "צרפת": "https://flagcdn.com/w40/fr.webp",
   "אנגליה": "https://flagcdn.com/w40/gb-eng.png", // אנגליה זה חריג
-  "ספרד": "https://flagcdn.com/w40/es.png",
+  "ספרד": "https://flagcdn.com/w40/es.webp",
   "הולנד": "https://flagcdn.com/w40/nl.png",
   "גרמניה": "https://flagcdn.com/w40/de.png",
   "פורטוגל": "https://flagcdn.com/w40/pt.png",

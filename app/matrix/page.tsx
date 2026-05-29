@@ -56,6 +56,9 @@ export default function MatrixPage() {
 
   const [tournamentState, setTournamentState] = useState<number>(0);
   const [isLoading, setIsLoading] = useState(true);
+  // 🔴 מתג כיבוי חירום ל-VAR 🔴
+  // שנה ל-false כדי להעלים את החיפוש של ה-VAR מהמסך לחלוטין
+  const ENABLE_VAR_FEATURE = true;
 // 👑 כאן בדיוק להדביק: המשתנים החדשים של עמדת ה-VAR
   // --- States for VAR Station (AI) ---
   const [varQuery, setVarQuery] = useState("");
@@ -335,6 +338,7 @@ const mList: any[] = [];
     document.body.removeChild(link);
   };
   // --- Function to fetch AI answer using Local Matrix State (Smart Firewall & Factual Prompt) ---
+  // --- Function to fetch AI answer using Local Matrix State (Smart Firewall & Factual Prompt) ---
   const handleAskVAR = async () => {
     if (!varQuery.trim()) return;
     setIsVarLoading(true);
@@ -344,77 +348,205 @@ const mList: any[] = [];
       const currentUserId = auth?.currentUser?.uid;
       const currentUserObj = users.find(u => u.id === currentUserId);
       const actualUserName = currentUserObj?.name || "שחקן אורח";
-      const fullLeaderboard = users.map((u, idx) => ({
-        rank: idx + 1, name: u.name || "שחקן", totalPoints: u.totalPoints || 0
-      }));
+      
+      // 1. עוגן זמן למניעת הזיות מונדיאל 2022
+      const currentDateHebrew = new Date().toLocaleDateString('he-IL', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 
-      // מעבירים ל-VAR לוח משחקים נקי עם הגדרה מפורשת של תוצאות
-      const allMatchesSchedule = matches.map(m => {
-        const isLocked = m.isFinished || checkIsMatchLocked(m, tournamentState);
-        return {
-          id: m.id, 
-          matchName: `${m.homeTeam} נגד ${m.awayTeam}`,
-          isFinished: !!m.isFinished,
-          // מונע מה-AI להתבלבל בגלל RTL: כותבים במפורש מי בבית ומי בחוץ
-          realScoreText: m.isFinished ? `${m.homeTeam} ${m.realHomeScore} - ${m.realAwayScore} ${m.awayTeam}` : "טרם שוחק"
-        };
+      // 2. בניית אובייקט נתונים חיים (מפאנל ניהול בונוסים)
+      const liveTournamentStats: any = {};
+      filteredBonusQuestions.forEach(q => {
+         const phase = q.phase || "TOURNAMENT";
+         let isExposed = (phase === "KNOCKOUT") ? (tournamentState >= 5) : (tournamentState >= 1);
+         if (q.isSurprise) {
+            const closeMs = parseDateTimeLocal(q.closeTime);
+            isExposed = nowMs > closeMs;
+         }
+
+         if (isExposed) {
+             const truth = realBonusFull.answers?.[q.id];
+             const lead = realBonusFull.leading?.[q.id];
+             
+             let statusText = "אין נתונים עדכניים / טרם הוכרע";
+             if (truth && (Array.isArray(truth) ? truth.length > 0 : truth !== "")) {
+                 statusText = `תשובה סופית ומוחלטת: ${Array.isArray(truth) ? truth.join(", ") : truth}`;
+             } else if (lead && (Array.isArray(lead) ? lead.length > 0 : lead !== "")) {
+                 statusText = `מוביל זמני כרגע: ${Array.isArray(lead) ? lead.join(", ") : lead}`;
+             }
+             
+             liveTournamentStats[q.label || q.questionText] = statusText;
+         }
       });
 
-      // בניית הפרופילים רק למשחקים רלוונטיים (שיש בהם ניחוש)
+      // 3. בניית הפרופילים האישיים רק לנתונים גלויים (משחקים, בונוסים והעפלות)
       const exposedUserProfiles: any = {};
       users.forEach(u => {
+        let userStats: any = { 
+            matchPredictions: [], 
+            bonuses: [], 
+            groupQualifiers: [], 
+            thirdPlaceQualifiers: [] 
+        };
+        
+        // א. משחקים
         const userPreds = predictions[u.id];
-        if (!userPreds) return;
+        if (userPreds) {
+          matches.forEach(m => {
+            if ((m.isFinished || checkIsMatchLocked(m, tournamentState)) && userPreds[m.id]) {
+              const p = userPreds[m.id];
+              let earnedPts = 0;
+              if (m.isFinished) {
+                 const rH = Number(m.realHomeScore); const rA = Number(m.realAwayScore);
+                 const pH = Number(p.predictedHomeScore); const pA = Number(p.predictedAwayScore);
+                 if (Math.sign(pH - pA) === Math.sign(rH - rA)) {
+                    earnedPts += 5; // כיוון
+                    if (pH === rH && pA === rA) earnedPts += 10; // בול
+                 }
+              }
+              
+              if (p.predictedHomeScore !== undefined || earnedPts > 0) {
+                 userStats.matchPredictions.push({
+                    match: `${m.homeTeam} נגד ${m.awayTeam}`,
+                    pred: `${p.predictedHomeScore}-${p.predictedAwayScore}`,
+                    real: m.isFinished ? `${m.realHomeScore}-${m.realAwayScore}` : "טרם שוחק",
+                    points: earnedPts
+                 });
+              }
+            }
+          });
+        }
 
-        let userStats: any = { matchPredictions: [] };
-        matches.forEach(m => {
-          if ((m.isFinished || checkIsMatchLocked(m, tournamentState)) && userPreds[m.id]) {
-            const p = userPreds[m.id];
-            // מחשבים את הנקודות כאן בקוד, לא נותנים ל-AI לנחש!
-            let earnedPts = 0;
-            if (m.isFinished) {
-               const rH = Number(m.realHomeScore); const rA = Number(m.realAwayScore);
-               const pH = Number(p.predictedHomeScore); const pA = Number(p.predictedAwayScore);
-               if (Math.sign(pH - pA) === Math.sign(rH - rA)) {
-                  earnedPts += 5; // כיוון
-                  if (pH === rH && pA === rA) earnedPts += 10; // בול
-               }
-            }
-            
-            // שולחים ל-AI רק אם המשחק רלוונטי (או היה ניחוש או יש ניקוד)
-            if (p.predictedHomeScore !== undefined || earnedPts > 0) {
-               userStats.matchPredictions.push({
-                  match: `${m.homeTeam} נגד ${m.awayTeam}`,
-                  pred: `${p.predictedHomeScore}-${p.predictedAwayScore}`,
-                  real: m.isFinished ? `${m.realHomeScore}-${m.realAwayScore}` : "טרם שוחק",
-                  points: earnedPts
+        // ב. בונוסים
+        filteredBonusQuestions.forEach(q => {
+           const phase = q.phase || "TOURNAMENT";
+           let isExposed = (phase === "KNOCKOUT") ? (tournamentState >= 5) : (tournamentState >= 1);
+           
+           if (q.isSurprise) {
+              const closeMs = parseDateTimeLocal(q.closeTime);
+              isExposed = nowMs > closeMs;
+           }
+
+           const bData = bonusPredictions[u.id];
+           if (isExposed && bData && bData[q.id] !== undefined) {
+               const truth = realBonusFull.answers?.[q.id] || [];
+               const tArr = Array.isArray(truth) ? truth : [truth];
+               const isHit = tArr.some((t:any) => String(t).trim().toLowerCase() === String(bData[q.id]).trim().toLowerCase());
+               const isMiss = realBonusFull.blacklist?.[q.id]?.some((t:any) => String(t).trim().toLowerCase() === String(bData[q.id]).trim().toLowerCase()) || (realBonusFull.locked?.[q.id] && !isHit);
+
+               let status = "פתוח (ממתין לתוצאה)";
+               if (isHit) status = "פגיעה נכונה!";
+               if (isMiss) status = "נפילה (נפסל)";
+
+               userStats.bonuses.push({
+                   question: q.label || q.questionText,
+                   answer: String(bData[q.id]),
+                   status: status
                });
-            }
-          }
+           }
         });
-        if (userStats.matchPredictions.length > 0) exposedUserProfiles[u.name] = userStats;
+
+        // ג. עולות מהבתים וד. עולות מהמקום השלישי
+        if (tournamentState >= 1) {
+           const uGroupPreds = qualifiersPredictions[u.id];
+           if (uGroupPreds) {
+               ["A","B","C","D","E","F","G","H","I","J","K","L"].forEach(group => {
+                   const gPred = uGroupPreds[group];
+                   if (gPred && (gPred.first || gPred.second)) {
+                       const rG = realQualifiers[group] || {};
+                       let statusFirst = "ממתין";
+                       let statusSecond = "ממתין";
+                       
+                       if (rG.first || rG.second) {
+                           if (gPred.first) {
+                               if (gPred.first === rG.first) statusFirst = "בול";
+                               else if (gPred.first === rG.second) statusFirst = "כיוון (מקום שני)";
+                               else statusFirst = "נפילה";
+                           }
+                           if (gPred.second) {
+                               if (gPred.second === rG.second) statusSecond = "בול";
+                               else if (gPred.second === rG.first) statusSecond = "כיוון (מקום ראשון)";
+                               else statusSecond = "נפילה";
+                           }
+                       }
+                       
+                       userStats.groupQualifiers.push({
+                           group: `בית ${group}`,
+                           predictedFirst: gPred.first || "--",
+                           statusFirst: statusFirst,
+                           predictedSecond: gPred.second || "--",
+                           statusSecond: statusSecond
+                       });
+                   }
+               });
+           }
+
+           const uThirdPreds = thirdPlacePredictions[u.id];
+           if (uThirdPreds && uThirdPreds.teams && uThirdPreds.teams.length > 0) {
+               const realThird = realThirdPlace || [];
+               const isFull = realThird.filter((x:any)=>x).length >= 8;
+               
+               const thirdTeamsStats = uThirdPreds.teams.map((t: string) => {
+                   const isHit = realThird.includes(t);
+                   let status = "ממתין";
+                   if (isHit) status = "פגיעה נכונה";
+                   else if (isFull && !isHit) status = "נפילה";
+                   return { team: t, status: status };
+               });
+               userStats.thirdPlaceQualifiers = thirdTeamsStats;
+           }
+        }
+
+        // דחיפת המשתמש רק אם יש לו נתונים כלשהם
+        if (userStats.matchPredictions.length > 0 || userStats.bonuses.length > 0 || userStats.groupQualifiers.length > 0 || userStats.thirdPlaceQualifiers.length > 0) {
+            exposedUserProfiles[u.name] = userStats;
+        }
       });
 
-      const systemInstructions = `אתה "פרשן ה-VAR". 
-חוקים קריטיים:
-חוקי זהות וזיהוי משתמש:
-1. המשתמש שפונה אליך כרגע הוא "${actualUserName}". אם הוא שואל "מה מצבי?", "הניחושים שלי", "איך הייתי" - סרוק את ה-JSON והצג אך ורק את הנתונים של ${actualUserName}!
-2. אם המשתמש שואל על שם ספציפי (למשל "מה עם ברק?"), חפש אותו ב-JSON שקיבלת וענה עליו.
-3. אם השאלה כללית (למשל "מי מוביל בטבלה?", "מה התוצאות של אתמול?"), ענה תשובה כללית.
-4. אם המשתמש שואל על מישהו שלא קיים ב-JSON, תגיד בעדינות שאין לך נתונים עליו.
-חוקים נוספים:
-1. איסור חישוב: אל תחשב נקודות! קרא את שדה ה-'points' מה-JSON בלבד.
-2. דאטה בלבד: אם משחק לא מופיע ב-JSON, הוא לא רלוונטי. אל תמציא משחקים.
-3. טבלה מעוצבת ו-Sticky Header (קריטי): 
-   השתמש אך ורק ב-HTML עם Tailwind. 
-   - עבור ה-<table>: "w-full text-right border-collapse my-3 bg-black/60 rounded-xl overflow-hidden text-xs shadow-inner"
-   - עבור ה-<thead>: "sticky top-0 z-20 bg-slate-800" (זה מה שגורם לשמות לא להיעלם!)
-   - עבור ה-<th>: "text-slate-300 p-2 font-black border-b border-slate-700 text-center"
-4. מילון: 'בול' = 15 נק', 'כיוון' = 5 נק', 'נפילה' = 0 נק'.
-5. דיסקליימר: אם המשתמש שאל על "פגיעות", הוסף בתחילת התשובה ב-<small>: "(התשובה כוללת את כל המשחקים שהניבו נקודות, בולים וכיוונים)".
-6.אם יש יותר מ-8 משחקים ברשימה, אל תייצר טבלה אחת ארוכה. פצל את המידע לשתי טבלאות נפרדות לפי קטגוריות: 'משחקי בול (15 נק')' ו-'משחקי כיוון (5 נק')  '. זה עוזר למשתמש לסרוק את הנתונים בלי לאבד את הריכוז."
+      // 4. אריזת הנתונים ל-AI
+      const varContextPayload = {
+          globalLiveStats: liveTournamentStats,
+          usersPredictions: exposedUserProfiles
+      };
 
-נתוני ה-JSON שקיבלת: ${JSON.stringify(exposedUserProfiles)}`;
+      // 5. הוראות המערכת (System Prompt)
+      const systemInstructions = `You are the "VAR Commentator" (פרשן ה-VAR). 
+CRITICAL RULE: You must ALWAYS respond in Hebrew. Your tone should be energetic, sharp, and slightly cynical, like a real sports commentator.
+
+=== REALITY & TIME ANCHORS ===
+1. Current Date: Today is ${currentDateHebrew}. Use this to understand concepts like "yesterday", "today", or "upcoming matches".
+2. World Cup 2026 Only: You are an expert on the FIFA World Cup 2026 hosted in the USA, Canada, and Mexico. 
+3. Anti-2022 Hallucination: DO NOT provide data, groups, stadiums, or results from the 2022 Qatar World Cup (or any past tournament) unless the user explicitly asks a historical question.
+4. No Internet Browsing: You do not have real-time internet access. If you are asked about a live score, a recent injury, or something you are not 100% sure about, DO NOT invent data. Reply with VAR-style sarcasm: "ה-VAR לא מחובר כרגע לאינטרנט כדי לוודא את זה, עדיף שתבדוק בגוגל במקום להטריד את חדר הבקרה."
+
+=== SECURITY & DATA DISCLOSURE RULES (STRICT) ===
+1. The JSON data you receive is dynamically pre-filtered. It ONLY contains data that is legally allowed to be exposed at this exact moment. 
+2. If a match, bonus question, group qualifier, or specific user prediction is NOT present in the JSON, you must assume it is currently LOCKED or HIDDEN. 
+3. If asked about missing/hidden game data, politely explain: "הנתונים האלה עדיין חסויים ב-VAR וייחשפו כשהשלב יינעל." Do not invent or guess.
+4. Live Tournament Data: The JSON you receive has a new section called 'globalLiveStats'. If the user asks a general question like "How many yellow cards have been shown?" or "Who is currently leading the goals?", ALWAYS check 'globalLiveStats' first. If the data is there (e.g., 'מוביל זמני כרגע: 42'), use it and state that this is the official live data from the VAR room. If it says "אין נתונים עדכניים / טרם הוכרע", fallback to your "no internet connection" persona.
+
+=== PREDICTION GAME RULES ===
+1. User Identification: The user currently speaking to you is "${actualUserName}". If they ask "What's my status?" or "My bets", present ONLY their data from 'usersPredictions'.
+2. Querying Others: If asked about a specific player (e.g., "What did Dekel bet?"), search for that exact name in 'usersPredictions'.
+3. Zero Calculation Policy: Read the 'points', 'status', 'statusFirst', and 'statusSecond' fields directly from the JSON.
+4. Categories in JSON: 
+   - 'matchPredictions': User's match score bets.
+   - 'bonuses': User's bonus questions.
+   - 'groupQualifiers': User's bets for 1st and 2nd place in each group. 
+   - 'thirdPlaceQualifiers': User's bets for the 8 teams qualifying from 3rd place.
+
+=== UI & RENDERING RULES (CRITICAL) ===
+You must render data using ONLY HTML with Tailwind CSS classes. Do not use markdown tables.
+
+- Table Element: <table class="w-full text-right border-collapse my-3 bg-black/60 rounded-xl overflow-hidden text-xs shadow-inner">
+- Header (Sticky): <thead class="sticky top-0 z-20 bg-slate-800">
+- Th Elements: <th class="text-slate-300 p-2 font-black border-b border-slate-700 text-center">
+
+Display Logic:
+- Disclaimer: If the user asks about personal points or hits, insert this at the beginning: <small>(התשובה מציגה את הנתונים שנחשפו עד כה בטורניר)</small>
+- Grouping: If answering broadly about bets, visually group the answer using separate HTML tables (Matches, Bonuses, Group Qualifiers, 3rd Place). Do not mix categories into one table.
+- Split Match Tables: If a match list has > 8 items, split it into two tables: 'משחקי בול (15 נק')' and 'משחקי כיוון (5 נק')'.
+
+INJECTED GAME DATA:
+${JSON.stringify(varContextPayload)}`;
 
       const res = await fetch('/api/chat', {
         method: 'POST',
@@ -561,7 +693,8 @@ const mList: any[] = [];
            </div>
         )}
       </div>
-      {/* 🔍 שורת הפעלה מהירה ל-VAR */}
+      {/* 🔍 שורת הפעלה מהירה ל-VAR */} 
+      {ENABLE_VAR_FEATURE && (
       <div className="w-full max-w-4xl mx-auto mb-6 bg-slate-950 border border-slate-800 rounded-2xl p-2 md:p-3 flex flex-col md:flex-row gap-2 md:gap-3 shadow-inner" dir="rtl">
         <input
           type="text"
@@ -588,6 +721,7 @@ const mList: any[] = [];
           🚨 שלח לבדיקה
         </button>
       </div>
+      )}
 {/* 1. הסרנו את ה-overflow-hidden מהעוטף החיצוני */}
 <div className="max-w-[98vw] mx-auto bg-slate-900/80 rounded-2xl border border-slate-700 shadow-2xl">
   
