@@ -1,7 +1,14 @@
 "use client";
 import { useState, useEffect, useRef } from "react";
 import { auth, db } from "../app/firebase";
-import { GoogleAuthProvider, signInWithPopup, signOut } from "firebase/auth";
+import { 
+  GoogleAuthProvider, 
+  signInWithPopup, 
+  signOut,
+  sendSignInLinkToEmail, 
+  isSignInWithEmailLink, 
+  signInWithEmailLink 
+} from "firebase/auth";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import toast from "react-hot-toast";
 
@@ -11,6 +18,10 @@ const LOCK_TIME = new Date("2026-06-11T14:00:00").getTime();
 export default function Login() {
   const [errorMsg, setErrorMsg] = useState("");
   const [isLoggingIn, setIsLoggingIn] = useState(false);
+  
+  // -- סטייטים חדשים עבור Magic Link --
+  const [email, setEmail] = useState("");
+  const [isMagicLinkLoading, setIsMagicLinkLoading] = useState(false);
   
   // שומרים את יחידות הזמן בנפרד לעיצוב הדיגיטלי
   const [timeUnits, setTimeUnits] = useState<{ d: string, h: string, m: string, s: string } | null>(null);
@@ -56,6 +67,7 @@ export default function Login() {
     return () => clearInterval(intervalId);
   }, []);
 
+  // -- התחברות קלאסית עם Google --
   const handleLogin = async () => {
     setErrorMsg("");
     setIsLoggingIn(true);
@@ -72,7 +84,6 @@ export default function Login() {
       const sysSnap = await getDoc(doc(db, "settings", "system"));
       const currentTournamentState = sysSnap.exists() ? (Number(sysSnap.data().tournamentState) || 0) : 0;
 
-      // בדיקה: האם זה משתמש חדש שמנסה להירשם אחרי שהתחיל הטורניר?
       if (isReallyNewUser && currentTournamentState >= 1) {
         toast.error("המשחקים כבר החלו! ⛔\nלא ניתן להצטרף לליגה לאחר שריקת הפתיחה.", {
           duration: 8000,
@@ -85,7 +96,6 @@ export default function Login() {
         return;
       }
 
-      // יצירת יוזר חדש במסד במידה וזה משתמש חדש והטורניר טרם התחיל
       if (isReallyNewUser) {
         const fallbackName = user.displayName || user.email?.split('@')[0] || "שחקן חדש";
         await setDoc(userDocRef, {
@@ -108,6 +118,96 @@ export default function Login() {
     }
   };
 
+  // -- פונקציית Magic Link --
+  const handleMagicLinkSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!email || !email.includes("@")) {
+      const errId = toast.error("נא להזין כתובת אימייל תקינה");
+      setTimeout(() => toast.dismiss(errId), 3000);
+      return;
+    }
+
+    if (email.toLowerCase().endsWith("@gmail.com")) {
+      const infoId = toast("יש לך ג'ימייל! פשוט לחץ על הכפתור של גוגל למעלה 👆", {
+        icon: '💡',
+        style: { background: '#334155', color: '#60a5fa', border: '1px solid #3b82f6' }
+      });
+      setTimeout(() => toast.dismiss(infoId), 4000);
+      return;
+    }
+
+    setIsMagicLinkLoading(true);
+    const toastId = toast.loading("מכין את קישור הכניסה...");
+
+    const actionCodeSettings = {
+      url: window.location.origin, 
+      handleCodeInApp: true,
+    };
+
+    try {
+      await sendSignInLinkToEmail(auth, email, actionCodeSettings);
+      window.localStorage.setItem("emailForSignIn", email);
+      
+      toast.dismiss(toastId);
+      const successId = toast.success("שלחנו לך מייל עם קישור כניסה! 🪄 (בדוק גם בספאם)");
+      setTimeout(() => toast.dismiss(successId), 4000);
+      setEmail("");
+    } catch (error) {
+      console.error(error);
+      toast.dismiss(toastId);
+      const errId = toast.error("שגיאה בשליחת המייל. נסה שוב.");
+      setTimeout(() => toast.dismiss(errId), 3000);
+    } finally {
+      setIsMagicLinkLoading(false);
+    }
+  };
+
+  // -- קליטת המשתמש שחוזר מהמייל --
+  useEffect(() => {
+    if (isSignInWithEmailLink(auth, window.location.href)) {
+      let savedEmail = window.localStorage.getItem("emailForSignIn");
+      
+      if (!savedEmail) {
+        savedEmail = window.prompt("נא להזין שוב את המייל שלך לאימות סופי (אבטחה):");
+      }
+
+      if (savedEmail) {
+        const loginToastId = toast.loading("מאמת ומחבר אותך...");
+        
+        signInWithEmailLink(auth, savedEmail, window.location.href)
+          .then(async (result) => {
+            window.localStorage.removeItem("emailForSignIn");
+            
+            const userDocRef = doc(db, "users", result.user.uid);
+            const userDocSnap = await getDoc(userDocRef);
+
+            if (!userDocSnap.exists()) {
+              const fallbackName = result.user.email?.split("@")[0] || "שחקן חדש";
+              await setDoc(userDocRef, {
+                name: fallbackName,
+                email: result.user.email,
+                totalPoints: 0,
+                knockoutPoints: 0,
+                hasPaid: false,
+                createdAt: new Date()
+              });
+            }
+
+            toast.dismiss(loginToastId);
+            const successId = toast.success("התחברת בהצלחה! ⚽");
+            setTimeout(() => toast.dismiss(successId), 3000);
+          })
+          .catch((error) => {
+            console.error("Magic link error:", error);
+            toast.dismiss(loginToastId);
+            const errId = toast.error("פג תוקפו של הקישור או שהוא אינו תקין.");
+            setTimeout(() => toast.dismiss(errId), 4000);
+          });
+      }
+    }
+  }, []);
+
   return (
     <div className="relative min-h-screen w-full overflow-hidden bg-black flex flex-col items-center" dir="rtl">
       <video 
@@ -121,9 +221,6 @@ export default function Login() {
       
       <div className="absolute inset-0 z-10 bg-gradient-to-b from-slate-950/80 via-slate-900/50 to-slate-950/95 md:from-slate-950/50 md:via-slate-900/30 md:to-slate-950/60" />
     
-      {/* 
-        הגדלנו מעט את המקסימום רוחב ל-500px כדי שהשעון לא יישבר לשורות.
-      */}
       <div className="relative z-20 flex flex-col items-center h-full min-h-screen w-full max-w-sm md:max-w-[500px] mx-auto p-6 md:p-12 md:mt-0 text-center md:justify-center justify-between pt-16 md:pt-12 pb-12 animate-fade-in-up">      
         
         {/* --- חלק עליון: לוגו וכותרות --- */}
@@ -147,10 +244,10 @@ export default function Login() {
           </div>
         </div>
 
-        {/* --- חלק תחתון: שעון קומפקטי + כפתור התחברות צמודים --- */}
+        {/* --- חלק תחתון: שעון קומפקטי + כפתור התחברות --- */}
         <div className="w-full mt-auto flex flex-col items-center gap-6">
           
-          {/* עיצוב השעון החדש: דיגיטלי, נקי, ללא טקסט מיותר */}
+          {/* עיצוב השעון הדיגיטלי */}
           {!isTimeUp && timeUnits ? (
              <div className="flex flex-col items-center w-full">
                 <span className="text-[10px] text-amber-500/90 font-black tracking-[0.2em] mb-2.5 uppercase drop-shadow-md">
@@ -158,37 +255,25 @@ export default function Login() {
                 </span>
                 
                 <div className="flex items-center justify-center gap-2 md:gap-4 bg-slate-950/40 backdrop-blur-md px-6 py-3.5 md:px-8 md:py-4 rounded-2xl border border-white/10 shadow-[0_8px_30px_rgba(0,0,0,0.5)] w-fit mx-auto" dir="ltr">
-                   
-                   {/* ימים */}
                    <div className="flex flex-col items-center min-w-[40px] md:min-w-[50px]">
                      <span className="text-2xl md:text-4xl font-mono font-black text-white drop-shadow-[0_0_10px_rgba(255,255,255,0.6)] leading-none">{timeUnits.d}</span>
                      <span className="text-[8px] md:text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-1 md:mt-1.5">Days</span>
                    </div>
-                   
                    <span className="text-xl md:text-3xl text-slate-500/50 font-black leading-none pb-3 md:pb-4">:</span>
-                   
-                   {/* שעות */}
                    <div className="flex flex-col items-center min-w-[40px] md:min-w-[50px]">
                      <span className="text-2xl md:text-4xl font-mono font-black text-white drop-shadow-[0_0_10px_rgba(255,255,255,0.6)] leading-none">{timeUnits.h}</span>
                      <span className="text-[8px] md:text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-1 md:mt-1.5">Hrs</span>
                    </div>
-                   
                    <span className="text-xl md:text-3xl text-slate-500/50 font-black leading-none pb-3 md:pb-4">:</span>
-                   
-                   {/* דקות */}
                    <div className="flex flex-col items-center min-w-[40px] md:min-w-[50px]">
                      <span className="text-2xl md:text-4xl font-mono font-black text-white drop-shadow-[0_0_10px_rgba(255,255,255,0.6)] leading-none">{timeUnits.m}</span>
                      <span className="text-[8px] md:text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-1 md:mt-1.5">Min</span>
                    </div>
-                   
                    <span className="text-xl md:text-3xl text-slate-500/50 font-black leading-none pb-3 md:pb-4">:</span>
-                   
-                   {/* שניות */}
                    <div className="flex flex-col items-center min-w-[40px] md:min-w-[50px]">
                      <span className="text-2xl md:text-4xl font-mono font-black text-amber-400 drop-shadow-[0_0_10px_rgba(251,191,36,0.6)] leading-none">{timeUnits.s}</span>
                      <span className="text-[8px] md:text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-1 md:mt-1.5">Sec</span>
                    </div>
-                   
                 </div>
              </div>
           ) : (
@@ -204,7 +289,7 @@ export default function Login() {
               </div>
             )}
             
-            {/* הכפתור הופך למושבת (disabled) אך ורק בזמן שמתבצעת התחברות (isLoggingIn) ולא בגלל שהשעון נגמר */}
+            {/* כפתור גוגל המקורי */}
             <button 
               onClick={handleLogin} 
               disabled={isLoggingIn}
@@ -219,6 +304,32 @@ export default function Login() {
                 </>
               )}
             </button>
+
+            {/* קו מפריד */}
+            <div className="flex items-center gap-3 my-5 w-full opacity-60">
+              <div className="h-px bg-slate-500 flex-1"></div>
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">או</span>
+              <div className="h-px bg-slate-500 flex-1"></div>
+            </div>
+
+            {/* טופס ה-Magic Link בעיצוב המשתלב שלך */}
+            <form onSubmit={handleMagicLinkSubmit} className="flex flex-col gap-3 w-full">
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="הכנס אימייל לכניסה ללא גוגל"
+                dir="ltr"
+                className="w-full px-4 py-3.5 rounded-2xl bg-slate-950/60 backdrop-blur-md text-white border border-white/10 focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/50 outline-none text-sm transition-all shadow-[0_4px_15px_rgba(0,0,0,0.3)] text-center placeholder:text-slate-500"
+              />
+              <button
+                type="submit"
+                disabled={isMagicLinkLoading}
+                className="w-full bg-slate-900/80 hover:bg-slate-800 text-slate-300 px-4 py-3.5 rounded-2xl text-sm font-bold transition-all border border-white/10 flex justify-center items-center gap-2 active:scale-95 disabled:opacity-50 shadow-[0_4px_15px_rgba(0,0,0,0.3)]"
+              >
+                {isMagicLinkLoading ? "שולח..." : "שלח לי קישור כניסה 🪄"}
+              </button>
+            </form>
           </div>
 
         </div>

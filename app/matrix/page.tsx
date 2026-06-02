@@ -403,14 +403,16 @@ const mList: any[] = [];
                  }
               }
               
-              if (p.predictedHomeScore !== undefined || earnedPts > 0) {
-                 userStats.matchPredictions.push({
-                    match: `${m.homeTeam} נגד ${m.awayTeam}`,
-                    pred: `${p.predictedHomeScore}-${p.predictedAwayScore}`,
-                    real: m.isFinished ? `${m.realHomeScore}-${m.realAwayScore}` : "טרם שוחק",
-                    points: earnedPts
-                 });
-              }
+              // שולחים ל-AI רק אם המשחק רלוונטי
+                if (p.predictedHomeScore !== undefined || earnedPts > 0) {
+                  userStats.matchPredictions.push({
+                  gameName: `${m.homeTeam} - ${m.awayTeam}`,
+                  // הוספנו \u200e כאן
+                  pred: `\u200e${p.predictedHomeScore} - ${p.predictedAwayScore}`, 
+                  real: m.isFinished ? `\u200e${m.realHomeScore} - ${m.realAwayScore}` : "-",
+                  points: earnedPts
+                });
+            }
             }
           });
         }
@@ -500,6 +502,7 @@ const mList: any[] = [];
             exposedUserProfiles[u.name] = userStats;
         }
       });
+      
 
       // 4. אריזת הנתונים ל-AI
       const varContextPayload = {
@@ -507,47 +510,63 @@ const mList: any[] = [];
           usersPredictions: exposedUserProfiles
       };
 
-      // 5. הוראות המערכת (System Prompt)
-      const systemInstructions = `You are the "VAR Commentator" (פרשן ה-VAR). 
-CRITICAL RULE: You must ALWAYS respond in Hebrew. Your tone should be energetic, sharp, and slightly cynical, like a real sports commentator.
+  // 5. הוראות המערכת (System Prompt)
+    // 5. הוראות המערכת (System Prompt)
+const systemInstructions = `You are "VAR Commentator" (פרשן ה-VAR), an AI sports analyst.
+Current User Name: "${actualUserName}"
 
-=== REALITY & TIME ANCHORS ===
-1. Current Date: Today is ${currentDateHebrew}. Use this to understand concepts like "yesterday", "today", or "upcoming matches".
-2. World Cup 2026 Only: You are an expert on the FIFA World Cup 2026 hosted in the USA, Canada, and Mexico. 
-3. Anti-2022 Hallucination: DO NOT provide data, groups, stadiums, or results from the 2022 Qatar World Cup (or any past tournament) unless the user explicitly asks a historical question.
-4. No Internet Browsing: You do not have real-time internet access. If you are asked about a live score, a recent injury, or something you are not 100% sure about, DO NOT invent data. Reply with VAR-style sarcasm: "ה-VAR לא מחובר כרגע לאינטרנט כדי לוודא את זה, עדיף שתבדוק בגוגל במקום להטריד את חדר הבקרה."
+=== 1. IDENTITY & KNOWLEDGE ===
+- You are speaking directly to: ${actualUserName}.
+- You MUST only fetch data matching "${actualUserName}". If the name is "שחקן אורח", politely explain you need a name to retrieve personal data.
+- Domain 1 (Trivia): For general World Cup facts, answer freely.
+- Domain 2 (Prediction Game): Rely ONLY on the JSON. If missing, say: "הנתונים חסויים כרגע." Always check 'globalLiveStats' first for live data.
 
-=== SECURITY & DATA DISCLOSURE RULES (STRICT) ===
-1. The JSON data you receive is dynamically pre-filtered. It ONLY contains data that is legally allowed to be exposed at this exact moment. 
-2. If a match, bonus question, group qualifier, or specific user prediction is NOT present in the JSON, you must assume it is currently LOCKED or HIDDEN. 
-3. If asked about missing/hidden game data, politely explain: "הנתונים האלה עדיין חסויים ב-VAR וייחשפו כשהשלב יינעל." Do not invent or guess.
-4. Live Tournament Data: The JSON you receive has a new section called 'globalLiveStats'. If the user asks a general question like "How many yellow cards have been shown?" or "Who is currently leading the goals?", ALWAYS check 'globalLiveStats' first. If the data is there (e.g., 'מוביל זמני כרגע: 42'), use it and state that this is the official live data from the VAR room. If it says "אין נתונים עדכניים / טרם הוכרע", fallback to your "no internet connection" persona.
+=== 2. COMMENTARY & ENERGY (CRITICAL) ===
+- You are a sarcastic, energetic commentator! 
+- Before presenting any table, you MUST write 2-3 sentences of sharp, colorful analysis about the requested data in Hebrew. 
+- Use football slang, tease the user if they lost points, or praise them if they got a "Bullseye". DO NOT be lazy or dry.
 
-=== PREDICTION GAME RULES ===
-1. User Identification: The user currently speaking to you is "${actualUserName}". If they ask "What's my status?" or "My bets", present ONLY their data from 'usersPredictions'.
-2. Querying Others: If asked about a specific player (e.g., "What did Dekel bet?"), search for that exact name in 'usersPredictions'.
-3. Zero Calculation Policy: Read the 'points', 'status', 'statusFirst', and 'statusSecond' fields directly from the JSON.
-4. Categories in JSON: 
-   - 'matchPredictions': User's match score bets.
-   - 'bonuses': User's bonus questions.
-   - 'groupQualifiers': User's bets for 1st and 2nd place in each group. 
-   - 'thirdPlaceQualifiers': User's bets for the 8 teams qualifying from 3rd place.
+=== 3. DATA INTEGRITY (STRICT "NO REORDER" RULE) ===
+You often try to "be helpful" by swapping team names (e.g., Senegal vs France -> France vs Senegal). 
+THIS IS STRICTLY FORBIDDEN! Swapping the names inverts the scores and ruins the data.
+1. THE ORDER IS ATOMIC: If the match is "Senegal vs France" in the JSON, it MUST appear exactly as "Senegal vs France" in your response. 
+2. NO SKIPPING: You are PROHIBITED from omitting matches. If a user asks about a team, find ALL matches involving that team and display them.
+3. DUMB PIPE: You are not an editor; you are a data display agent. Do not rephrase, do not translate, do not reorder.
 
-=== UI & RENDERING RULES (CRITICAL) ===
-You must render data using ONLY HTML with Tailwind CSS classes. Do not use markdown tables.
+==== 4. HTML TABLE TEMPLATE (STRICT - DO NOT ALTER) ===
+Use this exact HTML. The scores are split into separate spans to prevent the AI from flipping the string.
 
-- Table Element: <table class="w-full text-right border-collapse my-3 bg-black/60 rounded-xl overflow-hidden text-xs shadow-inner">
-- Header (Sticky): <thead class="sticky top-0 z-20 bg-slate-800">
-- Th Elements: <th class="text-slate-300 p-2 font-black border-b border-slate-700 text-center">
+<table class="w-full text-right border-collapse my-3 bg-black/60 rounded-xl overflow-hidden text-xs shadow-inner">
+  <thead class="bg-slate-800">
+     <tr>
+        <th class="p-2 border-b border-slate-700 text-center text-slate-300">משחק</th>
+        <th class="p-2 border-b border-slate-700 text-center text-slate-300">ניחוש</th>
+        <th class="p-2 border-b border-slate-700 text-center text-slate-300">אמת</th>
+        <th class="p-2 border-b border-slate-700 text-center text-slate-300">נק'</th>
+     </tr>
+  </thead>
+  <tbody>
+     <tr>
+        <td class="p-2 border-b border-slate-800 text-center font-bold text-slate-200">[homeTeam] - [awayTeam]</td>
+        <td class="p-2 border-b border-slate-800 text-center font-mono text-blue-400 font-bold">
+            <span dir="ltr">[predHome]</span>-<span dir="ltr">[predAway]</span>
+        </td>
+        <td class="p-2 border-b border-slate-800 text-center font-mono text-emerald-400 font-bold">
+            <span dir="ltr">[realHome]</span>-<span dir="ltr">[realAway]</span>
+        </td>
+        <td class="p-2 border-b border-slate-800 text-center font-black text-amber-400">[points]</td>
+     </tr>
+  </tbody>
+  <tfoot class="bg-slate-900 border-t-2 border-slate-700">
+     <tr>
+        <td colspan="3" class="p-2 text-left text-slate-300 font-bold">סה"כ נקודות לסיבוב:</td>
+        <td class="p-2 text-center text-amber-400 font-black text-lg">[totalPoints]</td>
+     </tr>
+  </tfoot>
+</table>
 
-Display Logic:
-- Disclaimer: If the user asks about personal points or hits, insert this at the beginning: <small>(התשובה מציגה את הנתונים שנחשפו עד כה בטורניר)</small>
-- Grouping: If answering broadly about bets, visually group the answer using separate HTML tables (Matches, Bonuses, Group Qualifiers, 3rd Place). Do not mix categories into one table.
-- Split Match Tables: If a match list has > 8 items, split it into two tables: 'משחקי בול (15 נק')' and 'משחקי כיוון (5 נק')'.
-
-INJECTED GAME DATA:
+INJECTED JSON PAYLOAD:
 ${JSON.stringify(varContextPayload)}`;
-
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -693,34 +712,78 @@ ${JSON.stringify(varContextPayload)}`;
            </div>
         )}
       </div>
-      {/* 🔍 שורת הפעלה מהירה ל-VAR */} 
+      {/* 🚨 עמדת ה-VAR החדשה והבולטת 🚨 */}
       {ENABLE_VAR_FEATURE && (
-      <div className="w-full max-w-4xl mx-auto mb-6 bg-slate-950 border border-slate-800 rounded-2xl p-2 md:p-3 flex flex-col md:flex-row gap-2 md:gap-3 shadow-inner" dir="rtl">
-        <input
-          type="text"
-          value={varQuery}
-          onChange={(e) => setVarQuery(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && varQuery.trim()) {
-              setIsVarModalOpen(true);
-              handleAskVAR();
-            }
-          }}
-          placeholder="שלח אירוע לבדיקת שופטי המסך... (לדוגמה: מה דקל הימר על מקסיקו?)"
-          className="flex-1 min-w-0 bg-black text-blue-400 font-mono text-sm px-4 py-3 rounded-xl border border-slate-800 focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/30 outline-none transition-all placeholder-slate-700"
-        />
-        <button
-          onClick={() => {
-            if (varQuery.trim()) {
-              setIsVarModalOpen(true);
-              handleAskVAR();
-            }
-          }}
-          className="shrink-0 w-full md:w-auto bg-rose-950/40 hover:bg-rose-900/60 text-rose-400 font-bold px-6 py-3 rounded-xl font-mono text-xs border border-rose-900/50 shadow-md transition-all uppercase tracking-wider whitespace-nowrap active:scale-95"
-        >
-          🚨 שלח לבדיקה
-        </button>
-      </div>
+        <div className="w-full max-w-4xl mx-auto mb-10 relative group" dir="rtl">
+          
+          {/* אפקט הילה זוהרת ברקע (Glow) */}
+          <div className="absolute -inset-1 bg-gradient-to-r from-rose-600 via-purple-600 to-blue-600 rounded-[28px] blur opacity-40 group-hover:opacity-70 transition duration-1000 group-hover:duration-200"></div>
+          
+          {/* הקונטיינר הראשי */}
+          <div className="relative bg-[#0a0a0f] border-2 border-slate-800/80 rounded-[24px] p-3 md:p-4 flex flex-col md:flex-row items-center gap-4 shadow-2xl overflow-hidden">
+             
+             {/* טקסטורת פסים אלכסוניים עדינה ברקע (סטייל אצטדיון) */}
+             <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'repeating-linear-gradient(45deg, #000 0, #000 2px, transparent 2px, transparent 8px)' }}></div>
+
+             {/* 🐭 האווטאר של עכבר ה-VAR */}
+             <div className="relative shrink-0 z-10 w-16 h-16 md:w-20 md:h-20 rounded-full border-4 border-slate-950 shadow-[0_0_20px_rgba(225,29,72,0.4)] overflow-hidden bg-black flex items-center justify-center">
+                {/* תחליף את ה-src לשם הקובץ שתייצר */}
+                <video 
+                  src="/speedy-var.mp4" 
+                  autoPlay 
+                  loop 
+                  muted 
+                  playsInline
+                  className="w-full h-full object-cover pointer-events-none"
+                />
+                {/* אם אין לך עדיין תמונה, אפשר לשים בינתיים אימוג'י בתוך הדיב: <span className="text-4xl">🐭</span> */}
+             </div>
+
+             {/* ⌨️ אזור הטקסט והאינפוט */}
+             <div className="flex-1 w-full relative z-10 flex flex-col justify-center">
+                
+                <div className="flex items-center gap-2 mb-1">
+                   <div className="flex items-center gap-1.5 px-2 py-0.5 bg-rose-500/10 border border-rose-500/30 rounded-md">
+                      <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse shadow-[0_0_8px_rgba(225,29,72,0.8)]"></span>
+                      <span className="text-[10px] font-black text-rose-400 tracking-widest uppercase">VAR Live Stream</span>
+                   </div>
+                   <span className="text-xs font-bold text-slate-400">יש לך תלונה על הניחושים? תשאל את הבוט!</span>
+                </div>
+
+                <input
+                  type="text"
+                  value={varQuery}
+                  onChange={(e) => setVarQuery(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && varQuery.trim()) {
+                      setIsVarModalOpen(true);
+                      handleAskVAR();
+                    }
+                  }}
+                  placeholder="מי המלך של בית ג'? כמה בולים יש לדקל?..."
+                  className="w-full bg-transparent text-white font-black text-base md:text-lg border-none outline-none focus:ring-0 placeholder-slate-600 p-0"
+                />
+             </div>
+
+             {/* 🎯 כפתור השליחה */}
+             <button
+               onClick={() => {
+                 if (varQuery.trim()) {
+                   setIsVarModalOpen(true);
+                   handleAskVAR();
+                 }
+               }}
+               className="relative z-10 shrink-0 w-full md:w-auto overflow-hidden rounded-xl group/btn"
+             >
+                <div className="absolute inset-0 bg-gradient-to-r from-rose-600 to-red-500 transition-transform group-hover/btn:scale-105"></div>
+                <div className="relative px-8 py-4 flex items-center justify-center gap-2 font-black text-white tracking-wide">
+                   <span>שלח לבדיקה</span>
+                   <span className="text-xl">📺</span>
+                </div>
+             </button>
+
+          </div>
+        </div>
       )}
 {/* 1. הסרנו את ה-overflow-hidden מהעוטף החיצוני */}
 <div className="max-w-[98vw] mx-auto bg-slate-900/80 rounded-2xl border border-slate-700 shadow-2xl">
