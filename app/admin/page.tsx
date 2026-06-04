@@ -308,12 +308,12 @@ export default function AdminPanel() {
     } 
   };
   
-  const handleUpdateUserName = async (userId: string, newName: string) => {
+const handleUpdateUserDetails = async (userId: string, details: { name?: string, phone?: string }) => {
     try {
-      await updateDoc(doc(db, "users", userId), { name: newName });
-      toast.success("שם השחקן עודכן בהצלחה! 👑");
+      await updateDoc(doc(db, "users", userId), details);
+      toast.success("פרטי השחקן עודכנו בהצלחה! 💾");
     } catch (error) {
-      toast.error("שגיאה בעדכון שם השחקן");
+      toast.error("שגיאה בעדכון פרטי השחקן");
     }
   };
 
@@ -1787,7 +1787,7 @@ const handleCalculateScores = async (silentParam: any = false) => {
             <AdminUsersTab
              usersList={usersList}
              setUsersList={setUsersList}
-             handleUpdateUserName={handleUpdateUserName}
+             handleUpdateUserDetails={handleUpdateUserDetails}
              handleTogglePayment={handleTogglePayment}
              handleExportPredictions={handleExportPredictions}
              handleDeleteUser={handleDeleteUser}

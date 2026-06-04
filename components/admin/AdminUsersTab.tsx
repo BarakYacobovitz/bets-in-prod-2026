@@ -4,7 +4,7 @@ import React from "react";
 interface AdminUsersTabProps {
   usersList: any[];
   setUsersList: React.Dispatch<React.SetStateAction<any[]>>;
-  handleUpdateUserName: (userId: string, newName: string) => void;
+  handleUpdateUserDetails: (userId: string, details: { name?: string, phone?: string }) => void;
   handleTogglePayment: (userId: string, currentStatus: boolean) => void;
   handleExportPredictions: (userId: string, userName: string) => void;
   handleDeleteUser: (userId: string, userName: string) => void;
@@ -16,14 +16,14 @@ interface AdminUsersTabProps {
   setSimStage: (stage: string) => void;
   handleSpawnBotsOnly: () => void;
   handleSmartSimulation: () => void;
-  handleRefreshData: () => void; // הפונקציה החדשה לסנכרון הרענון!
-  handleExportUserBackup: (userId: string, userName: string) => void; // 
+  handleRefreshData: () => void;
+  handleExportUserBackup: (userId: string, userName: string) => void; 
 }
 
 export default function AdminUsersTab({
   usersList,
   setUsersList,
-  handleUpdateUserName,
+  handleUpdateUserDetails,
   handleTogglePayment,
   handleExportPredictions,
   handleDeleteUser,
@@ -39,7 +39,6 @@ export default function AdminUsersTab({
   handleExportUserBackup
 }: AdminUsersTabProps) {
     
-// פונקציה משודרגת שבונה הודעה לפי החוסרים הספציפיים
   const sendWhatsAppReminder = (userObj: any) => {
     const firstName = (userObj.name || "").split(" ")[0];
     const mb = userObj.missingBreakdown || {};
@@ -57,7 +56,45 @@ export default function AdminUsersTab({
 
     const message = `אהלן ${firstName}, כאן הנהלת Bets in PROD ⚽\nראיתי שעוד לא סיימת למלא את הניחושים לשלב הנוכחי... הזמן רץ והדד-ליין מתקרב! \n${missingText}\nכנס עכשיו למגרש לפני שיינעל: ${window.location.origin}`;
     const encodedMsg = encodeURIComponent(message);
-    window.open(`https://wa.me/?text=${encodedMsg}`, "_blank");
+    
+    // לוגיקה חדשה: אם יש מספר טלפון, נתקן קידומת (0 -> 972) ונשלח ישירות
+    if (userObj.phone && userObj.phone.trim() !== "") {
+      let cleanPhone = userObj.phone.replace(/[\s-]/g, ''); // הסרת רווחים ומקפים
+      if (cleanPhone.startsWith('0')) {
+        cleanPhone = '972' + cleanPhone.substring(1);
+      }
+      window.open(`https://wa.me/${cleanPhone}?text=${encodedMsg}`, "_blank");
+    } else {
+      // חלון וואטסאפ רגיל לבחירת איש קשר
+      window.open(`https://wa.me/?text=${encodedMsg}`, "_blank");
+    }
+  };
+
+  // פונקציה חדשה לייצוא טבלת המשתמשים לאקסל (CSV)
+  const handleExportUsersCSV = () => {
+    let csvContent = "\uFEFF"; // BOM לתמיכה בעברית באקסל
+    csvContent += "שם,אימייל,טלפון,התקדמות (%),שילם,נקודות כללי,נקודות נוקאאוט\n";
+
+    usersList.forEach(u => {
+      const name = `"${u.name || ""}"`;
+      const email = `"${u.email || ""}"`;
+      const phone = `"${u.phone || ""}"`;
+      const progress = u.completionRate || 0;
+      const hasPaid = u.hasPaid ? "כן" : "לא";
+      const totalPts = u.totalPoints || 0;
+      const koPts = u.knockoutPoints || 0;
+
+      csvContent += `${name},${email},${phone},${progress},${hasPaid},${totalPts},${koPts}\n`;
+    });
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `users_table_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   return (
@@ -103,28 +140,34 @@ export default function AdminUsersTab({
       </div>
 
       <div className="bg-slate-800 p-8 rounded-3xl border border-blue-500/30 shadow-xl">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4 border-b border-slate-700 pb-6">
+        <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center mb-6 gap-4 border-b border-slate-700 pb-6">
           <div>
             <h2 className="text-2xl font-black text-white flex items-center gap-2">
               <span>👥</span> ניהול שחקנים ומד התקדמות
             </h2>
-            <p className="text-slate-400 text-sm mt-1">עקוב אחרי קצב הניחושים ונהל תשלומים.</p>
+            <p className="text-slate-400 text-sm mt-1">עקוב אחרי קצב הניחושים, הוסף מספרי טלפון וייצא דוחות.</p>
           </div>
-          <div className="flex gap-3 w-full md:w-auto">
-            {/* הכפתור החדש לרענון הנתונים! */}
+          <div className="flex flex-wrap gap-3 w-full xl:w-auto">
             <button
-              onClick={handleRefreshData}
+              onClick={handleExportUsersCSV}
               disabled={isCalculating}
-              className="bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 px-6 rounded-xl transition-all shadow-md flex items-center justify-center gap-2 active:scale-95 flex-1 md:flex-none"
+              className="bg-teal-600 hover:bg-teal-500 text-white font-bold py-3 px-4 rounded-xl transition-all shadow-md flex items-center justify-center gap-2 active:scale-95 flex-1 xl:flex-none text-sm whitespace-nowrap"
             >
-              <span>🔄</span> סנכרן נתונים
+              <span>📊</span> ייצוא טבלה
             </button>
             <button
               onClick={() => handleExportPredictions("ALL", "All")}
               disabled={isCalculating}
-              className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 px-6 rounded-xl transition-all shadow-md flex items-center justify-center gap-2 active:scale-95 flex-1 md:flex-none"
+              className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 px-4 rounded-xl transition-all shadow-md flex items-center justify-center gap-2 active:scale-95 flex-1 xl:flex-none text-sm whitespace-nowrap"
             >
               <span>⬇️</span> יומן ניחושים
+            </button>
+            <button
+              onClick={handleRefreshData}
+              disabled={isCalculating}
+              className="bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 px-4 rounded-xl transition-all shadow-md flex items-center justify-center gap-2 active:scale-95 flex-1 xl:flex-none text-sm whitespace-nowrap"
+            >
+              <span>🔄</span> סנכרן נתונים
             </button>
           </div>
         </div>
@@ -154,7 +197,7 @@ export default function AdminUsersTab({
             <button
               onClick={() => (simStage === "BOTS_ONLY" ? handleSpawnBotsOnly() : handleSmartSimulation())}
               disabled={isCalculating}
-              className="py-3 px-8 bg-purple-600 hover:bg-purple-500 text-white font-black rounded-xl transition-all shadow-lg text-sm active:scale-95"
+              className="py-3 px-8 bg-purple-600 hover:bg-purple-500 text-white font-black rounded-xl transition-all shadow-lg text-sm active:scale-95 whitespace-nowrap"
             >
               {isCalculating ? "מריץ... ⏳" : "🧪 הפעל"}
             </button>
@@ -162,10 +205,10 @@ export default function AdminUsersTab({
         </div>
 
         <div className="w-full overflow-x-auto bg-slate-950 rounded-2xl border border-slate-700 shadow-inner custom-scrollbar">
-          <table className="w-full text-right text-slate-300 min-w-[700px]">
+          <table className="w-full text-right text-slate-300 min-w-[800px]">
             <thead className="text-xs uppercase tracking-widest bg-slate-900/80 text-slate-500 border-b border-slate-800">
               <tr>
-                <th className="p-4 font-black">שם משתמש</th>
+                <th className="p-4 font-black">פרטי משתמש</th>
                 <th className="p-4 text-center font-black">התקדמות</th>
                 <th className="p-4 text-center font-black">תשלום</th>
                 <th className="p-4 text-center font-black">פעולות</th>
@@ -179,10 +222,10 @@ export default function AdminUsersTab({
                   const progress = u.completionRate || 0;
                   return (
                     <tr key={u.id} className="border-b border-slate-800/50 hover:bg-slate-800/50 transition-colors">
-                      <td className="p-4 min-w-[250px]">
-                        <div className="flex items-center gap-2">
-                          <span className="text-slate-600 text-xs w-4">{idx + 1}.</span>
-                          <div className="flex flex-col flex-1">
+                      <td className="p-4 min-w-[280px]">
+                        <div className="flex items-start gap-2">
+                          <span className="text-slate-600 text-xs w-4 mt-2">{idx + 1}.</span>
+                          <div className="flex flex-col flex-1 gap-2">
                             <input
                               type="text"
                               value={u.name || ""}
@@ -193,55 +236,72 @@ export default function AdminUsersTab({
                                   )
                                 )
                               }
-                              className="bg-slate-900 border border-slate-700 text-white px-2 py-1 rounded-lg focus:border-blue-500 outline-none text-sm w-full"
+                              placeholder="שם המשתמש"
+                              className="bg-slate-900 border border-slate-700 text-white px-2 py-1.5 rounded-lg focus:border-blue-500 outline-none text-sm w-full"
                             />
-                            <span className="text-[10px] text-slate-500 mt-1 mr-2">{u.email}</span>
+                            <div className="flex items-center gap-2">
+                                <span className="text-[10px] text-slate-500 truncate w-1/2" title={u.email}>{u.email}</span>
+                                <input
+                                  type="text"
+                                  value={u.phone || ""}
+                                  onChange={(e) =>
+                                    setUsersList(
+                                      usersList.map((user) =>
+                                        user.id === u.id ? { ...user, phone: e.target.value } : user
+                                      )
+                                    )
+                                  }
+                                  placeholder="טלפון (לדוגמה 054...)"
+                                  className="bg-slate-900 border border-slate-700 text-emerald-300 px-2 py-1 rounded-lg focus:border-emerald-500 outline-none text-[11px] w-1/2 font-sans text-left"
+                                  dir="ltr"
+                                />
+                            </div>
                           </div>
                           <button
-                            onClick={() => handleUpdateUserName(u.id, u.name)}
-                            className="bg-slate-800 hover:bg-blue-600 text-white p-1.5 rounded-lg border border-slate-700 transition-all shrink-0"
+                            onClick={() => handleUpdateUserDetails(u.id, { name: u.name, phone: u.phone })}
+                            className="bg-slate-800 hover:bg-blue-600 text-white p-2 rounded-lg border border-slate-700 transition-all shrink-0 self-stretch flex items-center justify-center shadow-sm"
+                            title="שמור שם וטלפון"
                           >
                             💾
                           </button>
                         </div>
                       </td>
 
-                      <td className="p-4 w-56">
-  <div className="flex flex-col gap-1.5">
-    <div className="flex justify-between items-center px-1">
-      <span className={`text-[10px] font-black ${progress === 100 ? "text-emerald-400" : "text-amber-400"}`}>
-        {progress}%
-      </span>
-      {progress < 100 && (
-        <span className="text-[9px] bg-rose-500/10 text-rose-400 px-1 rounded border border-rose-500/20 animate-pulse">חסר</span>
-      )}
-    </div>
-    <div className="w-full bg-slate-900 rounded-full h-2 border border-slate-700 overflow-hidden shadow-inner">
-      <div
-        className={`h-full transition-all duration-1000 ${
-          progress === 100 ? "bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.4)]" :
-          progress > 50 ? "bg-amber-500" : "bg-rose-500"
-        }`}
-        style={{ width: `${progress}%` }}
-      ></div>
-    </div>
-    
-    {/* התגיות החדשות שמפרטות מה בדיוק חסר! */}
-    {progress < 100 && u.missingBreakdown && (
-       <div className="flex flex-wrap gap-1 mt-1 justify-end">
-         {u.missingBreakdown.md1 > 0 && <span className="text-[8px] bg-slate-800 text-slate-300 border border-slate-600 px-1 rounded">מחזור 1: {u.missingBreakdown.md1}</span>}
-         {u.missingBreakdown.md2 > 0 && <span className="text-[8px] bg-slate-800 text-slate-300 border border-slate-600 px-1 rounded">מחזור 2: {u.missingBreakdown.md2}</span>}
-         {u.missingBreakdown.md3 > 0 && <span className="text-[8px] bg-slate-800 text-slate-300 border border-slate-600 px-1 rounded">מחזור 3: {u.missingBreakdown.md3}</span>}
-         {u.missingBreakdown.ko > 0 && <span className="text-[8px] bg-purple-900/50 text-purple-300 border border-purple-500/30 px-1 rounded">נוקאאוט: {u.missingBreakdown.ko}</span>}
-         {u.missingBreakdown.quals > 0 && <span className="text-[8px] bg-teal-900/50 text-teal-300 border border-teal-500/30 px-1 rounded">עולות מבתים</span>}
-         {u.missingBreakdown.third > 0 && <span className="text-[8px] bg-rose-900/50 text-rose-300 border border-rose-500/30 px-1 rounded">מקום 3</span>}
-         {u.missingBreakdown.bonus > 0 && <span className="text-[8px] bg-amber-900/50 text-amber-300 border border-amber-500/30 px-1 rounded">בונוס: {u.missingBreakdown.bonus}</span>}
-       </div>
-    )}
-  </div>
-</td>
+                      <td className="p-4 w-56 align-top pt-6">
+                        <div className="flex flex-col gap-1.5">
+                          <div className="flex justify-between items-center px-1">
+                            <span className={`text-[10px] font-black ${progress === 100 ? "text-emerald-400" : "text-amber-400"}`}>
+                              {progress}%
+                            </span>
+                            {progress < 100 && (
+                              <span className="text-[9px] bg-rose-500/10 text-rose-400 px-1 rounded border border-rose-500/20 animate-pulse">חסר</span>
+                            )}
+                          </div>
+                          <div className="w-full bg-slate-900 rounded-full h-2 border border-slate-700 overflow-hidden shadow-inner">
+                            <div
+                              className={`h-full transition-all duration-1000 ${
+                                progress === 100 ? "bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.4)]" :
+                                progress > 50 ? "bg-amber-500" : "bg-rose-500"
+                              }`}
+                              style={{ width: `${progress}%` }}
+                            ></div>
+                          </div>
+                          
+                          {progress < 100 && u.missingBreakdown && (
+                             <div className="flex flex-wrap gap-1 mt-1 justify-end">
+                               {u.missingBreakdown.md1 > 0 && <span className="text-[8px] bg-slate-800 text-slate-300 border border-slate-600 px-1 rounded">מחזור 1: {u.missingBreakdown.md1}</span>}
+                               {u.missingBreakdown.md2 > 0 && <span className="text-[8px] bg-slate-800 text-slate-300 border border-slate-600 px-1 rounded">מחזור 2: {u.missingBreakdown.md2}</span>}
+                               {u.missingBreakdown.md3 > 0 && <span className="text-[8px] bg-slate-800 text-slate-300 border border-slate-600 px-1 rounded">מחזור 3: {u.missingBreakdown.md3}</span>}
+                               {u.missingBreakdown.ko > 0 && <span className="text-[8px] bg-purple-900/50 text-purple-300 border border-purple-500/30 px-1 rounded">נוקאאוט: {u.missingBreakdown.ko}</span>}
+                               {u.missingBreakdown.quals > 0 && <span className="text-[8px] bg-teal-900/50 text-teal-300 border border-teal-500/30 px-1 rounded">עולות</span>}
+                               {u.missingBreakdown.third > 0 && <span className="text-[8px] bg-rose-900/50 text-rose-300 border border-rose-500/30 px-1 rounded">מקום 3</span>}
+                               {u.missingBreakdown.bonus > 0 && <span className="text-[8px] bg-amber-900/50 text-amber-300 border border-amber-500/30 px-1 rounded">בונוס: {u.missingBreakdown.bonus}</span>}
+                             </div>
+                          )}
+                        </div>
+                      </td>
 
-                      <td className="p-4 text-center">
+                      <td className="p-4 text-center align-middle">
                         <button
                           onClick={() => handleTogglePayment(u.id, u.hasPaid)}
                           className={`px-4 py-1.5 rounded-lg font-bold text-xs w-24 transition-all border ${
@@ -254,7 +314,7 @@ export default function AdminUsersTab({
                         </button>
                       </td>
 
-                      <td className="p-4">
+                      <td className="p-4 align-middle">
                         <div className="flex justify-center gap-2">
                           {progress < 100 && (
                             <button
@@ -263,7 +323,7 @@ export default function AdminUsersTab({
                             >
                               <span className="text-lg">💬</span>
                               <div className="absolute bottom-full mb-2 right-0 bg-slate-900 text-white text-[10px] px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap border border-slate-700 z-10 pointer-events-none">
-                                שלח תזכורת חביבה
+                                {u.phone ? "שלח תזכורת WhatsApp (ישיר)" : "שלח תזכורת חביבה"}
                               </div>
                             </button>
                           )}
