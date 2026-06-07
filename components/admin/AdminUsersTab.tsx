@@ -1,5 +1,9 @@
 "use client";
 import React from "react";
+import { pdf , PDFDownloadLink } from '@react-pdf/renderer';
+import { TicketPDF } from '../TicketPDF'; // עדכן את הנתיב בהתאם למיקום שבו שמרת את הקובץ
+import { useState, useEffect } from 'react';
+import { DailyMatrixPDF } from '../DailyMatrixPDF'; //
 
 interface AdminUsersTabProps {
   usersList: any[];
@@ -18,6 +22,16 @@ interface AdminUsersTabProps {
   handleSmartSimulation: () => void;
   handleRefreshData: () => void;
   handleExportUserBackup: (userId: string, userName: string) => void; 
+  fetchUserPredictionsForPDF: (
+    userId: string, 
+    targetStage?: string | number
+  ) => Promise<{ 
+    matches: any[]; 
+    qualifiers: any[]; 
+    thirdPlace: string[]; 
+    bonuses: any[]; 
+  }>;
+  fetchDailyMatrixForPDF: (targetDate: string) => Promise<{ matches: any[], rows: any[] }>;
 }
 
 export default function AdminUsersTab({
@@ -36,8 +50,35 @@ export default function AdminUsersTab({
   handleSpawnBotsOnly,
   handleSmartSimulation,
   handleRefreshData,
-  handleExportUserBackup
+  handleExportUserBackup,
+  fetchUserPredictionsForPDF,
+  fetchDailyMatrixForPDF
 }: AdminUsersTabProps) {
+  // מונע שגיאת Hydration ב-Next.js עם ספריות PDF
+  const [isMounted, setIsMounted] = useState(false);
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  // נתונים פיקטיביים לבדיקת העיצוב
+  const mockMatches = [
+    { home: "ספרד", away: "גרמניה", homeScore: 2, awayScore: 1, dateTime: "2026-06-12T22:00:00Z" },
+    { home: "אנגליה", away: "צרפת", homeScore: 3, awayScore: 1, dateTime: "2026-06-11T16:00:00Z" }, // תאריך מוקדם יותר, אמור לקפוץ למעלה
+    { home: "ארגנטינה", away: "ברזיל", homeScore: 0, awayScore: 0, dateTime: "2026-06-13T19:00:00Z" }
+  ];
+  
+  const mockQualifiers = [
+    { group: "A", first: "ארגנטינה", second: "הולנד" },
+    { group: "B", first: "ספרד", second: "אנגליה" },
+    { group: "C", first: "צרפת", second: "פורטוגל" },
+    { group: "D", first: "ברזיל", second: "גרמניה" }
+  ];
+  const mockThirdPlace = ["קרואטיה (מקום 3)", "אורוגוואי (מקום 3)"];
+  const mockBonuses = [
+    { question: "מלך השערים:", answer: "קיליאן אמבפה" },
+    { question: "הנבחרת המאכזבת:", answer: "איטליה" },
+    { question: "אלופת העולם:", answer: "ארגנטינה" }
+  ];
     
   const sendWhatsAppReminder = (userObj: any) => {
     const firstName = (userObj.name || "").split(" ")[0];
@@ -70,6 +111,85 @@ export default function AdminUsersTab({
     }
   };
 
+  const handleGenerateUserTicket = async (user: any) => {
+    try {
+      
+      // חלון קופץ משודרג עם כל השלבים
+      const targetStageRaw = prompt("איזה שלב להדפיס?\n(אפשרויות: 1 / 2 / 3 / 32 הגדולות / שמינית גמר / רבע גמר / חצי גמר / גמר / ALL)", "1");      
+      if (!targetStageRaw) return; // בוטל
+      const targetStage = targetStageRaw.trim(); // מנקה רווחים מיותרים
+
+      console.log(`מייצר טופס עבור ${user.name} - סיבוב ${targetStage}...`);
+
+      const predictions = await fetchUserPredictionsForPDF(user.id, targetStage);
+
+      const stageNameDisplay = (targetStage.toUpperCase() === "ALL") 
+        ? "טופס רשמי - כל הטורניר" 
+        : `טופס רשמי - ${targetStage}`;
+
+      const blob = await pdf(
+        <TicketPDF 
+          userName={user.name || "ללא שם"} 
+          stageName={stageNameDisplay} 
+          matches={predictions?.matches || []}
+          qualifiers={predictions?.qualifiers || []}
+          thirdPlace={predictions?.thirdPlace || []}
+          bonuses={predictions?.bonuses || []}
+        />
+      ).toBlob();
+
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      const safeName = (user.name || "User").replace(/\s+/g, '_');
+      link.download = `Ticket_MD${targetStage}_${safeName}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+    } catch (error) {
+      console.error("שגיאה בהפקת ה-PDF:", error);
+      alert("הייתה בעיה ביצירת הטופס. בדוק את הקונסול.");
+    }
+  };
+  const handleGenerateDailyMatrix = async () => {
+    try {
+      const today = new Date();
+      const todayStr = `${String(today.getDate()).padStart(2, '0')}/${String(today.getMonth() + 1).padStart(2, '0')}/${today.getFullYear()}`;
+      
+      const targetDateRaw = prompt("לאיזה תאריך להפיק את טבלת הניחושים?\n(הכנס תאריך בפורמט DD/MM/YYYY או DD/MM)", todayStr);
+      if (!targetDateRaw) return;
+      const targetDate = targetDateRaw.trim();
+
+      console.log(`מייצר מטריצה יומית ל-${targetDate}...`);
+
+      const matrixData = await fetchDailyMatrixForPDF(targetDate);
+
+      if (!matrixData || matrixData.matches.length === 0) {
+        alert("לא נמצאו משחקים לתאריך זה במסד הנתונים.");
+        return;
+      }
+
+      const blob = await pdf(
+        <DailyMatrixPDF 
+          dateStr={targetDate} 
+          matches={matrixData.matches}
+          rows={matrixData.rows}
+        />
+      ).toBlob();
+
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `Daily_Matrix_${targetDate.replace(/\//g, '-')}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (error) {
+      console.error("שגיאה בהפקת המטריצה:", error);
+      alert("הייתה בעיה ביצירת המטריצה. בדוק את הקונסול.");
+    }
+  };
   // פונקציה חדשה לייצוא טבלת המשתמשים לאקסל (CSV)
   const handleExportUsersCSV = () => {
     let csvContent = "\uFEFF"; // BOM לתמיכה בעברית באקסל
@@ -116,6 +236,13 @@ export default function AdminUsersTab({
           >
             {autoInsights.length > 0 ? "🔄 רענן תובנות" : "🔍 חלץ תובנות עכשיו"}
           </button>
+          <button
+              onClick={handleGenerateDailyMatrix}
+              disabled={isCalculating}
+              className="bg-purple-600 hover:bg-purple-500 text-white font-bold py-3 px-4 rounded-xl transition-all shadow-md flex items-center justify-center gap-2 active:scale-95 flex-1 xl:flex-none text-sm whitespace-nowrap"
+            >
+              <span>📅</span> מטריצה יומית
+            </button>
         </div>
 
         {autoInsights.length > 0 ? (
@@ -169,6 +296,7 @@ export default function AdminUsersTab({
             >
               <span>🔄</span> סנכרן נתונים
             </button>
+            
           </div>
         </div>
 
@@ -351,6 +479,16 @@ export default function AdminUsersTab({
                           >
                             🗑️
                           </button>
+                          <button
+                              onClick={() => handleGenerateUserTicket(u)}
+                              className="bg-orange-500/10 hover:bg-orange-500 text-orange-400 hover:text-white border border-orange-500/30 w-9 h-9 rounded-lg transition-all flex items-center justify-center group relative"
+                              title="הפק טופס רשמי (PDF)"
+                            >
+                              <span className="text-lg">📄</span>
+                              <div className="absolute bottom-full mb-2 right-0 bg-slate-900 text-white text-[10px] px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap border border-slate-700 z-10 pointer-events-none">
+                                הורד טופס PDF
+                              </div>
+                            </button>
 
                         </div>
                       </td>

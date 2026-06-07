@@ -8,14 +8,21 @@ export default function Rules() {
       <div className="bg-gradient-to-br from-slate-900 to-slate-800 p-8 rounded-3xl border border-slate-700 shadow-xl relative overflow-hidden">
         <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/10 rounded-full blur-3xl pointer-events-none -mr-20 -mt-20"></div>
         <h1 className="text-3xl md:text-4xl font-extrabold text-white mb-3 relative z-10 flex items-center gap-3">
-          <span>📜</span> חוקים ושיטת ניקוד
+          <span>📜</span> חוקים, תנאי שימוש ושיטת ניקוד
         </h1>
-        <p className="text-slate-400 text-lg relative z-10 max-w-3xl leading-relaxed">
-          ברוכים הבאים ל-Bets in Prod (בעברית: מהמרים בייצור), משחק הניחושים החברי למונדיאל 2026. 
-          הכלל הראשון הוא שברגע שאתם מצטרפים, אתם מקבלים על עצמכם שהאדמין הוא הפוסק האחרון. גם אם אתם לא מסכימים ב-100% - החלטתו סופית. 
-          <br/><br/>
-          כדי למנוע כאלו ויכוחים מראש, הנה הפירוט המלא של חוקי המשחק שלנו. <strong className="text-blue-400">שימו לב: הכל מחושב באופן אוטומטי לחלוטין</strong> על ידי המנוע של המערכת.
-        </p>
+        <div className="text-slate-400 text-sm md:text-base relative z-10 max-w-3xl space-y-4 leading-relaxed">
+          <p>
+            ברוכים הבאים ל-**Bets in Prod**, פלטפורמה חברתית וקהילתית לניחוש תוצאות משחקי מונדיאל 2026. 
+          </p>
+          <div className="bg-slate-950/50 p-4 rounded-xl border border-slate-700/60 my-4 text-xs md:text-sm space-y-2">
+            <p className="font-bold text-amber-400">⚖️ הבהרה משפטית ואופי הפעילות:</p>
+            <ul className="list-disc list-inside space-y-1 text-slate-300 pr-1">
+              <li>האתר מהווה פלטפורמה טכנולוגית בלבד לחישוב ניקוד, שעשוע ובידור חברתי פנימי, ואינו משמש, מנהל או מהווה פלטפורמת הימורים מסחרית.</li>
+              <li>ההשתתפות מיועדת לחוג חברים וקולגות מוגדר וסגור מראש, ואינה פתוחה לציבור הרחב.</li>
+              <li>כלל חישובי הניקוד, זמני הנעילה והתוצאות מנוהלים אוטומטית על ידי מנוע המערכת. מנהל המערכת משמש כגורם פוסק בלעדי לכל עניין תפעולי, והחלטתו סופית.</li>
+            </ul>
+          </div>
+        </div>
       </div>
 
       {/* באנר חובת מילוי - בולט במיוחד */}

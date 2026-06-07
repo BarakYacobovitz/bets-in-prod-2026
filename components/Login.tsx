@@ -330,6 +330,23 @@ export default function Login() {
                 {isMagicLinkLoading ? "שולח..." : "שלח לי קישור כניסה 🪄"}
               </button>
             </form>
+            {/* --- קוביית גילוי נאות, פרטיות ועוגיות --- */}
+            <div className="mt-6 text-right bg-slate-950/50 backdrop-blur-sm p-4 rounded-2xl border border-white/5 text-[11px] text-slate-400 leading-relaxed shadow-inner">
+              <p className="font-bold text-slate-300 mb-1.5 flex items-center gap-1">
+                <span>🛡️</span> גילוי נאות, פרטיות ושימוש בעוגיות:
+              </p>
+              <ul className="list-disc list-inside space-y-1.5 pr-1">
+                <li>
+                  <strong className="text-slate-300">איסוף מידע:</strong> בהתחברותך למערכת, אתה מסכים לשמירת פרטיך הבסיסיים (שם, אימייל, וטלפון במידה ויעודכן) ונתוני הניחושים שלך בשרתי Firebase מאובטחים. המידע משמש אך ורק לצורך ניהול המשחק, הצגת טבלאות ושליחת תזכורות תפעוליות.
+                </li>
+                <li>
+                  <strong className="text-slate-300">עוגיות (Cookies ו-LocalStorage):</strong> האתר משתמש ברכיבי LocalStorage וקוקיז תפעוליים של מערכת האימות (Firebase Auth) על מנת לזהות את המכשיר שלך, לשמור על חיבור רציף ולמנוע את ניתוק החשבון. ללא רכיבים אלו לא ניתן לבצע כניסה למערכת.
+                </li>
+                <li>
+                  <strong className="text-slate-300">אופי התחרות:</strong> המשחק הינו חברתי ופנימי למטרות בידור, אתגר ושעשוע בלבד. הפלטפורמה אינה מנהלת או מחזיקה קופות הימורים מסחריות, והשימוש בה הוא באחריות המשתתפים בלבד. המידע לא יועבר לצד שלישי.
+                </li>
+              </ul>
+            </div>
           </div>
 
         </div>

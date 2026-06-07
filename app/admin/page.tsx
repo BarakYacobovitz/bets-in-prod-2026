@@ -15,6 +15,7 @@ import AdminNotificationTab from "@/components/admin/AdminNotificationTab";
 import AdminPrizesTab from "@/components/admin/AdminPrizesTab";
 import AdminStatsTab from "@/components/admin/AdminStatsTab";
 
+
 const ADMIN_EMAIL = "bawak.y10@gmail.com"; 
 
 export default function AdminPanel() {
@@ -1419,7 +1420,7 @@ const handleCalculateScores = async (silentParam: any = false) => {
          
          const uMatches = pmData.filter(p => p.userId === u.id);
          uMatches.forEach(p => {
-            const m: any = matchesList.find(x => x.id === p.matchId);
+            const m: any = matchesList.find(x => x && x.id === p.matchId);
             if (m) {
                let pts = 0;
                if (m.isFinished && m.stage !== "KNOCKOUT") {
@@ -1511,7 +1512,7 @@ const handleCalculateScores = async (silentParam: any = false) => {
          const uBonus: any = pbData.find(p => p.id === u.id);
          if (uBonus && uBonus.answers) {
             for (const [qId, ans] of Object.entries<any>(uBonus.answers)) {
-               const q: any = bonusQs.find((x:any) => x.id === qId);
+               const q: any = bonusQs.find((x:any) => x && x.id === qId);
                if (q && String(ans).trim() !== "") {
                   let pts = 0;
                   let isGraded = false;
@@ -1564,6 +1565,210 @@ const handleCalculateScores = async (silentParam: any = false) => {
       toast.error("שגיאה בהורדת הניחושים.", { id: "csvExport" });
     } finally {
       setIsCalculating(false);
+    }
+  };
+  // פונקציה חדשה ששולפת נתונים נקיים עבור קומפוננטת ה-PDF
+    // פונקציית שליפה חכמה ל-PDF
+  const fetchUserPredictionsForPDF = async (userId: string, targetStage: string | number = "ALL") => {
+    try {
+      const matchesSnap = await getDocs(collection(db, "matches"));
+      const matchesList = matchesSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+      const bqSnap = await getDoc(doc(db, "settings", "bonus_questions"));
+      const bonusQs = bqSnap.exists() ? (bqSnap.data().questions || []) : [];
+
+      const pmSnap = await getDocs(collection(db, "predictions_matches"));
+      const pkSnap = await getDocs(collection(db, "predictions_knockout"));
+      const pqSnap = await getDoc(doc(db, "predictions_qualifiers", userId));
+      const ptSnap = await getDoc(doc(db, "predictions_third_place", userId));
+      const pbSnap = await getDoc(doc(db, "predictions_bonus", userId));
+
+      // זיהוי איזה סוג שלב ביקשנו כדי לדעת מה לסנן
+      const safeTarget = String(targetStage).trim();
+      const isTargetGroupPhase = ["1", "2", "3"].includes(safeTarget);
+      const isTargetKnockoutPhase = ["32 הגדולות", "שמינית גמר", "רבע גמר", "חצי גמר", "גמר"].includes(safeTarget);
+      const isAll = safeTarget.toUpperCase() === "ALL";
+
+      // --- עיבוד משחקים ---
+      const pmData = pmSnap.docs.map(d => d.data()).filter(p => p.userId === userId);
+      const pkData = pkSnap.docs.map(d => d.data()).filter(p => p.userId === userId);
+      const allUserMatches = [...pmData, ...pkData];
+      
+      const formattedMatches = [];
+      for (const p of allUserMatches) {
+        const m: any = matchesList.find(x => x && x.id === p.matchId);
+        if (m) {
+          const isKnockout = m.stage === "KNOCKOUT";
+          const roundLabel = isKnockout ? (m.roundName || "נוקאאוט") : `מחזור ${m.matchday || 1}`;
+
+          // מנגנון סינון משחקים לפי השלב המבוקש
+          if (!isAll) {
+             if (!isKnockout && String(m.matchday) !== safeTarget) continue;
+             if (isKnockout && String(m.roundName).trim() !== safeTarget) continue;
+          }
+
+          let finalDate = new Date().toISOString(); 
+          if (m.matchDate) {
+            try {
+              if (typeof m.matchDate.toDate === 'function') {
+                finalDate = m.matchDate.toDate().toISOString();
+              } else {
+                const dateStr = String(m.matchDate).trim();
+                let parsedDate: Date;
+                if (dateStr.includes('/')) {
+                  const [datePart, timePart = "00:00"] = dateStr.split(" ");
+                  const [day, month, year] = datePart.split("/");
+                  const [hour, minute] = timePart.split(":");
+                  parsedDate = new Date(Number(year), Number(month) - 1, Number(day), Number(hour), Number(minute));
+                } else {
+                  parsedDate = new Date(dateStr);
+                }
+                if (!isNaN(parsedDate.getTime())) finalDate = parsedDate.toISOString();
+              }
+            } catch (err) {}
+          }
+
+          formattedMatches.push({
+            home: m.homeTeam,
+            away: m.awayTeam,
+            homeScore: Number(p.predictedHomeScore),
+            awayScore: Number(p.predictedAwayScore),
+            dateTime: finalDate,
+            roundLabel: roundLabel
+          });
+        }
+      }
+
+      // --- עיבוד עולות (יוצג רק בשלב הבתים או ב-ALL) ---
+      const formattedQualifiers = [];
+      if (isAll || isTargetGroupPhase) {
+        if (pqSnap.exists()) {
+          const qData = pqSnap.data();
+          if (qData.groups) {
+            for (const [grp, preds] of Object.entries<any>(qData.groups)) {
+              if (preds.first || preds.second) {
+                 formattedQualifiers.push({ group: grp, first: preds.first || "", second: preds.second || "" });
+              }
+            }
+          }
+        }
+        formattedQualifiers.sort((a, b) => a.group.localeCompare(b.group));
+      }
+
+      // --- עיבוד מקום 3 (יוצג רק בשלב הבתים או ב-ALL) ---
+      let formattedThirdPlace: string[] = [];
+      if (isAll || isTargetGroupPhase) {
+        if (ptSnap.exists()) {
+           const tData = ptSnap.data();
+           if (tData.teams) formattedThirdPlace = tData.teams.filter((t: string) => t.trim() !== "");
+        }
+      }
+
+      // --- עיבוד בונוסים חכם לפי שלב  ---
+      const formattedBonuses = [];
+      if (pbSnap.exists()) {
+         const bData = pbSnap.data();
+         if (bData.answers) {
+            for (const [qId, ans] of Object.entries<any>(bData.answers)) {
+               const q: any = bonusQs.find((x:any) => x && x.id === qId);
+               if (q && String(ans).trim() !== "") {
+
+                  
+                  let includeBonus = false;
+                  const isGlobalBonus = !q.phase || q.phase === "ALL" || q.phase === "TOURNAMENT" || q.phase === "GLOBAL" || q.phase === "";
+                  if (isAll || isGlobalBonus) {
+                      includeBonus = true;
+                  } else if (isTargetGroupPhase) {
+                      // שאלות ספציפיות לשלב הבתים
+                      if (q.phase === "GROUPS") includeBonus = true;
+                  } else if (isTargetKnockoutPhase) {
+                      // שאלות ספציפיות לנוקאאוט או לשלב מדויק
+                      if (q.phase === "KNOCKOUT") includeBonus = true;
+                      if (q.roundName === safeTarget || q.stage === safeTarget) includeBonus = true;
+                  }
+
+                  if (includeBonus) {
+                      formattedBonuses.push({
+                        question: q.label,
+                        answer: String(ans),
+                        points: Number(q.points) || 0
+                      });
+                  }
+               }
+            }
+         }
+      }
+
+      return {
+        matches: formattedMatches,
+        qualifiers: formattedQualifiers,
+        thirdPlace: formattedThirdPlace,
+        bonuses: formattedBonuses
+      };
+
+    } catch (error) {
+      console.error("שגיאה בשליפת נתוני PDF:", error);
+      throw error;
+    }
+  };
+  // פונקציה חכמה להפקת מטריצה יומית
+  const fetchDailyMatrixForPDF = async (targetDate: string) => {
+    try {
+      const matchesSnap = await getDocs(collection(db, "matches"));
+      const allMatches = matchesSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+      // סינון משחקים לפי התאריך המבוקש (תומך בחיפוש חלקי כמו "16/06")
+      const dailyMatches = allMatches.filter(m => {
+        if (!m.matchDate) return false;
+        const dStr = String(m.matchDate);
+        return dStr.includes(targetDate) || dStr.includes(targetDate.replace(/\//g, '.'));
+      }).sort((a, b) => {
+        return String(a.matchDate).localeCompare(String(b.matchDate));
+      });
+
+      if (dailyMatches.length === 0) return { matches: [], rows: [] };
+
+      // שליפת ניחושים
+      const pmSnap = await getDocs(collection(db, "predictions_matches"));
+      const pkSnap = await getDocs(collection(db, "predictions_knockout"));
+      const allPreds = [...pmSnap.docs.map(d=>d.data()), ...pkSnap.docs.map(d=>d.data())];
+
+      // שימוש ברשימת המשתמשים המעודכנת מהסטייט (שכבר ממוינת לפי ניקוד!)
+      const sortedUsers = [...usersList].sort((a: any, b: any) => (b.totalPoints || 0) - (a.totalPoints || 0));
+
+      const rows = sortedUsers.map((u: any, index: number) => {
+         const userPreds: any = {};
+         dailyMatches.forEach(m => {
+            const pred = allPreds.find(p => p.userId === u.id && p.matchId === m.id);
+            if (pred && pred.predictedHomeScore !== "" && pred.predictedAwayScore !== "") {
+               userPreds[m.id] = `${pred.predictedHomeScore} - ${pred.predictedAwayScore}`;
+               if (m.stage === "KNOCKOUT" && pred.qualifier) {
+                  // בנוקאאוט נוסיף מי הוא ניחש שיעלה
+                  userPreds[m.id] += `\n(${pred.qualifier})`;
+               }
+            } else {
+               userPreds[m.id] = "X"; // לא ניחש
+            }
+         });
+         return {
+            rank: index + 1,
+            name: u.name || "ללא שם",
+            totalPoints: u.totalPoints || 0,
+            predictions: userPreds
+         };
+      });
+
+      return {
+        matches: dailyMatches.map(m => ({
+          id: m.id,
+          home: m.homeTeam,
+          away: m.awayTeam,
+          time: String(m.matchDate).split(" ")[1] || "" 
+        })),
+        rows: rows
+      };
+    } catch (error) {
+      console.error("שגיאה בהפקת מטריצה:", error);
+      throw error;
     }
   };
   
@@ -1802,6 +2007,8 @@ const handleCalculateScores = async (silentParam: any = false) => {
              // הוספנו פרופ לסנכרון ידני!
              handleRefreshData={fetchAdminData}
              handleExportUserBackup={handleExportUserBackup}
+             fetchUserPredictionsForPDF={fetchUserPredictionsForPDF} // <-- הוסף את השורה הזו
+             fetchDailyMatrixForPDF={fetchDailyMatrixForPDF}
            />
         )}
         {activeTab === "PRIZES" && <AdminPrizesTab />}
