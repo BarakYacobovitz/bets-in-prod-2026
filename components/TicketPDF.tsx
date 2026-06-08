@@ -1,7 +1,6 @@
 import React from 'react';
 import { Document, Page, Text, View, StyleSheet, Font, Image } from '@react-pdf/renderer';
 
-// טעינת הפונט התומך בעברית
 Font.register({
   family: 'Rubik',
   src: '/fonts/Rubik-Regular.ttf', 
@@ -9,7 +8,6 @@ Font.register({
 
 const styles = StyleSheet.create({
   page: { fontFamily: 'Rubik', padding: 30, backgroundColor: '#ffffff' },
-  
   headerBox: { backgroundColor: '#1e1b4b', padding: 15, borderRadius: 8, marginBottom: 20 },
   headerTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 },
   logo: { width: 45, height: 45, objectFit: 'contain' },
@@ -60,8 +58,14 @@ const styles = StyleSheet.create({
   bonusColQ: { width: '50%', textAlign: 'right', fontSize: 11, color: '#334155', paddingRight: 10 },
 
   footerBox: { marginTop: 30, borderTopWidth: 1, borderTopColor: '#cbd5e1', paddingTop: 15, alignItems: 'center' },
-  footerText: { fontSize: 10, color: '#64748b', marginBottom: 5 },
-  barcodeContainer: { flexDirection: 'row', height: 40, justifyContent: 'center', marginTop: 10 }
+  footerText: { fontSize: 10, color: '#64748b', marginBottom: 10 },
+  barcodeContainer: { flexDirection: 'row', height: 40, justifyContent: 'center' },
+  
+  // הברקודים הוגדרו מראש! אין יותר Inline styles
+  bc1: { backgroundColor: '#0f172a', marginRight: 1.5, width: 1 },
+  bc2: { backgroundColor: '#0f172a', marginRight: 1.5, width: 2 },
+  bc3: { backgroundColor: '#0f172a', marginRight: 1.5, width: 3 },
+  bc4: { backgroundColor: '#0f172a', marginRight: 1.5, width: 4 }
 });
 
 const r = (text: any) => {
@@ -102,7 +106,7 @@ export const TicketPDF = ({ userName, stageName, matches = [], qualifiers = [], 
     <Document>
       <Page size="A4" style={styles.page}>
         
-        <View style={styles.headerBox}>
+        <View style={styles.headerBox} wrap={false}>
           <View style={styles.headerTop}>
             <Image src="/icon-512.png" style={styles.logo} />
             <View style={styles.headerTextContainer}>
@@ -125,25 +129,31 @@ export const TicketPDF = ({ userName, stageName, matches = [], qualifiers = [], 
           <View style={styles.sectionContainer}>
             <Text style={styles.sectionTitle}>{r("משחקים")}</Text>
             {sortedMatches.map((match, index) => (
-              <View key={index} style={index % 2 !== 0 ? styles.matchRowZebra : styles.matchRow}>
-                <Text style={styles.teamText}>{r(match.home)}</Text>
+                <View key={index} style={index % 2 !== 0 ? styles.matchRowZebra : styles.matchRow}>
+                
+                {/* 1. קבוצת החוץ תהיה בצד שמאל */}
+                <Text style={styles.teamText}>{r(match.away)}</Text>
+                
                 <View style={styles.scoreCenter}>
-                  {/* אוחד לטקסט אחד עם שבירת שורה כדי למנוע קריסת רינדור מותנה! */}
                   <Text style={styles.dateText}>
                     {match.roundLabel ? `${r(match.roundLabel)}\n` : ""}{formatDateTime(match.dateTime)}
                   </Text>
                   <View style={styles.scoreBox}>
-                    <Text style={styles.scoreText}>{`${match.homeScore} - ${match.awayScore}`}</Text>
+                    {/* 2. תוצאת החוץ משמאל, תוצאת הבית מימין! */}
+                    <Text style={styles.scoreText}>{`${match.awayScore} - ${match.homeScore}`}</Text>
                   </View>
                 </View>
-                <Text style={styles.teamText}>{r(match.away)}</Text>
+                
+                {/* 3. קבוצת הבית תהיה בצד ימין (הכי אחרונה בקוד = הכי ימינה ב-PDF) */}
+                <Text style={styles.teamText}>{r(match.home)}</Text>
+
               </View>
             ))}
           </View>
         ) : null}
 
         {qualifiers.length > 0 ? (
-          <View style={styles.groupsSection}>
+          <View style={styles.groupsSection} wrap={false}>
             <Text style={styles.sectionTitle}>{r("עולות מהבתים")}</Text>
             <View style={styles.groupsContainer}>
               {qualifiers.map((q, idx) => (
@@ -177,7 +187,7 @@ export const TicketPDF = ({ userName, stageName, matches = [], qualifiers = [], 
         ) : null}
 
         {bonuses.length > 0 ? (
-          <View style={styles.sectionContainer} wrap={false}>
+          <View style={styles.sectionContainer}>
             <Text style={styles.sectionTitle}>{r("שאלות בונוס")}</Text>
             <View style={styles.bonusTable}>
               <View style={styles.bonusHeaderRow}>
@@ -189,7 +199,7 @@ export const TicketPDF = ({ userName, stageName, matches = [], qualifiers = [], 
               {[...bonuses]
                 .sort((a, b) => (b.points || 0) - (a.points || 0))
                 .map((bonus, idx) => (
-                <View key={idx} style={idx % 2 !== 0 ? styles.bonusRowZebra : styles.bonusRow}>
+                <View key={idx} style={idx % 2 !== 0 ? styles.bonusRowZebra : styles.bonusRow} wrap={false}>
                   <Text style={styles.bonusColPts}>{bonus.points > 0 ? `+${bonus.points}` : "-"}</Text>
                   <Text style={styles.bonusColAns}>{r(bonus.answer)}</Text>
                   <Text style={styles.bonusColQ}>{r(bonus.question)}</Text>
@@ -203,15 +213,7 @@ export const TicketPDF = ({ userName, stageName, matches = [], qualifiers = [], 
           <Text style={styles.footerText}>{r("הטופס ננעל והוזן למערכת בהצלחה. ט.ל.ח")}</Text>
           <View style={styles.barcodeContainer}>
             {barcodeWidths.map((w, i) => (
-              <View 
-                key={i} 
-                style={{ 
-                  backgroundColor: '#0f172a', 
-                  marginRight: 1.5, 
-                  height: '100%', 
-                  width: w 
-                }} 
-              />
+              <View key={i} style={styles[`bc${w}` as keyof typeof styles]} />
             ))}
           </View>
         </View>

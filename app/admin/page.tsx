@@ -1740,9 +1740,9 @@ const handleCalculateScores = async (silentParam: any = false) => {
          dailyMatches.forEach(m => {
             const pred = allPreds.find(p => p.userId === u.id && p.matchId === m.id);
             if (pred && pred.predictedHomeScore !== "" && pred.predictedAwayScore !== "") {
-               userPreds[m.id] = `${pred.predictedHomeScore} - ${pred.predictedAwayScore}`;
+               // התיקון: בניית המחרוזת הפוך (חוץ - בית) כדי שבתצוגה הבית יופיע מימין יחד עם הקבוצה!
+               userPreds[m.id] = `${pred.predictedAwayScore} - ${pred.predictedHomeScore}`;
                if (m.stage === "KNOCKOUT" && pred.qualifier) {
-                  // בנוקאאוט נוסיף מי הוא ניחש שיעלה
                   userPreds[m.id] += `\n(${pred.qualifier})`;
                }
             } else {
