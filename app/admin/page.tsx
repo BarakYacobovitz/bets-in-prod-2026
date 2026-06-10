@@ -356,20 +356,29 @@ const handleUpdateUserDetails = async (userId: string, details: { name?: string,
 
   const handleUpdateMatchDate = async (matchId: string, newDate: string) => {
     try {
-      await updateDoc(doc(db, "matches", matchId), { matchDate: newDate });
-      setMatches(matches.map(m => m.id === matchId ? { ...m, matchDate: newDate } : m));
-      toast.success("תאריך ושעת המשחק עודכנו בהצלחה!");
+      // 1. עוטפים את ה-ID ב-String כדי שפיירבייס לא יקרוס
+      const matchRef = doc(db, "matches", String(matchId));
+      await updateDoc(matchRef, { matchDate: newDate });
+      
+      // 2. משתמשים ב-prev כדי למנוע דריסת נתונים (Race Condition)
+      setMatches(prev => prev.map(m => String(m.id) === String(matchId) ? { ...m, matchDate: newDate } : m));
+      toast.success("תאריך ושעת המשחק עודכנו בהצלחה! 📅");
     } catch (error) {
+      console.error("שגיאה בעדכון מועד המשחק:", error);
       toast.error("שגיאה בעדכון מועד המשחק");
     }
   };
 
   const handleUpdateMatchday = async (matchId: string, newMatchday: number) => {
     try {
-      await updateDoc(doc(db, "matches", matchId), { matchday: newMatchday });
-      setMatches(matches.map(m => m.id === matchId ? { ...m, matchday: newMatchday } : m));
-      toast.success("מחזור המשחק עודכן בהצלחה!");
+      // אותו תיקון בדיוק חל גם על עדכון מספרי המחזורים
+      const matchRef = doc(db, "matches", String(matchId));
+      await updateDoc(matchRef, { matchday: newMatchday });
+      
+      setMatches(prev => prev.map(m => String(m.id) === String(matchId) ? { ...m, matchday: newMatchday } : m));
+      toast.success("מחזור המשחק עודכן בהצלחה! 🔄");
     } catch (error) {
+      console.error("שגיאה בעדכון מחזור המשחק:", error);
       toast.error("שגיאה בעדכון מחזור המשחק");
     }
   };
