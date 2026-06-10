@@ -282,6 +282,7 @@ function AdminMatchRow({ match, allMatches, isSaving, justSaved, onSave, onClear
      city: match.city || "",
      broadcastUrl: match.broadcastUrl || ""
   });
+  
   const [thirdPlaceTeams, setThirdPlaceTeams] = useState<string[]>([]);
 
   // שולף את 8 המעפילות (מקום 3) רק כשפותחים את פאנל העריכה של שלב 32 הגדולות
@@ -308,6 +309,11 @@ function AdminMatchRow({ match, allMatches, isSaving, justSaved, onSave, onClear
     });
   }, [match]);
 
+  useEffect(() => {
+    setTimeInput(match.matchDate || "");
+    setMatchdayInput(match.matchday || "");
+  }, [match.matchDate, match.matchday]);
+  
   const isKnockout = match.stage === "KNOCKOUT";
   useEffect(() => {
     if (isKnockout && homeInput !== "" && awayInput !== "") {

@@ -341,11 +341,12 @@ const handleUpdateUserDetails = async (userId: string, details: { name?: string,
   };
   const handleUpdateMatchDetails = async (matchId: string, details: any) => {
   try {
-    const matchRef = doc(db, "matches", matchId);
+    // 1. עוטפים את ה-ID ב-String כדי למנוע קריסה בפיירבייס
+    const matchRef = doc(db, "matches", String(matchId));
     await updateDoc(matchRef, details);
     
-    // רענון ה-State המקומי של המשחקים כדי שהשינוי יופיע מיד ב-UI
-    setMatches(prev => prev.map(m => m.id === matchId ? { ...m, ...details } : m));
+    // 2. עוטפים ב-String גם בבדיקת השוויון למניעת באג ב-State
+    setMatches(prev => prev.map(m => String(m.id) === String(matchId) ? { ...m, ...details } : m));
     
     return true;
   } catch (error) {
