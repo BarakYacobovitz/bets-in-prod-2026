@@ -7,13 +7,14 @@ import {
   signOut,
   sendSignInLinkToEmail, 
   isSignInWithEmailLink, 
-  signInWithEmailLink 
+  signInWithEmailLink,
+  onAuthStateChanged
 } from "firebase/auth";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import toast from "react-hot-toast";
 
 // תאריך יעד קבוע מראש: 11 ביוני 2026, שעה 14:00 (סגירת קלפיות)
-const LOCK_TIME = new Date("2026-06-11T14:00:00").getTime();
+const LOCK_TIME = new Date("2026-06-11T17:00:00").getTime();
 
 export default function Login() {
   const [errorMsg, setErrorMsg] = useState("");
@@ -26,9 +27,28 @@ export default function Login() {
   // שומרים את יחידות הזמן בנפרד לעיצוב הדיגיטלי
   const [timeUnits, setTimeUnits] = useState<{ d: string, h: string, m: string, s: string } | null>(null);
   const [isTimeUp, setIsTimeUp] = useState(false);
-  
+  useEffect(() => {
+  const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+    if (currentUser) {
+      // אם מצאנו משתמש מחובר בזיכרון המכשיר, נרענן קלות את המיקום
+      // או פשוט נגרום לרכיב האב (Home) להתעדכן ולסגור את מסך הלוגין
+      window.location.reload(); 
+    }
+  });
+  return () => unsubscribe();
+}, []);  
   const videoRef = useRef<HTMLVideoElement>(null);
-
+  // -- התיקון עבור משתמשי PWA (Magic Link) --
+  // מאזין שבודק אם המשתמש כבר מחובר ברקע כשמסך הלוגין עולה
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      if (currentUser) {
+        // אם מצאנו משתמש מחובר בזיכרון, מרעננים כדי שרכיב האב יכניס אותו פנימה
+        window.location.reload(); 
+      }
+    });
+    return () => unsubscribe();
+  }, []);
   // הפעלת סרטון הרקע בהשהייה
   useEffect(() => {
     const timer = setTimeout(() => {

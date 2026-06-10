@@ -1,0 +1,111 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Check if the user is an admin by their email address
+    function isAdmin() {
+      return request.auth != null && request.auth.token.email == 'bawak.y10@gmail.com';
+    }
+    
+    // Check if the user is operating on their own document
+    function isOwner(userId) {
+      return request.auth != null && request.auth.uid == userId;
+    }
+
+    // 👑 Admin bypass rule: Admins have full access to everything
+    match /{document=**} {
+      allow read, write: if isAdmin();
+    }
+
+    // --- Rules for users ---
+
+    // USERS collection:
+    // Anyone logged in can read the user profiles (e.g. for leaderboards, disclosure page)
+    // Users can create their profile only with totalPoints=0, knockoutPoints=0, hasPaid=false
+    // Users can update their profile but NOT stats/payment details
+    match /users/{userId} {
+      allow read: if request.auth != null;
+      allow create: if isOwner(userId) && 
+                      request.resource.data.totalPoints == 0 && 
+                      (!('knockoutPoints' in request.resource.data) || request.resource.data.knockoutPoints == 0) &&
+                      request.resource.data.hasPaid == false;
+      allow update: if isOwner(userId) && 
+                      !request.resource.data.diff(resource.data).affectedKeys().hasAny(['totalPoints', 'knockoutPoints', 'hasPaid', 'email']);
+    }
+
+    // MATCHES collection:
+    // Anyone logged in can read
+    // Only admin can write (covered by global match admin rule)
+    match /matches/{matchId} {
+      allow read: if request.auth != null;
+    }
+
+    // PREDICTIONS_MATCHES collection:
+    // Format is userUid_matchId
+    // Anyone logged in can read (for disclosure page / checking others' bets once locked)
+    // Users can write only their own predictions
+    match /predictions_matches/{predId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && 
+                      predId.startsWith(request.auth.uid + "_") && 
+                      request.resource.data.userId == request.auth.uid;
+    }
+
+    // PREDICTIONS_KNOCKOUT collection:
+    // Users can read/write their own knockout predictions
+    match /predictions_knockout/{predId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && 
+                      predId.startsWith(request.auth.uid + "_") && 
+                      request.resource.data.userId == request.auth.uid;
+    }
+
+    // PREDICTIONS_BONUS collection:
+    // Users can read/write their own bonus predictions
+    match /predictions_bonus/{predId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && 
+                      predId.startsWith(request.auth.uid + "_") && 
+                      request.resource.data.userId == request.auth.uid;
+    }
+
+    // PREDICTIONS_QUALIFIERS collection:
+    // Users can read/write their own qualifiers predictions
+    match /predictions_qualifiers/{userId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && isOwner(userId);
+    }
+
+    // PREDICTIONS_THIRD_PLACE collection:
+    // Users can read/write their own third-place predictions
+    match /predictions_third_place/{userId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && isOwner(userId);
+    }
+
+    // MINI_LEAGUES collection:
+    // Logged in users can read
+    // Users can create a league if they add themselves as a member and owner/creator
+    // Users can update members (joining/leaving) by only adding/removing their own UID from the 'members' array
+    match /mini_leagues/{leagueId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null && 
+                      request.resource.data.creatorId == request.auth.uid &&
+                      request.resource.data.members.size() == 1 &&
+                      request.resource.data.members[0] == request.auth.uid;
+      allow update: if request.auth != null && (
+                      // Only allow updating members (for joining/leaving) unless you are the creator
+                      (resource.data.creatorId == request.auth.uid) || (
+                        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['members']) &&
+                        (
+                          // Joining: user added themselves
+                          (request.resource.data.members.size() == resource.data.members.size() + 1 && request.resource.data.members.hasAll(resource.data.members) && request.resource.data.members.hasAny([request.auth.uid])) ||
+                          // Leaving: user removed themselves
+                          (request.resource.data.members.size() == resource.data.members.size() - 1 && resource.data.members.hasAll(request.resource.data.members) && !request.resource.data.members.hasAny([request.auth.uid]))
+                        )
+                      )
+                    );
+      allow delete: if request.auth != null && resource.data.creatorId == request.auth.uid;
+    }
+  }
+}
