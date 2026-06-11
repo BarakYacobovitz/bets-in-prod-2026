@@ -6,6 +6,7 @@ import { auth, db } from "../app/firebase";
 import { getFlagUrl } from "../app/utils/flags"; 
 import toast from "react-hot-toast";
 
+// פונקציית עזר לחישובי זמנים לשאלות הפתעה
 const parseDateTimeLocal = (dtStr: string) => {
   if (!dtStr) return 0;
   try {
@@ -19,6 +20,7 @@ const parseDateTimeLocal = (dtStr: string) => {
   } catch { return 0; }
 };
 
+// רכיב קונפטי עצמאי שיופעל רק עבור המקום הראשון עם נקודות! 🎊
 const Confetti = () => {
   const [pieces, setPieces] = useState<any[]>([]);
   const [isVisible, setIsVisible] = useState(true);
@@ -92,6 +94,7 @@ export default function Leaderboard() {
   const [isMyRowVisible, setIsMyRowVisible] = useState(true);
   const myRowRef = useRef<HTMLTableRowElement>(null);
 
+  // הגנה מפני Hydration Crash בסלולר!
   const [currentTimeMs, setCurrentTimeMs] = useState<number>(0);
   useEffect(() => { setCurrentTimeMs(Date.now()); }, []);
 
@@ -155,11 +158,22 @@ export default function Leaderboard() {
   }, []);
 
   const rankUsers = (usersArr: any[], field: string) => {
-    const sorted = [...usersArr].sort((a, b) => (b[field] || 0) - (a[field] || 0));
+    const sorted = [...usersArr].sort((a, b) => {
+      const scoreA = a[field] || 0;
+      const scoreB = b[field] || 0;
+      if (scoreB !== scoreA) return scoreB - scoreA;
+      // שובר שוויון לפי א'-ב' כדי למנוע החלפות פתאומיות בפודיום
+      const nameA = a.name || "";
+      const nameB = b.name || "";
+      return nameA > nameB ? 1 : -1;
+    });
+
     let currentRank = 1;
     return sorted.map((u, i) => {
-      if (i > 0 && (u[field] || 0) < (sorted[i - 1][field] || 0)) currentRank = i + 1;
-      return { ...u, displayRank: currentRank };
+      if (i > 0 && (u[field] || 0) < (sorted[i - 1][field] || 0)) {
+        currentRank = i + 1;
+      }
+      return { ...u, displayRank: currentRank, absoluteRank: i + 1 };
     });
   };
 
@@ -242,8 +256,20 @@ export default function Leaderboard() {
     finally { setIsLeagueLoading(false); }
   };
 
-  const getPrizeForRank = (rank: number, board: string, allUsers: any[]) => {
-    if (!prizes) return null;
+  // -----------------------------------------------------------
+  // פונקציית פרסים הוגנת: מפצלת קופה אם יש שוויון (Pool Logic)
+  // מסתירה פרסים לחלוטין אם הניקוד הוא 0 (מונעת באג 666 בתחילת הטורניר)
+  // -----------------------------------------------------------
+  const getPrizeForRank = (user: any, board: string, allUsers: any[]) => {
+    if (!prizes || !user) return null;
+    
+    const scoreField = board === "GENERAL" ? "totalPoints" : "knockoutPoints";
+    const score = user[scoreField] || 0;
+    
+    // אם הניקוד 0, אין חלוקת פרסים
+    if (score === 0) return null;
+
+    const rank = user.displayRank;
     const winnersAtThisRank = allUsers.filter(u => u.displayRank === rank);
     const count = winnersAtThisRank.length;
     
@@ -328,6 +354,7 @@ export default function Leaderboard() {
     ), { duration: Infinity });
   };
 
+  // שימוש ב-useMemo להגנה מפני לולאת רינדור (ריצודים)
   const currentUsers = useMemo(() => {
     if (activeBoard === "GENERAL") return generalUsers;
     if (activeBoard === "KNOCKOUT") return knockoutUsers;
@@ -469,6 +496,7 @@ export default function Leaderboard() {
 
   const isBonusLocked = (q: any, state: number) => {
     if (q.isSurprise) {
+       // שימוש בזמן המקומי ששמור ב-State כדי למנוע קריסה!
        if (!q.openTime || !q.closeTime || currentTimeMs === 0) return false;
        return currentTimeMs > parseDateTimeLocal(q.closeTime); 
     }
@@ -866,10 +894,10 @@ export default function Leaderboard() {
                         <span className="text-slate-800 font-black text-2xl text-center leading-none">{podiumSecond[scoreField]}</span>
                         <span className="text-slate-700 font-bold text-[10px] md:text-xs text-center mt-1">מקום {podiumSecond.displayRank}</span>
                         
-                        {getPrizeForRank(podiumSecond.displayRank, activeBoard, currentUsers) ? (
+                        {getPrizeForRank(podiumSecond, activeBoard, currentUsers) ? (
                           <div className="mt-2 bg-slate-500/20 px-2.5 py-1 rounded-full border border-slate-500/30 flex items-center gap-1.5 shadow-sm">
                             <span className="text-[10px]">💰</span>
-                            <span className="text-xs font-black text-slate-900">{getPrizeForRank(podiumSecond.displayRank, activeBoard, currentUsers)} ₪</span>
+                            <span className="text-xs font-black text-slate-900">{getPrizeForRank(podiumSecond, activeBoard, currentUsers)} ₪</span>
                           </div>
                         ) : null}
                      </div>
@@ -904,10 +932,10 @@ export default function Leaderboard() {
                         <span className="text-amber-950 font-black text-3xl text-center leading-none">{podiumFirst[scoreField]}</span>
                         <span className="text-amber-900 font-bold text-xs text-center mt-1">מקום {podiumFirst.displayRank}</span>
                         
-                        {getPrizeForRank(podiumFirst.displayRank, activeBoard, currentUsers) ? (
+                        {getPrizeForRank(podiumFirst, activeBoard, currentUsers) ? (
                           <div className="mt-2 bg-amber-900/20 px-3 py-1 rounded-full border border-amber-900/30 flex items-center gap-1.5 shadow-sm">
                             <span className="text-[11px]">💰</span>
-                            <span className="text-sm font-black text-amber-950">{getPrizeForRank(podiumFirst.displayRank, activeBoard, currentUsers)} ₪</span>
+                            <span className="text-sm font-black text-amber-950">{getPrizeForRank(podiumFirst, activeBoard, currentUsers)} ₪</span>
                           </div>
                         ) : null}
                      </div>
@@ -929,10 +957,10 @@ export default function Leaderboard() {
                         <span className="text-orange-100 font-black text-xl text-center leading-none">{podiumThird[scoreField]}</span>
                         <span className="text-orange-200 font-bold text-[10px] md:text-xs text-center mt-1">מקום {podiumThird.displayRank}</span>
                         
-                        {getPrizeForRank(podiumThird.displayRank, activeBoard, currentUsers) ? (
+                        {getPrizeForRank(podiumThird, activeBoard, currentUsers) ? (
                           <div className="mt-2 bg-orange-950/30 px-2.5 py-1 rounded-full border border-orange-950/40 flex items-center gap-1.5 shadow-sm">
                             <span className="text-[10px]">💰</span>
-                            <span className="text-xs font-black text-orange-100">{getPrizeForRank(podiumThird.displayRank, activeBoard, currentUsers)} ₪</span>
+                            <span className="text-xs font-black text-orange-100">{getPrizeForRank(podiumThird, activeBoard, currentUsers)} ₪</span>
                           </div>
                         ) : null}
                      </div>
@@ -952,7 +980,7 @@ export default function Leaderboard() {
              </div>
            )}
 
-           <div className="overflow-x-auto relative z-10 bg-slate-900/50 rounded-t-2xl border-t border-slate-700/50 pb-48">
+           <div className="overflow-x-auto relative z-10 bg-slate-900/50 rounded-t-2xl border-t border-slate-700/50 pb-48 transform-gpu">
              <table className="w-full text-right table-fixed">
                <thead>
                  <tr className="text-slate-400 border-b border-slate-700/50 bg-slate-800/80 text-sm md:text-base">
@@ -1009,36 +1037,36 @@ export default function Leaderboard() {
                         </div>
                       </td>
                        <td className={`p-3 md:p-4 text-center font-black text-lg md:text-xl ${isTop3 ? (activeBoard === "GENERAL" || activeBoard === "LEAGUES" ? "text-amber-400" : "text-emerald-400") : "text-slate-200"}`}>
-                         
-                         {/* כאן בוצע התיקון הקריטי לגלילה - הוסרו ה-onMouseEnter והועברו ל-onClick ו-CSS חכם */}
                          <div 
-                           className="inline-flex items-center justify-center gap-1.5 cursor-pointer relative group"
-                           onClick={(e) => {
-                             e.stopPropagation();
-                             setHoveredUser(hoveredUser === u.id ? null : u.id);
-                           }}
+                           className="inline-flex items-center justify-center gap-1.5 cursor-help relative group" 
+                           onMouseEnter={() => setHoveredUser(u.id)} 
+                           onMouseLeave={() => setHoveredUser(null)} 
+                           onClick={() => setHoveredUser(hoveredUser === u.id ? null : u.id)}
                          >
                            <span>{scoreToShow || 0}</span>
                            <span className="text-[10px] text-slate-500 group-hover:text-blue-400 transition-colors hidden sm:inline-block">ℹ️</span>
                            
-                           <div className={`absolute top-full left-[-30px] sm:left-1/2 sm:-translate-x-1/2 mt-3 w-56 bg-slate-900/95 backdrop-blur-md border border-slate-600/80 p-4 rounded-2xl shadow-2xl z-50 pointer-events-none transition-all duration-200 origin-top-left sm:origin-top ${hoveredUser === u.id ? "opacity-100 scale-100" : "opacity-0 scale-95 group-hover:opacity-100 group-hover:scale-100"}`}>
-                              <div className="absolute bottom-full left-[40px] sm:left-1/2 sm:-translate-x-1/2 -mb-[1px] border-[6px] border-transparent border-b-slate-600/80"></div>
-                              <div className="absolute bottom-full left-[40px] sm:left-1/2 sm:-translate-x-1/2 -mb-[2px] border-[5px] border-transparent border-b-slate-900/95"></div>
-                              
-                              <div className="text-xs font-black text-slate-300 border-b border-slate-700/50 pb-2 mb-3 text-center tracking-wide">פילוח נקודות</div>
-                              
-                              {u.breakdown ? (
-                                <div className="space-y-2.5 text-[11px] font-medium">
-                                  <div className="flex justify-between items-center"><span className="text-slate-400">⚽ משחקים:</span><span className="font-black text-white bg-slate-800 px-2 py-0.5 rounded">{u.breakdown.matches || 0}</span></div>
-                                  <div className="flex justify-between items-center"><span className="text-slate-400">🎁 בונוסים:</span><span className="font-black text-white bg-slate-800 px-2 py-0.5 rounded">{u.breakdown.bonuses || 0}</span></div>
-                                  <div className="flex justify-between items-center"><span className="text-slate-400">🥇 עולות מבתים:</span><span className="font-black text-white bg-slate-800 px-2 py-0.5 rounded">{u.breakdown.groups || 0}</span></div>
-                                  <div className="flex justify-between items-center"><span className="text-slate-400">🥉 8 המעפילות:</span><span className="font-black text-white bg-slate-800 px-2 py-0.5 rounded">{u.breakdown.thirdPlace || 0}</span></div>
-                                  <div className="flex justify-between items-center"><span className="text-slate-400">🔥 נוק-אאוט:</span><span className="font-black text-white bg-slate-800 px-2 py-0.5 rounded">{u.breakdown.knockout || 0}</span></div>
-                                </div>
-                              ) : (
-                                <div className="text-[10px] text-slate-400 text-center py-2 leading-relaxed">הפילוח המלא יוצג לאחר חישוב הנקודות הבא באדמין ⏳</div>
-                              )}
-                           </div>
+                           {/* הפופ-אפ עכשיו מרונדר רק מתי שצריך! זה יציל את הרינדור במובייל */}
+                           {hoveredUser === u.id && (
+                             <div className="absolute top-full left-[10px] sm:left-1/2 sm:-translate-x-1/2 mt-3 w-56 bg-slate-900 border border-slate-600 p-4 rounded-2xl shadow-2xl z-50 origin-top animate-fade-in-up">
+                                <div className="absolute bottom-full left-[40px] sm:left-1/2 sm:-translate-x-1/2 -mb-[1px] border-[6px] border-transparent border-b-slate-600"></div>
+                                <div className="absolute bottom-full left-[40px] sm:left-1/2 sm:-translate-x-1/2 -mb-[2px] border-[5px] border-transparent border-b-slate-900"></div>
+                                
+                                <div className="text-xs font-black text-slate-300 border-b border-slate-700/50 pb-2 mb-3 text-center tracking-wide">פילוח נקודות</div>
+                                
+                                {u.breakdown ? (
+                                  <div className="space-y-2.5 text-[11px] font-medium">
+                                    <div className="flex justify-between items-center"><span className="text-slate-400">⚽ משחקים:</span><span className="font-black text-white bg-slate-800 px-2 py-0.5 rounded">{u.breakdown.matches || 0}</span></div>
+                                    <div className="flex justify-between items-center"><span className="text-slate-400">🎁 בונוסים:</span><span className="font-black text-white bg-slate-800 px-2 py-0.5 rounded">{u.breakdown.bonuses || 0}</span></div>
+                                    <div className="flex justify-between items-center"><span className="text-slate-400">🥇 עולות מבתים:</span><span className="font-black text-white bg-slate-800 px-2 py-0.5 rounded">{u.breakdown.groups || 0}</span></div>
+                                    <div className="flex justify-between items-center"><span className="text-slate-400">🥉 8 המעפילות:</span><span className="font-black text-white bg-slate-800 px-2 py-0.5 rounded">{u.breakdown.thirdPlace || 0}</span></div>
+                                    <div className="flex justify-between items-center"><span className="text-slate-400">🔥 נוק-אאוט:</span><span className="font-black text-white bg-slate-800 px-2 py-0.5 rounded">{u.breakdown.knockout || 0}</span></div>
+                                  </div>
+                                ) : (
+                                  <div className="text-[10px] text-slate-400 text-center py-2 leading-relaxed">הפילוח המלא יוצג לאחר חישוב הנקודות הבא באדמין ⏳</div>
+                                )}
+                             </div>
+                           )}
                          </div>
                        </td>
                        <td className="p-3 md:p-4 text-center">
@@ -1097,8 +1125,8 @@ export default function Leaderboard() {
       )}
 
       {spyModalUser && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-2 md:p-4 backdrop-blur-sm" dir="rtl">
-          <div className="bg-slate-900 border border-slate-700 p-4 md:p-6 rounded-3xl w-full max-w-xl md:max-w-[800px] md:min-w-[500px] min-h-[500px] h-[85vh] md:h-[650px] md:max-h-[90vh] flex flex-col shadow-2xl relative overflow-hidden md:resize">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-2 md:p-4 backdrop-blur-sm" dir="rtl">
+          <div className="bg-slate-900 border border-slate-700 p-4 md:p-6 rounded-3xl w-full max-w-xl md:max-w-[800px] md:min-w-[500px] max-h-[90vh] flex flex-col shadow-2xl relative overflow-hidden">
             
             <div className="flex justify-between items-start mb-4 pb-4 border-b border-slate-800 shrink-0">
               <div>
