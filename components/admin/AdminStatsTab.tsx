@@ -4,6 +4,7 @@ import { collection, getDocs, doc, getDoc, updateDoc } from "firebase/firestore"
 import { db } from "../../app/firebase";
 import { getFlagUrl } from "../../app/utils/flags";
 import toast from "react-hot-toast";
+import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
 
 interface AdminStatsTabProps {
   matches: any[];
@@ -15,10 +16,14 @@ interface AdminStatsTabProps {
   setStatsData: React.Dispatch<React.SetStateAction<any>>;
 }
 
-export default function AdminStatsTab({ matches, bonusQuestions, groupsList, isCalculating, setIsCalculating, statsData, setStatsData }: AdminStatsTabProps) {  const [selectedStatMatch, setSelectedStatMatch] = useState<string>("");
+export default function AdminStatsTab({ matches, bonusQuestions, groupsList, isCalculating, setIsCalculating, statsData, setStatsData }: AdminStatsTabProps) {
+  const [selectedStatMatch, setSelectedStatMatch] = useState<string>("");
   const [selectedStatBonus, setSelectedStatBonus] = useState<string>("");
   const [selectedStatGroup, setSelectedStatGroup] = useState<string>("A");
   const [statSpyModal, setStatSpyModal] = useState<{title: string, list: any[], type: "MATCH_DIRECTION" | "NAMES_ONLY"} | null>(null);
+  
+  // State חדש למעבר בין תצוגות שאלות הבונוס
+  const [bonusViewMode, setBonusViewMode] = useState<"list" | "chart">("list");
 
   const formatAuditTime = (ts: any) => {
     if (!ts) return "";
@@ -144,11 +149,9 @@ export default function AdminStatsTab({ matches, bonusQuestions, groupsList, isC
     const toastId = toast.loading("מחשב נתוני Wrapped אישיים... נא להמתין", { duration: 10000 });
     
     try {
-      // 1. משיכת כל נתוני המשתמשים
       const usersSnap = await getDocs(collection(db, "users"));
       const allUsers = usersSnap.docs.map(d => ({ id: d.id, ...d.data() }));
       
-      // 2. משיכת תוצאות האמת (משחקים, עולות, מקום 3 ובונוסים) מהאדמין
       const rqSnap = await getDoc(doc(db, "admin_results", "qualifiers"));
       const realQualifiers = rqSnap.exists() ? rqSnap.data().results || {} : {};
 
@@ -161,7 +164,6 @@ export default function AdminStatsTab({ matches, bonusQuestions, groupsList, isC
       const bqMap: any = {};
       bonusQuestions.forEach((q: any) => bqMap[q.id] = q);
 
-      // 3. משיכת כל הניחושים
       const pmSnap = await getDocs(collection(db, "predictions_matches"));
       const allMatchesPreds = pmSnap.docs.map(d => d.data());
 
@@ -190,11 +192,9 @@ export default function AdminStatsTab({ matches, bonusQuestions, groupsList, isC
          }
       });
 
-      // 4. הרכבת התיק האישי לכל משתמש
       for (const user of allUsers) {
          const pointsPerGroup: any = {};
          
-         // א. משחקי שלב הבתים
          const userPreds = allMatchesPreds.filter(p => p.userId === user.id);
          let exactHits = 0;
          let directionHits = 0;
@@ -238,7 +238,6 @@ export default function AdminStatsTab({ matches, bonusQuestions, groupsList, isC
             }
          });
 
-         // ב. עולות מהבתים (כולל ספירת כמות המדויקים והכיוונים)
          const qualPred = allQualPreds.find(p => p.userId === user.id)?.groups || {};
          let qualPoints = 0;
          let qualStats = { exact: 0, direction: 0 }; 
@@ -262,7 +261,6 @@ export default function AdminStatsTab({ matches, bonusQuestions, groupsList, isC
             qualPoints += (p1 + p2);
          }
 
-         // ג. 8 המעפילות (מקום שלישי)
          const thirdPred = allThirdPreds.find(p => p.userId === user.id)?.teams || [];
          let thirdPlacePoints = 0;
          let thirdPlaceHitsCount = 0; 
@@ -274,11 +272,10 @@ export default function AdminStatsTab({ matches, bonusQuestions, groupsList, isC
             }
          });
 
-         // ד. בונוסים
          const bonusPred = allBonusPreds.find(p => p.userId === user.id)?.answers || {};
          let bonusPoints = 0;
          let bonusHitsCount = 0; 
-         const bonusBreakdown = { regular: 0, double: 0, surprise: 0 }; // <--- מעקב מפורט אחרי הבונוסים
+         const bonusBreakdown = { regular: 0, double: 0, surprise: 0 };
 
          for (const [qId, ans] of Object.entries(bonusPred)) {
             const truth = realBonusAnswers[qId];
@@ -289,7 +286,6 @@ export default function AdminStatsTab({ matches, bonusQuestions, groupsList, isC
                bonusPoints += (qInfo?.points || 0);
                bonusHitsCount++;
                
-               // סיווג סוג הפגיעה לשקף הבונוסים
                if (qInfo?.isDouble) {
                   bonusBreakdown.double++;
                } else if (qInfo?.isSurprise) {
@@ -309,7 +305,6 @@ export default function AdminStatsTab({ matches, bonusQuestions, groupsList, isC
             if (points < worstGroup.points) worstGroup = { name: gName, points };
          });
 
-         // עדכון המבנה הסופי 
          const wrappedData = {
             exactHits,
             directionHits,
@@ -322,7 +317,7 @@ export default function AdminStatsTab({ matches, bonusQuestions, groupsList, isC
             qualStats,          
             thirdPlaceHitsCount, 
             bonusHitsCount,      
-            bonusBreakdown, // <--- הנתון החדש שנוסף עבור שקף הבונוסים המפורט
+            bonusBreakdown, 
             pointsPerGroup
          };
 
@@ -359,10 +354,23 @@ export default function AdminStatsTab({ matches, bonusQuestions, groupsList, isC
     );
   };
 
+  // הכנת נתוני הגרף עבור שאלת הבונוס שנבחרה
+  const currentBonusAnswers = statsData?.bonuses?.[selectedStatBonus]?.answers || {};
+  const numericChartData = Object.entries(currentBonusAnswers)
+    .filter(([answer]) => !isNaN(Number(answer.trim())))
+    .flatMap(([answer, data]: any) => 
+      data.users.map((u: any) => ({
+        name: u.name,
+        guess: Number(answer.trim())
+      }))
+    )
+    .sort((a, b) => a.guess - b.guess);
+
+  const isNumericBonus = numericChartData.length > 0;
+
   return (
     <div className="space-y-8 relative">
        
-       {/* כרטיסיית ה-Wrapped החדשה */}
        <div className="bg-gradient-to-r from-purple-900/50 to-pink-900/40 p-6 rounded-3xl border border-pink-500/30 shadow-xl flex flex-col md:flex-row justify-between items-center gap-4">
          <div>
            <h3 className="text-xl font-black text-pink-400 mb-2 flex items-center gap-2"><span>🎬</span> יצירת Wrapped אישי</h3>
@@ -426,17 +434,61 @@ export default function AdminStatsTab({ matches, bonusQuestions, groupsList, isC
               ) : (<div className="text-slate-500 text-center py-8">אף אחד לא ניחש עדיין את המשחק הזה.</div>)}
            </div>
 
+           {/* כרטיסיית שאלות בונוס עם כפתורי המעבר המשולבים */}
            <div className="bg-slate-800 p-6 md:p-8 rounded-3xl border border-slate-700 shadow-xl">
-              <h3 className="text-xl md:text-2xl font-black text-amber-400 mb-6 border-b border-slate-700 pb-3">⭐ שאלות בונוס</h3>
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 mb-6 border-b border-slate-700 pb-3">
+                <h3 className="text-xl md:text-2xl font-black text-amber-400">⭐ שאלות בונוס</h3>
+                
+                {isNumericBonus && (
+                  <div className="flex bg-slate-900 p-1 rounded-xl border border-slate-700 self-end sm:self-auto">
+                    <button 
+                      onClick={() => setBonusViewMode("list")} 
+                      className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${bonusViewMode === "list" ? "bg-amber-500 text-slate-950 shadow" : "text-slate-400 hover:text-white"}`}
+                    >
+                      📋 פרופיל הימורים
+                    </button>
+                    <button 
+                      onClick={() => setBonusViewMode("chart")} 
+                      className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${bonusViewMode === "chart" ? "bg-amber-500 text-slate-950 shadow" : "text-slate-400 hover:text-white"}`}
+                    >
+                      📊 גרף התפלגות
+                    </button>
+                  </div>
+                )}
+              </div>
+
               <select value={selectedStatBonus} onChange={(e) => setSelectedStatBonus(e.target.value)} className="w-full bg-slate-900 text-amber-300 font-bold p-3.5 rounded-xl border border-slate-600 mb-6 outline-none shadow-inner cursor-pointer">
                 {bonusQuestions.map(q => (<option key={q.id} value={q.id}>{q.label}</option>))}
               </select>
+
               {statsData.bonuses[selectedStatBonus] ? (
-                <div className="bg-slate-900/50 p-4 rounded-2xl border border-slate-700/50 shadow-inner max-h-[300px] overflow-y-auto custom-scrollbar pr-2 space-y-2">
-                  {Object.entries(statsData.bonuses[selectedStatBonus].answers).sort(([,a]:any, [,b]:any) => b.count - a.count).map(([answer, data]: any, idx) => {
-                      return renderProgressBar(answer, data.count, statsData.bonuses[selectedStatBonus].total, idx === 0 ? "bg-amber-500" : "bg-slate-500", () => setStatSpyModal({ title: `הימרו על: ${answer}`, list: data.users, type: "NAMES_ONLY" }));
-                  })}
-                </div>
+                bonusViewMode === "chart" && isNumericBonus ? (
+                  /* תצוגת הגרף */
+                  <div className="bg-slate-900/50 p-4 rounded-2xl border border-slate-700/50 h-[300px] flex items-center justify-center direction-ltr">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={numericChartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
+                        <XAxis dataKey="name" hide />
+                        <YAxis domain={[0, 'dataMax + 5']} stroke="#94a3b8" tick={{ fontSize: 11, fontWeight: 'bold' }} />
+                        <Tooltip
+                          contentStyle={{ backgroundColor: '#0f172a', borderColor: '#475569', borderRadius: '14px', textAlign: 'right' }}
+                          itemStyle={{ color: '#fbbf24', fontWeight: 'black', direction: 'rtl' }}
+                          labelStyle={{ color: '#94a3b8', fontSize: '12px' }}
+                          labelFormatter={(label) => `שחקן: ${label}`}
+                          formatter={(value: any) => [`${value}`, "ניחוש"]}
+                        />
+                        <Bar dataKey="guess" fill="#fbbf24" radius={[4, 4, 0, 0]} barSize={12} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                ) : (
+                  /* תצוגת הרשימה המקורית */
+                  <div className="bg-slate-900/50 p-4 rounded-2xl border border-slate-700/50 shadow-inner max-h-[300px] overflow-y-auto custom-scrollbar pr-2 space-y-2">
+                    {Object.entries(statsData.bonuses[selectedStatBonus].answers).sort(([,a]:any, [,b]:any) => b.count - a.count).map(([answer, data]: any, idx) => {
+                        return renderProgressBar(answer, data.count, statsData.bonuses[selectedStatBonus].total, idx === 0 ? "bg-amber-500" : "bg-slate-500", () => setStatSpyModal({ title: `הימרו על: ${answer}`, list: data.users, type: "NAMES_ONLY" }));
+                    })}
+                  </div>
+                )
               ) : (<div className="text-slate-500 text-center py-8">אף אחד לא ענה על שאלת הבונוס הזו.</div>)}
            </div>
 

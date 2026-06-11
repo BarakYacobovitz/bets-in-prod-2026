@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { doc, getDoc, setDoc, collection, getDocs } from "firebase/firestore";
 import { db } from "../../app/firebase";
 import toast from "react-hot-toast";
@@ -33,6 +33,12 @@ export default function AdminBonusTab() {
   const [filterPhase, setFilterPhase] = useState<string>("ALL");
   const [filterType, setFilterType] = useState<string>("ALL");
   const [filterKoRound, setFilterKoRound] = useState<string>("ALL");
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // זיהוי סביבת העבודה הנוכחית מתוך פיירבייס
+  const projectId = db?.app?.options?.projectId || "סביבה לא ידועה";
+  const isProd = projectId.toLowerCase().includes("prod");
 
   useEffect(() => {
     fetchData();
@@ -204,7 +210,6 @@ export default function AdminBonusTab() {
     setFormData({ ...formData, specificTeams: currentTeams.join(", ") });
   };
 
-  // פעולת הטוגל המהירה מהלוח מודיעין
   const toggleQuickAction = (field: 'answer' | 'leading' | 'blacklist', guess: string) => {
     let currentArr = formResults[field] ? formResults[field].split(",").map((s:string) => s.trim()).filter(Boolean) : [];
     if (currentArr.includes(guess)) {
@@ -213,6 +218,59 @@ export default function AdminBonusTab() {
       currentArr.push(guess);
     }
     setFormResults({ ...formResults, [field]: currentArr.join(", ") });
+  };
+
+  const handleExportJSON = () => {
+    try {
+      const dataStr = JSON.stringify({ questions }, null, 2);
+      const blob = new Blob([dataStr], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `bonus_questions_export_${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      toast.success("קובץ השאלות ירד בהצלחה! 📥");
+    } catch (err) {
+      toast.error("שגיאה בייצוא הקובץ");
+    }
+  };
+
+  const handleImportJSON = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!confirm("⚠️ אזהרה: פעולה זו תדרוס לחלוטין את כל שאלות הבונוס הקיימות במסד הנתונים! האם להמשיך?")) {
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      try {
+        const json = JSON.parse(event.target?.result as string);
+        if (json && Array.isArray(json.questions)) {
+          setIsSaving(true);
+          await setDoc(doc(db, "settings", "bonus_questions"), { questions: json.questions }, { merge: true });
+          setQuestions(json.questions);
+          toast.success("השאלות יובאו ועודכנו במסד הנתונים בהצלחה! 📤");
+          if (json.questions.length > 0) {
+            handleSelectQuestion(json.questions[0].id, json.questions, resultsData);
+          }
+        } else {
+          toast.error("מבנה קובץ ה-JSON לא תקין (חסר מערך questions)");
+        }
+      } catch (err) {
+        toast.error("שגיאה בקריאת הקובץ - ודא שזהו קובץ JSON תקין");
+        console.error(err);
+      } finally {
+        setIsSaving(false);
+        if (fileInputRef.current) fileInputRef.current.value = "";
+      }
+    };
+    reader.readAsText(file);
   };
 
   const filteredQuestions = questions.filter(q => {
@@ -259,12 +317,45 @@ export default function AdminBonusTab() {
   return (
     <div className="space-y-6 animate-fade-in-up">
       
-      <div className="bg-slate-900 p-6 rounded-3xl border border-slate-700 shadow-xl">
-        <h2 className="text-xl font-black text-white mb-4 flex items-center gap-2">
-          <span>🎁</span> ניהול שאלות בונוס
-        </h2>
+      {/* --- סרגל התראת סביבה בולט --- */}
+      <div className={`p-4 rounded-3xl font-black text-center text-sm md:text-lg border-2 shadow-2xl flex items-center justify-center gap-3 transition-all ${isProd ? 'bg-rose-950/80 border-rose-500 text-rose-300' : 'bg-emerald-950/80 border-emerald-500 text-emerald-300'}`}>
+         <span className="text-2xl">{isProd ? '🚨' : '🧪'}</span>
+         שים לב! אתה מחובר כעת לסביבת: 
+         <span className={`px-3 py-1 rounded-xl bg-black/40 tracking-wider ${isProd ? 'text-rose-400' : 'text-emerald-400'}`}>{projectId}</span>
+         <span className="text-2xl">{isProd ? '🚨' : '🧪'}</span>
+      </div>
 
-        {/* --- אזור הפילטרים --- */}
+      <div className="bg-slate-900 p-6 rounded-3xl border border-slate-700 shadow-xl">
+        
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
+          <h2 className="text-xl font-black text-white flex items-center gap-2">
+            <span>🎁</span> ניהול שאלות בונוס
+          </h2>
+          
+          <div className="flex gap-2 w-full sm:w-auto">
+             <button 
+                onClick={handleExportJSON} 
+                className="flex-1 sm:flex-none text-xs bg-slate-800 hover:bg-slate-700 text-blue-300 font-bold py-2 px-4 rounded-xl border border-slate-600 transition-colors flex items-center justify-center gap-1.5 shadow-sm"
+             >
+                <span className="text-sm">📥</span> ייצוא ל-JSON
+             </button>
+             
+             <button 
+                onClick={() => fileInputRef.current?.click()} 
+                className="flex-1 sm:flex-none text-xs bg-slate-800 hover:bg-slate-700 text-emerald-300 font-bold py-2 px-4 rounded-xl border border-slate-600 transition-colors flex items-center justify-center gap-1.5 shadow-sm"
+             >
+                <span className="text-sm">📤</span> ייבוא מ-JSON
+             </button>
+             <input 
+                type="file" 
+                accept=".json" 
+                ref={fileInputRef} 
+                onChange={handleImportJSON} 
+                className="hidden" 
+             />
+          </div>
+        </div>
+
         <div className="flex flex-col gap-3 mb-5 bg-slate-950/50 p-3 rounded-2xl border border-slate-800 transition-all">
            <div className="flex flex-col xl:flex-row gap-3">
              <div className="flex-1 flex gap-1 bg-slate-900 p-1.5 rounded-xl border border-slate-700 overflow-x-auto custom-scrollbar snap-x">
@@ -294,7 +385,6 @@ export default function AdminBonusTab() {
            )}
         </div>
         
-        {/* --- כרטיסיות --- */}
         <div className="flex gap-3 overflow-x-auto custom-scrollbar pb-3 snap-x">
            <button 
              onClick={handleCreateNew}
@@ -340,7 +430,6 @@ export default function AdminBonusTab() {
         </div>
       </div>
 
-      {/* --- אזור תחתון: עריכת השאלה הנבחרת --- */}
       {selectedId && formData ? (
         <div className="bg-slate-800 p-6 md:p-8 rounded-3xl border border-blue-500/30 shadow-2xl relative overflow-hidden">
            <div className="absolute top-0 right-0 w-2 h-full bg-blue-500"></div>
@@ -352,7 +441,6 @@ export default function AdminBonusTab() {
 
            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
               
-              {/* עמודה 1: הגדרות בסיס */}
               <div className="space-y-5">
                  <div className="bg-slate-900 p-5 rounded-2xl border border-slate-700 shadow-inner">
                    <h4 className="text-sm font-black text-slate-300 mb-4 flex items-center gap-2">⚙️ הגדרות כלליות</h4>
@@ -388,7 +476,6 @@ export default function AdminBonusTab() {
                         </div>
                      )}
 
-                     {/* --- בחירת סוג התשובה --- */}
                      <div className="pt-4 border-t border-slate-800 animate-fade-in-up mt-4">
                         <label className="block text-emerald-400 text-xs font-bold mb-1.5">סוג התשובה המצופה מהשחקן</label>
                         <select value={currentAnswerType} onChange={e => setFormData({...formData, answerType: e.target.value})} className="w-full bg-emerald-950/20 border border-emerald-500/30 rounded-xl p-3 text-white outline-none focus:border-emerald-500 text-sm">
@@ -403,7 +490,6 @@ export default function AdminBonusTab() {
                         </select>
                      </div>
 
-                     {/* הגדרות דינמיות בהתאם לסוג התשובה */}
                      {currentAnswerType === "TEAM" && (
                         <div className="pt-4 border-t border-emerald-900/50 mt-4 animate-fade-in-up space-y-4">
                           
@@ -459,7 +545,6 @@ export default function AdminBonusTab() {
                    </div>
                  </div>
 
-                 {/* סוגי שאלות מיוחדות */}
                  <div className="bg-slate-900 p-5 rounded-2xl border border-slate-700 shadow-inner space-y-4">
                     <h4 className="text-sm font-black text-slate-300 mb-2 flex items-center gap-2">✨ סיווג מיוחד</h4>
                     
@@ -489,7 +574,6 @@ export default function AdminBonusTab() {
                       </div>
                     )}
 
-                    {/* --- קוד להוספה מתחת לטוגל של שאלת הפתעה ב- AdminBonusTab.tsx --- */}
                     {currentAnswerType === "NUMBER_PURE" && (
                       <label className={`flex items-center gap-3 cursor-pointer bg-slate-950 p-3 rounded-xl border transition-colors ${formData.isProximity ? "border-orange-500/50" : "border-slate-800 hover:border-slate-600"}`}>
                         <input 
@@ -507,14 +591,12 @@ export default function AdminBonusTab() {
                  </div>
               </div>
 
-              {/* עמודה 2: תוצאות ואדמין */}
               <div className="flex flex-col gap-6">
                 <div className="bg-slate-900 p-5 rounded-2xl border border-slate-700 shadow-inner flex flex-col">
                    <h4 className="text-sm font-black text-amber-400 mb-4 flex items-center gap-2">📊 ניהול תוצאות בפועל (LIVE)</h4>
                    
                    <div className="space-y-5 flex-1">
                      
-                     {/* שדה: תשובה נכונה */}
                      <div>
                        <label className="block text-emerald-400 text-xs font-bold mb-1.5 flex flex-col sm:flex-row sm:justify-between gap-1">
                          <span>✅ התשובה הנכונה (מזכה בנקודות)</span>
@@ -523,7 +605,6 @@ export default function AdminBonusTab() {
                        <input type="text" value={formResults.answer} onChange={e => setFormResults({...formResults, answer: e.target.value})} className="w-full bg-emerald-950/20 border border-emerald-500/30 rounded-xl p-3 text-white outline-none focus:border-emerald-500 text-sm" placeholder="התשובה הנכונה..." />
                      </div>
 
-                     {/* שדה: מובילה זמנית */}
                      <div>
                        <label className="block text-amber-400 text-xs font-bold mb-1.5">
                          <span>👑 מובילה זמנית (מסמן סמיילי 👑 בדאשבורד)</span>
@@ -531,7 +612,6 @@ export default function AdminBonusTab() {
                        <input type="text" value={formResults.leading} onChange={e => setFormResults({...formResults, leading: e.target.value})} className="w-full bg-amber-950/20 border border-amber-500/30 rounded-xl p-3 text-white outline-none focus:border-amber-500 text-sm" placeholder="מובילה כרגע..." />
                      </div>
 
-                     {/* שדה: רשימה שחורה */}
                      <div>
                        <label className="block text-rose-400 text-xs font-bold mb-1.5">
                          <span>❌ רשימה שחורה (פוסל את התשובה)</span>
@@ -551,7 +631,6 @@ export default function AdminBonusTab() {
                    </div>
                 </div>
 
-                {/* --- הלוח מודיעין המשודרג (עם כפתורי הוספה מהירים) --- */}
                 <div className="bg-slate-900 p-5 rounded-2xl border border-slate-700 shadow-inner flex flex-col min-h-[300px]">
                    <div className="flex justify-between items-center mb-4">
                      <h4 className="text-sm font-black text-cyan-400 flex items-center gap-2">👁️ לוח מודיעין ופעולות (התפלגות ניחושים)</h4>
@@ -565,7 +644,6 @@ export default function AdminBonusTab() {
                         sortedDistribution.map(([guess, count]: any, i: number) => {
                            const percent = Math.round((count / totalGuesses) * 100);
                            
-                           // בדיקה האם הניחוש כבר נמצא באחד השדות (כדי להציג כפתור "לחוץ")
                            const isAns = formResults.answer.split(',').map((s:string)=>s.trim()).includes(guess);
                            const isLead = formResults.leading.split(',').map((s:string)=>s.trim()).includes(guess);
                            const isBlack = formResults.blacklist.split(',').map((s:string)=>s.trim()).includes(guess);
@@ -581,7 +659,6 @@ export default function AdminBonusTab() {
                                  <div className="h-full bg-cyan-500 rounded-full" style={{ width: `${percent}%` }}></div>
                                </div>
 
-                               {/* שורת הכפתורים המהירים */}
                                <div className="flex gap-1.5 mt-1 pt-2 border-t border-slate-800/50">
                                   <button 
                                     onClick={() => toggleQuickAction('answer', guess)} 
