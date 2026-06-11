@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { collection, getDocs, doc, getDoc, query, where, onSnapshot, updateDoc, addDoc, arrayUnion, arrayRemove } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth, db } from "../app/firebase";
@@ -746,7 +746,7 @@ const getPrizeForRank = (rank: number, board: string, allUsers: any[]) => {
   return (
     <div className="w-full max-w-4xl mx-auto pb-12" dir="rtl">
       
-      {isFirstPlace && tournamentState > 0 && myScore > 0 && <Confetti />}
+      {isFirstPlace && tournamentState > 0 && <Confetti />}
 
 {/* ========================================== */}
       {/* טאבים ראשיים של הטבלה - משימה 2 מהבקלוג */}
