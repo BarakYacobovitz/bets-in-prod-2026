@@ -1,6 +1,6 @@
 "use client";
 import React, { useState, useEffect, useRef } from "react";
-import { collection, getDocs, doc, updateDoc, setDoc, getDoc, deleteDoc, query, where } from "firebase/firestore";
+import { collection, getDocs, doc, updateDoc, setDoc, getDoc, deleteDoc, query, where, writeBatch } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth, db } from "../firebase";
 import Link from "next/link";
@@ -1186,8 +1186,9 @@ const handleCalculateScores = async (silentParam: any = false) => {
     reader.readAsText(file);
   };
 
-  const handleExportBackup = async () => {
+const handleExportBackup = async () => {
     setIsCalculating(true);
+    toast.loading("מייצר קובץ גיבוי מלא... ⏳", { id: "backup" });
     try {
       const collectionsToBackup = ['users', 'matches', 'predictions_matches', 'predictions_knockout', 'predictions_qualifiers', 'predictions_third_place', 'predictions_bonus', 'settings', 'admin_results', 'mini_leagues'];
       const backupData: any = {};
@@ -1198,18 +1199,23 @@ const handleCalculateScores = async (silentParam: any = false) => {
         snap.forEach(d => { backupData[collName][d.id] = d.data(); });
       }
 
-      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(backupData));
+      // שימוש ב-Blob מונע קריסות זיכרון בקבצים גדולים (תחליף בטוח ל-encodeURIComponent)
+      const dataStr = JSON.stringify(backupData, null, 2);
+      const blob = new Blob([dataStr], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      
       const downloadAnchorNode = document.createElement('a');
-      downloadAnchorNode.setAttribute("href", dataStr);
-      downloadAnchorNode.setAttribute("download", `bets_in_prod_backup_${new Date().toISOString().split('T')[0]}.json`);
+      downloadAnchorNode.setAttribute("href", url);
+      downloadAnchorNode.setAttribute("download", `bets_in_prod_FULL_BACKUP_${new Date().toISOString().split('T')[0]}.json`);
       document.body.appendChild(downloadAnchorNode);
       downloadAnchorNode.click();
       downloadAnchorNode.remove();
+      URL.revokeObjectURL(url);
       
-      toast.success("קובץ הגיבוי הורד בהצלחה!");
+      toast.success("קובץ הגיבוי המלא הורד בהצלחה!", { id: "backup" });
     } catch (e) { 
       console.error(e); 
-      toast.error("שגיאה ביצירת קובץ הגיבוי."); 
+      toast.error("שגיאה ביצירת קובץ הגיבוי.", { id: "backup" }); 
     } 
     finally { setIsCalculating(false); }
   };
@@ -1222,12 +1228,11 @@ const handleCalculateScores = async (silentParam: any = false) => {
       try {
         const backup = JSON.parse(event.target?.result as string);
         
-        // --- 1. איתור משתמשים שעלולים להימחק ---
+        // --- 1. איתור משתמשים שעלולים להימחק (שמרתי על הלוגיקה החכמה שלך) ---
         const currentUsersSnap = await getDocs(collection(db, "users"));
         const currentUsersIds = currentUsersSnap.docs.map(d => d.id);
         const backupUsersIds = backup.users ? Object.keys(backup.users) : [];
         
-        // מי נמצא עכשיו במערכת, אבל לא נמצא בקובץ הגיבוי?
         const newUsersAtRisk = currentUsersSnap.docs
            .filter(d => !backupUsersIds.includes(d.id))
            .map(d => (d.data() as any).name || d.id);
@@ -1242,31 +1247,55 @@ const handleCalculateScores = async (silentParam: any = false) => {
         if (!confirm(warningMessage)) return;
 
         setIsCalculating(true);
-        toast.loading("מוחק נתונים ישנים ומשחזר מקובץ... ⏳", { duration: 5000 });
+        toast.loading("מוחק נתונים ישנים ומשחזר מקובץ (נא לא לסגור את הדף)... ⏳", { duration: 15000, id: "import" });
         
-        // --- 2. מחיקה מלאה של הקולקשנים כדי למנוע "שאריות" ---
+        // --- שימוש ב-Batch של Firebase לביצועים מהירים ומניעת קריסות ---
+        let batch = writeBatch(db);
+        let operationCount = 0;
+
+        const commitBatchIfNeeded = async () => {
+           if (operationCount >= 400) {
+              await batch.commit();
+              batch = writeBatch(db); // פתיחת באצ' חדש
+              operationCount = 0;
+           }
+        };
+
+        // --- 2. מחיקה מהירה של הקולקשנים כדי למנוע "שאריות" ---
         const collectionsToRestore = Object.keys(backup);
         for (const collName of collectionsToRestore) {
            const snap = await getDocs(collection(db, collName));
            for (const d of snap.docs) {
-              await deleteDoc(doc(db, collName, d.id));
+              batch.delete(doc(db, collName, d.id));
+              operationCount++;
+              await commitBatchIfNeeded();
            }
         }
 
-        // --- 3. הזרקת הנתונים מהגיבוי למסד ---
+        // --- 3. הזרקה מהירה של הנתונים מהגיבוי למסד ---
         for (const [collName, docs] of Object.entries(backup)) {
           for (const [docId, data] of Object.entries(docs as any)) {
-            await setDoc(doc(db, collName, docId), data);
+            batch.set(doc(db, collName, docId), data);
+            operationCount++;
+            await commitBatchIfNeeded();
           }
         }
         
-        toast.success("✅ שחזור מסד הנתונים הסתיים בהצלחה! מרענן דף...", { duration: 5000 });
+        // Commit אחרון למה שנשאר בזיכרון של הבאצ'
+        if (operationCount > 0) {
+           await batch.commit();
+        }
+        
+        toast.success("✅ שחזור מסד הנתונים הסתיים בהצלחה! מרענן דף...", { duration: 5000, id: "import" });
         setTimeout(() => window.location.reload(), 2000);
       } catch (err) { 
         console.error(err); 
-        toast.error("שגיאה בפענוח קובץ השחזור. ודא שזהו קובץ תקין."); 
+        toast.error("שגיאה בפענוח קובץ השחזור. ודא שזהו קובץ תקין.", { id: "import" }); 
       } 
-      finally { setIsCalculating(false); }
+      finally { 
+        setIsCalculating(false); 
+        if (e.target) e.target.value = ""; // איפוס הקובץ
+      }
     };
     reader.readAsText(file);
   };
