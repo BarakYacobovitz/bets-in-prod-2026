@@ -4,8 +4,8 @@ import { collection, getDocs, doc, getDoc, updateDoc } from "firebase/firestore"
 import { db } from "../../app/firebase";
 import { getFlagUrl } from "../../app/utils/flags";
 import toast from "react-hot-toast";
-import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
-import html2canvas from "html2canvas";
+import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, LabelList } from "recharts";
+import { toPng } from "html-to-image";
 
 interface AdminStatsTabProps {
   matches: any[];
@@ -17,7 +17,7 @@ interface AdminStatsTabProps {
   setStatsData: React.Dispatch<React.SetStateAction<any>>;
 }
 
-export default function AdminStatsTab({ matches, bonusQuestions, groupsList, isCalculating, setIsCalculating, statsData, setStatsData }: AdminStatsTabProps) {
+export default function AdminStatsTab({ matches, bonusQuestions, groupsList, isCalculating, setIsCalculating, statsData, setStatsData }: AdminStatsTabProps) {  
   const [selectedStatMatch, setSelectedStatMatch] = useState<string>("");
   const [selectedStatBonus, setSelectedStatBonus] = useState<string>("");
   const [selectedStatGroup, setSelectedStatGroup] = useState<string>("A");
@@ -38,11 +38,10 @@ export default function AdminStatsTab({ matches, bonusQuestions, groupsList, isC
     if (!chartRef.current) return;
     const toastId = toast.loading("מייצר תמונה... 📷");
     try {
-      const canvas = await html2canvas(chartRef.current, { 
+      const dataUrl = await toPng(chartRef.current, { 
         backgroundColor: "#0f172a", 
-        scale: 2 
+        pixelRatio: 2 
       });
-      const dataUrl = canvas.toDataURL("image/png");
       const link = document.createElement("a");
       link.download = `bets_in_prod_graph_${Date.now()}.png`;
       link.href = dataUrl;
@@ -296,7 +295,7 @@ export default function AdminStatsTab({ matches, bonusQuestions, groupsList, isC
          const bonusPred = allBonusPreds.find(p => p.userId === user.id)?.answers || {};
          let bonusPoints = 0;
          let bonusHitsCount = 0; 
-         const bonusBreakdown = { regular: 0, double: 0, surprise: 0 };
+         const bonusBreakdown = { regular: 0, double: 0, surprise: 0 }; 
 
          for (const [qId, ans] of Object.entries(bonusPred)) {
             const truth = realBonusAnswers[qId];
@@ -387,6 +386,8 @@ export default function AdminStatsTab({ matches, bonusQuestions, groupsList, isC
     .sort((a, b) => a.guess - b.guess);
 
   const isNumericBonus = numericChartData.length > 0;
+  
+  const dynamicChartHeight = Math.max(400, numericChartData.length * 45);
 
   return (
     <div className="space-y-8 relative">
@@ -492,25 +493,43 @@ export default function AdminStatsTab({ matches, bonusQuestions, groupsList, isC
 
               {statsData.bonuses[selectedStatBonus] ? (
                 bonusViewMode === "chart" && isNumericBonus ? (
-                  <div ref={chartRef} className="bg-slate-900 p-6 rounded-2xl border border-slate-700/50 h-[350px] flex flex-col justify-center direction-ltr relative">
-                     <div className="absolute top-2 right-4 text-slate-400 text-xs font-black tracking-widest direction-rtl opacity-50">
-                       BETS IN PROD - מודיעין הקהל
-                     </div>
-                     <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={numericChartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
-                          <XAxis dataKey="name" hide />
-                          <YAxis domain={[0, 'dataMax + 5']} stroke="#94a3b8" tick={{ fontSize: 11, fontWeight: 'bold' }} />
-                          <Tooltip
-                            contentStyle={{ backgroundColor: '#0f172a', borderColor: '#475569', borderRadius: '14px', textAlign: 'right' }}
-                            itemStyle={{ color: '#fbbf24', fontWeight: 'black', direction: 'rtl' }}
-                            labelStyle={{ color: '#94a3b8', fontSize: '12px' }}
-                            labelFormatter={(label) => `שחקן: ${label}`}
-                            formatter={(value: any) => [`${value}`, "ניחוש"]}
-                          />
-                          <Bar dataKey="guess" fill="#fbbf24" radius={[4, 4, 0, 0]} barSize={12} />
-                        </BarChart>
-                     </ResponsiveContainer>
+                  /* עוטפים ב-dir="ltr" כדי למנוע את באג המרכוז של ה-SVG! */
+                  <div className="overflow-x-auto custom-scrollbar" dir="ltr">
+                    <div ref={chartRef} className="bg-slate-900 p-6 pr-8 rounded-2xl border border-slate-700/50 flex flex-col justify-center relative" style={{ height: dynamicChartHeight, minWidth: '500px' }}>
+                       <div className="absolute top-4 right-6 text-slate-400 text-sm font-black tracking-widest opacity-50 z-10">
+                         BETS IN PROD - מודיעין הקהל
+                       </div>
+                       <ResponsiveContainer width="100%" height="100%">
+                          <BarChart layout="vertical" data={numericChartData} margin={{ top: 40, right: 60, left: 10, bottom: 20 }}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="#334155" horizontal={true} vertical={false} />
+                            
+                            {/* ציר LTR קלאסי: העמודה צומחת מימין לשמאל במסך LTR (שזה אומר שהיא צומחת ימינה) */}
+                            <XAxis type="number" domain={[0, 'dataMax + 5']} stroke="#94a3b8" tick={{ fontSize: 12, fontWeight: 'bold' }} />
+                            
+                            {/* השמות מופיעים בצד שמאל, ומיושרים ימינה עד הקו בעזרת textAnchor: 'end' */}
+                            <YAxis 
+                              dataKey="name" 
+                              type="category" 
+                              width={140} 
+                              stroke="#94a3b8" 
+                              tick={{ fontSize: 13, fill: '#cbd5e1', fontWeight: 'bold', textAnchor: 'end', dx: -5 }} 
+                            />
+                            
+                            <Tooltip
+                              contentStyle={{ backgroundColor: '#0f172a', borderColor: '#475569', borderRadius: '14px', textAlign: 'right' }}
+                              itemStyle={{ color: '#fbbf24', fontWeight: 'black', direction: 'rtl' }}
+                              labelStyle={{ color: '#94a3b8', fontSize: '12px' }}
+                              labelFormatter={(label) => `שחקן: ${label}`}
+                              formatter={(value: any) => [`${value}`, "ניחוש"]}
+                            />
+                            
+                            {/* העמודה צומחת ימינה באופן טבעי, המספר בקצה הימני */}
+                            <Bar dataKey="guess" fill="#3b82f6" radius={[0, 4, 4, 0]} barSize={20}>
+                               <LabelList dataKey="guess" position="right" fill="#f8fafc" fontSize={14} fontWeight="black" offset={10} />
+                            </Bar>
+                          </BarChart>
+                       </ResponsiveContainer>
+                    </div>
                   </div>
                 ) : (
                   <div className="bg-slate-900/50 p-4 rounded-2xl border border-slate-700/50 shadow-inner max-h-[300px] overflow-y-auto custom-scrollbar pr-2 space-y-2">
