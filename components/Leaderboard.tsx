@@ -163,13 +163,30 @@ export default function Leaderboard() {
   }, []);
 
   const rankUsers = (usersArr: any[], field: string) => {
-    const sorted = [...usersArr].sort((a, b) => (b[field] || 0) - (a[field] || 0));
-    let currentRank = 1;
-    return sorted.map((u, i) => {
-      if (i > 0 && (u[field] || 0) < (sorted[i - 1][field] || 0)) currentRank = i + 1;
-      return { ...u, displayRank: currentRank };
-    });
-  };
+  const sorted = [...usersArr].sort((a, b) => {
+    const scoreA = a[field] || 0;
+    const scoreB = b[field] || 0;
+
+    // 1. מיון ראשי לפי הניקוד הגבוה ביותר
+    if (scoreB !== scoreA) {
+      return scoreB - scoreA;
+    }
+
+    // 2. שובר שוויון משני: מיון לפי א'-ב' של שם השחקן
+    const nameA = a.name || "";
+    const nameB = b.name || "";
+    return nameA.localeCompare(nameB, 'he'); 
+  });
+
+  let currentRank = 1;
+  return sorted.map((u, i) => {
+    // אם הניקוד קטן מהשחקן הקודם, המיקום מתעדכן לאינדקס הנוכחי + 1
+    if (i > 0 && (u[field] || 0) < (sorted[i - 1][field] || 0)) {
+      currentRank = i + 1;
+    }
+    return { ...u, displayRank: currentRank };
+  });
+};
 
   useEffect(() => {
     const fetchLeaderboardData = async () => {
