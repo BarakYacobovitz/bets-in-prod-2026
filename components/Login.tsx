@@ -13,7 +13,7 @@ import { doc, getDoc, setDoc } from "firebase/firestore";
 import toast from "react-hot-toast";
 
 // תאריך יעד קבוע מראש: 11 ביוני 2026, שעה 14:00 (סגירת קלפיות)
-const LOCK_TIME = new Date("2026-06-11T17:00:00").getTime();
+const LOCK_TIME = new Date("2026-06-11T18:30:00").getTime();
 
 export default function Login() {
   const [errorMsg, setErrorMsg] = useState("");
