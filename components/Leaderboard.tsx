@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { collection, getDocs, doc, getDoc, query, where, onSnapshot, updateDoc, addDoc, arrayUnion, arrayRemove } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth, db } from "../app/firebase";
@@ -20,7 +20,7 @@ const parseDateTimeLocal = (dtStr: string) => {
   } catch { return 0; }
 };
 
-// רכיב קונפטי עצמאי שיופעל רק עבור המקום הראשון! 🎊
+// רכיב קונפטי עצמאי שיופעל רק עבור המקום הראשון עם נקודות! 🎊
 const Confetti = () => {
   const [pieces, setPieces] = useState<any[]>([]);
   const [isVisible, setIsVisible] = useState(true);
@@ -58,9 +58,8 @@ const Confetti = () => {
     </div>
   );
 };
-// <--- כאן בדיוק תדביק את סעיף 1 --->
+
 const BROADCAST_QUOTES = {
-  // סוף שלב הבתים (States 4-5)
   GROUP_STAGE_END: [
     "שלב הבתים ננעל! חלקנו נביאים, חלקנו צריכים להחליף מקצוע לניחוש תוצאות בטניס שולחן... 🏓",
     "הבתים נסגרו, הלב נפתח. מי היה מאמין שבלגיה תעשה לנו ככה? (לפחות חלקכם צדקתם) 🇧🇪",
@@ -68,7 +67,6 @@ const BROADCAST_QUOTES = {
     "מי ששרד את הבתים - גיבור. מי שמוביל - חשוד בשימוש בבינה מלאכותית או בקשרים ישירים עם פיפ״א... 👀",
     "הבתים נגמרו. עכשיו כל גול שווה זהב, וכל החמצה שווה דמעות בוואטסאפ הקבוצתי 😢"
   ],
-  // סוף הטורניר (State 13)
   TOURNAMENT_END: [
     "זהו, תם הטקס! הגביע הונף, הניקוד סופי, והמנצח הולך לחפור לנו על זה ב-4 השנים הקרובות... 🏆",
     "הטורניר נגמר. חלק יצאו עם קופה, חלק יצאו עם תובנות, וכולנו יצאנו עם חוסר רציני בשעות שינה 😴",
@@ -76,30 +74,29 @@ const BROADCAST_QUOTES = {
     "אלוף הליגה שלנו הוא רשמית ה'בנאדם הכי מעצבן בקבוצה' עד המונדיאל הבא. ברכות! 👑",
     "תודה לכל המהמרים, הנביאים ואלו שסתם ניחשו 0-0 כל הזמן וקיוו לנס. היה מטורף! ✨"
   ],
-  // משפטים רגילים לשאר הזמן
   REGULAR: [
     "הטבלה לא משקרת, היא פשוט לפעמים קצת אכזרית... 📉",
     "מישהו ראה את המקום הראשון? הוא נעלם באופק... 💨",
     "זוכרים שבתחילת הטורניר כולם חשבו שהם מבינים בכדורגל? זמנים יפים... 🏟️"
   ]
 };
+
 export default function Leaderboard() {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
-  
   const [generalUsers, setGeneralUsers] = useState<any[]>([]);
   const [knockoutUsers, setKnockoutUsers] = useState<any[]>([]);
-  
   const [activeBoard, setActiveBoard] = useState<"GENERAL" | "KNOCKOUT" | "LEAGUES">("GENERAL");
   const [myLeagues, setMyLeagues] = useState<any[]>([]);
   const [selectedLeagueId, setSelectedLeagueId] = useState<string | null>(null);
   const [isLeagueLoading, setIsLeagueLoading] = useState(false);
-
   const [isLoading, setIsLoading] = useState(true);
-
   const [hoveredUser, setHoveredUser] = useState<string | null>(null);
-
   const [isMyRowVisible, setIsMyRowVisible] = useState(true);
   const myRowRef = useRef<HTMLTableRowElement>(null);
+
+  // הגנה מפני Hydration Crash בסלולר!
+  const [currentTimeMs, setCurrentTimeMs] = useState<number>(0);
+  useEffect(() => { setCurrentTimeMs(Date.now()); }, []);
 
   const [spyModalUser, setSpyModalUser] = useState<any | null>(null);
   const [spyPredictions, setSpyPredictions] = useState<any[]>([]);
@@ -127,26 +124,24 @@ export default function Leaderboard() {
 
   const groupsList = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L"];
   const [broadcastQuote, setBroadcastQuote] = useState("");
-  useEffect(() => {
-  let pool = BROADCAST_QUOTES.REGULAR;
-  
-  if (tournamentState >= 4 && tournamentState <= 5) {
-    pool = BROADCAST_QUOTES.GROUP_STAGE_END;
-  } else if (tournamentState >= 13) {
-    pool = BROADCAST_QUOTES.TOURNAMENT_END;
-  }
-  
-  const randomQuote = pool[Math.floor(Math.random() * pool.length)];
-  setBroadcastQuote(randomQuote);
-}, [tournamentState]);
 
-  // --- קליטת ניתוב מהדאשבורד ---
+  useEffect(() => {
+    let pool = BROADCAST_QUOTES.REGULAR;
+    if (tournamentState >= 4 && tournamentState <= 5) {
+      pool = BROADCAST_QUOTES.GROUP_STAGE_END;
+    } else if (tournamentState >= 13) {
+      pool = BROADCAST_QUOTES.TOURNAMENT_END;
+    }
+    const randomQuote = pool[Math.floor(Math.random() * pool.length)];
+    setBroadcastQuote(randomQuote);
+  }, [tournamentState]);
+
   useEffect(() => {
     const targetBoard = sessionStorage.getItem("targetBoard");
-  if (targetBoard === "GENERAL" || targetBoard === "KNOCKOUT" || targetBoard === "LEAGUES") {
-    setActiveBoard(targetBoard);
-    sessionStorage.removeItem("targetBoard");
-  }
+    if (targetBoard === "GENERAL" || targetBoard === "KNOCKOUT" || targetBoard === "LEAGUES") {
+      setActiveBoard(targetBoard);
+      sessionStorage.removeItem("targetBoard");
+    }
     const targetLeagueId = sessionStorage.getItem("targetLeagueId");
     if (targetLeagueId) {
       setActiveBoard("LEAGUES");
@@ -162,12 +157,25 @@ export default function Leaderboard() {
     return () => unsubscribe();
   }, []);
 
+  // דירוג יציב עם שובר שוויון – שומר על פודיום נקי ותקין ללא ריצודים
   const rankUsers = (usersArr: any[], field: string) => {
-    const sorted = [...usersArr].sort((a, b) => (b[field] || 0) - (a[field] || 0));
+    const sorted = [...usersArr].sort((a, b) => {
+      const scoreA = a[field] || 0;
+      const scoreB = b[field] || 0;
+      if (scoreB !== scoreA) return scoreB - scoreA;
+      // שובר שוויון לפי א'-ב' (מונע החלפות פתאומיות בפודיום)
+      const nameA = a.name || "";
+      const nameB = b.name || "";
+      return nameA > nameB ? 1 : -1;
+    });
+
     let currentRank = 1;
     return sorted.map((u, i) => {
-      if (i > 0 && (u[field] || 0) < (sorted[i - 1][field] || 0)) currentRank = i + 1;
-      return { ...u, displayRank: currentRank };
+      if (i > 0 && (u[field] || 0) < (sorted[i - 1][field] || 0)) {
+        currentRank = i + 1;
+      }
+      // מוסיף אינדקס אבסולוטי כדי שחלוקת הפרסים תהיה מדויקת וללא חלוקות הזויות (כמו 666)
+      return { ...u, displayRank: currentRank, absoluteRank: i + 1 };
     });
   };
 
@@ -199,6 +207,7 @@ export default function Leaderboard() {
 
         const rtSnap = await getDoc(doc(db, "admin_results", "third_place"));
         if (rtSnap.exists()) setRealThirdPlace(rtSnap.data().teams || []);
+        
         const prizesSnap = await getDoc(doc(db, "settings", "prizes"));
         if (prizesSnap.exists()) setPrizes(prizesSnap.data());
       } catch (error) { console.error("שגיאה:", error); } 
@@ -223,8 +232,6 @@ export default function Leaderboard() {
         const leagues: any[] = [];
         snap.forEach(doc => leagues.push({ id: doc.id, ...doc.data() }));
         setMyLeagues(leagues);
-        
-        // אם אין ליגה נבחרת (או שהגיעה מהסשן), נבחר את הראשונה
         if (leagues.length > 0 && !selectedLeagueId && !sessionStorage.getItem("targetLeagueId")) {
             setSelectedLeagueId(leagues[0].id);
         }
@@ -251,36 +258,20 @@ export default function Leaderboard() {
     finally { setIsLeagueLoading(false); }
   };
 
-const getPrizeForRank = (rank: number, board: string, allUsers: any[]) => {
+  // פונקציית פרסים אבסולוטית: מונעת פיצול קופות ומעניקה את הפרס המדויק לפי פוזיציה בפודיום
+  const getPrizeForRank = (absoluteRank: number, board: string) => {
     if (!prizes) return null;
-    
-    // מציא כמה אנשים חולקים את אותו הדירוג בדיוק
-    const winnersAtThisRank = allUsers.filter(u => u.displayRank === rank);
-    const count = winnersAtThisRank.length;
-    
-    // פונקציית עזר למשיכת ערך הפרס הגולמי מהמסד
-    const getRaw = (r: number) => {
-      if (board === "GENERAL") {
-        if (r === 1) return Number(prizes.main1 || 0);
-        if (r === 2) return Number(prizes.main2 || 0);
-        if (r === 3) return Number(prizes.main3 || 0);
-        if (r === 4) return Number(prizes.main4 || 0);
-      } else {
-        if (r === 1) return Number(prizes.ko1 || 0);
-        if (r === 2) return Number(prizes.ko2 || 0);
-      }
-      return 0;
-    };
-
-    // חישוב הקופה המשותפת: סכימת הפרסים של המקומות הרלוונטיים
-    // למשל: אם יש 3 אנשים במקום ראשון, הם חולקים את (פרס 1 + פרס 2 + פרס 3)
-    let totalPool = 0;
-    for (let i = 0; i < count; i++) {
-      totalPool += getRaw(rank + i);
+    let p = 0;
+    if (board === "GENERAL") {
+      if (absoluteRank === 1) p = Number(prizes.main1 || 0);
+      if (absoluteRank === 2) p = Number(prizes.main2 || 0);
+      if (absoluteRank === 3) p = Number(prizes.main3 || 0);
+      if (absoluteRank === 4) p = Number(prizes.main4 || 0);
+    } else if (board === "KNOCKOUT") {
+      if (absoluteRank === 1) p = Number(prizes.ko1 || 0);
+      if (absoluteRank === 2) p = Number(prizes.ko2 || 0);
     }
-    
-    const finalPrize = totalPool / count;
-    return finalPrize > 0 ? Math.floor(finalPrize) : null;
+    return p > 0 ? p : null;
   };
 
   const handleJoinLeague = async () => {
@@ -315,23 +306,22 @@ const getPrizeForRank = (rank: number, board: string, allUsers: any[]) => {
           בטוח שברצונך לעזוב את הליגה '{leagueName}'?
         </span>
         <div className="flex gap-2">
- <button 
-  onClick={async () => {
-    toast.dismiss(t.id); // קודם כל מעלימים את שאלת האישור
-    try {
-      await updateDoc(doc(db, "mini_leagues", leagueId), { members: arrayRemove(currentUserId) });
-      setSelectedLeagueId(null);
-      setActiveBoard("GENERAL");
-      // נותנים ל-UI שנייה לנשום לפני שמקפיצים את ההצלחה
-      setTimeout(() => toast.success("עזבת את הליגה."), 100); 
-    } catch (e) {
-      setTimeout(() => toast.error("שגיאה בביצוע הפעולה."), 100);
-    }
-  }} 
-  className="bg-rose-600 hover:bg-rose-700 text-white px-3 py-1.5 rounded-lg text-xs font-black transition-all active:scale-95"
->
-  כן, עזוב
-</button>
+          <button 
+            onClick={async () => {
+              toast.dismiss(t.id);
+              try {
+                await updateDoc(doc(db, "mini_leagues", leagueId), { members: arrayRemove(currentUserId) });
+                setSelectedLeagueId(null);
+                setActiveBoard("GENERAL");
+                setTimeout(() => toast.success("עזבת את הליגה."), 100); 
+              } catch (e) {
+                setTimeout(() => toast.error("שגיאה בביצוע הפעולה."), 100);
+              }
+            }} 
+            className="bg-rose-600 hover:bg-rose-700 text-white px-3 py-1.5 rounded-lg text-xs font-black transition-all active:scale-95"
+          >
+            כן, עזוב
+          </button>
           <button 
             onClick={() => toast.dismiss(t.id)} 
             className="bg-slate-200 hover:bg-slate-300 text-slate-800 px-3 py-1.5 rounded-lg text-xs font-bold transition-all"
@@ -343,18 +333,19 @@ const getPrizeForRank = (rank: number, board: string, allUsers: any[]) => {
     ), { duration: Infinity });
   };
 
-  let currentUsers: any[] = [];
-  if (activeBoard === "GENERAL") {
-     currentUsers = generalUsers;
-  } else if (activeBoard === "KNOCKOUT") {
-     currentUsers = knockoutUsers;
-  } else if (activeBoard === "LEAGUES") {
-     const activeLeague = myLeagues.find(l => l.id === selectedLeagueId);
-     if (activeLeague) {
-        const filtered = generalUsers.filter(u => activeLeague.members.includes(u.id));
-        currentUsers = rankUsers(filtered, "totalPoints");
-     }
-  }
+  // נעילת הרינדור בלולאה אינסופית שמפילה את הניידים (Hydration/404)
+  const currentUsers = useMemo(() => {
+    if (activeBoard === "GENERAL") return generalUsers;
+    if (activeBoard === "KNOCKOUT") return knockoutUsers;
+    if (activeBoard === "LEAGUES") {
+       const activeLeague = myLeagues.find(l => l.id === selectedLeagueId);
+       if (activeLeague) {
+          const filtered = generalUsers.filter(u => activeLeague.members.includes(u.id));
+          return rankUsers(filtered, "totalPoints");
+       }
+    }
+    return [];
+  }, [activeBoard, generalUsers, knockoutUsers, myLeagues, selectedLeagueId]);
 
   useEffect(() => {
     if (!currentUserId || currentUsers.length === 0) return;
@@ -383,7 +374,6 @@ const getPrizeForRank = (rank: number, board: string, allUsers: any[]) => {
     const myPrevScore = me[prevScoreField] || myScore;
     const myRank = me.displayRank;
     const myPrevRank = me[prevRankField] || myRank;
-    // הגדרת היריב בתוך הבלוק כדי למנוע שגיאות סדר טעינה
     const myNemesisId = generalUsers.find(u => u.id === currentUserId)?.nemesisId || null;
     const nemesisUser = myNemesisId ? currentUsers.find(u => u.id === myNemesisId) : null;
     
@@ -393,10 +383,7 @@ const getPrizeForRank = (rank: number, board: string, allUsers: any[]) => {
     const getRandom = (arr: string[]) => arr[Math.floor(Math.random() * arr.length)];
     let newTeaser = "";
 
-
-    // --- 1. קודם כל בודקים אם אנחנו בסיום שלב דרמטי בטורניר ---
     if (tournamentState >= 13) {
-       // סוף הטורניר
        if (me.displayRank === 1) {
          newTeaser = `שריקת הסיום! ${me.name?.split(' ')[0]}, אתה האלוף הבלתי מעורער! תכין מקום בארון לגביע (ולמזומן) 🏆💸`;
        } else if (me.displayRank <= 3) {
@@ -408,7 +395,6 @@ const getPrizeForRank = (rank: number, board: string, allUsers: any[]) => {
        }
     } 
     else if (tournamentState === 4 || tournamentState === 5) {
-       // סוף שלב הבתים
        if (me.displayRank === 1) {
          newTeaser = `שלב הבתים ננעל ואתה בפסגה! כולם מחכים לראות אם תקרוס בלחץ של הנוקאאוט או שתלך עד הסוף... 👀`;
        } else if (me.displayRank <= 5) {
@@ -419,7 +405,6 @@ const getPrizeForRank = (rank: number, board: string, allUsers: any[]) => {
          newTeaser = `שלב הבתים הסתיים, וטוב שכך. תמחק את מה שהיה, בנוקאאוט מתחילים לעבוד על באמת! 💪`;
        }
     } 
-    // --- 2. אם אנחנו במהלך רגיל של הטורניר, נשתמש בלוגיקה המקורית והמעולה שלך ---
     else {
       if (rankDiff > 0) {
          const passedGuy = currentUsers[myIndex + 1]; 
@@ -452,19 +437,14 @@ const getPrizeForRank = (rank: number, board: string, allUsers: any[]) => {
          }
       }
     }
-
     setTeaser(newTeaser);
-    }, [currentUsers, activeBoard, currentUserId, tournamentState]);
+  }, [currentUsers, activeBoard, currentUserId, tournamentState, generalUsers]);
+
   useEffect(() => {
     let observer: IntersectionObserver;
     const timer = setTimeout(() => {
       if (!myRowRef.current) return;
-      observer = new IntersectionObserver(
-        ([entry]) => {
-          setIsMyRowVisible(entry.isIntersecting);
-        },
-        { threshold: 0 } 
-      );
+      observer = new IntersectionObserver(([entry]) => { setIsMyRowVisible(entry.isIntersecting); }, { threshold: 0 });
       observer.observe(myRowRef.current);
     }, 100);
 
@@ -495,8 +475,9 @@ const getPrizeForRank = (rank: number, board: string, allUsers: any[]) => {
 
   const isBonusLocked = (q: any, state: number) => {
     if (q.isSurprise) {
-       if (!q.openTime || !q.closeTime) return false;
-       return Date.now() > parseDateTimeLocal(q.closeTime); 
+       // שימוש בזמן המקומי ששמור ב-State כדי למנוע קריסה!
+       if (!q.openTime || !q.closeTime || currentTimeMs === 0) return false;
+       return currentTimeMs > parseDateTimeLocal(q.closeTime); 
     }
     const s = Number(state) || 0;
     if (s === 0) return false;
@@ -507,30 +488,24 @@ const getPrizeForRank = (rank: number, board: string, allUsers: any[]) => {
       if (kr === "שמינית גמר") return s >= 7;
       if (kr === "רבע גמר") return s >= 9;
       if (kr === "חצי גמר") return s >= 11;
-      // בונוסים מתייחסים עכשיו נטו לגמר (אין אופציית מקום 3 בבונוסים)
       if (kr === "גמר") return s >= 13;
     }
     return false;
   };
 
   const calculateMatchPoints = (match: any, predH: string, predA: string, predQ: string) => {
-    // התיקון הקריטי: מוודאים שבאמת הוזנה תוצאה ושזה לא שדה ריק
     if (!match.isFinished || predH === "" || predA === "" || match.realHomeScore === "" || match.realAwayScore === "" || match.realHomeScore === undefined) return null;
-    
     let pts = 0; 
     const rH = Number(match.realHomeScore); 
     const rA = Number(match.realAwayScore); 
     const pH = Number(predH); 
     const pA = Number(predA);
-    
-    // מונע באגים של חישובי NaN
     if (!isNaN(pH) && !isNaN(pA) && !isNaN(rH) && !isNaN(rA)) {
        if (Math.sign(pH - pA) === Math.sign(rH - rA)) { 
            pts += 5; 
            if (pH === rH && pA === rA) pts += 10; 
        }
     }
-    
     if (match.stage === "KNOCKOUT" && predQ === match.realQualifier && predQ !== "") {
       const qMap: any = { "32 הגדולות": 5, "שמינית גמר": 10, "רבע גמר": 15, "חצי גמר": 20, "גמר": 25, "מקום שלישי": 10 }; 
       pts += (qMap[match.roundName] || 0);
@@ -594,7 +569,6 @@ const getPrizeForRank = (rank: number, board: string, allUsers: any[]) => {
       const snapGroups = await getDocs(qGroups);
       snapGroups.forEach(doc => {
         const data = doc.data(); const matchInfo = matchesMap[data.matchId];
-        // גם אם המשחק לא "נעול" טכנית לפי השלב, אבל הוא הסתיים בפועל, חובה להציג אותו!
         if (matchInfo && data.predictedHomeScore !== "" && (isMatchLocked(matchInfo, tournamentState) || matchInfo.isFinished)) {
           gatheredMatches.push({ ...data, matchInfo, points: calculateMatchPoints(matchInfo, data.predictedHomeScore, data.predictedAwayScore, "") });
           
@@ -682,9 +656,7 @@ const getPrizeForRank = (rank: number, board: string, allUsers: any[]) => {
       if (spyMatchTab === "R32") return m.stage === "KNOCKOUT" && m.roundName === "32 הגדולות";
       if (spyMatchTab === "R16") return m.stage === "KNOCKOUT" && m.roundName === "שמינית גמר";
       if (spyMatchTab === "QF") return m.stage === "KNOCKOUT" && m.roundName === "רבע גמר";
-      // פה דייקנו רק את חצי גמר
       if (spyMatchTab === "SF") return m.stage === "KNOCKOUT" && m.roundName === "חצי גמר";
-      // ופה המשחק של מקום 3 מופיע יחד עם הגמר!
       if (spyMatchTab === "FINAL") return m.stage === "KNOCKOUT" && (m.roundName === "גמר" || m.roundName === "מקום שלישי");
       return true;
     });
@@ -725,14 +697,10 @@ const getPrizeForRank = (rank: number, board: string, allUsers: any[]) => {
   return (
     <div className="w-full max-w-4xl mx-auto pb-12" dir="rtl">
       
-      {isFirstPlace && tournamentState > 0 && <Confetti />}
+      {isFirstPlace && tournamentState > 0 && myScore > 0 && <Confetti />}
 
-{/* ========================================== */}
-      {/* טאבים ראשיים של הטבלה - משימה 2 מהבקלוג */}
-      {/* ========================================== */}
       <div className="flex overflow-x-auto gap-2 mb-4 pb-2 custom-scrollbar bg-slate-900/50 p-2 rounded-2xl border border-slate-800 max-w-4xl mx-auto md:justify-center">
         
-        {/* דירוג כללי - תמיד זהב (Amber) כדי שיתכתב עם בונוסים/מקום 1 */}
         <button 
           onClick={() => setActiveBoard("GENERAL")} 
           className={`px-6 py-3 rounded-xl font-black whitespace-nowrap transition-all text-sm flex items-center justify-center gap-2 ${activeBoard === "GENERAL" ? "bg-amber-500 text-slate-900 shadow-lg shadow-amber-500/20" : "text-slate-400 hover:bg-slate-800 hover:text-amber-400"}`}
@@ -743,7 +711,6 @@ const getPrizeForRank = (rank: number, board: string, allUsers: any[]) => {
           דירוג כללי
         </button>
         
-        {/* נוק-אאוט - תמיד ורוד (Pink) בדיוק כמו בתפריט הניחושים */}
         {tournamentState >= 4 && (
           <button 
             onClick={() => setActiveBoard("KNOCKOUT")} 
@@ -756,7 +723,6 @@ const getPrizeForRank = (rank: number, board: string, allUsers: any[]) => {
           </button>
         )}
 
-        {/* ליגות פרטיות - תמיד כחול (Blue) */}
         <button id="private-leagues-section"
           onClick={() => setActiveBoard("LEAGUES")} 
           className={`px-6 py-3 rounded-xl font-black whitespace-nowrap transition-all text-sm flex items-center justify-center gap-2 ${activeBoard === "LEAGUES" ? "bg-blue-600 text-white shadow-lg shadow-blue-500/20" : "text-slate-400 hover:bg-slate-800 hover:text-blue-400"}`}
@@ -768,7 +734,7 @@ const getPrizeForRank = (rank: number, board: string, allUsers: any[]) => {
         </button>
         
       </div>
-      {/* קופת הטורניר בשקיפות מלאה */}
+
       {prizes && activeBoard !== "LEAGUES" && (
         <div className="bg-slate-900/50 border border-slate-800 p-3 sm:p-4 rounded-2xl mb-6 flex items-center justify-between max-w-sm mx-auto shadow-inner animate-fade-in-up">
           <div className="flex items-center gap-3">
@@ -787,7 +753,7 @@ const getPrizeForRank = (rank: number, board: string, allUsers: any[]) => {
           </div>
         </div>
       )}
-      {/* פאנל ניהול ובחירת ליגות פרטיות */}
+
       {activeBoard === "LEAGUES" && (
         <div className="mb-6 animate-fade-in-up">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-4 bg-slate-800/50 p-4 rounded-2xl border border-slate-700 shadow-inner">
@@ -818,7 +784,6 @@ const getPrizeForRank = (rank: number, board: string, allUsers: any[]) => {
         </div>
       )}
 
-      {/* מצב שאין למשתמש אף ליגה */}
       {activeBoard === "LEAGUES" && myLeagues.length === 0 ? (
          <div className="bg-slate-800 border border-slate-700 rounded-3xl p-8 text-center mb-8 shadow-xl">
            <div className="text-6xl mb-4 opacity-80">🏟️</div>
@@ -841,10 +806,9 @@ const getPrizeForRank = (rank: number, board: string, allUsers: any[]) => {
 
              <div className="flex flex-wrap justify-center items-center max-w-5xl mx-auto relative z-10 py-16 px-4 gap-x-4 gap-y-10 md:gap-x-8 md:gap-y-14">
                  {generalUsers.filter(u => u.hasPaid).map((user, i) => {
-                    // לוגיקה חכמה ליצירת מראה "מפוזר ואקראי" על בסיס האינדקס
                     const sizeScale = i % 3 === 0 ? "scale-110" : i % 5 === 0 ? "scale-90" : "scale-100";
                     const verticalOffset = i % 4 === 0 ? "-translate-y-8 md:-translate-y-12" : i % 3 === 0 ? "translate-y-6 md:translate-y-10" : i % 2 === 0 ? "-translate-y-3" : "translate-y-4";
-                    const animDelay = `${(i * 0.4) % 3}s`; // דיליי משתנה לאנימציית הריחוף
+                    const animDelay = `${(i * 0.4) % 3}s`;
 
                     return (
                        <div 
@@ -874,7 +838,6 @@ const getPrizeForRank = (rank: number, board: string, allUsers: any[]) => {
          <div className="bg-slate-800 pt-10 rounded-3xl border border-slate-700 shadow-2xl relative overflow-hidden flex flex-col">
            <div className={`absolute top-0 right-0 w-64 h-64 rounded-full blur-3xl pointer-events-none -mr-20 -mt-20 ${activeBoard === "GENERAL" ? "bg-amber-500/10" : activeBoard === "LEAGUES" ? "bg-blue-500/10" : "bg-emerald-500/10"}`}></div>
            
-           {/* כותרת הטבלה ופאנל שליטה פנימי לליגות */}
            <div 
                 className="flex flex-col md:flex-row justify-between items-center mb-2 px-6 md:px-10 relative z-10"
             >
@@ -882,7 +845,6 @@ const getPrizeForRank = (rank: number, board: string, allUsers: any[]) => {
                 {activeBoard === "GENERAL" ? "טבלת הדירוג הכללי" : activeBoard === "KNOCKOUT" ? "טבלת שלב הנוק-אאוט" : `ליגה: ${myLeagues.find(l => l.id === selectedLeagueId)?.name || "פרטית"}`}
               </h2>
 
-              {/* חיווי קוד וכפתור עזיבה בתוך הליגה */}
               {activeBoard === "LEAGUES" && selectedLeagueId && (
                  <div className="flex items-center gap-3 mt-3 md:mt-0 bg-slate-900/50 p-1.5 rounded-xl border border-slate-700/50 shadow-inner">
                     <span className="bg-blue-900/40 text-blue-300 border border-blue-500/30 px-3 py-1.5 rounded-lg text-sm font-mono tracking-widest flex items-center gap-2" title="קוד הצטרפות לחברים">
@@ -913,10 +875,10 @@ const getPrizeForRank = (rank: number, board: string, allUsers: any[]) => {
                         <span className="text-slate-800 font-black text-2xl text-center leading-none">{podiumSecond[scoreField]}</span>
                         <span className="text-slate-700 font-bold text-[10px] md:text-xs text-center mt-1">מקום {podiumSecond.displayRank}</span>
                         
-                        {getPrizeForRank(podiumSecond.displayRank, activeBoard, currentUsers) ? (
+                        {getPrizeForRank(podiumSecond.absoluteRank, activeBoard) ? (
                           <div className="mt-2 bg-slate-500/20 px-2.5 py-1 rounded-full border border-slate-500/30 flex items-center gap-1.5 shadow-sm">
                             <span className="text-[10px]">💰</span>
-                            <span className="text-xs font-black text-slate-900">{getPrizeForRank(podiumSecond.displayRank, activeBoard, currentUsers)} ₪</span>
+                            <span className="text-xs font-black text-slate-900">{getPrizeForRank(podiumSecond.absoluteRank, activeBoard)} ₪</span>
                           </div>
                         ) : null}
                      </div>
@@ -949,10 +911,10 @@ const getPrizeForRank = (rank: number, board: string, allUsers: any[]) => {
                         <span className="text-amber-950 font-black text-3xl text-center leading-none">{podiumFirst[scoreField]}</span>
                         <span className="text-amber-900 font-bold text-xs text-center mt-1">מקום {podiumFirst.displayRank}</span>
                         
-                        {getPrizeForRank(podiumFirst.displayRank, activeBoard, currentUsers) ? (
+                        {getPrizeForRank(podiumFirst.absoluteRank, activeBoard) ? (
                           <div className="mt-2 bg-amber-900/20 px-3 py-1 rounded-full border border-amber-900/30 flex items-center gap-1.5 shadow-sm">
                             <span className="text-[11px]">💰</span>
-                            <span className="text-sm font-black text-amber-950">{getPrizeForRank(podiumFirst.displayRank, activeBoard, currentUsers)} ₪</span>
+                            <span className="text-sm font-black text-amber-950">{getPrizeForRank(podiumFirst.absoluteRank, activeBoard)} ₪</span>
                           </div>
                         ) : null}
                      </div>
@@ -972,10 +934,10 @@ const getPrizeForRank = (rank: number, board: string, allUsers: any[]) => {
                         <span className="text-orange-100 font-black text-xl text-center leading-none">{podiumThird[scoreField]}</span>
                         <span className="text-orange-200 font-bold text-[10px] md:text-xs text-center mt-1">מקום {podiumThird.displayRank}</span>
                         
-                        {getPrizeForRank(podiumThird.displayRank, activeBoard, currentUsers) ? (
+                        {getPrizeForRank(podiumThird.absoluteRank, activeBoard) ? (
                           <div className="mt-2 bg-orange-950/30 px-2.5 py-1 rounded-full border border-orange-950/40 flex items-center gap-1.5 shadow-sm">
                             <span className="text-[10px]">💰</span>
-                            <span className="text-xs font-black text-orange-100">{getPrizeForRank(podiumThird.displayRank, activeBoard, currentUsers)} ₪</span>
+                            <span className="text-xs font-black text-orange-100">{getPrizeForRank(podiumThird.absoluteRank, activeBoard)} ₪</span>
                           </div>
                         ) : null}
                      </div>
@@ -985,7 +947,6 @@ const getPrizeForRank = (rank: number, board: string, allUsers: any[]) => {
              </div>
            )}
 
-           {/* עמדת השידור באמצע! */}
            {teaser && (
              <div className="mb-6 mx-4 md:mx-8 bg-slate-900/60 backdrop-blur-md border border-blue-500/30 p-3 md:p-4 rounded-2xl shadow-inner flex items-center gap-3 md:gap-4 relative z-10 transition-all">
                <div className="text-2xl md:text-3xl shrink-0 animate-pulse drop-shadow-md">🎙️</div>
@@ -1019,16 +980,11 @@ const getPrizeForRank = (rank: number, board: string, allUsers: any[]) => {
                                  u.displayRank === 3 ? "bg-orange-700/10 border-orange-700/30" : "hover:bg-slate-700/30";
                    
                    const scoreToShow = u[scoreField];
-                   
                    const prevR = activeBoard === "GENERAL" ? u.previousRankGeneral : (activeBoard === "KNOCKOUT" ? u.previousRankKnockout : null);
                    const trend = prevR ? (prevR - u.displayRank) : 0;
                    
                    return (
-                     <tr 
-                       key={u.id} 
-                       ref={isMe ? myRowRef : null} 
-                       className={`border-b border-slate-700/50 transition-colors ${rowBg}`}
-                     >
+                     <tr key={u.id} ref={isMe ? myRowRef : null} className={`border-b border-slate-700/50 transition-colors ${rowBg}`}>
                        <td className="p-3 md:p-4 text-center">
                          <div className="flex justify-center items-center gap-1.5 md:gap-2">
                             <div className="flex flex-col items-center">
@@ -1055,17 +1011,10 @@ const getPrizeForRank = (rank: number, board: string, allUsers: any[]) => {
                         {isMe && <span className="bg-blue-600 text-white text-[9px] px-1.5 py-0.5 rounded uppercase tracking-wider shrink-0 shadow-sm">אתה</span>}
                         {isNemesis && <span className="bg-rose-600/20 border border-rose-500/50 text-rose-400 text-[9px] px-1.5 py-0.5 rounded tracking-wider shrink-0 flex items-center gap-1 shadow-sm" title="היריב המושבע שלך!"><span>🎯</span> יריב</span>}
                          {!u.hasPaid && <span className="text-[10px] text-rose-400">טרם שולם</span>}
-
                         </div>
                       </td>
                        <td className={`p-3 md:p-4 text-center font-black text-lg md:text-xl ${isTop3 ? (activeBoard === "GENERAL" || activeBoard === "LEAGUES" ? "text-amber-400" : "text-emerald-400") : "text-slate-200"}`}>
-                         
-                         <div 
-                           className="inline-flex items-center justify-center gap-1.5 cursor-help relative group"
-                           onMouseEnter={() => setHoveredUser(u.id)}
-                           onMouseLeave={() => setHoveredUser(null)}
-                           onClick={() => setHoveredUser(hoveredUser === u.id ? null : u.id)}
-                         >
+                         <div className="inline-flex items-center justify-center gap-1.5 cursor-help relative group" onMouseEnter={() => setHoveredUser(u.id)} onMouseLeave={() => setHoveredUser(null)} onClick={() => setHoveredUser(hoveredUser === u.id ? null : u.id)}>
                            <span>{scoreToShow || 0}</span>
                            <span className="text-[10px] text-slate-500 group-hover:text-blue-400 transition-colors hidden sm:inline-block">ℹ️</span>
                            
@@ -1073,9 +1022,7 @@ const getPrizeForRank = (rank: number, board: string, allUsers: any[]) => {
                               <div className="absolute bottom-full left-[40px] sm:left-1/2 sm:-translate-x-1/2 -mb-[1px] border-[6px] border-transparent border-b-slate-600/80"></div>
                               <div className="absolute bottom-full left-[40px] sm:left-1/2 sm:-translate-x-1/2 -mb-[2px] border-[5px] border-transparent border-b-slate-900/95"></div>
                               
-                              <div className="text-xs font-black text-slate-300 border-b border-slate-700/50 pb-2 mb-3 text-center tracking-wide">
-                                פילוח נקודות
-                              </div>
+                              <div className="text-xs font-black text-slate-300 border-b border-slate-700/50 pb-2 mb-3 text-center tracking-wide">פילוח נקודות</div>
                               
                               {u.breakdown ? (
                                 <div className="space-y-2.5 text-[11px] font-medium">
@@ -1086,18 +1033,13 @@ const getPrizeForRank = (rank: number, board: string, allUsers: any[]) => {
                                   <div className="flex justify-between items-center"><span className="text-slate-400">🔥 נוק-אאוט:</span><span className="font-black text-white bg-slate-800 px-2 py-0.5 rounded">{u.breakdown.knockout || 0}</span></div>
                                 </div>
                               ) : (
-                                <div className="text-[10px] text-slate-400 text-center py-2 leading-relaxed">
-                                   הפילוח המלא יוצג לאחר חישוב הנקודות הבא באדמין ⏳
-                                </div>
+                                <div className="text-[10px] text-slate-400 text-center py-2 leading-relaxed">הפילוח המלא יוצג לאחר חישוב הנקודות הבא באדמין ⏳</div>
                               )}
                            </div>
                          </div>
-                         
                        </td>
                        <td className="p-3 md:p-4 text-center">
-                         <button onClick={() => handleOpenSpy(u)} className="w-8 h-8 md:w-10 md:h-10 mx-auto rounded-full bg-slate-800 border border-slate-600 flex items-center justify-center hover:bg-blue-600/20 hover:border-blue-400 hover:text-blue-400 transition-all text-slate-300 shadow-sm" title="הרכב ניקוד">
-                           👁️
-                         </button>
+                         <button onClick={() => handleOpenSpy(u)} className="w-8 h-8 md:w-10 md:h-10 mx-auto rounded-full bg-slate-800 border border-slate-600 flex items-center justify-center hover:bg-blue-600/20 hover:border-blue-400 hover:text-blue-400 transition-all text-slate-300 shadow-sm" title="הרכב ניקוד">👁️</button>
                        </td>
                      </tr>
                    );
@@ -1109,7 +1051,6 @@ const getPrizeForRank = (rank: number, board: string, allUsers: any[]) => {
          </div>
       )}
 
-      {/* בר הסטטוס המרחף */}
       {!isMyRowVisible && me && !spyModalUser && (
         <div className="fixed bottom-0 left-0 right-0 z-40 bg-slate-900/95 backdrop-blur-md border-t-2 border-blue-500 shadow-[0_-10px_30px_rgba(0,0,0,0.8)] pb-4 pt-3 md:py-4 animate-fade-in-up">
           <div className="max-w-4xl mx-auto flex justify-between items-center px-4 md:px-8">
@@ -1139,7 +1080,6 @@ const getPrizeForRank = (rank: number, board: string, allUsers: any[]) => {
                           </>
                        )}
                    </div>
-
                 </div>
              </div>
              
@@ -1147,15 +1087,12 @@ const getPrizeForRank = (rank: number, board: string, allUsers: any[]) => {
                 <div className={`font-black text-2xl md:text-3xl ${activeBoard === "GENERAL" || activeBoard === "LEAGUES" ? "text-amber-400" : "text-emerald-400"} drop-shadow-md`}>
                   {myScore}
                 </div>
-                <button onClick={() => handleOpenSpy(me)} className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-slate-800 border border-slate-600 flex items-center justify-center hover:bg-blue-600/20 hover:border-blue-400 transition-all text-slate-300 shadow-sm" title="הניחושים שלי">
-                  👁️
-                </button>
+                <button onClick={() => handleOpenSpy(me)} className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-slate-800 border border-slate-600 flex items-center justify-center hover:bg-blue-600/20 hover:border-blue-400 transition-all text-slate-300 shadow-sm" title="הניחושים שלי">👁️</button>
              </div>
           </div>
         </div>
       )}
 
-      {/* --- חלון הריגול/פרופיל המעודכן --- */}
       {spyModalUser && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-2 md:p-4 backdrop-blur-sm" dir="rtl">
           <div className="bg-slate-900 border border-slate-700 p-4 md:p-6 rounded-3xl w-full max-w-xl md:max-w-[800px] md:min-w-[500px] min-h-[500px] h-[85vh] md:h-[650px] md:max-h-[90vh] flex flex-col shadow-2xl relative overflow-hidden md:resize">
