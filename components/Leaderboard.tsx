@@ -6,7 +6,6 @@ import { auth, db } from "../app/firebase";
 import { getFlagUrl } from "../app/utils/flags"; 
 import toast from "react-hot-toast";
 
-// פונקציית עזר לחישובי זמנים לשאלות הפתעה
 const parseDateTimeLocal = (dtStr: string) => {
   if (!dtStr) return 0;
   try {
@@ -20,7 +19,6 @@ const parseDateTimeLocal = (dtStr: string) => {
   } catch { return 0; }
 };
 
-// רכיב קונפטי עצמאי שיופעל רק עבור המקום הראשון עם נקודות! 🎊
 const Confetti = () => {
   const [pieces, setPieces] = useState<any[]>([]);
   const [isVisible, setIsVisible] = useState(true);
@@ -94,7 +92,6 @@ export default function Leaderboard() {
   const [isMyRowVisible, setIsMyRowVisible] = useState(true);
   const myRowRef = useRef<HTMLTableRowElement>(null);
 
-  // הגנה מפני Hydration Crash בסלולר!
   const [currentTimeMs, setCurrentTimeMs] = useState<number>(0);
   useEffect(() => { setCurrentTimeMs(Date.now()); }, []);
 
@@ -157,25 +154,12 @@ export default function Leaderboard() {
     return () => unsubscribe();
   }, []);
 
-  // דירוג יציב עם שובר שוויון – שומר על פודיום נקי ותקין ללא ריצודים
   const rankUsers = (usersArr: any[], field: string) => {
-    const sorted = [...usersArr].sort((a, b) => {
-      const scoreA = a[field] || 0;
-      const scoreB = b[field] || 0;
-      if (scoreB !== scoreA) return scoreB - scoreA;
-      // שובר שוויון לפי א'-ב' (מונע החלפות פתאומיות בפודיום)
-      const nameA = a.name || "";
-      const nameB = b.name || "";
-      return nameA > nameB ? 1 : -1;
-    });
-
+    const sorted = [...usersArr].sort((a, b) => (b[field] || 0) - (a[field] || 0));
     let currentRank = 1;
     return sorted.map((u, i) => {
-      if (i > 0 && (u[field] || 0) < (sorted[i - 1][field] || 0)) {
-        currentRank = i + 1;
-      }
-      // מוסיף אינדקס אבסולוטי כדי שחלוקת הפרסים תהיה מדויקת וללא חלוקות הזויות (כמו 666)
-      return { ...u, displayRank: currentRank, absoluteRank: i + 1 };
+      if (i > 0 && (u[field] || 0) < (sorted[i - 1][field] || 0)) currentRank = i + 1;
+      return { ...u, displayRank: currentRank };
     });
   };
 
@@ -258,20 +242,31 @@ export default function Leaderboard() {
     finally { setIsLeagueLoading(false); }
   };
 
-  // פונקציית פרסים אבסולוטית: מונעת פיצול קופות ומעניקה את הפרס המדויק לפי פוזיציה בפודיום
-  const getPrizeForRank = (absoluteRank: number, board: string) => {
+  const getPrizeForRank = (rank: number, board: string, allUsers: any[]) => {
     if (!prizes) return null;
-    let p = 0;
-    if (board === "GENERAL") {
-      if (absoluteRank === 1) p = Number(prizes.main1 || 0);
-      if (absoluteRank === 2) p = Number(prizes.main2 || 0);
-      if (absoluteRank === 3) p = Number(prizes.main3 || 0);
-      if (absoluteRank === 4) p = Number(prizes.main4 || 0);
-    } else if (board === "KNOCKOUT") {
-      if (absoluteRank === 1) p = Number(prizes.ko1 || 0);
-      if (absoluteRank === 2) p = Number(prizes.ko2 || 0);
+    const winnersAtThisRank = allUsers.filter(u => u.displayRank === rank);
+    const count = winnersAtThisRank.length;
+    
+    const getRaw = (r: number) => {
+      if (board === "GENERAL") {
+        if (r === 1) return Number(prizes.main1 || 0);
+        if (r === 2) return Number(prizes.main2 || 0);
+        if (r === 3) return Number(prizes.main3 || 0);
+        if (r === 4) return Number(prizes.main4 || 0);
+      } else {
+        if (r === 1) return Number(prizes.ko1 || 0);
+        if (r === 2) return Number(prizes.ko2 || 0);
+      }
+      return 0;
+    };
+
+    let totalPool = 0;
+    for (let i = 0; i < count; i++) {
+      totalPool += getRaw(rank + i);
     }
-    return p > 0 ? p : null;
+    
+    const finalPrize = totalPool / count;
+    return finalPrize > 0 ? Math.floor(finalPrize) : null;
   };
 
   const handleJoinLeague = async () => {
@@ -333,7 +328,6 @@ export default function Leaderboard() {
     ), { duration: Infinity });
   };
 
-  // נעילת הרינדור בלולאה אינסופית שמפילה את הניידים (Hydration/404)
   const currentUsers = useMemo(() => {
     if (activeBoard === "GENERAL") return generalUsers;
     if (activeBoard === "KNOCKOUT") return knockoutUsers;
@@ -475,7 +469,6 @@ export default function Leaderboard() {
 
   const isBonusLocked = (q: any, state: number) => {
     if (q.isSurprise) {
-       // שימוש בזמן המקומי ששמור ב-State כדי למנוע קריסה!
        if (!q.openTime || !q.closeTime || currentTimeMs === 0) return false;
        return currentTimeMs > parseDateTimeLocal(q.closeTime); 
     }
@@ -700,7 +693,6 @@ export default function Leaderboard() {
       {isFirstPlace && tournamentState > 0 && myScore > 0 && <Confetti />}
 
       <div className="flex overflow-x-auto gap-2 mb-4 pb-2 custom-scrollbar bg-slate-900/50 p-2 rounded-2xl border border-slate-800 max-w-4xl mx-auto md:justify-center">
-        
         <button 
           onClick={() => setActiveBoard("GENERAL")} 
           className={`px-6 py-3 rounded-xl font-black whitespace-nowrap transition-all text-sm flex items-center justify-center gap-2 ${activeBoard === "GENERAL" ? "bg-amber-500 text-slate-900 shadow-lg shadow-amber-500/20" : "text-slate-400 hover:bg-slate-800 hover:text-amber-400"}`}
@@ -732,7 +724,6 @@ export default function Leaderboard() {
           </svg>
           ליגות פרטיות
         </button>
-        
       </div>
 
       {prizes && activeBoard !== "LEAGUES" && (
@@ -838,9 +829,7 @@ export default function Leaderboard() {
          <div className="bg-slate-800 pt-10 rounded-3xl border border-slate-700 shadow-2xl relative overflow-hidden flex flex-col">
            <div className={`absolute top-0 right-0 w-64 h-64 rounded-full blur-3xl pointer-events-none -mr-20 -mt-20 ${activeBoard === "GENERAL" ? "bg-amber-500/10" : activeBoard === "LEAGUES" ? "bg-blue-500/10" : "bg-emerald-500/10"}`}></div>
            
-           <div 
-                className="flex flex-col md:flex-row justify-between items-center mb-2 px-6 md:px-10 relative z-10"
-            >
+           <div className="flex flex-col md:flex-row justify-between items-center mb-2 px-6 md:px-10 relative z-10">
               <h2 className="text-2xl md:text-3xl font-extrabold text-white text-center md:text-right">
                 {activeBoard === "GENERAL" ? "טבלת הדירוג הכללי" : activeBoard === "KNOCKOUT" ? "טבלת שלב הנוק-אאוט" : `ליגה: ${myLeagues.find(l => l.id === selectedLeagueId)?.name || "פרטית"}`}
               </h2>
@@ -870,15 +859,17 @@ export default function Leaderboard() {
                      {podiumSecond.name?.split(' ')[0]}
                    </div>
                    <div className={`w-full bg-gradient-to-t from-slate-400 to-slate-300 pt-3 pb-4 rounded-t-lg shadow-lg relative flex flex-col items-center justify-between border-t-2 ${podiumSecond.id === myNemesisId ? 'border-rose-500 shadow-[0_0_15px_rgba(225,29,72,0.5)]' : 'border-slate-200'} min-h-[130px] md:min-h-[150px]`}>
-                     <span className="text-4xl drop-shadow-md mb-2">🥈</span>
+                     <span className="text-4xl drop-shadow-md mb-2">
+                       {podiumSecond.displayRank === 1 ? "🥇" : podiumSecond.displayRank === 2 ? "🥈" : "🥉"}
+                     </span>
                      <div className="flex flex-col items-center w-full mt-auto">
                         <span className="text-slate-800 font-black text-2xl text-center leading-none">{podiumSecond[scoreField]}</span>
                         <span className="text-slate-700 font-bold text-[10px] md:text-xs text-center mt-1">מקום {podiumSecond.displayRank}</span>
                         
-                        {getPrizeForRank(podiumSecond.absoluteRank, activeBoard) ? (
+                        {getPrizeForRank(podiumSecond.displayRank, activeBoard, currentUsers) ? (
                           <div className="mt-2 bg-slate-500/20 px-2.5 py-1 rounded-full border border-slate-500/30 flex items-center gap-1.5 shadow-sm">
                             <span className="text-[10px]">💰</span>
-                            <span className="text-xs font-black text-slate-900">{getPrizeForRank(podiumSecond.absoluteRank, activeBoard)} ₪</span>
+                            <span className="text-xs font-black text-slate-900">{getPrizeForRank(podiumSecond.displayRank, activeBoard, currentUsers)} ₪</span>
                           </div>
                         ) : null}
                      </div>
@@ -906,15 +897,17 @@ export default function Leaderboard() {
                      {podiumFirst.name?.split(' ')[0]}
                      </div>
                    <div className={`w-full bg-gradient-to-t from-amber-600 to-amber-400 pt-3 pb-4 rounded-t-lg shadow-[0_0_30px_rgba(251,191,36,0.4)] relative flex flex-col items-center justify-between border-t-2 ${podiumFirst.id === myNemesisId ? 'border-rose-500 shadow-[0_0_20px_rgba(225,29,72,0.8)]' : 'border-amber-200'} min-h-[160px] md:min-h-[180px]`}>
-                     <span className="text-5xl drop-shadow-lg mb-2">🥇</span>
+                     <span className="text-5xl drop-shadow-lg mb-2">
+                       {podiumFirst.displayRank === 1 ? "🥇" : "🥈"}
+                     </span>
                      <div className="flex flex-col items-center w-full mt-auto">
                         <span className="text-amber-950 font-black text-3xl text-center leading-none">{podiumFirst[scoreField]}</span>
                         <span className="text-amber-900 font-bold text-xs text-center mt-1">מקום {podiumFirst.displayRank}</span>
                         
-                        {getPrizeForRank(podiumFirst.absoluteRank, activeBoard) ? (
+                        {getPrizeForRank(podiumFirst.displayRank, activeBoard, currentUsers) ? (
                           <div className="mt-2 bg-amber-900/20 px-3 py-1 rounded-full border border-amber-900/30 flex items-center gap-1.5 shadow-sm">
                             <span className="text-[11px]">💰</span>
-                            <span className="text-sm font-black text-amber-950">{getPrizeForRank(podiumFirst.absoluteRank, activeBoard)} ₪</span>
+                            <span className="text-sm font-black text-amber-950">{getPrizeForRank(podiumFirst.displayRank, activeBoard, currentUsers)} ₪</span>
                           </div>
                         ) : null}
                      </div>
@@ -929,15 +922,17 @@ export default function Leaderboard() {
                      {podiumThird.name?.split(' ')[0]}
                    </div>
                    <div className={`w-full bg-gradient-to-t from-orange-800 to-orange-600 pt-3 pb-4 rounded-t-lg shadow-lg relative flex flex-col items-center justify-between border-t-2 ${podiumThird.id === myNemesisId ? 'border-rose-500 shadow-[0_0_15px_rgba(225,29,72,0.5)]' : 'border-orange-400'} min-h-[110px] md:min-h-[130px]`}>
-                     <span className="text-3xl drop-shadow-md mb-2">🥉</span>
+                     <span className="text-3xl drop-shadow-md mb-2">
+                       {podiumThird.displayRank === 1 ? "🥇" : podiumThird.displayRank === 2 ? "🥈" : "🥉"}
+                     </span>
                      <div className="flex flex-col items-center w-full mt-auto">
                         <span className="text-orange-100 font-black text-xl text-center leading-none">{podiumThird[scoreField]}</span>
                         <span className="text-orange-200 font-bold text-[10px] md:text-xs text-center mt-1">מקום {podiumThird.displayRank}</span>
                         
-                        {getPrizeForRank(podiumThird.absoluteRank, activeBoard) ? (
+                        {getPrizeForRank(podiumThird.displayRank, activeBoard, currentUsers) ? (
                           <div className="mt-2 bg-orange-950/30 px-2.5 py-1 rounded-full border border-orange-950/40 flex items-center gap-1.5 shadow-sm">
                             <span className="text-[10px]">💰</span>
-                            <span className="text-xs font-black text-orange-100">{getPrizeForRank(podiumThird.absoluteRank, activeBoard)} ₪</span>
+                            <span className="text-xs font-black text-orange-100">{getPrizeForRank(podiumThird.displayRank, activeBoard, currentUsers)} ₪</span>
                           </div>
                         ) : null}
                      </div>
@@ -1014,11 +1009,19 @@ export default function Leaderboard() {
                         </div>
                       </td>
                        <td className={`p-3 md:p-4 text-center font-black text-lg md:text-xl ${isTop3 ? (activeBoard === "GENERAL" || activeBoard === "LEAGUES" ? "text-amber-400" : "text-emerald-400") : "text-slate-200"}`}>
-                         <div className="inline-flex items-center justify-center gap-1.5 cursor-help relative group" onMouseEnter={() => setHoveredUser(u.id)} onMouseLeave={() => setHoveredUser(null)} onClick={() => setHoveredUser(hoveredUser === u.id ? null : u.id)}>
+                         
+                         {/* כאן בוצע התיקון הקריטי לגלילה - הוסרו ה-onMouseEnter והועברו ל-onClick ו-CSS חכם */}
+                         <div 
+                           className="inline-flex items-center justify-center gap-1.5 cursor-pointer relative group"
+                           onClick={(e) => {
+                             e.stopPropagation();
+                             setHoveredUser(hoveredUser === u.id ? null : u.id);
+                           }}
+                         >
                            <span>{scoreToShow || 0}</span>
                            <span className="text-[10px] text-slate-500 group-hover:text-blue-400 transition-colors hidden sm:inline-block">ℹ️</span>
                            
-                           <div className={`absolute top-full left-[-30px] sm:left-1/2 sm:-translate-x-1/2 mt-3 w-56 bg-slate-900/95 backdrop-blur-md border border-slate-600/80 p-4 rounded-2xl shadow-2xl z-50 pointer-events-none transition-all duration-200 origin-top-left sm:origin-top ${hoveredUser === u.id ? "opacity-100 scale-100" : "opacity-0 scale-95"}`}>
+                           <div className={`absolute top-full left-[-30px] sm:left-1/2 sm:-translate-x-1/2 mt-3 w-56 bg-slate-900/95 backdrop-blur-md border border-slate-600/80 p-4 rounded-2xl shadow-2xl z-50 pointer-events-none transition-all duration-200 origin-top-left sm:origin-top ${hoveredUser === u.id ? "opacity-100 scale-100" : "opacity-0 scale-95 group-hover:opacity-100 group-hover:scale-100"}`}>
                               <div className="absolute bottom-full left-[40px] sm:left-1/2 sm:-translate-x-1/2 -mb-[1px] border-[6px] border-transparent border-b-slate-600/80"></div>
                               <div className="absolute bottom-full left-[40px] sm:left-1/2 sm:-translate-x-1/2 -mb-[2px] border-[5px] border-transparent border-b-slate-900/95"></div>
                               
