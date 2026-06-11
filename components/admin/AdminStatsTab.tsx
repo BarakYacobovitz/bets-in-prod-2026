@@ -1,10 +1,11 @@
 "use client";
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import { collection, getDocs, doc, getDoc, updateDoc } from "firebase/firestore";
 import { db } from "../../app/firebase";
 import { getFlagUrl } from "../../app/utils/flags";
 import toast from "react-hot-toast";
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
+import html2canvas from "html2canvas";
 
 interface AdminStatsTabProps {
   matches: any[];
@@ -22,8 +23,8 @@ export default function AdminStatsTab({ matches, bonusQuestions, groupsList, isC
   const [selectedStatGroup, setSelectedStatGroup] = useState<string>("A");
   const [statSpyModal, setStatSpyModal] = useState<{title: string, list: any[], type: "MATCH_DIRECTION" | "NAMES_ONLY"} | null>(null);
   
-  // State חדש למעבר בין תצוגות שאלות הבונוס
   const [bonusViewMode, setBonusViewMode] = useState<"list" | "chart">("list");
+  const chartRef = useRef<HTMLDivElement>(null);
 
   const formatAuditTime = (ts: any) => {
     if (!ts) return "";
@@ -31,6 +32,26 @@ export default function AdminStatsTab({ matches, bonusQuestions, groupsList, isC
       const date = ts.toDate ? ts.toDate() : (ts.seconds ? new Date(ts.seconds * 1000) : new Date(ts));
       return date.toLocaleString('he-IL', {day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit'});
     } catch { return ""; }
+  };
+
+  const handleDownloadGraphImage = async () => {
+    if (!chartRef.current) return;
+    const toastId = toast.loading("מייצר תמונה... 📷");
+    try {
+      const canvas = await html2canvas(chartRef.current, { 
+        backgroundColor: "#0f172a", 
+        scale: 2 
+      });
+      const dataUrl = canvas.toDataURL("image/png");
+      const link = document.createElement("a");
+      link.download = `bets_in_prod_graph_${Date.now()}.png`;
+      link.href = dataUrl;
+      link.click();
+      toast.success("התמונה מוכנה! אפשר לשתף בוואטסאפ 🚀", { id: toastId });
+    } catch (error) {
+      console.error(error);
+      toast.error("שגיאה ביצירת התמונה", { id: toastId });
+    }
   };
 
   const handleGenerateStats = async () => {
@@ -354,7 +375,6 @@ export default function AdminStatsTab({ matches, bonusQuestions, groupsList, isC
     );
   };
 
-  // הכנת נתוני הגרף עבור שאלת הבונוס שנבחרה
   const currentBonusAnswers = statsData?.bonuses?.[selectedStatBonus]?.answers || {};
   const numericChartData = Object.entries(currentBonusAnswers)
     .filter(([answer]) => !isNaN(Number(answer.trim())))
@@ -434,25 +454,34 @@ export default function AdminStatsTab({ matches, bonusQuestions, groupsList, isC
               ) : (<div className="text-slate-500 text-center py-8">אף אחד לא ניחש עדיין את המשחק הזה.</div>)}
            </div>
 
-           {/* כרטיסיית שאלות בונוס עם כפתורי המעבר המשולבים */}
            <div className="bg-slate-800 p-6 md:p-8 rounded-3xl border border-slate-700 shadow-xl">
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 mb-6 border-b border-slate-700 pb-3">
                 <h3 className="text-xl md:text-2xl font-black text-amber-400">⭐ שאלות בונוס</h3>
                 
                 {isNumericBonus && (
-                  <div className="flex bg-slate-900 p-1 rounded-xl border border-slate-700 self-end sm:self-auto">
-                    <button 
-                      onClick={() => setBonusViewMode("list")} 
-                      className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${bonusViewMode === "list" ? "bg-amber-500 text-slate-950 shadow" : "text-slate-400 hover:text-white"}`}
-                    >
-                      📋 פרופיל הימורים
-                    </button>
-                    <button 
-                      onClick={() => setBonusViewMode("chart")} 
-                      className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${bonusViewMode === "chart" ? "bg-amber-500 text-slate-950 shadow" : "text-slate-400 hover:text-white"}`}
-                    >
-                      📊 גרף התפלגות
-                    </button>
+                  <div className="flex gap-2 bg-slate-900 p-1 rounded-xl border border-slate-700 self-end sm:self-auto items-center">
+                    {bonusViewMode === "chart" && (
+                      <button 
+                        onClick={handleDownloadGraphImage}
+                        className="px-3 py-1.5 text-xs font-black rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white shadow transition-all flex items-center gap-1.5 ml-2"
+                      >
+                        <span>📷</span> תמונה לוואטסאפ
+                      </button>
+                    )}
+                    <div className="flex border-r border-slate-700 pr-2">
+                      <button 
+                        onClick={() => setBonusViewMode("list")} 
+                        className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${bonusViewMode === "list" ? "bg-amber-500 text-slate-950 shadow" : "text-slate-400 hover:text-white"}`}
+                      >
+                        📋 פרופיל הימורים
+                      </button>
+                      <button 
+                        onClick={() => setBonusViewMode("chart")} 
+                        className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${bonusViewMode === "chart" ? "bg-amber-500 text-slate-950 shadow" : "text-slate-400 hover:text-white"}`}
+                      >
+                        📊 גרף התפלגות
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>
@@ -463,26 +492,27 @@ export default function AdminStatsTab({ matches, bonusQuestions, groupsList, isC
 
               {statsData.bonuses[selectedStatBonus] ? (
                 bonusViewMode === "chart" && isNumericBonus ? (
-                  /* תצוגת הגרף */
-                  <div className="bg-slate-900/50 p-4 rounded-2xl border border-slate-700/50 h-[300px] flex items-center justify-center direction-ltr">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={numericChartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
-                        <XAxis dataKey="name" hide />
-                        <YAxis domain={[0, 'dataMax + 5']} stroke="#94a3b8" tick={{ fontSize: 11, fontWeight: 'bold' }} />
-                        <Tooltip
-                          contentStyle={{ backgroundColor: '#0f172a', borderColor: '#475569', borderRadius: '14px', textAlign: 'right' }}
-                          itemStyle={{ color: '#fbbf24', fontWeight: 'black', direction: 'rtl' }}
-                          labelStyle={{ color: '#94a3b8', fontSize: '12px' }}
-                          labelFormatter={(label) => `שחקן: ${label}`}
-                          formatter={(value: any) => [`${value}`, "ניחוש"]}
-                        />
-                        <Bar dataKey="guess" fill="#fbbf24" radius={[4, 4, 0, 0]} barSize={12} />
-                      </BarChart>
-                    </ResponsiveContainer>
+                  <div ref={chartRef} className="bg-slate-900 p-6 rounded-2xl border border-slate-700/50 h-[350px] flex flex-col justify-center direction-ltr relative">
+                     <div className="absolute top-2 right-4 text-slate-400 text-xs font-black tracking-widest direction-rtl opacity-50">
+                       BETS IN PROD - מודיעין הקהל
+                     </div>
+                     <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={numericChartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
+                          <XAxis dataKey="name" hide />
+                          <YAxis domain={[0, 'dataMax + 5']} stroke="#94a3b8" tick={{ fontSize: 11, fontWeight: 'bold' }} />
+                          <Tooltip
+                            contentStyle={{ backgroundColor: '#0f172a', borderColor: '#475569', borderRadius: '14px', textAlign: 'right' }}
+                            itemStyle={{ color: '#fbbf24', fontWeight: 'black', direction: 'rtl' }}
+                            labelStyle={{ color: '#94a3b8', fontSize: '12px' }}
+                            labelFormatter={(label) => `שחקן: ${label}`}
+                            formatter={(value: any) => [`${value}`, "ניחוש"]}
+                          />
+                          <Bar dataKey="guess" fill="#fbbf24" radius={[4, 4, 0, 0]} barSize={12} />
+                        </BarChart>
+                     </ResponsiveContainer>
                   </div>
                 ) : (
-                  /* תצוגת הרשימה המקורית */
                   <div className="bg-slate-900/50 p-4 rounded-2xl border border-slate-700/50 shadow-inner max-h-[300px] overflow-y-auto custom-scrollbar pr-2 space-y-2">
                     {Object.entries(statsData.bonuses[selectedStatBonus].answers).sort(([,a]:any, [,b]:any) => b.count - a.count).map(([answer, data]: any, idx) => {
                         return renderProgressBar(answer, data.count, statsData.bonuses[selectedStatBonus].total, idx === 0 ? "bg-amber-500" : "bg-slate-500", () => setStatSpyModal({ title: `הימרו על: ${answer}`, list: data.users, type: "NAMES_ONLY" }));

@@ -7,8 +7,7 @@ import {
   signOut,
   sendSignInLinkToEmail, 
   isSignInWithEmailLink, 
-  signInWithEmailLink,
-  onAuthStateChanged
+  signInWithEmailLink
 } from "firebase/auth";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import toast from "react-hot-toast";
@@ -27,28 +26,9 @@ export default function Login() {
   // שומרים את יחידות הזמן בנפרד לעיצוב הדיגיטלי
   const [timeUnits, setTimeUnits] = useState<{ d: string, h: string, m: string, s: string } | null>(null);
   const [isTimeUp, setIsTimeUp] = useState(false);
-  useEffect(() => {
-  const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-    if (currentUser) {
-      // אם מצאנו משתמש מחובר בזיכרון המכשיר, נרענן קלות את המיקום
-      // או פשוט נגרום לרכיב האב (Home) להתעדכן ולסגור את מסך הלוגין
-      window.location.reload(); 
-    }
-  });
-  return () => unsubscribe();
-}, []);  
+  
   const videoRef = useRef<HTMLVideoElement>(null);
-  // -- התיקון עבור משתמשי PWA (Magic Link) --
-  // מאזין שבודק אם המשתמש כבר מחובר ברקע כשמסך הלוגין עולה
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      if (currentUser) {
-        // אם מצאנו משתמש מחובר בזיכרון, מרעננים כדי שרכיב האב יכניס אותו פנימה
-        window.location.reload(); 
-      }
-    });
-    return () => unsubscribe();
-  }, []);
+  
   // הפעלת סרטון הרקע בהשהייה
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -104,6 +84,7 @@ export default function Login() {
       const sysSnap = await getDoc(doc(db, "settings", "system"));
       const currentTournamentState = sysSnap.exists() ? (Number(sysSnap.data().tournamentState) || 0) : 0;
 
+      // מניעת כניסה למשתמשים חדשים אם הטורניר החל
       if (isReallyNewUser && currentTournamentState >= 1) {
         toast.error("המשחקים כבר החלו! ⛔\nלא ניתן להצטרף לליגה לאחר שריקת הפתיחה.", {
           duration: 8000,
@@ -116,6 +97,7 @@ export default function Login() {
         return;
       }
 
+      // יצירת מסמך למשתמש חדש (הריפרש הישן היה מונע מהקוד הזה לרוץ!)
       if (isReallyNewUser) {
         const fallbackName = user.displayName || user.email?.split('@')[0] || "שחקן חדש";
         await setDoc(userDocRef, {
