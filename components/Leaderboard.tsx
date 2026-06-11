@@ -360,18 +360,22 @@ const getPrizeForRank = (rank: number, board: string, allUsers: any[]) => {
     ), { duration: Infinity });
   };
 
-  let currentUsers: any[] = [];
+  const currentUsers = useMemo(() => {
   if (activeBoard === "GENERAL") {
-     currentUsers = generalUsers;
-  } else if (activeBoard === "KNOCKOUT") {
-     currentUsers = knockoutUsers;
-  } else if (activeBoard === "LEAGUES") {
+     return generalUsers;
+  } 
+  if (activeBoard === "KNOCKOUT") {
+     return knockoutUsers;
+  } 
+  if (activeBoard === "LEAGUES") {
      const activeLeague = myLeagues.find(l => l.id === selectedLeagueId);
      if (activeLeague) {
         const filtered = generalUsers.filter(u => activeLeague.members.includes(u.id));
-        currentUsers = rankUsers(filtered, "totalPoints");
+        return rankUsers(filtered, "totalPoints");
      }
   }
+  return [];
+}, [activeBoard, generalUsers, knockoutUsers, myLeagues, selectedLeagueId]);
 
   useEffect(() => {
     if (!currentUserId || currentUsers.length === 0) return;
@@ -471,7 +475,7 @@ const getPrizeForRank = (rank: number, board: string, allUsers: any[]) => {
     }
 
     setTeaser(newTeaser);
-    }, [currentUsers, activeBoard, currentUserId, tournamentState]);
+    }, [currentUsers, activeBoard, currentUserId, tournamentState, generalUsers]);
   useEffect(() => {
     let observer: IntersectionObserver;
     const timer = setTimeout(() => {
@@ -742,7 +746,7 @@ const getPrizeForRank = (rank: number, board: string, allUsers: any[]) => {
   return (
     <div className="w-full max-w-4xl mx-auto pb-12" dir="rtl">
       
-      {isFirstPlace && tournamentState > 0 && <Confetti />}
+      {isFirstPlace && tournamentState > 0 && myScore > 0 && <Confetti />}
 
 {/* ========================================== */}
       {/* טאבים ראשיים של הטבלה - משימה 2 מהבקלוג */}
