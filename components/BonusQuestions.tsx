@@ -776,11 +776,11 @@ const regularQuestions = filteredQuestions.filter(q => !q.isDouble && !q.isSurpr
            </div>
          )}
          
-         {locked && !hasTruth && !isWaitingToOpen && (
-           <button onClick={() => handleOpenSpy(q)} className="mt-3 w-full py-2 rounded-xl font-black text-xs transition-all border flex items-center justify-center gap-1.5 bg-slate-900 text-slate-400 hover:text-white border-slate-700 hover:bg-slate-800 shadow-sm active:scale-95">
-             <span className="text-sm">🕵️‍♂️</span> הצג ניחושי חברים
-           </button>
-         )}
+         {locked && !isWaitingToOpen && (
+          <button onClick={() => handleOpenSpy(q)} className="mt-3 w-full py-2 rounded-xl font-black text-xs transition-all border flex items-center justify-center gap-1.5 bg-slate-900 text-slate-400 hover:text-white border-slate-700 hover:bg-slate-800 shadow-sm active:scale-95">
+            <span className="text-sm">🕵️‍♂️</span> הצג ניחושי חברים
+          </button>
+          )}
       </div>
     );
   };
