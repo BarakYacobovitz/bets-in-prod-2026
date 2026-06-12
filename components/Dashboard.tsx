@@ -782,8 +782,7 @@ export default function Dashboard({ userId, userName, setActiveTab, setPredictio
   const myDataInfo = allUsersList.find(u => u.id === userId);
   const safeUserName = myDataInfo?.name ? myDataInfo.name.split(" ")[0] : "אלוף";
   const nemesisFirstName = (nemesisData && nemesisData.name) ? nemesisData.name.split(" ")[0] : "";
-  const totalPrizesPool = prizes ? (Number(prizes.main1||0) + Number(prizes.main2||0) + Number(prizes.main3||0) + Number(prizes.main4||0) + Number(prizes.ko1||0) + Number(prizes.ko2||0)) : 0;
-
+  const totalPrizesPool = prizes ? (Number(prizes.main1||0) + Number(prizes.main2||0) + Number(prizes.main3||0) + Number(prizes.main4||0) + Number(prizes.ko1||0) + Number(prizes.ko2||0) + Number(prizes.ko3||0)) : 0;
   const userLeaguesData = myLeagues.map(league => {
      const leagueUsers = allUsersList.filter(u => league.members?.includes(u.id));
      leagueUsers.sort((a,b) => (b.totalPoints || 0) - (a.totalPoints || 0));
@@ -842,7 +841,7 @@ const renderedMagazineContent = useMemo(() => {
     }));
 
     const sortedKo = [...allUsersList].sort((a, b) => (b.knockoutPoints || 0) - (a.knockoutPoints || 0));
-    const winnersTable2 = sortedKo.slice(0, 2).map(u => ({
+    const winnersTable2 = sortedKo.slice(0, 3).map(u => ({
       name: u.name,
       points: u.knockoutPoints,
       prize: getPrizeForRank(u.displayKoRank, "KNOCKOUT", sortedKo)
