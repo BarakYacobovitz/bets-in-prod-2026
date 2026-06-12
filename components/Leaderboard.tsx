@@ -282,6 +282,7 @@ export default function Leaderboard() {
       } else {
         if (r === 1) return Number(prizes.ko1 || 0);
         if (r === 2) return Number(prizes.ko2 || 0);
+        if (r === 3) return Number(prizes.ko3 || 0);
       }
       return 0;
     };
@@ -763,7 +764,7 @@ export default function Leaderboard() {
               <div className="text-xl font-black text-white leading-none mt-1">
                  {activeBoard === "GENERAL" 
                    ? (Number(prizes.main1||0) + Number(prizes.main2||0) + Number(prizes.main3||0) + Number(prizes.main4||0))
-                   : (Number(prizes.ko1||0) + Number(prizes.ko2||0))} ₪
+                   : (Number(prizes.ko1||0) + Number(prizes.ko2||0) + Number(prizes.ko3||0))} ₪
               </div>
             </div>
           </div>

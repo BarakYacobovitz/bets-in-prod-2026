@@ -7,7 +7,7 @@ import toast from "react-hot-toast";
 export default function AdminPrizesTab() {
   const [prizes, setPrizes] = useState({
     main1: 0, main2: 0, main3: 0, main4: 0,
-    ko1: 0, ko2: 0
+    ko1: 0, ko2: 0, ko3: 0
   });
   const [isSaving, setIsSaving] = useState(false);
 
@@ -77,12 +77,13 @@ export default function AdminPrizesTab() {
             <span className="text-3xl">⚔️</span>
             <div>
               <h3 className="text-xl font-black text-white">אלופי הנוק-אאוט</h3>
-              <p className="text-slate-400 text-xs">הפרסים עבור שני המקומות הראשונים</p>
+              <p className="text-slate-400 text-xs">הפרסים עבור שלושת המקומות הראשונים</p> {/* עדכון טקסט */}
             </div>
           </div>
           
+          {/* הוספנו את המספר 3 למערך! */}
           <div className="grid grid-cols-2 gap-4">
-            {[1, 2].map((num) => (
+            {[1, 2, 3].map((num) => (
               <div key={num} className="bg-slate-950/50 p-4 rounded-2xl border border-slate-800">
                 <label className="block text-slate-500 text-[10px] font-bold mb-2 uppercase tracking-widest">מקום {num}</label>
                 <div className="relative">
