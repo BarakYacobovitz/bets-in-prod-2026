@@ -92,7 +92,7 @@ export default function BonusQuestions({ userId, tournamentState: propTournament
   const [isLoadingSpy, setIsLoadingSpy] = useState(false);
 
   const [spySearchQuery, setSpySearchQuery] = useState("");
-  const [spyFilter, setSpyFilter] = useState<"ALL" | "CORRECT" | "INCORRECT">("ALL");
+  const [spyFilter, setSpyFilter] = useState<"ALL" | "CORRECT" | "INCORRECT" | "PENDING">("ALL");
 
   const isLoaded = useRef(false);
   const isUserAction = useRef(false);
@@ -1064,7 +1064,29 @@ const regularQuestions = filteredQuestions.filter(q => !q.isDouble && !q.isSurpr
 
          </div>
       )}
-      {spyModalQuestion && (
+      {spyModalQuestion && (() => {
+        // --- בניית הנתונים החכמה (Enrichment) ---
+        // מחשבים מראש מי פגע, מי נפל, ומי עדיין ממתין לתוצאה בהמשך הטורניר
+        const enrichedSpyData = spyData.map(d => {
+           const truth = realBonusAnswers[spyModalQuestion.id] || [];
+           const blacklist = realBonusData.blacklist?.[spyModalQuestion.id] || [];
+           const isLocked = realBonusData.locked?.[spyModalQuestion.id] || false;
+           
+           const tArr = Array.isArray(truth) ? truth : [truth];
+           const bArr = Array.isArray(blacklist) ? blacklist : [blacklist];
+           
+           const ansStr = String(d.answer).trim().toLowerCase();
+           const isHit = tArr.some((t:any) => String(t).trim().toLowerCase() === ansStr);
+           const isMiss = bArr.some((t:any) => String(t).trim().toLowerCase() === ansStr) || (isLocked && !isHit);
+           
+           return { ...d, isHit, isMiss };
+        });
+
+        const hitsCount = enrichedSpyData.filter(d => d.isHit).length;
+        const missesCount = enrichedSpyData.filter(d => d.isMiss).length;
+        const pendingCount = enrichedSpyData.filter(d => !d.isHit && !d.isMiss).length;
+
+        return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-md animate-fade-in-up" dir="rtl">
           <div className="bg-gradient-to-b from-slate-800 to-slate-900 border border-slate-700 p-5 md:p-6 rounded-3xl w-full max-w-md md:max-w-[600px] md:min-w-[400px] min-h-[500px] h-[85vh] md:h-[650px] md:max-h-[90vh] flex flex-col shadow-2xl relative overflow-hidden md:resize">            
             <div className="flex justify-between items-center mb-4 pb-4 border-b border-slate-700/50 shrink-0">
@@ -1116,42 +1138,49 @@ const regularQuestions = filteredQuestions.filter(q => !q.isDouble && !q.isSurpr
               </div>
             </div>
 
-            {realBonusAnswers[spyModalQuestion.id] && (
-              <div className="grid grid-cols-3 gap-2 mb-4 shrink-0">
-                <button onClick={() => setSpyFilter("ALL")} className={`py-2 px-1 rounded-xl text-[10px] sm:text-xs font-bold transition-colors border flex justify-center items-center gap-1 ${spyFilter === "ALL" ? "bg-slate-700 text-white border-slate-500 shadow-sm" : "bg-slate-900 text-slate-400 border-slate-800 hover:bg-slate-800"}`}>
-                  הכל ({spyData.length})
-                </button>
-                <button onClick={() => setSpyFilter("CORRECT")} className={`py-2 px-1 rounded-xl text-[10px] sm:text-xs font-bold transition-colors border flex justify-center items-center gap-1.5 ${spyFilter === "CORRECT" ? "bg-emerald-900/40 text-emerald-400 border-emerald-500/50 shadow-[0_0_10px_rgba(16,185,129,0.15)]" : "bg-slate-900 text-slate-400 border-slate-800 hover:bg-slate-800"}`}>
-                  ✅ פגעו ({spyData.filter(d => d.points > 0).length})
-                </button>
-                <button onClick={() => setSpyFilter("INCORRECT")} className={`py-2 px-1 rounded-xl text-[10px] sm:text-xs font-bold transition-colors border flex justify-center items-center gap-1.5 ${spyFilter === "INCORRECT" ? "bg-rose-900/40 text-rose-400 border-rose-500/50 shadow-[0_0_10px_rgba(225,29,72,0.1)]" : "bg-slate-900 text-slate-400 border-slate-800 hover:bg-slate-800"}`}>
-                  ❌ נפלו ({spyData.filter(d => !d.points || d.points === 0).length})
-                </button>
-              </div>
-            )}
+            {/* כפתורי הסינון החדשים - תומכים במצב "ממתין" (כשהשאלה עוד לא ננעלה) */}
+            <div className="grid grid-cols-4 gap-1.5 mb-4 shrink-0">
+              <button onClick={() => setSpyFilter("ALL")} className={`py-2 px-1 rounded-xl text-[10px] sm:text-[11px] font-bold transition-colors border flex justify-center items-center gap-1 ${spyFilter === "ALL" ? "bg-slate-700 text-white border-slate-500 shadow-sm" : "bg-slate-900 text-slate-400 border-slate-800 hover:bg-slate-800"}`}>
+                הכל ({enrichedSpyData.length})
+              </button>
+              <button onClick={() => setSpyFilter("CORRECT")} className={`py-2 px-1 rounded-xl text-[10px] sm:text-[11px] font-bold transition-colors border flex justify-center items-center gap-1 ${spyFilter === "CORRECT" ? "bg-emerald-900/40 text-emerald-400 border-emerald-500/50 shadow-[0_0_10px_rgba(16,185,129,0.15)]" : "bg-slate-900 text-slate-400 border-slate-800 hover:bg-slate-800"}`}>
+                ✅ פגעו ({hitsCount})
+              </button>
+              <button onClick={() => setSpyFilter("PENDING")} className={`py-2 px-1 rounded-xl text-[10px] sm:text-[11px] font-bold transition-colors border flex justify-center items-center gap-1 ${spyFilter === "PENDING" ? "bg-blue-900/40 text-blue-400 border-blue-500/50 shadow-[0_0_10px_rgba(59,130,246,0.15)]" : "bg-slate-900 text-slate-400 border-slate-800 hover:bg-slate-800"}`}>
+                ⏳ ממתין ({pendingCount})
+              </button>
+              <button onClick={() => setSpyFilter("INCORRECT")} className={`py-2 px-1 rounded-xl text-[10px] sm:text-[11px] font-bold transition-colors border flex justify-center items-center gap-1 ${spyFilter === "INCORRECT" ? "bg-rose-900/40 text-rose-400 border-rose-500/50 shadow-[0_0_10px_rgba(225,29,72,0.1)]" : "bg-slate-900 text-slate-400 border-slate-800 hover:bg-slate-800"}`}>
+                ❌ נפלו ({missesCount})
+              </button>
+            </div>
 
             <div className="overflow-y-auto custom-scrollbar flex-1 pl-2 md:pl-4 pr-1 pb-2">
               {isLoadingSpy ? (
                 <div className="flex justify-center py-8 text-blue-400 animate-pulse font-black tracking-wide">טוען נתונים מהשטח... ⏳</div>
-              ) : spyData.filter(d => d.userName.toLowerCase().includes(spySearchQuery.toLowerCase())).length === 0 ? (
+              ) : enrichedSpyData.filter(d => d.userName.toLowerCase().includes(spySearchQuery.toLowerCase())).length === 0 ? (
                 <div className="text-center text-slate-500 py-8 font-bold">לא נמצאו ניחושים שמתאימים לחיפוש.</div>
               ) : (
                 <div className="space-y-2.5">
-                  {spyData
-                      .filter(d => {
-                        if (spyFilter === "CORRECT") return d.points && d.points > 0;
-                        if (spyFilter === "INCORRECT") return !d.points || d.points === 0;
-                        return true;
-                      })
-                      .filter(d => d.userName.toLowerCase().includes(spySearchQuery.toLowerCase()))
-                      .map((data, idx) => {
+                  {enrichedSpyData
+                    .filter(d => {
+                       if (spyFilter === "CORRECT") return d.isHit;
+                       if (spyFilter === "INCORRECT") return d.isMiss;
+                       if (spyFilter === "PENDING") return !d.isHit && !d.isMiss;
+                       return true;
+                    })
+                    .filter(d => d.userName.toLowerCase().includes(spySearchQuery.toLowerCase()))
+                    .map((data, idx) => {
                     
                     let itemStyle = "px-3 py-2.5 rounded-xl border transition-all ";
-                    if (realBonusAnswers[spyModalQuestion.id]) {
-                      if (data.points && data.points > 0) itemStyle += "bg-emerald-900/10 border-emerald-500/30 shadow-[0_0_15px_rgba(16,185,129,0.05)]";
-                      else itemStyle += "bg-rose-900/10 border-rose-500/20 opacity-80";
+                    
+                    // צביעת הרקע עפ"י הסטטוס המדויק
+                    if (data.isHit) {
+                       itemStyle += "bg-emerald-900/10 border-emerald-500/30 shadow-[0_0_15px_rgba(16,185,129,0.05)]";
+                    } else if (data.isMiss) {
+                       itemStyle += "bg-rose-900/10 border-rose-500/20 opacity-80";
                     } else {
-                      itemStyle += data.userId === userId ? "bg-blue-900/10 border-blue-500/30" : "bg-slate-900/50 border-slate-800 hover:bg-slate-800";
+                       // ממתינים לתוצאה סופית (לא פגעו ולא נפלו)
+                       itemStyle += data.userId === userId ? "bg-blue-900/10 border-blue-500/30" : "bg-slate-900/50 border-slate-800 hover:bg-slate-800";
                     }
 
                     return (
@@ -1166,22 +1195,25 @@ const regularQuestions = filteredQuestions.filter(q => !q.isDouble && !q.isSurpr
                             </div>
                         </div>
                         <div className="flex justify-between items-center bg-slate-950/40 px-2.5 py-2 rounded-lg border border-slate-700/50 shadow-inner">
-                           <div className={`font-bold text-[11px] sm:text-xs flex items-center gap-1.5 ${data.points && data.points > 0 ? "text-emerald-400" : "text-slate-300"}`}>
+                           <div className={`font-bold text-[11px] sm:text-xs flex items-center gap-1.5 ${data.isHit ? "text-emerald-400" : data.isMiss ? "text-rose-400 line-through decoration-rose-500/50" : "text-slate-300"}`}>
                             {getFlagUrl(data.answer) ? <img src={getFlagUrl(data.answer)!} className="w-4 h-3 object-cover rounded-sm shadow-sm" alt="flag" /> : <span className="text-sm">📝</span>}
                             <span className="truncate max-w-[150px] sm:max-w-[200px]">
                               {data.answer}
                               {spyModalQuestion.answerType === "PLAYER" && getPlayerInfo(data.answer) && (
-                                <span className={`pr-1 text-[10px] ${data.points && data.points > 0 ? "text-emerald-600" : "text-slate-500"}`}>
+                                <span className={`pr-1 text-[10px] ${data.isHit ? "text-emerald-600" : "text-slate-500"}`}>
                                   ({getPlayerInfo(data.answer)?.country})
                                 </span>
                               )}
                             </span>
                           </div>
-                           {realBonusAnswers[spyModalQuestion.id] && (
-                             <div className={`text-[10px] font-black px-1.5 py-0.5 rounded border ${data.points && data.points > 0 ? "bg-emerald-900/40 text-emerald-400 border-emerald-500/40" : "bg-rose-950/50 text-rose-400 border-rose-500/40"}`}>
-                               {data.points && data.points > 0 ? `+${data.points}` : "0 נק'"}
-                             </div>
-                           )}
+                           {/* תגית נקודות / סטטוס */}
+                           <div className={`text-[10px] font-black px-1.5 py-0.5 rounded border ${
+                              data.isHit ? "bg-emerald-900/40 text-emerald-400 border-emerald-500/40" : 
+                              data.isMiss ? "bg-rose-950/50 text-rose-400 border-rose-500/40" : 
+                              "bg-blue-900/30 text-blue-400 border-blue-500/30"
+                           }`}>
+                               {data.isHit ? `+${data.points}` : data.isMiss ? "0 נק'" : "ממתין"}
+                           </div>
                         </div>
                       </div>
                     );
@@ -1191,8 +1223,9 @@ const regularQuestions = filteredQuestions.filter(q => !q.isDouble && !q.isSurpr
             </div>
           </div>
         </div>
-        
-      )}
+        );
+      })()}
+      
       {/* קרדיט לאייקונים של הקבוצות */}
       <div className="mt-8 pb-4 text-center text-slate-500 text-[10px] tracking-wide">
         Icons by Giannis Zographos on <a href="https://icon-icons.com/authors/66-giannis-zographos" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300 transition-colors underline decoration-blue-500/50 underline-offset-2">Icon-Icons.com</a>
