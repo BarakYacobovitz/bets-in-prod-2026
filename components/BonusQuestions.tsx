@@ -252,7 +252,59 @@ if (!q.knockoutRound || q.knockoutRound === "" || q.knockoutRound === "ALL" || q
     const isCorrect = truthArray.some((t: string) => t.toString().trim() === userAnswer.toString().trim());
     return isCorrect ? q.points : 0;
   };
+const handleOpenSpy = async (q: any) => {
+    setSpyModalQuestion(q);
+    setIsLoadingSpy(true);
+    setSpyData([]);
+    setSpySearchQuery("");
+    setSpyFilter("ALL");
 
+    try {
+      // 1. שליפת כל המשתמשים כדי לקבל את השמות והניקוד הכללי שלהם
+      const usersSnap = await getDocs(collection(db, "users"));
+      const usersMap: any = {};
+      usersSnap.forEach(doc => {
+        usersMap[doc.id] = { 
+          name: doc.data().name || "שחקן לא ידוע", 
+          totalPoints: doc.data().totalPoints || 0 
+        };
+      });
+
+      // 2. שליפת ניחושי הבונוסים של כולם
+      const bonusSnap = await getDocs(collection(db, "predictions_bonus"));
+      const gatheredData: any[] = [];
+      
+      bonusSnap.forEach(doc => {
+        const uId = doc.id;
+        const userAns = doc.data().answers?.[q.id];
+        
+        if (userAns) {
+          gatheredData.push({
+            userId: uId,
+            userName: usersMap[uId]?.name || "שחקן לא ידוע",
+            userTotalPoints: usersMap[uId]?.totalPoints || 0,
+            answer: userAns,
+            points: checkAnswerPoints(q, userAns) // שימוש בפונקציית החישוב שקיימת בקובץ
+          });
+        }
+      });
+
+      // 3. מיון: קודם כל לפי מי שצדק, ואז לפי מיקומם בטבלה הכללית
+      gatheredData.sort((a, b) => {
+         const ptsA = a.points || 0;
+         const ptsB = b.points || 0;
+         if (ptsB !== ptsA) return ptsB - ptsA;
+         return (b.userTotalPoints || 0) - (a.userTotalPoints || 0);
+      });
+
+      setSpyData(gatheredData);
+    } catch (error) {
+      console.error("שגיאה בשליפת נתוני ריגול:", error);
+      toast.error("שגיאה בטעינת הנתונים");
+    } finally {
+      setIsLoadingSpy(false);
+    }
+  };
   const handleRandomizeSingle = (q: any) => {
     if (isQuestionLocked(q)) return;
     
@@ -1085,7 +1137,14 @@ const regularQuestions = filteredQuestions.filter(q => !q.isDouble && !q.isSurpr
                 <div className="text-center text-slate-500 py-8 font-bold">לא נמצאו ניחושים שמתאימים לחיפוש.</div>
               ) : (
                 <div className="space-y-2.5">
-                  {spyData.filter(d => d.userName.toLowerCase().includes(spySearchQuery.toLowerCase())).map((data, idx) => {
+                  {spyData
+                      .filter(d => {
+                        if (spyFilter === "CORRECT") return d.points && d.points > 0;
+                        if (spyFilter === "INCORRECT") return !d.points || d.points === 0;
+                        return true;
+                      })
+                      .filter(d => d.userName.toLowerCase().includes(spySearchQuery.toLowerCase()))
+                      .map((data, idx) => {
                     
                     let itemStyle = "px-3 py-2.5 rounded-xl border transition-all ";
                     if (realBonusAnswers[spyModalQuestion.id]) {
