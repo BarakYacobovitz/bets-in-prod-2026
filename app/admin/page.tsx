@@ -652,7 +652,7 @@ const handleUpdateUserDetails = async (userId: string, details: { name?: string,
     } 
   };
 
-const handleCalculateScores = async (silentParam: any = false) => {
+  const handleCalculateScores = async (silentParam: any = false) => {
     const isSilent = silentParam === true;
     if (!isSilent && !confirm("האם לחשב נקודות לכל המשתמשים?")) return;
     setIsCalculating(true);
@@ -693,26 +693,26 @@ const handleCalculateScores = async (silentParam: any = false) => {
       const allUserBonuses = allUserBonusSnap.docs.map(doc => ({ userId: doc.id, answers: doc.data().answers || {} }));
       
       const allUserThirdSnap = await getDocs(collection(db, "predictions_third_place")); 
-              const allUserThirds = allUserThirdSnap.docs.map(doc => ({ userId: doc.id, teams: doc.data().teams || [] }));
+      const allUserThirds = allUserThirdSnap.docs.map(doc => ({ userId: doc.id, teams: doc.data().teams || [] }));
 
-              // ✨ הגדרת המחירון לשלבי הנוקאאוט (היה חסר וגרם לקריסות)
-        const qualifierPointsMap: any = { "32 הגדולות": 5, "שמינית גמר": 10, "רבע גמר": 15, "חצי גמר": 20, "גמר": 25, "מקום שלישי": 10 };
+      const qualifierPointsMap: any = { "32 הגדולות": 5, "שמינית גמר": 10, "רבע גמר": 15, "חצי גמר": 20, "גמר": 25, "מקום שלישי": 10 };
 
-        for (const currentUser of allUsers) {
-          let basePoints = 0;       // ניקוד שלב הבתים והטורניר
-          let knockoutPoints = 0;   // ניקוד שלב הנוקאאוט (משחקים + בונוסים של נוקאאוט)
+      // שימוש ב-Batch לחיתוך זמני הריצה מ-15 שניות לשבריר שניה
+      let batch = writeBatch(db);
+      let opCount = 0;
+
+      for (const currentUser of allUsers) {
+          let basePoints = 0;       
+          let knockoutPoints = 0;   
           let matchesPoints = 0;
           let groupPoints = 0;
           let thirdPlacePoints = 0;
           let bonusPoints = 0;
           const uid = currentUser.id;
 
-          // 1. חישוב משחקי שלב הבתים
           const userGroupMatches = allUserMatches.filter(m => m.userId === uid);
           userGroupMatches.forEach(userMatch => {
             const realMatch = realMatches.find(m => m.id === userMatch.matchId);
-            
-            // התיקון: חומת מגן שמוודאת שהתוצאות האמיתיות קיימות והן לא מחרוזת ריקה או null
             if (realMatch && realMatch.isFinished && realMatch.stage !== "KNOCKOUT" && realMatch.realHomeScore !== "" && realMatch.realAwayScore !== "" && realMatch.realHomeScore !== null && realMatch.realAwayScore !== null) {
               const predH = Number(userMatch.predictedHomeScore); const predA = Number(userMatch.predictedAwayScore);
               const realH = Number(realMatch.realHomeScore); const realA = Number(realMatch.realAwayScore);
@@ -729,7 +729,6 @@ const handleCalculateScores = async (silentParam: any = false) => {
             }
           });
 
-          // 2. חישוב מעפילות מהבתים
           const userQualData = allUserQuals.find(q => q.userId === uid);
           if (userQualData && userQualData.groups) {
             for (const [groupName, preds] of Object.entries<any>(userQualData.groups)) {
@@ -737,14 +736,12 @@ const handleCalculateScores = async (silentParam: any = false) => {
               if (realGroup) {
                 if (preds.first === realGroup.first && preds.first !== "") { basePoints += 15; groupPoints += 15; }
                 else if (preds.first === realGroup.second && preds.first !== "") { basePoints += 7; groupPoints += 7; }
-                
                 if (preds.second === realGroup.second && preds.second !== "") { basePoints += 15; groupPoints += 15; }
                 else if (preds.second === realGroup.first && preds.second !== "") { basePoints += 7; groupPoints += 7; }
               }
             }
           }
 
-          // 3. חישוב 8 המעפילות מהמקום ה-3
           const userThirdData = allUserThirds.find(t => t.userId === uid);
           if (userThirdData) {
             userThirdData.teams.forEach((team: string) => { 
@@ -755,12 +752,9 @@ const handleCalculateScores = async (silentParam: any = false) => {
             });
           }
 
-          // 4. חישוב משחקי נוקאאוט (נוסף ישירות ל-knockoutPoints)
           const userKnockoutMatches = allUserKnockouts.filter(m => m.userId === uid);
           userKnockoutMatches.forEach(koMatch => {
             const realMatch = realMatches.find(m => m.id === koMatch.matchId);
-            
-            // התיקון: חומת מגן גם לשלב הנוקאאוט
             if (realMatch && realMatch.isFinished && realMatch.stage === "KNOCKOUT" && realMatch.realHomeScore !== "" && realMatch.realAwayScore !== "" && realMatch.realHomeScore !== null && realMatch.realAwayScore !== null) {
               const predH = Number(koMatch.predictedHomeScore); const predA = Number(koMatch.predictedAwayScore);
               const realH = Number(realMatch.realHomeScore); const realA = Number(realMatch.realAwayScore);
@@ -775,18 +769,15 @@ const handleCalculateScores = async (silentParam: any = false) => {
             }
           });
 
-          // 5. חישוב שאלות בונוס (עם הפרדה לטבלת נוקאאוט)
           const userBonusData = allUserBonuses.find(b => b.userId === uid);
           if (userBonusData) {
             const userBonus = userBonusData.answers;
             currentBonusQuestions.forEach((q: any) => {
               const truth = realBonusAns[q.id]; 
               const userAnswer = userBonus[q.id];
-              
               if (truth !== undefined && truth !== null && userAnswer !== undefined && userAnswer !== null && userAnswer !== "") {
                 const truthArray = Array.isArray(truth) ? truth : [truth]; 
                 let pointsForThisQuestion = 0;
-                
                 if (q.isProximity && q.answerType === "NUMBER_PURE") {
                    const truthNum = Number(truthArray[0]);
                    const ansNum = Number(userAnswer);
@@ -803,10 +794,8 @@ const handleCalculateScores = async (silentParam: any = false) => {
                   const isCorrect = truthArray.some((t: any) => normalize(t) === normalize(userAnswer));
                   if (isCorrect) pointsForThisQuestion = (Number(q.points) || 0);
                 }
-
                 if (pointsForThisQuestion > 0) {
                   bonusPoints += pointsForThisQuestion;
-                  // ✨ התיקון הקריטי: אם הבונוס שייך לנוקאאוט, הוא נספר בטבלת הנוקאאוט
                   if (q.phase === "KNOCKOUT") {
                      knockoutPoints += pointsForThisQuestion;
                   } else {
@@ -817,12 +806,11 @@ const handleCalculateScores = async (silentParam: any = false) => {
             });
           }
 
-          // סיכום סופי: totalPoints הוא תמיד הסכום של שניהם
           const finalTotal = basePoints + knockoutPoints;
           
-          await updateDoc(doc(db, "users", uid), { 
+          batch.update(doc(db, "users", uid), { 
               totalPoints: finalTotal, 
-              knockoutPoints: knockoutPoints, // עכשיו כולל גם בונוסים של נוקאאוט!
+              knockoutPoints: knockoutPoints,
               breakdown: {
                   matches: matchesPoints,
                   groups: groupPoints,
@@ -831,7 +819,18 @@ const handleCalculateScores = async (silentParam: any = false) => {
                   knockout: knockoutPoints
               }
           });
-        }
+
+          opCount++;
+          if (opCount >= 400) {
+             await batch.commit();
+             batch = writeBatch(db);
+             opCount = 0;
+          }
+      }
+      
+      if (opCount > 0) {
+         await batch.commit();
+      }
       
       const updatedUsersSnap = await getDocs(collection(db, "users"));
       const updatedUsersArray: any[] = [];
@@ -845,10 +844,7 @@ const handleCalculateScores = async (silentParam: any = false) => {
         toast.success("הניקוד חושב בהצלחה! 🏆");
         if (wasSnapshotTakenNow) {
           setTimeout(() => {
-            toast.success("מודיעין: המערכת זיהתה יום חדש וביצעה ריצת סוף יום (Snapshot) ברקע! 📸", { 
-              duration: 7000,
-              icon: '🌟'
-            });
+            toast.success("מודיעין: המערכת זיהתה יום חדש וביצעה ריצת סוף יום (Snapshot) ברקע! 📸", { duration: 7000, icon: '🌟' });
           }, 500);
         }
       }
@@ -1322,15 +1318,31 @@ const handleExportBackup = async () => {
         return { id: u.id, rank: currentKoRank };
       });
 
+      // שימוש ב-Batch לעדכון מהיר של כולם במכה
+      let batch = writeBatch(db);
+      let opCount = 0;
+
       for (const u of usersArray) {
         const genRank = genRanks.find((r: any) => r.id === u.id)?.rank || 1;
         const koRank = koRanks.find((r: any) => r.id === u.id)?.rank || 1;
-        await updateDoc(doc(db, "users", u.id), {
+        
+        batch.update(doc(db, "users", u.id), {
           previousTotalPoints: u.totalPoints || 0,
           previousKnockoutPoints: u.knockoutPoints || 0,
           previousRankGeneral: genRank,
           previousRankKnockout: koRank
         });
+
+        opCount++;
+        if (opCount >= 400) {
+           await batch.commit();
+           batch = writeBatch(db);
+           opCount = 0;
+        }
+      }
+      
+      if (opCount > 0) {
+         await batch.commit();
       }
       
       if (!isSilent) toast.success("📸 תמונת מצב נשמרה בהצלחה! חיצי המגמה התאפסו.");
@@ -1934,8 +1946,7 @@ const handleExportBackup = async () => {
              <button onClick={() => handleTakeSnapshot()} disabled={isCalculating} className="flex-1 md:flex-none px-6 py-3 rounded-xl font-bold border border-emerald-500/50 text-emerald-400 hover:bg-emerald-900/50 transition-all shadow-sm">
                {isCalculating ? "⏳" : "📸 סוף יום (Snapshot)"}
              </button>
-             <button onClick={() => handleCalculateScores()} disabled={isCalculating} className="flex-1 md:flex-none px-8 py-3 rounded-xl font-black shadow-[0_0_15px_rgba(16,185,129,0.3)] bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white transition-all transform active:scale-95">
-               {isCalculating ? "⏳" : "🚀 הרץ מנוע ניקוד!"}
+              <button onClick={() => handleCalculateScores()} disabled={isCalculating || savingId !== null} className={`flex-1 md:flex-none px-8 py-3 rounded-xl font-black transition-all transform active:scale-95 ${isCalculating || savingId !== null ? "bg-slate-700 text-slate-500 cursor-not-allowed border border-slate-600" : "shadow-[0_0_15px_rgba(16,185,129,0.3)] bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white"}`}>               {isCalculating ? "⏳" : "🚀 הרץ מנוע ניקוד!"}
              </button>
           </div>
         </div>

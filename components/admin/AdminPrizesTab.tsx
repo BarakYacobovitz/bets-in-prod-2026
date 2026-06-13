@@ -61,7 +61,7 @@ export default function AdminPrizesTab() {
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-emerald-500/50 font-bold">₪</span>
                   <input 
                     type="number" 
-                    value={prizes[`main${num}` as keyof typeof prizes]} 
+                    value={prizes[`main${num}` as keyof typeof prizes] || 0}  
                     onChange={(e) => setPrizes({...prizes, [`main${num}`]: Number(e.target.value)})}
                     className={inputClass}
                   />
@@ -90,7 +90,7 @@ export default function AdminPrizesTab() {
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-emerald-500/50 font-bold">₪</span>
                   <input 
                     type="number" 
-                    value={prizes[`ko${num}` as keyof typeof prizes]} 
+                    value={prizes[`ko${num}` as keyof typeof prizes] || 0} 
                     onChange={(e) => setPrizes({...prizes, [`ko${num}`]: Number(e.target.value)})}
                     className={inputClass}
                   />
