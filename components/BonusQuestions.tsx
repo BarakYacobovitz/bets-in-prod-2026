@@ -19,6 +19,7 @@ const parseDateTimeLocal = (dtStr: string) => {
     return new Date(dtStr).getTime();
   } catch { return 0; }
 };
+
 const CLUB_ICONS: Record<string, string> = {
   "ריאל מדריד": "/real_madrid_footballteam_18009.png",
   "ברצלונה": "/fc_barcelona_footballteam_18015.png",
@@ -26,7 +27,6 @@ const CLUB_ICONS: Record<string, string> = {
   "ארסנל": "/arsenal_17995.png",
   "באיירן מינכן": "/Bayern_Munchen_icon-icons.com_75868.png",
   "פריז סן ז'רמן": "/france_paris-saint-germain.football-logos.cc.svg"
-
 };
 
 const TEAM_EMOJIS: Record<string, string> = {
@@ -67,17 +67,17 @@ export default function BonusQuestions({ userId, tournamentState: propTournament
   const [realBonusAnswers, setRealBonusAnswers] = useState<any>({});
   
   const [tournamentState, setTournamentState] = useState<number>(propTournamentState || 0);
-  // 1. הוספת האזנה חיה לסטטוס הטורניר
   const [localTournamentState, setLocalTournamentState] = useState(tournamentState);
 
-    useEffect(() => {
+  useEffect(() => {
         const unsubSys = onSnapshot(doc(db, "settings", "system"), (docSnap) => {
         if (docSnap.exists()) {
            setLocalTournamentState(Number(docSnap.data().tournamentState) || 0);
         }
   });
   return () => unsubSys();
-}, []);
+  }, []);
+
   const [bonusCategory, setBonusCategory] = useState<string>("TOURNAMENT");
   const [knockoutRound, setKnockoutRound] = useState<string>("ALL");
   const [weightTab, setWeightTab] = useState<string>("REGULAR");
@@ -92,6 +92,7 @@ export default function BonusQuestions({ userId, tournamentState: propTournament
   const [isLoadingSpy, setIsLoadingSpy] = useState(false);
 
   const [spySearchQuery, setSpySearchQuery] = useState("");
+  // הוספת סטטוס PENDING לסינון
   const [spyFilter, setSpyFilter] = useState<"ALL" | "CORRECT" | "INCORRECT" | "PENDING">("ALL");
 
   const isLoaded = useRef(false);
@@ -102,12 +103,13 @@ export default function BonusQuestions({ userId, tournamentState: propTournament
   const [allMatches, setAllMatches] = useState<any[]>([]);
 
   useEffect(() => {
-  const fetchMatches = async () => {
-    const mSnap = await getDocs(collection(db, "matches"));
-    setAllMatches(mSnap.docs.map(d => ({ id: d.id, ...d.data() })));
-  };
-  fetchMatches();
-}, []);
+    const fetchMatches = async () => {
+      const mSnap = await getDocs(collection(db, "matches"));
+      setAllMatches(mSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+    };
+    fetchMatches();
+  }, []);
+
   useEffect(() => {
     if (typeof window !== "undefined") {
       const ua = navigator.userAgent;
@@ -222,10 +224,10 @@ export default function BonusQuestions({ userId, tournamentState: propTournament
     if (state === 0) return false;
     if (q.phase === "TOURNAMENT" || q.phase === "GROUPS") return state >= 1;
     if (q.phase === "KNOCKOUT") {
-if (!q.knockoutRound || q.knockoutRound === "" || q.knockoutRound === "ALL" || q.knockoutRound.includes("כללי") || q.knockoutRound === "32 הגדולות") return state >= 5;      if (q.knockoutRound === "שמינית גמר") return state >= 7;
+      if (!q.knockoutRound || q.knockoutRound === "" || q.knockoutRound === "ALL" || q.knockoutRound.includes("כללי") || q.knockoutRound === "32 הגדולות") return state >= 5;      
+      if (q.knockoutRound === "שמינית גמר") return state >= 7;
       if (q.knockoutRound === "רבע גמר") return state >= 9;
       if (q.knockoutRound === "חצי גמר") return state >= 11;
-      // הסרנו מכאן את מקום שלישי
       if (q.knockoutRound === "גמר") return state >= 13;
     }
     return false;
@@ -236,23 +238,25 @@ if (!q.knockoutRound || q.knockoutRound === "" || q.knockoutRound === "ALL" || q
     if (!truth || !userAnswer) return null;
     const truthArray = Array.isArray(truth) ? truth : [truth];
     
-  if (q.isProximity && q.answerType === "NUMBER_PURE") {
-    const truthNum = Number(truthArray[0]);
-    const ansNum = Number(userAnswer);
-    if (!isNaN(truthNum) && !isNaN(ansNum)) {
-      const diff = Math.abs(truthNum - ansNum);
-      if (diff === 0) return 50;
-      if (diff <= 5) return 40;
-      if (diff <= 10) return 30;
-      if (diff <= 15) return 20;
-      if (diff <= 20) return 10;
-      return 0;
+    if (q.isProximity && q.answerType === "NUMBER_PURE") {
+      const truthNum = Number(truthArray[0]);
+      const ansNum = Number(userAnswer);
+      if (!isNaN(truthNum) && !isNaN(ansNum)) {
+        const diff = Math.abs(truthNum - ansNum);
+        if (diff === 0) return 50;
+        if (diff <= 5) return 40;
+        if (diff <= 10) return 30;
+        if (diff <= 15) return 20;
+        if (diff <= 20) return 10;
+        return 0;
+      }
     }
-  }
     const isCorrect = truthArray.some((t: string) => t.toString().trim() === userAnswer.toString().trim());
     return isCorrect ? q.points : 0;
   };
-const handleOpenSpy = async (q: any) => {
+
+  // הזרקת הפונקציה הקריטית שנשמטה לפתיחת חלון הריגול
+  const handleOpenSpy = async (q: any) => {
     setSpyModalQuestion(q);
     setIsLoadingSpy(true);
     setSpyData([]);
@@ -260,7 +264,6 @@ const handleOpenSpy = async (q: any) => {
     setSpyFilter("ALL");
 
     try {
-      // 1. שליפת כל המשתמשים כדי לקבל את השמות והניקוד הכללי שלהם
       const usersSnap = await getDocs(collection(db, "users"));
       const usersMap: any = {};
       usersSnap.forEach(doc => {
@@ -270,7 +273,6 @@ const handleOpenSpy = async (q: any) => {
         };
       });
 
-      // 2. שליפת ניחושי הבונוסים של כולם
       const bonusSnap = await getDocs(collection(db, "predictions_bonus"));
       const gatheredData: any[] = [];
       
@@ -284,12 +286,11 @@ const handleOpenSpy = async (q: any) => {
             userName: usersMap[uId]?.name || "שחקן לא ידוע",
             userTotalPoints: usersMap[uId]?.totalPoints || 0,
             answer: userAns,
-            points: checkAnswerPoints(q, userAns) // שימוש בפונקציית החישוב שקיימת בקובץ
+            points: checkAnswerPoints(q, userAns)
           });
         }
       });
 
-      // 3. מיון: קודם כל לפי מי שצדק, ואז לפי מיקומם בטבלה הכללית
       gatheredData.sort((a, b) => {
          const ptsA = a.points || 0;
          const ptsB = b.points || 0;
@@ -305,6 +306,7 @@ const handleOpenSpy = async (q: any) => {
       setIsLoadingSpy(false);
     }
   };
+
   const handleRandomizeSingle = (q: any) => {
     if (isQuestionLocked(q)) return;
     
@@ -319,7 +321,6 @@ const handleOpenSpy = async (q: any) => {
        ans = opts[Math.floor(Math.random() * opts.length)];
        
     } else if (currentAnswerType === "MATCH") {
-       // שליפת משחק אקראי מתוך מאגר המשחקים הטעון
        const relevantMatches = allMatches.filter(m => {
           if (q.phase === "GROUPS") return m.stage !== "KNOCKOUT";
           if (q.phase === "KNOCKOUT") {
@@ -334,7 +335,6 @@ const handleOpenSpy = async (q: any) => {
        }
        
     } else if (["CUSTOM", "CLUB"].includes(currentAnswerType)) {
-       // כאן הסרנו את המילה "MATCH" כדי שלא תתנגש!
        const opts = q.possibleOptions ? q.possibleOptions.split(",").map((s:string)=>s.trim()).filter(Boolean) : [];
        if (opts.length > 0) ans = opts[Math.floor(Math.random() * opts.length)];
 
@@ -349,11 +349,10 @@ const handleOpenSpy = async (q: any) => {
       isUserAction.current = true;
       setAnswers((prev: any) => ({ ...prev, [q.id]: ans }));
       toast.success(`הוגרלה תשובה! 🎲`, { id: `rand_${q.id}` });
-      setTimeout(() => toast.dismiss(`rand_${q.id}`), 2000); // חיסול ממוקד לאייפון
+      setTimeout(() => toast.dismiss(`rand_${q.id}`), 2000); 
     } else {
-      // אם אין משחקים רלוונטיים עדיין, נקפיץ שגיאה כדי שתדע
       toast.error(`לא מצאתי אופציות להגרלה`, { id: `rand_${q.id}` });
-      setTimeout(() => toast.dismiss(`rand_${q.id}`), 2000); // חיסול ממוקד לאייפון
+      setTimeout(() => toast.dismiss(`rand_${q.id}`), 2000); 
     }
   };
 
@@ -367,10 +366,7 @@ const handleOpenSpy = async (q: any) => {
         <div className="flex gap-2">
           <button 
             onClick={() => {
-              // 1. מעיפים את שאלת האישור מיד
               toast.dismiss(t.id);
-              
-              // 2. השהיית ניתוק-המגע הקריטית של אפל
               setTimeout(async () => {
                 setIsRandomizing(true);
                 toast.loading("מגריל ושומר במסד הנתונים...", { id: "randomizeBonus" });
@@ -379,7 +375,6 @@ const handleOpenSpy = async (q: any) => {
                   const newAnswers = { ...answers };
                   let hasChanges = false;
                   
-                  // שימוש במערך השאלות המסונן התקין במקום במשתנה שלא היה קיים
                   filteredQuestions.forEach(q => {
                     if (!isQuestionLocked(q)) {
                       let ans = "";
@@ -427,18 +422,18 @@ const handleOpenSpy = async (q: any) => {
                     setAnswers(newAnswers);
                     await setDoc(doc(db, "predictions_bonus", userId), { answers: newAnswers, updatedAt: new Date() }, { merge: true });
                     toast.success("הוגרלו ונשמרו תשובות בהצלחה 🎲", { id: "randomizeBonus" });
-                    setTimeout(() => toast.dismiss("randomizeBonus"), 2500); // כפיית מחיקה לאייפון
+                    setTimeout(() => toast.dismiss("randomizeBonus"), 2500); 
                   } else {
                     toast.error("אין שאלות פתוחות להגרלה", { id: "randomizeBonus" });
-                    setTimeout(() => toast.dismiss("randomizeBonus"), 2500); // כפיית מחיקה לאייפון
+                    setTimeout(() => toast.dismiss("randomizeBonus"), 2500); 
                   }
                 } catch(e) { 
                   console.error(e); 
                   toast.error("שגיאה בשמירת ההגרלה", { id: "randomizeBonus" });
-                  setTimeout(() => toast.dismiss("randomizeBonus"), 2500); // כפיית מחיקה לאייפון
+                  setTimeout(() => toast.dismiss("randomizeBonus"), 2500); 
                 } 
                 finally { setIsRandomizing(false); }
-              }, 100); // <-- סיום ה-setTimeout הקצרצר
+              }, 100);
             }} 
             className="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold"
           >
@@ -458,16 +453,16 @@ const handleOpenSpy = async (q: any) => {
   const filteredQuestions = questions.filter(q => {
     if (q.phase !== bonusCategory) return false;
     if (bonusCategory === "KNOCKOUT") {
-       // התיקון: מזהים את כל הוריאציות של שאלות "כללי" ומשייכים אותן לטאב ALL
        const qRound = (!q.knockoutRound || q.knockoutRound === "" || q.knockoutRound === "ALL" || q.knockoutRound.includes("כללי")) ? "ALL" : q.knockoutRound;
        if (qRound !== knockoutRound) return false;
     }
     return true;
   });
-const regularQuestions = filteredQuestions.filter(q => !q.isDouble && !q.isSurprise);
+
+  const regularQuestions = filteredQuestions.filter(q => !q.isDouble && !q.isSurprise);
   const doubleQuestions = filteredQuestions.filter(q => q.isDouble && !q.isSurprise);
   const surpriseQuestions = filteredQuestions.filter(q => q.isSurprise);
-// --- חישוב מדדי התקדמות (Progress Bars) ---
+
   const getActiveKnockoutRound = () => {
     const state = localTournamentState;
     if (state < 5) return "32 הגדולות";
@@ -489,7 +484,6 @@ const regularQuestions = filteredQuestions.filter(q => !q.isDouble && !q.isSurpr
     const isAnswered = (qId: string) => !!answers[qId] && String(answers[qId]).trim() !== "";
 
     questions.forEach(q => {
-      // לא סופרים שאלות הפתעה במד ההתקדמות הרגיל כי הן לא תמיד זמינות
       if (q.isSurprise) return; 
 
       const answered = isAnswered(q.id) ? 1 : 0;
@@ -503,7 +497,6 @@ const regularQuestions = filteredQuestions.filter(q => !q.isDouble && !q.isSurpr
       } else if (q.phase === "KNOCKOUT") {
         const qRound = (!q.knockoutRound || q.knockoutRound === "" || q.knockoutRound === "ALL" || q.knockoutRound.includes("כללי")) ? "ALL" : q.knockoutRound;
         
-        // הלוגיקה שביקשת: שאלות כלליות + השלב הספציפי שבו אנו נמצאים
         if (qRound === "ALL" || qRound === activeKnockoutRound) {
           stats.KNOCKOUT.total++;
           stats.KNOCKOUT.answered += answered;
@@ -513,10 +506,9 @@ const regularQuestions = filteredQuestions.filter(q => !q.isDouble && !q.isSurpr
 
     return stats;
   }, [questions, answers, activeKnockoutRound]);
-  // פונקציית עזר שמרנדרת כרטיסיית שאלה בודדת - עברה "דיאטה" קלה כדי לחסוך מקום בגלילה
+
   const renderQuestionCard = (q: any) => {
     const locked = isQuestionLocked(q);
-    // הגנה קפדנית: מוודא שיש ערך ממשי ולא רק מערך ריק
     const hasTruth = realBonusAnswers[q.id] && (Array.isArray(realBonusAnswers[q.id]) ? realBonusAnswers[q.id].length > 0 : String(realBonusAnswers[q.id]).trim() !== "");
     const hasLeading = realBonusData.leading?.[q.id] && (Array.isArray(realBonusData.leading[q.id]) ? realBonusData.leading[q.id].length > 0 : String(realBonusData.leading[q.id]).trim() !== "");
     
@@ -667,7 +659,6 @@ const regularQuestions = filteredQuestions.filter(q => !q.isDouble && !q.isSurpr
             })() : ["CUSTOM", "CLUB"].includes(currentAnswerType) ? (() => {
                const opts = q.possibleOptions ? q.possibleOptions.split(",").map((s:string)=>s.trim()).filter(Boolean) : [];
                
-               // הגנה: אם לא הוזנו אופציות, נציג שורת טקסט חופשית מותאמת אישית
                if (opts.length === 0) {
                   return (
                      <div className="relative">
@@ -717,7 +708,6 @@ const regularQuestions = filteredQuestions.filter(q => !q.isDouble && !q.isSurpr
                );
 
                })() : currentAnswerType === "MATCH" ? (() => {
-               // סינון המשחקים לפי השלב המוגדר לשאלה
                const relevantMatches = allMatches.filter(m => {
                   if (q.phase === "GROUPS") return m.stage !== "KNOCKOUT";
                   if (q.phase === "KNOCKOUT") {
@@ -726,7 +716,6 @@ const regularQuestions = filteredQuestions.filter(q => !q.isDouble && !q.isSurpr
                   return true; 
                });
 
-               // הפיכת רשימת המשחקים למערך של מחרוזות עבור ה-Autocomplete
                const matchSuggestions = relevantMatches.map(m => `${m.homeTeam} - ${m.awayTeam}`);
 
                return (
@@ -829,22 +818,18 @@ const regularQuestions = filteredQuestions.filter(q => !q.isDouble && !q.isSurpr
          )}
          
          {locked && !isWaitingToOpen && (
-          <button onClick={() => handleOpenSpy(q)} className="mt-3 w-full py-2 rounded-xl font-black text-xs transition-all border flex items-center justify-center gap-1.5 bg-slate-900 text-slate-400 hover:text-white border-slate-700 hover:bg-slate-800 shadow-sm active:scale-95">
-            <span className="text-sm">🕵️‍♂️</span> הצג ניחושי חברים
-          </button>
-          )}
+           <button onClick={() => handleOpenSpy(q)} className="mt-3 w-full py-2 rounded-xl font-black text-xs transition-all border flex items-center justify-center gap-1.5 bg-slate-900 text-slate-400 hover:text-white border-slate-700 hover:bg-slate-800 shadow-sm active:scale-95">
+             <span className="text-sm">🕵️‍♂️</span> הצג ניחושי חברים
+           </button>
+         )}
       </div>
     );
   };
 
   return (
     <>
-{/* ========================================== */}
-      {/* 1. טאבים ראשיים - חכמים (עם מדי התקדמות) */}
-      {/* ========================================== */}
       <div className="flex overflow-x-auto custom-scrollbar gap-2 mb-6 pb-2 mt-2 bg-slate-900/50 p-2 rounded-2xl border border-slate-800 max-w-3xl mx-auto md:justify-center">
          
-         {/* ---- טאב: כל הטורניר ---- */}
          <button 
            onClick={() => { setBonusCategory("TOURNAMENT"); setKnockoutRound("ALL"); }} 
            className={`flex flex-col flex-1 items-center justify-center gap-2 min-w-[120px] px-2 py-2.5 rounded-xl font-black whitespace-nowrap transition-all text-sm ${bonusCategory === "TOURNAMENT" ? "bg-amber-500 text-slate-900 shadow-lg shadow-amber-500/20" : "bg-slate-950/50 text-slate-400 hover:bg-slate-800 hover:text-amber-400 border border-slate-800"}`}
@@ -874,7 +859,6 @@ const regularQuestions = filteredQuestions.filter(q => !q.isDouble && !q.isSurpr
            </div>
          </button>
 
-         {/* ---- טאב: שלב הבתים ---- */}
          <button 
            onClick={() => { setBonusCategory("GROUPS"); setKnockoutRound("ALL"); }} 
            className={`flex flex-col flex-1 items-center justify-center gap-2 min-w-[120px] px-2 py-2.5 rounded-xl font-black whitespace-nowrap transition-all text-sm ${bonusCategory === "GROUPS" ? "bg-blue-600 text-white shadow-lg shadow-blue-500/20" : "bg-slate-950/50 text-slate-400 hover:bg-slate-800 hover:text-blue-400 border border-slate-800"}`}
@@ -904,7 +888,6 @@ const regularQuestions = filteredQuestions.filter(q => !q.isDouble && !q.isSurpr
            </div>
          </button>
 
-         {/* ---- טאב: נוק-אאוט ---- */}
          {tournamentState >= 4 && (
            <button 
              onClick={() => setBonusCategory("KNOCKOUT")} 
@@ -932,9 +915,6 @@ const regularQuestions = filteredQuestions.filter(q => !q.isDouble && !q.isSurpr
          )}
       </div>
 
-      {/* ========================================== */}
-      {/* 2. תת-תפריט סבבי נוק-אאוט */}
-      {/* ========================================== */}
       {bonusCategory === "KNOCKOUT" && (
         <div className="flex overflow-x-auto gap-2 mb-6 pb-2 custom-scrollbar bg-slate-900/50 p-2 rounded-2xl border border-slate-800 max-w-4xl mx-auto md:justify-center">
           {[
@@ -976,7 +956,6 @@ const regularQuestions = filteredQuestions.filter(q => !q.isDouble && !q.isSurpr
             {saveStatus === "saved" && <span className="text-emerald-400 text-xs font-bold tracking-widest">✓ נשמר</span>}
          </div>
          
-         {/* כפתור הגרלה - עכשיו מגריל את כל השאלות שמוצגות בעמוד! */}
          {filteredQuestions.some(q => !isQuestionLocked(q)) && (
             <button 
               onClick={handleRandomizeCategory}
@@ -993,14 +972,10 @@ const regularQuestions = filteredQuestions.filter(q => !q.isDouble && !q.isSurpr
             אין שאלות בקטגוריה זו.
          </div>
       ) : (
-         /* ========================================== */
-         /* ה-Timeline UI החדש!                        */
-         /* ========================================== */
          <div className="relative border-r-[3px] border-slate-800/80 pr-5 md:pr-8 mr-1 md:mr-2 space-y-10">
             
             {regularQuestions.length > 0 && (
                <div className="relative">
-                  {/* העיגול (Node) של ה-Timeline */}
                   <div className="absolute -right-[27px] md:-right-[39px] top-1.5 w-4 h-4 bg-blue-500 rounded-full ring-4 ring-slate-950 shadow-[0_0_10px_rgba(59,130,246,0.5)] z-10"></div>
                   
                   <div className="mb-4">
@@ -1026,7 +1001,6 @@ const regularQuestions = filteredQuestions.filter(q => !q.isDouble && !q.isSurpr
 
             {doubleQuestions.length > 0 && (
                <div className="relative">
-                  {/* העיגול הפועם של דאבל */}
                   <div className="absolute -right-[27px] md:-right-[39px] top-1.5 w-4 h-4 bg-rose-500 rounded-full ring-4 ring-slate-950 shadow-[0_0_15px_rgba(225,29,72,0.8)] z-10">
                      <div className="absolute inset-0 rounded-full bg-rose-400 animate-ping opacity-75"></div>
                   </div>
@@ -1046,7 +1020,6 @@ const regularQuestions = filteredQuestions.filter(q => !q.isDouble && !q.isSurpr
 
             {surpriseQuestions.length > 0 && (
                <div className="relative">
-                  {/* העיגול המסתורי של הפתעות */}
                   <div className="absolute -right-[27px] md:-right-[39px] top-1.5 w-4 h-4 bg-purple-500 rounded-full ring-4 ring-slate-950 shadow-[0_0_15px_rgba(168,85,247,0.8)] z-10"></div>
                   
                   <div className="mb-4">
@@ -1064,9 +1037,12 @@ const regularQuestions = filteredQuestions.filter(q => !q.isDouble && !q.isSurpr
 
          </div>
       )}
+      
+      {/* ========================================== */}
+      {/* פופ-אפ ריגול מחוזק (עם סטטוס "ממתין") */}
+      {/* ========================================== */}
       {spyModalQuestion && (() => {
         // --- בניית הנתונים החכמה (Enrichment) ---
-        // מחשבים מראש מי פגע, מי נפל, ומי עדיין ממתין לתוצאה בהמשך הטורניר
         const enrichedSpyData = spyData.map(d => {
            const truth = realBonusAnswers[spyModalQuestion.id] || [];
            const blacklist = realBonusData.blacklist?.[spyModalQuestion.id] || [];
@@ -1138,7 +1114,6 @@ const regularQuestions = filteredQuestions.filter(q => !q.isDouble && !q.isSurpr
               </div>
             </div>
 
-            {/* כפתורי הסינון החדשים - תומכים במצב "ממתין" (כשהשאלה עוד לא ננעלה) */}
             <div className="grid grid-cols-4 gap-1.5 mb-4 shrink-0">
               <button onClick={() => setSpyFilter("ALL")} className={`py-2 px-1 rounded-xl text-[10px] sm:text-[11px] font-bold transition-colors border flex justify-center items-center gap-1 ${spyFilter === "ALL" ? "bg-slate-700 text-white border-slate-500 shadow-sm" : "bg-slate-900 text-slate-400 border-slate-800 hover:bg-slate-800"}`}>
                 הכל ({enrichedSpyData.length})
@@ -1173,13 +1148,11 @@ const regularQuestions = filteredQuestions.filter(q => !q.isDouble && !q.isSurpr
                     
                     let itemStyle = "px-3 py-2.5 rounded-xl border transition-all ";
                     
-                    // צביעת הרקע עפ"י הסטטוס המדויק
                     if (data.isHit) {
                        itemStyle += "bg-emerald-900/10 border-emerald-500/30 shadow-[0_0_15px_rgba(16,185,129,0.05)]";
                     } else if (data.isMiss) {
                        itemStyle += "bg-rose-900/10 border-rose-500/20 opacity-80";
                     } else {
-                       // ממתינים לתוצאה סופית (לא פגעו ולא נפלו)
                        itemStyle += data.userId === userId ? "bg-blue-900/10 border-blue-500/30" : "bg-slate-900/50 border-slate-800 hover:bg-slate-800";
                     }
 
@@ -1206,7 +1179,6 @@ const regularQuestions = filteredQuestions.filter(q => !q.isDouble && !q.isSurpr
                               )}
                             </span>
                           </div>
-                           {/* תגית נקודות / סטטוס */}
                            <div className={`text-[10px] font-black px-1.5 py-0.5 rounded border ${
                               data.isHit ? "bg-emerald-900/40 text-emerald-400 border-emerald-500/40" : 
                               data.isMiss ? "bg-rose-950/50 text-rose-400 border-rose-500/40" : 
