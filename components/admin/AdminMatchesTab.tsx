@@ -18,7 +18,8 @@ export default function AdminMatchesTab({
   handleUpdateMatchDetails, // פרופ חדש שסידרנו
   handleDeleteMatch,
   groupsList,
-  savingId
+  savingId,
+  handleCalculateCrowdStats
 }: any) {
   
   const [adminMatchGroup, setAdminMatchGroup] = useState<string>("ALL");
@@ -229,6 +230,7 @@ export default function AdminMatchesTab({
                  onUpdateMatchday={handleUpdateMatchday} 
                  onUpdateDetails={handleUpdateMatchDetails}
                  onDelete={handleDeleteMatch}
+                 handleCalculateCrowdStats={handleCalculateCrowdStats}
                />
              ))
           )}
@@ -265,8 +267,11 @@ export default function AdminMatchesTab({
   );
 }
 
-function AdminMatchRow({ match, allMatches, isSaving, justSaved, onSave, onClear, onUpdateDate, onUpdateMatchday, onUpdateDetails, onDelete }: any) {  const [homeInput, setHomeInput] = useState(match.realHomeScore ?? "");
+function AdminMatchRow({ match, allMatches, isSaving, justSaved, onSave, onClear, onUpdateDate, onUpdateMatchday, onUpdateDetails, onDelete, handleCalculateCrowdStats }: any) {  
+  // הנה שתי השורות שהלכו לאיבוד!
+  const [homeInput, setHomeInput] = useState(match.realHomeScore ?? "");
   const [awayInput, setAwayInput] = useState(match.realAwayScore ?? "");
+  
   const [qualifierInput, setQualifierInput] = useState(match.realQualifier ?? "");
   const [isEditingTime, setIsEditingTime] = useState(false);
   const [timeInput, setTimeInput] = useState(match.matchDate || "");
@@ -284,7 +289,6 @@ function AdminMatchRow({ match, allMatches, isSaving, justSaved, onSave, onClear
   });
   
   const [thirdPlaceTeams, setThirdPlaceTeams] = useState<string[]>([]);
-
   // שולף את 8 המעפילות (מקום 3) רק כשפותחים את פאנל העריכה של שלב 32 הגדולות
   useEffect(() => {
     if (isEditingDetails && match.roundName === "32 הגדולות") {
@@ -640,6 +644,9 @@ function AdminMatchRow({ match, allMatches, isSaving, justSaved, onSave, onClear
       <div className="flex gap-2 mt-auto">
         <button type="button" onClick={() => onSave(match.id, parseInt(homeInput), parseInt(awayInput), qualifierInput)} disabled={isSaving || homeInput === "" || awayInput === "" || (isKnockout && qualifierInput === "")} className={`flex-1 py-2 sm:py-2.5 rounded-xl font-black text-[10px] sm:text-xs transition-all shadow-md flex items-center justify-center gap-1.5 ${justSaved ? "bg-emerald-500 text-white border border-emerald-400" : isSaving ? "bg-slate-600 text-slate-300" : match.isFinished ? "bg-slate-800 text-emerald-400 border border-emerald-500/30 hover:border-emerald-500 hover:bg-slate-700" : "bg-emerald-600 hover:bg-emerald-500 text-white border border-emerald-500"} disabled:opacity-50 active:scale-95`}>
           {justSaved ? "✓ נשמר" : isSaving ? "⏳..." : match.isFinished ? "עדכן תוצאה" : "💾 שמור תוצאה"}
+        </button>
+        <button onClick={() => handleCalculateCrowdStats(match)} className="flex-1 py-2 bg-indigo-600/20 hover:bg-indigo-600 text-indigo-400 hover:text-white border border-indigo-500/30 rounded-xl font-bold transition-all shadow-md active:scale-95 text-xs">
+          📊 פרסם לקהל
         </button>
         {match.isFinished && (
           <button type="button" onClick={() => { onClear(match.id); setHomeInput(""); setAwayInput(""); setQualifierInput(""); }} disabled={isSaving} className="w-10 sm:w-12 flex-shrink-0 flex items-center justify-center rounded-xl bg-slate-800 hover:bg-rose-900 text-rose-500 border border-slate-700 hover:border-rose-500 transition-all active:scale-95 disabled:opacity-50" title="אפס תוצאה">✕</button>

@@ -59,6 +59,7 @@ const AnimatedNumber = ({ value, prefix = "" }: { value: number, prefix?: string
 
   return <>{prefix}{current.toLocaleString()}</>; // הוספנו toLocaleString כדי שיהיו פסיקים באלפים!
 };
+
 const isMatchInCurrentActivePhase = (m: any, state: number) => {
   const s = Number(state) || 0;
   if (m.stage !== "KNOCKOUT") {
@@ -118,6 +119,7 @@ export default function Dashboard({ userId, userName, setActiveTab, setPredictio
   const [todayMatchIndex, setTodayMatchIndex] = useState(0);
   const [todayBonusIndex, setTodayBonusIndex] = useState(0);
   const [spyModalMatch, setSpyModalMatch] = useState<any | null>(null);
+  const [matchStatsModal, setMatchStatsModal] = useState<any | null>(null);
   const [spyData, setSpyData] = useState<any[]>([]);
   const [isLoadingSpy, setIsLoadingSpy] = useState(false);
   const [spySearchQuery, setSpySearchQuery] = useState("");
@@ -1796,18 +1798,54 @@ const renderedMagazineContent = useMemo(() => {
                                    <span className="bg-blue-900/30 px-3 py-1 rounded-lg border border-blue-500/20">{m.stage === "KNOCKOUT" ? m.roundName : `בית ${m.group}`}</span>
                                  </div>
                                  
-                                 <div className="flex justify-between items-center text-white font-bold text-lg mb-6 bg-slate-950 p-4 rounded-2xl border border-slate-800 shadow-inner">
-                                   <span className="flex-1 flex flex-col items-center gap-2 text-center" title={m.homeTeam}>
-                                      {getFlagUrl(m.homeTeam) ? <img src={getFlagUrl(m.homeTeam)!} className="w-8 h-5 object-cover rounded shadow-sm" alt="flag" /> : "🏳️"} 
-                                      <span className="truncate max-w-[80px] text-sm md:text-base">{m.homeTeam}</span>
-                                   </span>
-                                   <span className="text-slate-600 text-sm mx-2 font-black">VS</span>
-                                   <span className="flex-1 flex flex-col items-center gap-2 text-center" title={m.awayTeam}>
-                                      {getFlagUrl(m.awayTeam) ? <img src={getFlagUrl(m.awayTeam)!} className="w-8 h-5 object-cover rounded shadow-sm" alt="flag" /> : "🏳️"}
-                                      <span className="truncate max-w-[80px] text-sm md:text-base">{m.awayTeam}</span>
-                                   </span>
-                                 </div>
+                                 <div className="flex flex-col mb-6 bg-slate-950 p-4 rounded-2xl border border-slate-800 shadow-inner">
+                                   
+                                   {/* אזור הנבחרות והאחוזים */}
+                                   <div className="flex justify-between items-start text-white font-bold text-lg w-full">
+                                     <span className="flex-1 flex flex-col items-center gap-2 text-center" title={m.homeTeam}>
+                                        {getFlagUrl(m.homeTeam) ? <img src={getFlagUrl(m.homeTeam)!} className="w-8 h-5 object-cover rounded shadow-sm" alt="flag" /> : "🏳️"} 
+                                        <span className="truncate max-w-[80px] text-sm md:text-base">{m.homeTeam}</span>
+                                        {/* אחוזי הקהל - בית */}
+                                        {m.crowdStats && m.crowdStats.total > 0 && (
+                                           <span className="text-[11px] font-black text-blue-400 bg-blue-900/20 px-2.5 py-0.5 rounded-md border border-blue-500/30 shadow-sm mt-0.5">
+                                              {Math.round((m.crowdStats.homeWins / m.crowdStats.total) * 100)}%
+                                           </span>
+                                        )}
+                                     </span>
+                                     
+                                     <span className="flex flex-col items-center justify-center mx-2 gap-1.5 mt-2">
+                                       <span className="text-slate-600 text-sm font-black">VS</span>
+                                       {/* אחוזי הקהל - תיקו */}
+                                       {m.crowdStats && m.crowdStats.total > 0 && (
+                                          <span className="text-[10px] font-bold text-slate-400 bg-slate-800/50 px-2 py-0.5 rounded-md border border-slate-700 shadow-sm">
+                                             {Math.round((m.crowdStats.draws / m.crowdStats.total) * 100)}% תיקו
+                                          </span>
+                                       )}
+                                     </span>
 
+                                     <span className="flex-1 flex flex-col items-center gap-2 text-center" title={m.awayTeam}>
+                                        {getFlagUrl(m.awayTeam) ? <img src={getFlagUrl(m.awayTeam)!} className="w-8 h-5 object-cover rounded shadow-sm" alt="flag" /> : "🏳️"}
+                                        <span className="truncate max-w-[80px] text-sm md:text-base">{m.awayTeam}</span>
+                                        {/* אחוזי הקהל - חוץ */}
+                                        {m.crowdStats && m.crowdStats.total > 0 && (
+                                           <span className="text-[11px] font-black text-emerald-400 bg-emerald-900/20 px-2.5 py-0.5 rounded-md border border-emerald-500/30 shadow-sm mt-0.5">
+                                              {Math.round((m.crowdStats.awayWins / m.crowdStats.total) * 100)}%
+                                           </span>
+                                        )}
+                                     </span>
+                                   </div>
+
+                                   {/* מד כוחות מעוצב (Power Bar) בתחתית */}
+                                   {m.crowdStats && m.crowdStats.total > 0 && (
+                                     <div className="w-full mt-6 px-2">
+                                        <div className="flex w-full h-2.5 bg-slate-900 rounded-full overflow-hidden border border-slate-800 shadow-inner relative">
+                                           <div className="bg-blue-500 transition-all duration-1000 shadow-[0_0_10px_rgba(59,130,246,0.8)]" style={{width: `${Math.round((m.crowdStats.homeWins / m.crowdStats.total) * 100)}%`}}></div>
+                                           <div className="bg-slate-500 transition-all duration-1000 border-x border-slate-900/50" style={{width: `${Math.round((m.crowdStats.draws / m.crowdStats.total) * 100)}%`}}></div>
+                                           <div className="bg-emerald-500 transition-all duration-1000 shadow-[0_0_10px_rgba(16,185,129,0.8)]" style={{width: `${Math.round((m.crowdStats.awayWins / m.crowdStats.total) * 100)}%`}}></div>
+                                        </div>
+                                     </div>
+                                   )}
+                                 </div>
                                  <div className="mt-auto border-t border-slate-700/50 pt-5">
                                    {hasPrediction ? (
                                       <div className="flex flex-col gap-3">
@@ -1829,6 +1867,7 @@ const renderedMagazineContent = useMemo(() => {
                                         הזן ניחוש למשחק זה! ⚠️
                                       </button>
                                    )}
+
                                  </div>
                               </div>
                             );
@@ -2162,7 +2201,68 @@ const renderedMagazineContent = useMemo(() => {
           </div>
         </div>
       )}
+{/* --- מודל סטטיסטיקת קהל --- */}
+      {matchStatsModal && (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm animate-fade-in-up" dir="rtl">
+          <div className="bg-slate-900 border border-slate-700 p-6 rounded-3xl w-full max-w-sm shadow-2xl relative">
+            <button onClick={() => setMatchStatsModal(null)} className="absolute top-4 left-4 w-8 h-8 bg-slate-800 hover:bg-slate-700 rounded-full flex items-center justify-center text-slate-300">✕</button>
+            
+            <h3 className="text-xl font-black text-white text-center mb-1">חכמת ההמונים 🧠</h3>
+            <p className="text-slate-400 text-xs text-center mb-6">מבוסס על {matchStatsModal.stats.total} ניחושים</p>
+            
+            <div className="flex justify-center items-center gap-3 mb-6 bg-slate-950/50 py-3 rounded-xl border border-slate-800 shadow-inner">
+               <span className="font-bold text-slate-200">{matchStatsModal.match.homeTeam}</span>
+               {getFlagUrl(matchStatsModal.match.homeTeam) && <img src={getFlagUrl(matchStatsModal.match.homeTeam)!} className="w-5 h-3.5 object-cover rounded-sm shadow-sm" alt="flag" />}
+               <span className="text-slate-500 font-black">-</span>
+               {getFlagUrl(matchStatsModal.match.awayTeam) && <img src={getFlagUrl(matchStatsModal.match.awayTeam)!} className="w-5 h-3.5 object-cover rounded-sm shadow-sm" alt="flag" />}
+               <span className="font-bold text-slate-200">{matchStatsModal.match.awayTeam}</span>
+            </div>
 
+            <div className="space-y-3 mb-6">
+              <div className="flex items-center gap-3">
+                <div className="w-16 text-xs font-bold text-blue-400 text-right truncate">{matchStatsModal.match.homeTeam}</div>
+                <div className="flex-1 bg-slate-800 h-3 rounded-full overflow-hidden border border-slate-700/50">
+                  <div className="bg-blue-500 h-full rounded-full" style={{ width: `${(matchStatsModal.stats.homeWins / matchStatsModal.stats.total) * 100}%` }}></div>
+                </div>
+                <div className="w-8 text-[10px] font-black text-slate-300">{Math.round((matchStatsModal.stats.homeWins / matchStatsModal.stats.total) * 100)}%</div>
+              </div>
+              
+              <div className="flex items-center gap-3">
+                <div className="w-16 text-xs font-bold text-slate-400 text-right">תיקו</div>
+                <div className="flex-1 bg-slate-800 h-3 rounded-full overflow-hidden border border-slate-700/50">
+                  <div className="bg-slate-500 h-full rounded-full" style={{ width: `${(matchStatsModal.stats.draws / matchStatsModal.stats.total) * 100}%` }}></div>
+                </div>
+                <div className="w-8 text-[10px] font-black text-slate-300">{Math.round((matchStatsModal.stats.draws / matchStatsModal.stats.total) * 100)}%</div>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <div className="w-16 text-xs font-bold text-emerald-400 text-right truncate">{matchStatsModal.match.awayTeam}</div>
+                <div className="flex-1 bg-slate-800 h-3 rounded-full overflow-hidden border border-slate-700/50">
+                  <div className="bg-emerald-500 h-full rounded-full" style={{ width: `${(matchStatsModal.stats.awayWins / matchStatsModal.stats.total) * 100}%` }}></div>
+                </div>
+                <div className="w-8 text-[10px] font-black text-slate-300">{Math.round((matchStatsModal.stats.awayWins / matchStatsModal.stats.total) * 100)}%</div>
+              </div>
+            </div>
+
+            {matchStatsModal.stats.topScores.length > 0 && (
+              <div className="bg-slate-800/50 p-4 rounded-2xl border border-slate-700">
+                <h4 className="text-center text-[10px] font-bold text-slate-400 mb-3 uppercase tracking-widest">התוצאות הנפוצות ביותר</h4>
+                <div className="flex justify-center gap-2">
+                  {matchStatsModal.stats.topScores.map((item: any, idx: number) => {
+                    const isGold = idx === 0;
+                    return (
+                      <div key={item.score} className={`flex-1 flex flex-col items-center justify-center p-2 rounded-xl border ${isGold ? 'bg-amber-900/20 border-amber-500/50 text-amber-400 shadow-inner' : 'bg-slate-900 border-slate-700 text-slate-300'}`}>
+                        <span className="font-black text-lg mb-1" dir="ltr">{item.score}</span>
+                        <span className="text-[9px] opacity-70">{item.count} ניחושים</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
       {showWrappedModal && (
         <WrappedModal 
           onClose={() => setShowWrappedModal(false)}

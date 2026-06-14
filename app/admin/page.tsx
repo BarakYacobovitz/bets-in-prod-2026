@@ -590,7 +590,55 @@ const handleUpdateUserDetails = async (userId: string, details: { name?: string,
     setSavingId(null);
   }
 };
+const handleCalculateCrowdStats = async (match: any) => {
+    try {
+      toast.loading("מחשב סטטיסטיקות קהל...", { id: `stats_${match.id}` });
+      
+      const collName = match.stage === "KNOCKOUT" ? "predictions_knockout" : "predictions_matches";
+      const qPreds = query(collection(db, collName), where("matchId", "==", match.id));
+      const snap = await getDocs(qPreds);
 
+      let homeWins = 0, awayWins = 0, draws = 0;
+      const exactScores: Record<string, number> = {};
+      let total = 0;
+
+      snap.forEach(docSnap => {
+        const data = docSnap.data();
+        const pHome = Number(data.predictedHomeScore);
+        const pAway = Number(data.predictedAwayScore);
+        
+        if (!isNaN(pHome) && !isNaN(pAway) && data.predictedHomeScore !== "" && data.predictedAwayScore !== "") {
+          total++;
+          if (pHome > pAway) homeWins++;
+          else if (pAway > pHome) awayWins++;
+          else draws++;
+
+          // שומרים הפוך (חוץ ואז בית) כדי שיוצג נכון ב-LTR/RTL
+          const scoreStr = `${pAway}-${pHome}`;
+          exactScores[scoreStr] = (exactScores[scoreStr] || 0) + 1;
+        }
+      });
+
+      // שומרים כאובייקט כדי שפיירבייס לא יקרוס על "Nested Arrays"
+      const topScores = Object.entries(exactScores)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 3)
+        .map(([score, count]) => ({ score, count }));
+
+      const crowdStats = { total, homeWins, awayWins, draws, topScores };
+
+      // עדכון ה-DB
+      await updateDoc(doc(db, "matches", String(match.id)), { crowdStats });
+      
+      // עדכון הטבלה המקומית באדמין כדי שלא נצטרך לרענן
+      setMatches(prevMatches => prevMatches.map(m => m.id === match.id ? { ...m, crowdStats } : m));
+      
+      toast.success("חכמת הקהל נשמרה למשחק בהצלחה!", { id: `stats_${match.id}` });
+    } catch (e) {
+      console.error(e);
+      toast.error("שגיאה בחישוב חכמת הקהל", { id: `stats_${match.id}` });
+    }
+  };
   const handleClearMatch = async (matchId: string) => { 
     if (!confirm("האם לאפס משחק זה?")) return; 
     setSavingId(matchId); 
@@ -2201,6 +2249,7 @@ const handleExportBackup = async () => {
             savingId={savingId}
             handleUpdateMatchDetails={handleUpdateMatchDetails}
             handleDeleteMatch={handleDeleteMatch} 
+            handleCalculateCrowdStats={handleCalculateCrowdStats}
          />
        )}
 
