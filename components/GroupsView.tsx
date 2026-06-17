@@ -437,7 +437,52 @@ useEffect(() => {
     }
     return true;
   });
+// --- התחלת לוגיקת חישוב טבלת הבית ---
+  const groupTableData = (() => {
+    const stats: any = {};
+    // איתחול כל הנבחרות בבית ב-0
+    activeTeams.forEach((team: string) => {
+      stats[team] = { name: team, played: 0, gf: 0, ga: 0, gd: 0, pts: 0 };
+    });
 
+    // מעבר על המשחקים שנגמרו והזנת נתונים
+    activeMatches.forEach((m: any) => {
+      if (m.isFinished && m.realHomeScore !== "" && m.realHomeScore !== null) {
+        const hTeam = m.homeTeam;
+        const aTeam = m.awayTeam;
+        const hScore = Number(m.realHomeScore);
+        const aScore = Number(m.realAwayScore);
+
+        if (stats[hTeam] && stats[aTeam]) {
+          stats[hTeam].played++;
+          stats[aTeam].played++;
+          stats[hTeam].gf += hScore;
+          stats[hTeam].ga += aScore;
+          stats[aTeam].gf += aScore;
+          stats[aTeam].ga += hScore;
+
+          if (hScore > aScore) {
+            stats[hTeam].pts += 3; // ניצחון בית
+          } else if (aScore > hScore) {
+            stats[aTeam].pts += 3; // ניצחון חוץ
+          } else {
+            stats[hTeam].pts += 1; // תיקו
+            stats[aTeam].pts += 1;
+          }
+        }
+      }
+    });
+
+    // חישוב הפרש שערים ומיון (נקודות -> הפרש שערים -> שערי זכות)
+    return Object.values(stats)
+      .map((t: any) => ({ ...t, gd: t.gf - t.ga }))
+      .sort((a: any, b: any) => {
+        if (b.pts !== a.pts) return b.pts - a.pts;
+        if (b.gd !== a.gd) return b.gd - a.gd;
+        return b.gf - a.gf;
+      });
+  })();
+  // --- סוף לוגיקת חישוב טבלת הבית ---
   const currentProgress = getGroupProgress(activeGroup);
 
   return (
@@ -502,7 +547,50 @@ useEffect(() => {
             </div>
 
             <div className="w-full h-px bg-slate-800/50 mt-1"></div>
+              {/* --- טבלת הבית המוטמעת --- */}
+<div className="w-full bg-slate-900/60 rounded-xl border border-slate-700/50 p-2.5 mt-2 mb-2 shadow-inner">
+  {/* כותרות עמודות */}
+  <div className="grid grid-cols-[20px_1fr_55px_30px] gap-2 text-[10px] font-bold text-slate-500 mb-1.5 border-b border-slate-700/50 pb-1.5 px-1">
+    <div className="text-center">#</div>
+    <div className="text-right pl-1">נבחרת</div>
+    <div className="text-center">שערים</div>
+    <div className="text-center">נק'</div>
+  </div>
 
+  {/* שורות הנתונים */}
+  <div className="flex flex-col">
+    {groupTableData.map((team: any, index: number) => {
+      const isTopTwo = index < 2; // צובע את שתי העולות
+      return (
+        <div key={team.name} className={`grid grid-cols-[20px_1fr_55px_30px] gap-2 items-center py-1.5 border-b border-slate-800/50 last:border-0 px-1 rounded-md transition-colors ${isTopTwo ? 'bg-emerald-900/10' : ''}`}>
+          
+          <div className={`text-center text-xs font-black ${isTopTwo ? 'text-emerald-400' : 'text-slate-500'}`}>
+            {index + 1}
+          </div>
+          
+          <div className="text-right flex items-center gap-1.5">
+            {getFlagUrl(team.name) && (
+              <img src={getFlagUrl(team.name)!} className="w-4 h-3 rounded-sm object-cover shadow-sm opacity-90" alt="flag" />
+            )}
+            <span className={`text-xs sm:text-sm font-bold truncate ${isTopTwo ? 'text-white' : 'text-slate-300'}`}>
+              {team.name}
+            </span>
+          </div>
+          
+          <div className="text-center text-[11px] font-medium text-slate-400 tracking-wider" dir="ltr">
+            {team.gf}-{team.ga}
+          </div>
+          
+          <div className={`text-center font-black text-xs sm:text-sm ${isTopTwo ? 'text-emerald-400' : 'text-white'}`}>
+            {team.pts}
+          </div>
+          
+        </div>
+      );
+    })}
+  </div>
+</div>
+{/* --- סוף טבלת הבית --- */}
             <div className="relative flex items-center justify-center w-full px-1 mt-1 min-h-[32px]">
                <div className="absolute right-1">
                    {viewMode === "MATCHES" && canRandomizeGroupMatches && (

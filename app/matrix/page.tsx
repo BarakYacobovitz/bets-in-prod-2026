@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 import { collection, getDocs, getDoc, doc } from "firebase/firestore";
 import { auth, db } from "../firebase";
 import Link from "next/link";
@@ -62,6 +62,7 @@ export default function MatrixPage() {
 // 👑 כאן בדיוק להדביק: המשתנים החדשים של עמדת ה-VAR
   // --- States for VAR Station (AI) ---
   const [varQuery, setVarQuery] = useState("");
+  const varInputRef = useRef<HTMLInputElement>(null); 
   const [varResponse, setVarResponse] = useState("");
   const [isVarLoading, setIsVarLoading] = useState(false);
   const [isVarModalOpen, setIsVarModalOpen] = useState(false); // שולט בפתיחת הפופ-אפ
@@ -73,12 +74,23 @@ export default function MatrixPage() {
   
   const [filterBonusPhase, setFilterBonusPhase] = useState("ALL");
 
-  // שעון חי כדי לחשוף שאלות הפתעה ברגע שהן נסגרות
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const unsubscribe = auth.onAuthStateChanged((user) => {
+      if (user) setCurrentUserId(user.uid);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // שעון חי כדי לחשוף שאלות הפתעה. 
+  // ⚡ תיקון ביצועים: שונה מעדכון של כל שניה (1000) לעדכון של כל דקה (60000) כדי למנוע רינדור מסיבי של הטבלה!
   const [nowMs, setNowMs] = useState(Date.now());
   useEffect(() => {
-    const interval = setInterval(() => setNowMs(Date.now()), 1000);
+    const interval = setInterval(() => setNowMs(Date.now()), 60000);
     return () => clearInterval(interval);
   }, []);
+
 
   useEffect(() => {
     const fetchAllData = async () => {
@@ -107,7 +119,7 @@ export default function MatrixPage() {
         uList.sort((a, b) => (b.totalPoints || 0) - (a.totalPoints || 0));
         setUsers(uList);
 
-const mList: any[] = [];
+        const mList: any[] = [];
         mSnap.forEach(d => mList.push({ id: d.id, ...d.data() }));
         
         // --- מילון סדר השלבים הקשיח ---
@@ -339,8 +351,8 @@ const mList: any[] = [];
   };
   // --- Function to fetch AI answer using Local Matrix State (Smart Firewall & Factual Prompt) ---
   // --- Function to fetch AI answer using Local Matrix State (Smart Firewall & Factual Prompt) ---
-  const handleAskVAR = async () => {
-    if (!varQuery.trim()) return;
+  const handleAskVAR = async (searchStr: string) => {
+    if (!searchStr.trim()) return;
     setIsVarLoading(true);
     setVarResponse(""); 
     
@@ -376,11 +388,12 @@ const mList: any[] = [];
              liveTournamentStats[q.label || q.questionText] = statusText;
          }
       });
-
       // 3. בניית הפרופילים האישיים רק לנתונים גלויים (משחקים, בונוסים והעפלות)
       const exposedUserProfiles: any = {};
-      users.forEach(u => {
+      users.forEach((u, index) => {
         let userStats: any = { 
+            totalPoints: u.totalPoints || 0,
+            rank: index + 1,
             matchPredictions: [], 
             bonuses: [], 
             groupQualifiers: [], 
@@ -497,10 +510,7 @@ const mList: any[] = [];
            }
         }
 
-        // דחיפת המשתמש רק אם יש לו נתונים כלשהם
-        if (userStats.matchPredictions.length > 0 || userStats.bonuses.length > 0 || userStats.groupQualifiers.length > 0 || userStats.thirdPlaceQualifiers.length > 0) {
-            exposedUserProfiles[u.name] = userStats;
-        }
+        exposedUserProfiles[u.name] = userStats;
       });
       
 
@@ -517,66 +527,56 @@ const mList: any[] = [];
 Current User Name: "${actualUserName}"
 
 === 1. CORE IDENTITY, TONE & TALENT ===
-- You speak directly to ${actualUserName} using football slang and sarcastic commentator energy.
-- KEEP IT SHORT & PUNCHY: Do NOT write long stories, essays, or overly complex metaphors. Get straight to the point. Maximum 1-2 short sentences before showing the data.
-- THE STING: Always include a short, sharp, sarcastic sting or tease directed at the user or the situation at the end of your response, but keep it brief.
-- SPECIAL ROEE COHEN RULE: If the user's name is "רועי כהן", you MUST include this exact phrase in your response: "ידעתי שצריך להיזהר ממך רועי כהן, ברק אמר לי שאתה לא תניח לי..."
-- If the user asks about their own status (e.g., "מה המצב שלי?"), fetch data specifically matching "${actualUserName}".
-- You are an AGGRESSIVE STATISTICAL ENGINE. Compute, count, aggregate, and average data across all users when asked complex questions.
-- Use live web search for World Cup 2026 factual data, injuries, or history.
+- You speak directly to the user in conversational, natural Hebrew.
+- Your tone is friendly, professional, and lightly humorous. You are NOT overly cynical or mean.
+- Praise the leaders: If you check data for users at the top of the table (Rank 1-5), explicitly compliment them (e.g., "איזה נביא", "קורא את המשחק מושלם").
+- Encourage the strugglers: If you check data for users at the bottom, lightly chuckle but immediately encourage them (e.g., "לא נורא, אולי בנוקאאוט תפציץ").
+- World Cup 2026 Expert: Answer general factual questions about the 2026 World Cup (stadiums, format, history) accurately.
 
-=== 2. DATA SEGREGATION & KNOWLEDGE FIREWALL ===
-- PREDICTION DATA: Rely ONLY on the provided JSON payload.
-- LIVE BONUS DATA: Always parse 'globalLiveStats' to answer questions about current leaders/trends of bonus questions.
-- WORLD CUP FACTUAL DATA: Answer general trivia or 2026 real-world sports queries freely using internet grounding.
+=== 2. STRICT DATA EXTRACTION (ANTI-HALLUCINATION) ===
+- CRITICAL: You MUST fetch the EXACT "totalPoints" and "rank" from the JSON payload under usersPredictions[Requested_Name].
+- NEVER invent, guess, or default to 20 points! If the JSON says 0, write 0. If the user is missing from the JSON, write 0 for their points.
+- BONUS QUESTIONS: 
+  * Clearly state if a bonus result is final ("תשובה סופית") or just a temporary leader ("מוביל זמני").
+  * Distinguish between 'Hit' (פגיעה נכונה), 'Miss' (נפילה), and 'Pending' (ממתין).
 
 === 3. DATA INTEGRITY & HEBREW RTL SCORE FIX (NON-NEGOTIABLE) ===
-1. STRICT "NO SWAP" NAMES RULE: You are PROHIBITED from swapping team positions in a matchup string. If the JSON says "Senegal - France", it MUST stay "Senegal - France".
-2. SCORE FLIPPING FOR RTL LIGHTBOXES: To combat the Hebrew Right-to-Left rendering bug, you MUST reverse the numeric score layout inside the HTML table. Output "[Away] - [Home]".
+- RTL BUG FIX: You MUST always output scores in the format "[Away Team Score] - [Home Team Score]" inside the HTML table.
+- NEVER output "[Home] - [Away]" in the score column, because the Hebrew RTL rendering flips it incorrectly. By swapping them here, the user sees them perfectly in the right order.
 
-=== 4. CUSTOM HTML RENDERING TEMPLATE ===
-When displaying computed statistical lists or matchup grids, format them cleanly using this tailored tailwind template. 
-Note 1: Scores are manually inverted inside 'dir="ltr"' for RTL safety.
-Note 2: Use the <tfoot> ONLY if you are displaying a specific user's match predictions and want to sum their points. Otherwise, omit it.
+=== 4. CUSTOM HTML RENDERING TEMPLATES (CRITICAL) ===
+Template A (General Status):
+<div class="bg-slate-800/80 border border-slate-600 rounded-xl p-4 my-2">
+  <div class="text-amber-400 font-black text-2xl mb-1">סה"כ נקודות: [TotalPoints]</div>
+  <div class="text-slate-300 font-bold">דירוג נוכחי: [Rank]</div>
+</div>
 
+Template B (Match Predictions):
 <table class="w-full text-right border-collapse my-3 bg-black/60 rounded-xl overflow-hidden text-xs shadow-inner">
   <thead class="bg-slate-800">
      <tr>
-        <th class="p-2 border-b border-slate-700 text-center text-slate-300">שחקן / משחק</th>
+        <th class="p-2 border-b border-slate-700 text-center text-slate-300">משחק</th>
         <th class="p-2 border-b border-slate-700 text-center text-slate-300">ניחוש</th>
         <th class="p-2 border-b border-slate-700 text-center text-slate-300">אמת בפועל</th>
-        <th class="p-2 border-b border-slate-700 text-center text-slate-300">מדד / נק'</th>
+        <th class="p-2 border-b border-slate-700 text-center text-slate-300">נק'</th>
      </tr>
   </thead>
   <tbody>
      <tr>
-        <td class="p-2 border-b border-slate-800 text-center font-bold text-slate-200">[Row_Label]</td>
-        <td class="p-2 border-b border-slate-800 text-center font-mono text-blue-400 font-bold" dir="ltr">
-            [ValueAway] - [ValueHome]
-        </td>
-        <td class="p-2 border-b border-slate-800 text-center font-mono text-emerald-400 font-bold" dir="ltr">
-            [RealAway] - [RealHome]
-        </td>
-        <td class="p-2 border-b border-slate-800 text-center font-black text-amber-400">[Metric_or_Points]</td>
+        <td class="p-2 border-b border-slate-800 text-center font-bold text-slate-200">[GameName]</td>
+        <td class="p-2 border-b border-slate-800 text-center font-mono text-blue-400 font-bold" dir="ltr">[AwayScore]-[HomeScore]</td>
+        <td class="p-2 border-b border-slate-800 text-center font-mono text-emerald-400 font-bold" dir="ltr">[RealAway]-[RealHome]</td>
+        <td class="p-2 border-b border-slate-800 text-center font-black text-amber-400">[Points]</td>
      </tr>
   </tbody>
-  <tfoot class="bg-slate-900 border-t-2 border-slate-700">
-     <tr>
-        <td colspan="3" class="p-2 text-left text-slate-300 font-bold">סה"כ:</td>
-        <td class="p-2 text-center text-amber-400 font-black text-lg">[Total]</td>
-     </tr>
-  </tfoot>
 </table>
-
-=== 5. EXAMPLES OF DEEP STATISTICAL COMPUTATION ===
-- "מי השחקן שהכי הרבה פעמים הימר על תיקו?": Loop through 'matchPredictions' for all users, sum exact ties, present ranking.
 
 INJECTED LIVE TOURNAMENT JSON PAYLOAD:
 ${JSON.stringify(varContextPayload)}`;
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: varQuery, context: { systemInstructions } })
+        body: JSON.stringify({ message: searchStr, context: { systemInstructions } })
       });
       
       const data = await res.json();
@@ -757,36 +757,42 @@ ${JSON.stringify(varContextPayload)}`;
                 </div>
 
                 <input
-                  type="text"
-                  value={varQuery}
-                  onChange={(e) => setVarQuery(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && varQuery.trim()) {
-                      setIsVarModalOpen(true);
-                      handleAskVAR();
-                    }
-                  }}
-                  placeholder="מי המלך של בית ג'? כמה בולים יש לדקל?..."
-                  className="w-full bg-transparent text-white font-black text-base md:text-lg border-none outline-none focus:ring-0 placeholder-slate-600 p-0"
-                />
+                    type="text"
+                    ref={varInputRef}
+                    defaultValue={varQuery}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        const val = varInputRef.current?.value || "";
+                        if (val.trim()) {
+                          setVarQuery(val);
+                          setIsVarModalOpen(true);
+                          handleAskVAR(val);
+                        }
+                      }
+                    }}
+                    placeholder="מי המלך של בית ג'? כמה בולים יש לדקל?..."
+                    className="w-full bg-transparent text-white font-black text-base md:text-lg border-none outline-none focus:ring-0 placeholder-slate-600 p-0"
+                  /> 
              </div>
 
              {/* 🎯 כפתור השליחה */}
-             <button
-               onClick={() => {
-                 if (varQuery.trim()) {
-                   setIsVarModalOpen(true);
-                   handleAskVAR();
-                 }
-               }}
-               className="relative z-10 shrink-0 w-full md:w-auto overflow-hidden rounded-xl group/btn"
-             >
+              <button
+                onClick={() => {
+                  const val = varInputRef.current?.value || "";
+                  if (val.trim()) {
+                    setVarQuery(val);
+                    setIsVarModalOpen(true);
+                    handleAskVAR(val);
+                  }
+                }}
+                className="relative z-10 shrink-0 w-full md:w-auto overflow-hidden rounded-xl group/btn"
+              >
                 <div className="absolute inset-0 bg-gradient-to-r from-rose-600 to-red-500 transition-transform group-hover/btn:scale-105"></div>
                 <div className="relative px-8 py-4 flex items-center justify-center gap-2 font-black text-white tracking-wide">
-                   <span>שלח לבדיקה</span>
-                   <span className="text-xl">📺</span>
+                    <span>שלח לבדיקה</span>
+                    <span className="text-xl">📺</span>
                 </div>
-             </button>
+              </button>
 
           </div>
         </div>
@@ -916,24 +922,31 @@ ${JSON.stringify(varContextPayload)}`;
                </thead>
                
                <tbody>
-                  {filteredUsers.map((u, idx) => (
-                    <tr key={u.id} className="hover:bg-slate-800/50 transition-colors group">
+                  {filteredUsers.map((u, idx) => {
+                    const isMe = u.id === currentUserId; // בדיקה אם זה השחקן המחובר
+                    return (
+                    <tr key={u.id} className={`transition-colors group ${isMe ? 'bg-blue-900/30 shadow-[inset_0_0_15px_rgba(59,130,246,0.15)] hover:bg-blue-900/40' : 'hover:bg-slate-800/50'}`}>
                       
-                      {/* בשורת ה-TD של שם השחקן - ביטלנו פדינג והעברנו ל-div פנימי */}
-                    <td className="sticky right-0 z-[50] bg-slate-950 bg-clip-padding border-b border-l border-slate-700/80 p-3 m-0 w-[150px] max-w-[150px] min-w-[150px] outline-none transition-colors will-change-transform" style={{ transform: 'translate3d(0, 0, 0)', WebkitTransform: 'translate3d(0, 0, 0)' }}>
-                        {/* הוספנו פה transform כדי להכריח את האייפון לצייר את הטקסט, וביטלנו h-full */}
-                        <div className="flex items-center justify-between gap-2 w-full">
-                          <span className="text-[10px] text-slate-500 font-mono shrink-0">{idx + 1}.</span>
-                          
-                          <span className="font-bold text-white text-xs text-right flex-1 whitespace-nowrap" title={u.name}>
-                            {u.name ? (u.name.length > 12 ? u.name.substring(0, 12) + '...' : u.name) : "שחקן אורח"}
-                          </span>
-                          
-                          <span className="bg-amber-500/10 text-amber-400 text-[10px] px-2 py-0.5 rounded border border-amber-500/20 shrink-0">
-                            {u.totalPoints || 0}
-                          </span>
-                        </div>
-                    </td>
+                      <td className={`sticky right-0 z-[50] bg-clip-padding border-b border-l p-3 m-0 w-[150px] max-w-[150px] min-w-[150px] outline-none transition-colors will-change-transform ${isMe ? 'bg-blue-950 border-blue-500/50' : 'bg-slate-950 border-slate-700/80'}`} style={{ transform: 'translate3d(0, 0, 0)', WebkitTransform: 'translate3d(0, 0, 0)' }}>
+                          <div className="flex items-center justify-between gap-2 w-full">
+                            <span className={`text-[10px] font-mono shrink-0 ${isMe ? 'text-blue-400 font-black' : 'text-slate-500'}`}>{idx + 1}.</span>
+                            
+                            <span className={`font-bold text-xs text-right flex-1 whitespace-nowrap ${isMe ? 'text-blue-300 drop-shadow-md' : 'text-white'}`} title={u.name}>
+                              {u.name ? (u.name.length > 12 ? u.name.substring(0, 12) + '...' : u.name) : "שחקן אורח"}
+                            </span>
+                            
+                            {isMe ? (
+                              <span className="bg-blue-600 text-white text-[10px] px-2 py-0.5 rounded border border-blue-400 shrink-0 font-black shadow-[0_0_8px_rgba(37,99,235,0.5)]">
+                                אתה
+                              </span>
+                            ) : (
+                              <span className="bg-amber-500/10 text-amber-400 text-[10px] px-2 py-0.5 rounded border border-amber-500/20 shrink-0">
+                                {u.totalPoints || 0}
+                              </span>
+                            )}
+                          </div>
+                      </td>
+
                       {activeTab === "MATCHES" && filteredMatches.map(m => {
                         const uData = predictions[u.id];
                         const p = uData ? uData[m.id] : null;
@@ -1036,7 +1049,7 @@ ${JSON.stringify(varContextPayload)}`;
                                         const isFull = realThirdPlace.filter(x=>x).length >= 8;
                                         return (
                                           <div key={i} className={`text-[8px] font-black p-1 rounded-md border flex items-center justify-center gap-1 truncate ${isHit ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/40" : (isFull ? "bg-rose-500/10 text-rose-400 border-rose-500/20 opacity-60" : "bg-slate-800 text-slate-400 border-slate-700")}`}>
-                                             {getFlagUrl(t) && <img src={getFlagUrl(t)!} className="w-3 h-2 rounded-sm shadow-sm" />}
+                                             {getFlagUrl(t) && <img src={getFlagUrl(t)!} className="w-3 h-2 rounded-sm shadow-sm" alt="" />}
                                              {t}
                                           </div>
                                         );
@@ -1099,7 +1112,7 @@ ${JSON.stringify(varContextPayload)}`;
                         );
                       })}
                     </tr>
-                  ))}
+                  )})}
                </tbody>
             </table>
          </div>
@@ -1114,7 +1127,12 @@ ${JSON.stringify(varContextPayload)}`;
       
       {/* כפתור ה-X נשאר קבוע */}
       <button 
-        onClick={() => { setIsVarModalOpen(false); setVarQuery(""); setVarResponse(""); }}
+        onClick={() => { 
+          setIsVarModalOpen(false); 
+          setVarQuery(""); 
+          setVarResponse(""); 
+          if(varInputRef.current) varInputRef.current.value = ""; // הניקוי של ה-Ref
+        }}
         className="absolute top-3 left-3 z-50 w-8 h-8 flex items-center justify-center rounded-full bg-black/50 text-gray-400 hover:text-white transition-colors border border-white/10"
       >
         ✕
@@ -1144,7 +1162,12 @@ ${JSON.stringify(varContextPayload)}`;
       {/* כפתור תחתון */}
       <div className="bg-[#050507] p-4 border-t border-slate-800 shrink-0">
         <button
-          onClick={() => { setIsVarModalOpen(false); setVarQuery(""); setVarResponse(""); }}
+          onClick={() => { 
+            setIsVarModalOpen(false); 
+            setVarQuery(""); 
+            setVarResponse(""); 
+            if(varInputRef.current) varInputRef.current.value = ""; // הניקוי של ה-Ref
+          }}
           className="w-full bg-slate-800 hover:bg-slate-700 text-slate-300 font-black py-3 rounded-xl border border-slate-700 text-sm transition-all active:scale-95"
         >
           ✓ חזרה למגרש
