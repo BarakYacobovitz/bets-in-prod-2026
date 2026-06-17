@@ -58,6 +58,15 @@ export async function POST(req: Request) {
     // 5. משגרים!
     const response = await admin.messaging().sendEachForMulticast(message);
 
+    if (response.successCount === 0 && response.failureCount > 0) {
+      // אם כל ההודעות נכשלו, נחזיר שגיאה עם פירוט הסיבה מההודעה הראשונה שנכשלה
+      const firstError = response.responses.find(r => !r.success)?.error;
+      return NextResponse.json({ 
+        success: false, 
+        error: `נכשלה השליחה לכל ${response.failureCount} המכשירים. שגיאה לדוגמה: ${firstError?.message || 'לא ידוע'}`
+      }, { status: 400 });
+    }
+
     return NextResponse.json({
       success: true,
       successCount: response.successCount,

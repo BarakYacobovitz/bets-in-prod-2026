@@ -34,7 +34,7 @@ export const metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="he" dir="rtl" className="bg-slate-950">
+    <html lang="he" dir="rtl" translate="no" className="bg-slate-950">
       <body className="bg-slate-950 text-slate-200 h-[100dvh] flex flex-col overflow-hidden relative">
         
         
