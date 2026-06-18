@@ -711,8 +711,9 @@ const handleCalculateCrowdStats = async (match: any) => {
       const systemSnap = await getDoc(doc(db, "settings", "system"));
       const lastSnapshotDate = systemSnap.exists() ? systemSnap.data().lastSnapshotDate : "";
       
-      const shiftedDate = new Date(Date.now() - 8 * 60 * 60 * 1000);
-      const todayString = shiftedDate.toISOString().split('T')[0]; 
+      // מזיזים את השעון 12 שעות אחורה ומשתמשים בתאריך מקומי כדי להסתנכרן בדיוק עם הדשבורד ב-12 בצהריים!
+      const shiftedDate = new Date(Date.now() - 12 * 60 * 60 * 1000);
+      const todayString = `${shiftedDate.getFullYear()}-${shiftedDate.getMonth() + 1}-${shiftedDate.getDate()}`;
       
       if (lastSnapshotDate !== todayString) {
          console.log(`New football day detected! (Date: ${todayString}). Taking automated snapshot before calculating scores...`);

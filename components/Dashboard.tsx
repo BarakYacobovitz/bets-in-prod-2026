@@ -423,7 +423,10 @@ export default function Dashboard({ userId, userName, setActiveTab, setPredictio
         const ptSnap = await getDoc(doc(db, "predictions_third_place", userId));
         const userThirdData = ptSnap.exists() ? ptSnap.data().teams || [] : [];
 
-        const today = new Date();
+        const now = new Date();
+        // מזיזים את "היום הנוכחי" 12 שעות אחורה. כך "היום" מוגדר מ-12:00 עד 11:59 ביום שלמחרת
+        const shiftedNow = new Date(now.getTime() - 12 * 60 * 60 * 1000); 
+        
         const targets: any[] = [];
         const tMatches: any[] = [];
         const todayTeams = new Set<string>();
@@ -436,9 +439,22 @@ export default function Dashboard({ userId, userName, setActiveTab, setPredictio
               const d = parts[0] || "";
               const t = parts[1] || "";
               const dParts = d.split("/");
-              if(dParts.length === 3) {
+              const tParts = t.split(":");
+              
+              if(dParts.length === 3 && tParts.length >= 2) {
                  const [day, month, year] = dParts;
-                 if (today.getDate() === Number(day) && today.getMonth() === Number(month) - 1 && today.getFullYear() === Number(year)) {
+                 const [hour, minute] = tParts;
+                 
+                 // יוצרים אובייקט תאריך למשחק, ומזיזים גם אותו 12 שעות אחורה לשם ההשוואה
+                 const matchDateObj = new Date(Number(year), Number(month) - 1, Number(day), Number(hour), Number(minute));
+                 const shiftedMatchDate = new Date(matchDateObj.getTime() - 12 * 60 * 60 * 1000);
+
+                 // משווים תאריכים לפי הזמן ה"מוזז"
+                 if (
+                    shiftedNow.getDate() === shiftedMatchDate.getDate() &&
+                    shiftedNow.getMonth() === shiftedMatchDate.getMonth() &&
+                    shiftedNow.getFullYear() === shiftedMatchDate.getFullYear()
+                 ) {
                     todayTeams.add(m.homeTeam);
                     todayTeams.add(m.awayTeam);
                     const pred = userMatchPreds[m.id];
@@ -1794,19 +1810,20 @@ const renderedMagazineContent = useMemo(() => {
                                )}
                                  
                                  <div className="text-blue-400 text-xs font-bold mb-6 flex justify-between items-center">
-                                   <span className="bg-slate-950 px-3 py-1 rounded-lg border border-slate-800">🕒 {m.time}</span>
+                                   <span className={`px-3 py-1 rounded-lg border ${m.isFinished ? 'bg-emerald-900/30 border-emerald-500/30 text-emerald-400' : locked ? 'bg-rose-900/30 border-rose-500/30 text-rose-400' : 'bg-slate-950 border-slate-800 text-blue-400'}`}>
+                                      {m.isFinished ? '✅ הסתיים' : locked ? '🔒 ננעל לניחושים' : `🕒 ${m.time}`}
+                                   </span>
                                    <span className="bg-blue-900/30 px-3 py-1 rounded-lg border border-blue-500/20">{m.stage === "KNOCKOUT" ? m.roundName : `בית ${m.group}`}</span>
                                  </div>
                                  
                                  <div className="flex flex-col mb-6 bg-slate-950 p-4 rounded-2xl border border-slate-800 shadow-inner">
-                                   
                                    {/* אזור הנבחרות והאחוזים */}
                                    <div className="flex justify-between items-start text-white font-bold text-lg w-full">
                                      <span className="flex-1 flex flex-col items-center gap-2 text-center" title={m.homeTeam}>
                                         {getFlagUrl(m.homeTeam) ? <img src={getFlagUrl(m.homeTeam)!} className="w-8 h-5 object-cover rounded shadow-sm" alt="flag" /> : "🏳️"} 
                                         <span className="truncate max-w-[80px] text-sm md:text-base">{m.homeTeam}</span>
-                                        {/* אחוזי הקהל - בית */}
-                                        {m.crowdStats && m.crowdStats.total > 0 && (
+                                        {/* אחוזי הקהל - מוסתר אם המשחק הסתיים */}
+                                        {m.crowdStats && m.crowdStats.total > 0 && !m.isFinished && (
                                            <span className="text-[11px] font-black text-blue-400 bg-blue-900/20 px-2.5 py-0.5 rounded-md border border-blue-500/30 shadow-sm mt-0.5">
                                               {Math.round((m.crowdStats.homeWins / m.crowdStats.total) * 100)}%
                                            </span>
@@ -1814,20 +1831,30 @@ const renderedMagazineContent = useMemo(() => {
                                      </span>
                                      
                                      <span className="flex flex-col items-center justify-center mx-2 gap-1.5 mt-2">
-                                       <span className="text-slate-600 text-sm font-black">VS</span>
-                                       {/* אחוזי הקהל - תיקו */}
-                                       {m.crowdStats && m.crowdStats.total > 0 && (
-                                          <span className="text-[10px] font-bold text-slate-400 bg-slate-800/50 px-2 py-0.5 rounded-md border border-slate-700 shadow-sm">
-                                             {Math.round((m.crowdStats.draws / m.crowdStats.total) * 100)}% תיקו
-                                          </span>
+                                       {m.isFinished ? (
+                                         <div className="flex items-center gap-3 bg-slate-900 px-4 py-2 rounded-xl border border-slate-700 shadow-inner">
+                                            <span className="text-2xl font-black text-emerald-400">{m.realHomeScore}</span>
+                                            <span className="text-slate-600 font-black">-</span>
+                                            <span className="text-2xl font-black text-emerald-400">{m.realAwayScore}</span>
+                                         </div>
+                                       ) : (
+                                         <>
+                                            <span className="text-slate-600 text-sm font-black">VS</span>
+                                            {/* אחוזי הקהל לתיקו - מוסתר אם המשחק הסתיים */}
+                                            {m.crowdStats && m.crowdStats.total > 0 && (
+                                               <span className="text-[10px] font-bold text-slate-400 bg-slate-800/50 px-2 py-0.5 rounded-md border border-slate-700 shadow-sm">
+                                                  {Math.round((m.crowdStats.draws / m.crowdStats.total) * 100)}% תיקו
+                                               </span>
+                                            )}
+                                         </>
                                        )}
                                      </span>
 
                                      <span className="flex-1 flex flex-col items-center gap-2 text-center" title={m.awayTeam}>
                                         {getFlagUrl(m.awayTeam) ? <img src={getFlagUrl(m.awayTeam)!} className="w-8 h-5 object-cover rounded shadow-sm" alt="flag" /> : "🏳️"}
                                         <span className="truncate max-w-[80px] text-sm md:text-base">{m.awayTeam}</span>
-                                        {/* אחוזי הקהל - חוץ */}
-                                        {m.crowdStats && m.crowdStats.total > 0 && (
+                                        {/* אחוזי הקהל - מוסתר אם המשחק הסתיים */}
+                                        {m.crowdStats && m.crowdStats.total > 0 && !m.isFinished && (
                                            <span className="text-[11px] font-black text-emerald-400 bg-emerald-900/20 px-2.5 py-0.5 rounded-md border border-emerald-500/30 shadow-sm mt-0.5">
                                               {Math.round((m.crowdStats.awayWins / m.crowdStats.total) * 100)}%
                                            </span>
@@ -1836,7 +1863,7 @@ const renderedMagazineContent = useMemo(() => {
                                    </div>
 
                                    {/* מד כוחות מעוצב (Power Bar) בתחתית */}
-                                   {m.crowdStats && m.crowdStats.total > 0 && (
+                                   {m.crowdStats && m.crowdStats.total > 0 && !m.isFinished && (
                                      <div className="w-full mt-6 px-2">
                                         <div className="flex w-full h-2.5 bg-slate-900 rounded-full overflow-hidden border border-slate-800 shadow-inner relative">
                                            <div className="bg-blue-500 transition-all duration-1000 shadow-[0_0_10px_rgba(59,130,246,0.8)]" style={{width: `${Math.round((m.crowdStats.homeWins / m.crowdStats.total) * 100)}%`}}></div>
