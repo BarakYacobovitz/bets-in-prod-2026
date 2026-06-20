@@ -25,6 +25,8 @@ export default function AdminStatsTab({ matches, bonusQuestions, groupsList, isC
   
   const [bonusViewMode, setBonusViewMode] = useState<"list" | "chart">("list");
   const chartRef = useRef<HTMLDivElement>(null);
+  const [scorersData, setScorersData] = useState<any[] | null>(null);
+  const [isFetchingScorers, setIsFetchingScorers] = useState(false);
 
   const formatAuditTime = (ts: any) => {
     if (!ts) return "";
@@ -50,6 +52,25 @@ export default function AdminStatsTab({ matches, bonusQuestions, groupsList, isC
     } catch (error) {
       console.error(error);
       toast.error("שגיאה ביצירת התמונה", { id: toastId });
+    }
+  };
+
+  const handleFetchLiveScorers = async () => {
+    setIsFetchingScorers(true);
+    const toastId = toast.loading("מתחבר ללוויין... מושך כובשים מהאינטרנט 📡");
+    try {
+      const res = await fetch('/api/scorers');
+      const data = await res.json();
+      if (data.success) {
+        toast.success("טבלת הכובשים עודכנה בהצלחה ב-Firebase! ⚽", { id: toastId });
+        setScorersData(data.data); // שומרים את הנתונים כדי להציג לאדמין במסך
+      } else {
+        toast.error("שגיאה במשיכת הנתונים: " + data.error, { id: toastId });
+      }
+    } catch (e) {
+      toast.error("שגיאת תקשורת. ה-API כנראה לא זמין.", { id: toastId });
+    } finally {
+      setIsFetchingScorers(false);
     }
   };
 
@@ -407,7 +428,63 @@ export default function AdminStatsTab({ matches, bonusQuestions, groupsList, isC
            {isCalculating ? "⏳ מעבד נתונים..." : "🚀 פרסם Wrapped לכולם"}
          </button>
        </div>
+{/* מודול חיבור ל-API חיצוני - כובשים */}
+       <div className="bg-gradient-to-r from-emerald-900/40 to-teal-900/30 p-6 rounded-3xl border border-emerald-500/30 shadow-xl flex flex-col gap-4">
+         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+           <div>
+             <h3 className="text-xl font-black text-emerald-400 mb-2 flex items-center gap-2"><span>📡</span> מערכת סריקת כובשים (LIVE API)</h3>
+             <p className="text-slate-400 text-sm max-w-xl">
+               מתחבר לשירות API חיצוני כדי למשוך את כל השערים שנכבשו במונדיאל. הנתונים נשמרים ישירות ל-Firebase לטובת חישוב שאלות בונוס עתידיות (כמו מלך השערים).
+             </p>
+           </div>
+           <button 
+             onClick={handleFetchLiveScorers} 
+             disabled={isFetchingScorers} 
+             className="w-full md:w-auto bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-black py-3 px-6 rounded-xl shadow-[0_0_15px_rgba(16,185,129,0.3)] transition-transform active:scale-95 whitespace-nowrap"
+           >
+             {isFetchingScorers ? "⏳ שואב נתונים..." : "⚽ הפעל סריקת כובשים"}
+           </button>
+         </div>
 
+         {/* תצוגת התוצאות מהאינטרנט באותו רגע */}
+         {scorersData && (
+           <div className="mt-4 bg-slate-950/50 rounded-2xl border border-emerald-500/20 p-4 max-h-96 overflow-y-auto custom-scrollbar shadow-inner animate-fade-in-up">
+             <h4 className="text-emerald-300 font-bold mb-4 border-b border-slate-700/50 pb-2 flex justify-between items-center">
+               <span>דוח סריקה נוכחי:</span>
+               <span className="text-xs bg-slate-800 px-2 py-1 rounded text-slate-400">{scorersData.length} משחקים נסרקו</span>
+             </h4>
+             
+             {scorersData.length === 0 ? (
+               <div className="text-slate-500 text-sm text-center py-4">לא נמצאו אירועי שערים (אולי הטורניר טרם התחיל או שהליגה ריקה).</div>
+             ) : (
+               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                 {scorersData.map((match: any, idx: number) => (
+                   <div key={idx} className="bg-slate-800/80 p-3.5 rounded-xl border border-slate-700 shadow-sm">
+                     <div className="text-white font-black text-sm mb-3 text-center bg-slate-900 py-1.5 rounded-lg border border-slate-700/50">
+                       {match.matchName}
+                     </div>
+                     <div className="space-y-1.5">
+                       {match.scorers && match.scorers.length > 0 ? (
+                         match.scorers.map((s: any, sIdx: number) => (
+                           <div key={sIdx} className="text-xs font-bold text-emerald-100 flex justify-between items-center bg-emerald-900/20 px-2.5 py-1.5 rounded border border-emerald-500/10">
+                             <span className="flex items-center gap-1.5">
+                               <span className="text-[10px]">⚽</span> {s.playerName}
+                               {getFlagUrl(s.team) && <img src={getFlagUrl(s.team)!} className="w-3 h-2 rounded-[1px] opacity-80" alt="flag"/>}
+                             </span>
+                             <span className="text-emerald-500/70 text-[10px] bg-slate-900 px-1.5 py-0.5 rounded">דק' {s.minute}</span>
+                           </div>
+                         ))
+                       ) : (
+                         <div className="text-xs text-slate-500 italic text-center py-1">תיקו מאופס / אין שערים</div>
+                       )}
+                     </div>
+                   </div>
+                 ))}
+               </div>
+             )}
+           </div>
+         )}
+       </div>
        <div className="flex flex-col md:flex-row justify-between items-start md:items-center bg-gradient-to-r from-indigo-900/50 to-slate-800 p-6 md:p-8 rounded-3xl border border-indigo-500/30 shadow-lg gap-6">
          <div>
            <h2 className="text-2xl md:text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-purple-400 flex items-center gap-2"><span>📡</span> ראדאר תובנות וביון</h2>

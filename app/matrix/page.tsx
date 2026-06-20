@@ -42,10 +42,11 @@ const parseDateTimeLocal = (dtStr: string) => {
 };
 // פונקציה שמתרגמת את סטטוס הטורניר לערך הסינון של טבלת המטריקס
 const getDefaultMatchdayFilter = (state: number) => {
-  if (state <= 0) return "1"; // מחזור 1
-  if (state === 1) return "2"; // מחזור 2
-  if (state === 2 || state === 3) return "3"; // מחזור 3
-  if (state === 4 || state === 5) return "32 הגדולות";
+  if (state <= 0) return "1"; // לפני תחילת הטורניר מציגים את 1
+  if (state === 1) return "1"; // מחזור 1 ננעל -> כולם באים לראות מה החברים ניחשו!
+  if (state === 2) return "2"; // מחזור 2 ננעל
+  if (state === 3) return "3"; // מחזור 3 ננעל
+  if (state === 4 || state === 5) return "32 הגדולות"; // 4=פתוח, 5=ננעל
   if (state === 6 || state === 7) return "שמינית גמר";
   if (state === 8 || state === 9) return "רבע גמר";
   if (state === 10 || state === 11) return "חצי גמר";
