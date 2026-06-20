@@ -40,6 +40,18 @@ const parseDateTimeLocal = (dtStr: string) => {
     return new Date(dtStr).getTime();
   } catch { return 0; }
 };
+// פונקציה שמתרגמת את סטטוס הטורניר לערך הסינון של טבלת המטריקס
+const getDefaultMatchdayFilter = (state: number) => {
+  if (state <= 0) return "1"; // מחזור 1
+  if (state === 1) return "2"; // מחזור 2
+  if (state === 2 || state === 3) return "3"; // מחזור 3
+  if (state === 4 || state === 5) return "32 הגדולות";
+  if (state === 6 || state === 7) return "שמינית גמר";
+  if (state === 8 || state === 9) return "רבע גמר";
+  if (state === 10 || state === 11) return "חצי גמר";
+  if (state >= 12) return "גמר";
+  return "ALL";
+};
 
 export default function MatrixPage() {
   const [users, setUsers] = useState<any[]>([]);
@@ -111,7 +123,10 @@ export default function MatrixPage() {
         ]);
 
         if (sysDoc.exists()) {
-           setTournamentState(sysDoc.data().tournamentState || 0);
+           const sysState = sysDoc.data().tournamentState || 0;
+           setTournamentState(sysState);
+           // ברגע שגילינו מה הסטטוס, אנחנו מגדירים את הדיפולט של החיפוש!
+           setFilterMatchday(getDefaultMatchdayFilter(sysState)); 
         }
 
         const uList: any[] = [];
