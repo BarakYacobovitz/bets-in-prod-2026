@@ -116,6 +116,7 @@ export default function Dashboard({ userId, userName, setActiveTab, setPredictio
   const [todayTargets, setTodayTargets] = useState<any[]>([]);
   const [todayMatches, setTodayMatches] = useState<any[]>([]);
   const [activeBannerMode, setActiveBannerMode] = useState<"MATCHES" | "BONUS" | "RADAR">("MATCHES");
+  const [todayViewMode, setTodayViewMode] = useState<"LIST" | "CAROUSEL">("LIST");
   const [todayMatchIndex, setTodayMatchIndex] = useState(0);
   const [todayBonusIndex, setTodayBonusIndex] = useState(0);
   const [spyModalMatch, setSpyModalMatch] = useState<any | null>(null);
@@ -1136,12 +1137,20 @@ const renderedMagazineContent = useMemo(() => {
            <img src="tunnel.png" alt="Bets in Prod Tunnel" className="absolute inset-0 w-full h-full object-cover z-0 opacity-40 transition-all duration-1000 pointer-events-none" />
             <div className="absolute inset-0 z-0 bg-gradient-to-l from-slate-950/90 via-slate-900/60 to-slate-950/90 pointer-events-none"></div>
             
-            <div className="relative z-10 text-right mb-6">
-               <h1 className="text-3xl md:text-4xl font-black text-white flex items-center justify-center md:justify-start gap-2 mb-2" dir="rtl">
-                  <span>אהלן, {safeUserName}!</span>
-                  <span className="origin-bottom-right">👋</span>
-               </h1>
-               <p className="text-slate-300 text-sm font-medium drop-shadow-lg">ברוך הבא לחדר ההלבשה. הנה המצב שלך כרגע:</p>
+            <div className="relative z-10 text-right mb-6 flex justify-between items-start gap-2">
+               <div>
+                 <h1 className="text-3xl md:text-4xl font-black text-white flex items-center justify-center md:justify-start gap-2 mb-2" dir="rtl">
+                    <span>אהלן, {safeUserName}!</span>
+                    <span className="origin-bottom-right">👋</span>
+                 </h1>
+                 <p className="text-slate-300 text-sm font-medium drop-shadow-lg">ברוך הבא לחדר ההלבשה. הנה המצב שלך כרגע:</p>
+               </div>
+               
+               {/* 👈 רמז ההחלקה למובייל (יופיע רק במסכים קטנים) */}
+               <div className="lg:hidden flex flex-col items-center justify-center bg-blue-900/20 border border-blue-500/30 px-3 py-1.5 rounded-2xl shadow-sm animate-pulse shrink-0 mt-1">
+                 <span className="text-xl leading-none mb-0.5">👈</span>
+                 <span className="text-[9px] font-black text-blue-300 uppercase tracking-widest">החלק</span>
+               </div>
             </div>
             {tournamentState >= 4 && (
        <button 
@@ -1700,7 +1709,17 @@ const renderedMagazineContent = useMemo(() => {
 
             <div className={`${timelineTab === "TODAY" ? "flex" : "hidden"} lg:flex flex-col w-full lg:w-1/2 h-full bg-slate-800`}>
                <div className="hidden lg:flex bg-slate-900/80 px-6 h-20 border-b border-slate-700 justify-between items-center z-10 shadow-sm shrink-0">
-                 <h2 className="text-xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-cyan-400 flex items-center gap-2"><span>📅</span> מה צפוי היום?</h2>
+                 <div className="flex items-center gap-3">
+                   <h2 className="text-xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-cyan-400 flex items-center gap-2"><span>📅</span> מה צפוי היום?</h2>
+                   
+                   {/* כפתור ה-Toggle בין רשימה לקרוסלה */}
+                   {(activeBannerMode === "MATCHES" || activeBannerMode === "BONUS") && (
+                     <div className="hidden sm:flex bg-slate-950 rounded-lg p-0.5 border border-slate-700 shadow-inner">
+                        <button onClick={() => setTodayViewMode("LIST")} className={`px-2 py-1 rounded text-[10px] font-bold transition-all flex items-center gap-1 ${todayViewMode === "LIST" ? "bg-slate-800 text-white shadow-sm" : "text-slate-500 hover:text-slate-300"}`}><span>📄</span> רשימה</button>
+                        <button onClick={() => setTodayViewMode("CAROUSEL")} className={`px-2 py-1 rounded text-[10px] font-bold transition-all flex items-center gap-1 ${todayViewMode === "CAROUSEL" ? "bg-slate-800 text-white shadow-sm" : "text-slate-500 hover:text-slate-300"}`}><span>🖼️</span> קרוסלה</button>
+                     </div>
+                   )}
+                 </div>
                  <div className="flex bg-slate-950 p-1.5 rounded-xl border border-slate-700/50 shadow-inner">
                    {todayMatches.length > 0 && <button onClick={() => { setActiveBannerMode("MATCHES"); setTodayMatchIndex(0); }} className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${isMatchesMode ? "bg-gradient-to-r from-blue-600 to-cyan-600 text-white shadow-md" : "text-slate-400 hover:text-white hover:bg-slate-800"}`}>⚽ משחקים</button>}
                    {todayTargets.length > 0 && <button onClick={() => { setActiveBannerMode("BONUS"); setTodayBonusIndex(0); }} className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${activeBannerMode === "BONUS" ? "bg-gradient-to-r from-rose-600 to-amber-600 text-white shadow-md" : "text-slate-400 hover:text-white hover:bg-slate-800"}`}>🎯 מטרות</button>}
@@ -1791,116 +1810,201 @@ const renderedMagazineContent = useMemo(() => {
                   ) : isMatchesMode ? (
                     todayMatches.length > 0 && (
                       <div className="w-full max-w-md mx-auto flex flex-col items-center animate-fade-in-up">
-                         <div className="flex items-center justify-between w-full bg-slate-950 p-2 rounded-2xl border border-slate-800 mb-6 shadow-inner shrink-0">
-                            <button onClick={handlePrevMatch} className="w-10 h-10 flex items-center justify-center rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors border border-slate-700 active:scale-95 text-lg">▶</button>
-                            <div className="text-sm font-bold text-slate-400">משחק {todayMatchIndex + 1} מתוך {todayMatches.length}</div>
-                            <button onClick={handleNextMatch} className="w-10 h-10 flex items-center justify-center rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors border border-slate-700 active:scale-95 text-lg">◀</button>
-                         </div>
+                         {todayViewMode === "CAROUSEL" ? (
+                           <>
+                             <div className="flex items-center justify-between w-full bg-slate-950 p-2 rounded-2xl border border-slate-800 mb-6 shadow-inner shrink-0">
+                                <button onClick={handlePrevMatch} className="w-10 h-10 flex items-center justify-center rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors border border-slate-700 active:scale-95 text-lg">▶</button>
+                                <div className="text-sm font-bold text-slate-400">משחק {todayMatchIndex + 1} מתוך {todayMatches.length}</div>
+                                <button onClick={handleNextMatch} className="w-10 h-10 flex items-center justify-center rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors border border-slate-700 active:scale-95 text-lg">◀</button>
+                             </div>
 
-                         {currentDisplayedMatch && (() => {
-                            const m = currentDisplayedMatch;
-                            const hasPrediction = m.userPrediction && m.userPrediction.predictedHomeScore !== "" && m.userPrediction.predictedAwayScore !== "";
-                            const locked = checkIsMatchLocked(m, tournamentState);
-                            
-                            return (
-                              <div className={`w-full relative mt-3 md:mt-4 bg-slate-900 p-6 md:p-8 rounded-3xl border transition-all shadow-xl flex flex-col shrink-0 ${hasPrediction ? "border-blue-500/30" : "border-amber-500/50 shadow-[0_0_20px_rgba(245,158,11,0.15)]"}`}>
-                                    {Number(m.matchday) === 3 && m.stage !== "KNOCKOUT" && (
-                                  <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 bg-gradient-to-r from-rose-600 to-red-500 text-white text-[11px] md:text-xs font-black px-5 py-1.5 rounded-full shadow-lg border border-rose-400/50 whitespace-nowrap flex items-center gap-1.5 z-10">                                 <span className="animate-pulse">🔥</span> מחזור הכרעה
-                                 </div>
-                               )}
-                                 
-                                 <div className="text-blue-400 text-xs font-bold mb-6 flex justify-between items-center">
-                                   <span className={`px-3 py-1 rounded-lg border ${m.isFinished ? 'bg-emerald-900/30 border-emerald-500/30 text-emerald-400' : locked ? 'bg-rose-900/30 border-rose-500/30 text-rose-400' : 'bg-slate-950 border-slate-800 text-blue-400'}`}>
-                                      {m.isFinished ? '✅ הסתיים' : locked ? '🔒 ננעל לניחושים' : `🕒 ${m.time}`}
-                                   </span>
-                                   <span className="bg-blue-900/30 px-3 py-1 rounded-lg border border-blue-500/20">{m.stage === "KNOCKOUT" ? m.roundName : `בית ${m.group}`}</span>
-                                 </div>
-                                 
-                                 <div className="flex flex-col mb-6 bg-slate-950 p-4 rounded-2xl border border-slate-800 shadow-inner">
-                                   {/* אזור הנבחרות והאחוזים */}
-                                   <div className="flex justify-between items-start text-white font-bold text-lg w-full">
-                                     <span className="flex-1 flex flex-col items-center gap-2 text-center" title={m.homeTeam}>
-                                        {getFlagUrl(m.homeTeam) ? <img src={getFlagUrl(m.homeTeam)!} className="w-8 h-5 object-cover rounded shadow-sm" alt="flag" /> : "🏳️"} 
-                                        <span className="truncate max-w-[80px] text-sm md:text-base">{m.homeTeam}</span>
-                                        {/* אחוזי הקהל - מוסתר אם המשחק הסתיים */}
-                                        {m.crowdStats && m.crowdStats.total > 0 && !m.isFinished && (
-                                           <span className="text-[11px] font-black text-blue-400 bg-blue-900/20 px-2.5 py-0.5 rounded-md border border-blue-500/30 shadow-sm mt-0.5">
-                                              {Math.round((m.crowdStats.homeWins / m.crowdStats.total) * 100)}%
-                                           </span>
-                                        )}
-                                     </span>
-                                     
-                                     <span className="flex flex-col items-center justify-center mx-2 gap-1.5 mt-2">
-                                       {m.isFinished ? (
-                                         <div className="flex items-center gap-3 bg-slate-900 px-4 py-2 rounded-xl border border-slate-700 shadow-inner">
-                                            <span className="text-2xl font-black text-emerald-400">{m.realHomeScore}</span>
-                                            <span className="text-slate-600 font-black">-</span>
-                                            <span className="text-2xl font-black text-emerald-400">{m.realAwayScore}</span>
-                                         </div>
-                                       ) : (
-                                         <>
-                                            <span className="text-slate-600 text-sm font-black">VS</span>
-                                            {/* אחוזי הקהל לתיקו - מוסתר אם המשחק הסתיים */}
-                                            {m.crowdStats && m.crowdStats.total > 0 && (
-                                               <span className="text-[10px] font-bold text-slate-400 bg-slate-800/50 px-2 py-0.5 rounded-md border border-slate-700 shadow-sm">
-                                                  {Math.round((m.crowdStats.draws / m.crowdStats.total) * 100)}% תיקו
-                                               </span>
-                                            )}
-                                         </>
-                                       )}
-                                     </span>
-
-                                     <span className="flex-1 flex flex-col items-center gap-2 text-center" title={m.awayTeam}>
-                                        {getFlagUrl(m.awayTeam) ? <img src={getFlagUrl(m.awayTeam)!} className="w-8 h-5 object-cover rounded shadow-sm" alt="flag" /> : "🏳️"}
-                                        <span className="truncate max-w-[80px] text-sm md:text-base">{m.awayTeam}</span>
-                                        {/* אחוזי הקהל - מוסתר אם המשחק הסתיים */}
-                                        {m.crowdStats && m.crowdStats.total > 0 && !m.isFinished && (
-                                           <span className="text-[11px] font-black text-emerald-400 bg-emerald-900/20 px-2.5 py-0.5 rounded-md border border-emerald-500/30 shadow-sm mt-0.5">
-                                              {Math.round((m.crowdStats.awayWins / m.crowdStats.total) * 100)}%
-                                           </span>
-                                        )}
-                                     </span>
-                                   </div>
-
-                                   {/* מד כוחות מעוצב (Power Bar) בתחתית */}
-                                   {m.crowdStats && m.crowdStats.total > 0 && !m.isFinished && (
-                                     <div className="w-full mt-6 px-2">
-                                        <div className="flex w-full h-2.5 bg-slate-900 rounded-full overflow-hidden border border-slate-800 shadow-inner relative">
-                                           <div className="bg-blue-500 transition-all duration-1000 shadow-[0_0_10px_rgba(59,130,246,0.8)]" style={{width: `${Math.round((m.crowdStats.homeWins / m.crowdStats.total) * 100)}%`}}></div>
-                                           <div className="bg-slate-500 transition-all duration-1000 border-x border-slate-900/50" style={{width: `${Math.round((m.crowdStats.draws / m.crowdStats.total) * 100)}%`}}></div>
-                                           <div className="bg-emerald-500 transition-all duration-1000 shadow-[0_0_10px_rgba(16,185,129,0.8)]" style={{width: `${Math.round((m.crowdStats.awayWins / m.crowdStats.total) * 100)}%`}}></div>
-                                        </div>
+                             {currentDisplayedMatch && (() => {
+                                const m = currentDisplayedMatch;
+                                const hasPrediction = m.userPrediction && m.userPrediction.predictedHomeScore !== "" && m.userPrediction.predictedAwayScore !== "";
+                                const locked = checkIsMatchLocked(m, tournamentState);
+                                
+                                return (
+                                  <div className={`w-full relative mt-3 md:mt-4 bg-slate-900 p-6 md:p-8 rounded-3xl border transition-all shadow-xl flex flex-col shrink-0 ${hasPrediction ? "border-blue-500/30" : "border-amber-500/50 shadow-[0_0_20px_rgba(245,158,11,0.15)]"}`}>
+                                        {Number(m.matchday) === 3 && m.stage !== "KNOCKOUT" && (
+                                      <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 bg-gradient-to-r from-rose-600 to-red-500 text-white text-[11px] md:text-xs font-black px-5 py-1.5 rounded-full shadow-lg border border-rose-400/50 whitespace-nowrap flex items-center gap-1.5 z-10">                                 <span className="animate-pulse">🔥</span> מחזור הכרעה
                                      </div>
                                    )}
-                                 </div>
-                                 <div className="mt-auto border-t border-slate-700/50 pt-5">
-                                   {hasPrediction ? (
-                                      <div className="flex flex-col gap-3">
-                                         <div className="text-sm font-black text-emerald-400 bg-emerald-900/20 py-3 rounded-xl border border-emerald-500/30 text-center shadow-sm">
-                                           הניחוש שלך: {m.userPrediction.predictedHomeScore} - {m.userPrediction.predictedAwayScore}
-                                         </div>
-                                         {locked ? (
-                                           <button onClick={() => handleOpenSpyForMatch(m)} className="w-full text-xs font-bold text-slate-300 bg-slate-800 hover:bg-slate-700 py-3 rounded-xl border border-slate-600 text-center shadow-sm flex justify-center items-center gap-2 transition-all">
-                                              <span className="text-base">👁️</span> הצג ניחושי חברים (ריגול)
-                                           </button>
-                                         ) : (
-                                           <button onClick={() => { setActiveTab("PREDICTIONS"); if(setPredictionTab) setPredictionTab(m.stage === "KNOCKOUT" ? "KNOCKOUT" : "MATCHES"); }} className="w-full text-xs font-bold text-blue-300 bg-blue-900/20 hover:bg-blue-900/40 py-3 rounded-xl border border-blue-500/30 text-center shadow-sm flex justify-center items-center gap-2 transition-all">
-                                              <span className="text-base">✍️</span> עדכן את הניחוש שלך
-                                           </button>
-                                         )}
-                                      </div>
-                                   ) : (
-                                      <button onClick={() => { setActiveTab("PREDICTIONS"); if(setPredictionTab) setPredictionTab(m.stage === "KNOCKOUT" ? "KNOCKOUT" : "MATCHES"); }} className="w-full text-sm font-bold text-slate-900 bg-amber-500 hover:bg-amber-400 py-3 rounded-xl text-center shadow-md transition-transform active:scale-95 animate-pulse">
-                                        הזן ניחוש למשחק זה! ⚠️
-                                      </button>
-                                   )}
+                                     
+                                     <div className="text-blue-400 text-xs font-bold mb-6 flex justify-between items-center">
+                                       <span className={`px-3 py-1 rounded-lg border ${m.isFinished ? 'bg-emerald-900/30 border-emerald-500/30 text-emerald-400' : locked ? 'bg-rose-900/30 border-rose-500/30 text-rose-400' : 'bg-slate-950 border-slate-800 text-blue-400'}`}>
+                                          {m.isFinished ? '✅ הסתיים' : locked ? '🔒 ננעל לניחושים' : `🕒 ${m.time}`}
+                                       </span>
+                                       <span className="bg-blue-900/30 px-3 py-1 rounded-lg border border-blue-500/20">{m.stage === "KNOCKOUT" ? m.roundName : `בית ${m.group}`}</span>
+                                     </div>
+                                     
+                                     <div className="flex flex-col mb-6 bg-slate-950 p-4 rounded-2xl border border-slate-800 shadow-inner">
+                                       {/* אזור הנבחרות והאחוזים */}
+                                       <div className="flex justify-between items-start text-white font-bold text-lg w-full">
+                                         <span className="flex-1 flex flex-col items-center gap-2 text-center" title={m.homeTeam}>
+                                            {getFlagUrl(m.homeTeam) ? <img src={getFlagUrl(m.homeTeam)!} className="w-8 h-5 object-cover rounded shadow-sm" alt="flag" /> : "🏳️"} 
+                                            <span className="truncate max-w-[80px] text-sm md:text-base">{m.homeTeam}</span>
+                                            {m.crowdStats && m.crowdStats.total > 0 && !m.isFinished && (
+                                               <span className="text-[11px] font-black text-blue-400 bg-blue-900/20 px-2.5 py-0.5 rounded-md border border-blue-500/30 shadow-sm mt-0.5">
+                                                  {Math.round((m.crowdStats.homeWins / m.crowdStats.total) * 100)}%
+                                               </span>
+                                            )}
+                                         </span>
+                                         
+                                         <span className="flex flex-col items-center justify-center mx-2 gap-1.5 mt-2">
+                                           {m.isFinished ? (
+                                             <div className="flex items-center gap-3 bg-slate-900 px-4 py-2 rounded-xl border border-slate-700 shadow-inner">
+                                                <span className="text-2xl font-black text-emerald-400">{m.realHomeScore}</span>
+                                                <span className="text-slate-600 font-black">-</span>
+                                                <span className="text-2xl font-black text-emerald-400">{m.realAwayScore}</span>
+                                             </div>
+                                           ) : (
+                                             <>
+                                                <span className="text-slate-600 text-sm font-black">VS</span>
+                                                {m.crowdStats && m.crowdStats.total > 0 && (
+                                                   <span className="text-[10px] font-bold text-slate-400 bg-slate-800/50 px-2 py-0.5 rounded-md border border-slate-700 shadow-sm">
+                                                      {Math.round((m.crowdStats.draws / m.crowdStats.total) * 100)}% תיקו
+                                                   </span>
+                                                )}
+                                             </>
+                                           )}
+                                         </span>
 
-                                 </div>
-                              </div>
-                            );
-                         })()}
+                                         <span className="flex-1 flex flex-col items-center gap-2 text-center" title={m.awayTeam}>
+                                            {getFlagUrl(m.awayTeam) ? <img src={getFlagUrl(m.awayTeam)!} className="w-8 h-5 object-cover rounded shadow-sm" alt="flag" /> : "🏳️"}
+                                            <span className="truncate max-w-[80px] text-sm md:text-base">{m.awayTeam}</span>
+                                            {m.crowdStats && m.crowdStats.total > 0 && !m.isFinished && (
+                                               <span className="text-[11px] font-black text-emerald-400 bg-emerald-900/20 px-2.5 py-0.5 rounded-md border border-emerald-500/30 shadow-sm mt-0.5">
+                                                  {Math.round((m.crowdStats.awayWins / m.crowdStats.total) * 100)}%
+                                               </span>
+                                            )}
+                                         </span>
+                                       </div>
+
+                                       {/* מד כוחות */}
+                                       {m.crowdStats && m.crowdStats.total > 0 && !m.isFinished && (
+                                         <div className="w-full mt-6 px-2">
+                                            <div className="flex w-full h-2.5 bg-slate-900 rounded-full overflow-hidden border border-slate-800 shadow-inner relative">
+                                               <div className="bg-blue-500 transition-all duration-1000 shadow-[0_0_10px_rgba(59,130,246,0.8)]" style={{width: `${Math.round((m.crowdStats.homeWins / m.crowdStats.total) * 100)}%`}}></div>
+                                               <div className="bg-slate-500 transition-all duration-1000 border-x border-slate-900/50" style={{width: `${Math.round((m.crowdStats.draws / m.crowdStats.total) * 100)}%`}}></div>
+                                               <div className="bg-emerald-500 transition-all duration-1000 shadow-[0_0_10px_rgba(16,185,129,0.8)]" style={{width: `${Math.round((m.crowdStats.awayWins / m.crowdStats.total) * 100)}%`}}></div>
+                                            </div>
+                                         </div>
+                                       )}
+                                     </div>
+                                     <div className="mt-auto border-t border-slate-700/50 pt-5">
+                                       {hasPrediction ? (
+                                          <div className="flex flex-col gap-3">
+                                             <div className="text-sm font-black text-emerald-400 bg-emerald-900/20 py-3 rounded-xl border border-emerald-500/30 text-center shadow-sm">
+                                               הניחוש שלך: {m.userPrediction.predictedHomeScore} - {m.userPrediction.predictedAwayScore}
+                                             </div>
+                                             {locked ? (
+                                               <button onClick={() => handleOpenSpyForMatch(m)} className="w-full text-xs font-bold text-slate-300 bg-slate-800 hover:bg-slate-700 py-3 rounded-xl border border-slate-600 text-center shadow-sm flex justify-center items-center gap-2 transition-all">
+                                                  <span className="text-base">👁️</span> הצג ניחושי חברים (ריגול)
+                                               </button>
+                                             ) : (
+                                               <button onClick={() => { setActiveTab("PREDICTIONS"); if(setPredictionTab) setPredictionTab(m.stage === "KNOCKOUT" ? "KNOCKOUT" : "MATCHES"); }} className="w-full text-xs font-bold text-blue-300 bg-blue-900/20 hover:bg-blue-900/40 py-3 rounded-xl border border-blue-500/30 text-center shadow-sm flex justify-center items-center gap-2 transition-all">
+                                                  <span className="text-base">✍️</span> עדכן את הניחוש שלך
+                                               </button>
+                                             )}
+                                          </div>
+                                       ) : (
+                                          <button onClick={() => { setActiveTab("PREDICTIONS"); if(setPredictionTab) setPredictionTab(m.stage === "KNOCKOUT" ? "KNOCKOUT" : "MATCHES"); }} className="w-full text-sm font-bold text-slate-900 bg-amber-500 hover:bg-amber-400 py-3 rounded-xl text-center shadow-md transition-transform active:scale-95 animate-pulse">
+                                            הזן ניחוש למשחק זה! ⚠️
+                                          </button>
+                                       )}
+
+                                     </div>
+                                  </div>
+                                );
+                             })()}
+                           </>
+                         ) : (
+                           <div className="w-full flex flex-col gap-3 mt-2 h-[350px] lg:h-auto overflow-y-auto custom-scrollbar pr-1">
+                             {todayMatches.map((m) => {
+                                const hasPrediction = m.userPrediction && m.userPrediction.predictedHomeScore !== "" && m.userPrediction.predictedAwayScore !== "";
+                                const locked = checkIsMatchLocked(m, tournamentState);
+
+                                // --- חישוב עיצוב הקובייה של הניחוש (צבעים לפי פגיעה) ---
+                                let predictionBoxStyle = "bg-blue-900/20 text-blue-400 border-blue-500/30 group-hover:border-blue-400 group-hover:bg-blue-900/40";
+                                if (m.isFinished && hasPrediction) {
+                                   const pH = Number(m.userPrediction.predictedHomeScore);
+                                   const pA = Number(m.userPrediction.predictedAwayScore);
+                                   const rH = Number(m.realHomeScore);
+                                   const rA = Number(m.realAwayScore);
+                                   if (pH === rH && pA === rA) {
+                                       predictionBoxStyle = "bg-emerald-900/40 text-emerald-400 border-emerald-500/50 shadow-[0_0_10px_rgba(16,185,129,0.2)]"; // בול
+                                   } else if (Math.sign(pH - pA) === Math.sign(rH - rA)) {
+                                       predictionBoxStyle = "bg-amber-900/40 text-amber-400 border-amber-500/50"; // כיוון
+                                   } else {
+                                       predictionBoxStyle = "bg-rose-900/20 text-rose-400 border-rose-500/30 opacity-80"; // נפילה
+                                   }
+                                } else if (locked && hasPrediction && !m.isFinished) {
+                                   predictionBoxStyle = "bg-slate-950 text-slate-400 border-slate-700 group-hover:bg-slate-900"; // נעול טרם התחיל
+                                }
+
+                                const onMatchClick = () => {
+                                   if (locked) {
+                                       handleOpenSpyForMatch(m);
+                                   } else {
+                                       sessionStorage.setItem("scrollToMatch", m.id);
+                                       if (m.group) sessionStorage.setItem("targetGroup", m.group);
+                                       sessionStorage.setItem("groupsViewMode", "MATCHES");
+                                       setActiveTab("PREDICTIONS"); 
+                                       if(setPredictionTab) setPredictionTab(m.stage === "KNOCKOUT" ? "KNOCKOUT" : "MATCHES");
+                                   }
+                                };
+
+                                return (
+                                  <div key={m.id} onClick={onMatchClick} className={`flex items-center justify-between p-3.5 rounded-2xl border cursor-pointer transition-all shadow-sm group hover:-translate-y-0.5 ${hasPrediction ? "bg-slate-900/90 border-slate-700/80 hover:border-blue-500/50 hover:bg-slate-800" : "bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 border-amber-500/40 hover:border-amber-400"}`}>
+                                    
+                                    {/* קבוצת בית */}
+                                    <div className="flex items-center gap-2 flex-1 justify-start">
+                                      {getFlagUrl(m.homeTeam) ? <img src={getFlagUrl(m.homeTeam)!} className="w-6 h-4 object-cover rounded-sm shadow-sm" alt="flag" /> : "🏳️"}
+                                      <span className="text-sm font-bold text-slate-200 truncate">{m.homeTeam}</span>
+                                    </div>
+                                    
+                                    {/* אמצע - תוצאה וניחוש המשולבים */}
+                                    <div className="flex flex-col items-center flex-1 shrink-0 px-2 relative z-10">
+                                      {hasPrediction ? (
+                                        <div className="flex flex-col items-center gap-1">
+                                           {m.isFinished && (
+                                              <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none mb-0.5">הניחוש שלך</span>
+                                           )}
+                                           <div className={`text-xs md:text-sm font-black px-4 py-1.5 rounded-xl border shadow-inner transition-colors ${predictionBoxStyle}`}>
+                                             {m.userPrediction.predictedHomeScore} - {m.userPrediction.predictedAwayScore}
+                                           </div>
+                                           {m.isFinished && (
+                                             <span className="text-[10px] font-bold text-emerald-400 bg-emerald-950/50 px-2 py-0.5 rounded border border-emerald-500/20 mt-0.5 whitespace-nowrap">
+                                               אמת: {m.realHomeScore}-{m.realAwayScore}
+                                             </span>
+                                           )}
+                                        </div>
+                                      ) : m.isFinished ? (
+                                         <div className="flex flex-col items-center gap-1">
+                                           <div className="text-emerald-400 font-black tracking-widest text-lg bg-emerald-900/20 px-3 py-0.5 rounded-lg border border-emerald-500/20">{m.realHomeScore} - {m.realAwayScore}</div>
+                                           <span className="text-[9px] text-slate-500 font-bold mt-1">לא הוזן ניחוש</span>
+                                         </div>
+                                      ) : locked ? (
+                                         <div className="bg-rose-950/50 text-rose-400 border border-rose-500/30 text-[10px] font-black px-3 py-1.5 rounded-lg shadow-sm whitespace-nowrap">לא הוזן ❌</div>
+                                      ) : (
+                                         <div className="bg-amber-500 text-slate-900 text-[10px] font-black px-3 py-1.5 rounded-lg shadow-sm animate-pulse whitespace-nowrap">הזן ניחוש!</div>
+                                      )}
+                                      {!m.isFinished && <span className="text-[10px] text-slate-500 mt-1.5 font-bold">{locked ? "🔒 ננעל (לחץ לריגול)" : m.time}</span>}
+                                    </div>
+
+                                    {/* קבוצת חוץ */}
+                                    <div className="flex items-center gap-2 flex-1 justify-end text-left">
+                                      <span className="text-sm font-bold text-slate-200 truncate">{m.awayTeam}</span>
+                                      {getFlagUrl(m.awayTeam) ? <img src={getFlagUrl(m.awayTeam)!} className="w-6 h-4 object-cover rounded-sm shadow-sm" alt="flag" /> : "🏳️"}
+                                    </div>
+
+                                  </div>
+                                );
+                             })}
+                           </div>
+                         )}
                       </div>
-                    )
+                      )
                   ) : (
                     todayTargets.length > 0 && (
                       <div className="w-full max-w-md mx-auto flex flex-col items-center animate-fade-in-up">
