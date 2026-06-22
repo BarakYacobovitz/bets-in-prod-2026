@@ -1958,33 +1958,44 @@ const renderedMagazineContent = useMemo(() => {
                                       </div>
                                       
                                       {/* אמצע - תוצאה וניחוש המשולבים */}
-                                      <div className="flex flex-col items-center flex-1 shrink-0 px-2 relative z-10">
-                                        {hasPrediction ? (
-                                          <div className="flex flex-col items-center gap-1">
-                                             {m.isFinished && (
-                                                <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none mb-0.5">הניחוש שלך</span>
-                                             )}
-                                             <div className={`text-xs md:text-sm font-black px-4 py-1.5 rounded-xl border shadow-inner transition-colors ${predictionBoxStyle}`}>
-                                               {m.userPrediction.predictedHomeScore} - {m.userPrediction.predictedAwayScore}
-                                             </div>
-                                             {m.isFinished && (
-                                               <span className="text-[10px] font-bold text-emerald-400 bg-emerald-950/50 px-2 py-0.5 rounded border border-emerald-500/20 mt-0.5 whitespace-nowrap">
-                                                 אמת: {m.realHomeScore}-{m.realAwayScore}
-                                               </span>
-                                             )}
-                                          </div>
-                                        ) : m.isFinished ? (
-                                           <div className="flex flex-col items-center gap-1">
-                                             <div className="text-emerald-400 font-black tracking-widest text-lg bg-emerald-900/20 px-3 py-0.5 rounded-lg border border-emerald-500/20">{m.realHomeScore} - {m.realAwayScore}</div>
-                                             <span className="text-[9px] text-slate-500 font-bold mt-1">לא הוזן ניחוש</span>
+                                    <div className="flex flex-col items-center flex-1 shrink-0 px-2 relative z-10">
+                                      {hasPrediction ? (
+                                        <div className="flex flex-col items-center gap-1">
+                                           {m.isFinished && (
+                                              <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none mb-0.5">הניחוש שלך</span>
+                                           )}
+                                           <div className={`text-xs md:text-sm font-black px-4 py-1.5 rounded-xl border shadow-inner transition-colors flex justify-center items-center gap-1.5 ${predictionBoxStyle}`} dir="ltr">
+                                             <span>{m.userPrediction.predictedHomeScore}</span>
+                                             <span className="text-slate-500">-</span>
+                                             <span>{m.userPrediction.predictedAwayScore}</span>
                                            </div>
-                                        ) : locked ? (
-                                           <div className="bg-rose-950/50 text-rose-400 border border-rose-500/30 text-[10px] font-black px-3 py-1.5 rounded-lg shadow-sm whitespace-nowrap">לא הוזן ❌</div>
-                                        ) : (
-                                           <div className="bg-amber-500 text-slate-900 text-[10px] font-black px-3 py-1.5 rounded-lg shadow-sm animate-pulse whitespace-nowrap">הזן ניחוש!</div>
-                                        )}
-                                        {!m.isFinished && <span className="text-[10px] text-slate-500 mt-1.5 font-bold">{locked ? "🔒 ננעל (לחץ לריגול)" : m.time}</span>}
-                                      </div>
+                                           {m.isFinished && (
+                                             <div className="text-[10px] font-bold text-emerald-400 bg-emerald-950/50 px-2 py-0.5 rounded border border-emerald-500/20 mt-0.5 whitespace-nowrap flex items-center justify-center gap-1.5">
+                                               <span>אמת:</span>
+                                               <span dir="ltr" className="flex items-center gap-1">
+                                                 <span>{m.realHomeScore}</span>
+                                                 <span className="text-emerald-600">-</span>
+                                                 <span>{m.realAwayScore}</span>
+                                               </span>
+                                             </div>
+                                           )}
+                                        </div>
+                                      ) : m.isFinished ? (
+                                         <div className="flex flex-col items-center gap-1">
+                                           <div className="text-emerald-400 font-black tracking-widest text-lg bg-emerald-900/20 px-3 py-0.5 rounded-lg border border-emerald-500/20 flex items-center justify-center gap-1.5" dir="ltr">
+                                             <span>{m.realHomeScore}</span>
+                                             <span className="text-emerald-600">-</span>
+                                             <span>{m.realAwayScore}</span>
+                                           </div>
+                                           <span className="text-[9px] text-slate-500 font-bold mt-1">לא הוזן ניחוש</span>
+                                         </div>
+                                      ) : locked ? (
+                                         <div className="bg-rose-950/50 text-rose-400 border border-rose-500/30 text-[10px] font-black px-3 py-1.5 rounded-lg shadow-sm whitespace-nowrap">לא הוזן ❌</div>
+                                      ) : (
+                                         <div className="bg-amber-500 text-slate-900 text-[10px] font-black px-3 py-1.5 rounded-lg shadow-sm animate-pulse whitespace-nowrap">הזן ניחוש!</div>
+                                      )}
+                                      {!m.isFinished && <span className="text-[10px] text-slate-500 mt-1.5 font-bold">{locked ? "🔒 ננעל (לחץ לריגול)" : m.time}</span>}
+                                    </div>
 
                                       {/* קבוצת חוץ */}
                                       <div className="flex items-center gap-2 flex-1 justify-end text-left">
