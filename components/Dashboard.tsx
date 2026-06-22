@@ -1705,12 +1705,12 @@ const renderedMagazineContent = useMemo(() => {
 
             <div className={`${timelineTab === "TODAY" ? "flex" : "hidden"} lg:flex flex-col w-full lg:w-1/2 h-full bg-slate-800`}>
                <div className="hidden lg:flex bg-slate-900/80 px-6 h-20 border-b border-slate-700 justify-between items-center z-10 shadow-sm shrink-0">
-                 <div className="flex items-center gap-3">
-                   <h2 className="text-xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-cyan-400 flex items-center gap-2"><span>📅</span> מה צפוי היום?</h2>
+                 <div className="flex items-center justify-between w-full lg:w-auto gap-2 sm:gap-3">
+                   <h2 className="text-lg sm:text-xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-cyan-400 flex items-center gap-1.5 sm:gap-2"><span>📅</span> צפוי היום</h2>
                    
-                   {/* כפתור ה-Toggle בין רשימה לקרוסלה */}
+                   {/* כפתור ה-Toggle בין רשימה לקרוסלה (עכשיו גלוי תמיד!) */}
                    {(activeBannerMode === "MATCHES" || activeBannerMode === "BONUS") && (
-                     <div className="hidden sm:flex bg-slate-950 rounded-lg p-0.5 border border-slate-700 shadow-inner">
+                     <div className="flex bg-slate-950 rounded-lg p-0.5 border border-slate-700 shadow-inner shrink-0">
                         <button onClick={() => setTodayViewMode("LIST")} className={`px-2 py-1 rounded text-[10px] font-bold transition-all flex items-center gap-1 ${todayViewMode === "LIST" ? "bg-slate-800 text-white shadow-sm" : "text-slate-500 hover:text-slate-300"}`}><span>📄</span> רשימה</button>
                         <button onClick={() => setTodayViewMode("CAROUSEL")} className={`px-2 py-1 rounded text-[10px] font-bold transition-all flex items-center gap-1 ${todayViewMode === "CAROUSEL" ? "bg-slate-800 text-white shadow-sm" : "text-slate-500 hover:text-slate-300"}`}><span>🖼️</span> קרוסלה</button>
                      </div>
