@@ -1843,13 +1843,13 @@ const renderedMagazineContent = useMemo(() => {
                                          </span>
                                          
                                          <span className="flex flex-col items-center justify-center mx-2 gap-1.5 mt-2">
-                                           {m.isFinished ? (
-                                             <div className="flex items-center gap-3 bg-slate-900 px-4 py-2 rounded-xl border border-slate-700 shadow-inner">
-                                                <span className="text-2xl font-black text-emerald-400">{m.realHomeScore}</span>
-                                                <span className="text-slate-600 font-black">-</span>
-                                                <span className="text-2xl font-black text-emerald-400">{m.realAwayScore}</span>
-                                             </div>
-                                           ) : (
+                                       {m.isFinished ? (
+                                         <div className="flex items-center gap-3 bg-slate-900 px-4 py-2 rounded-xl border border-slate-700 shadow-inner" dir="ltr">
+                                            <span>{m.realAwayScore}</span>
+                                            <span className="text-slate-600 font-black">-</span>
+                                            <span>{m.realHomeScore}</span>
+                                         </div>
+                                       ) : (
                                              <>
                                                 <span className="text-slate-600 text-sm font-black">VS</span>
                                                 {m.crowdStats && m.crowdStats.total > 0 && (
@@ -1886,9 +1886,14 @@ const renderedMagazineContent = useMemo(() => {
                                      <div className="mt-auto border-t border-slate-700/50 pt-5">
                                        {hasPrediction ? (
                                           <div className="flex flex-col gap-3">
-                                             <div className="text-sm font-black text-emerald-400 bg-emerald-900/20 py-3 rounded-xl border border-emerald-500/30 text-center shadow-sm">
-                                               הניחוש שלך:  {m.userPrediction.predictedAwayScore} - {m.userPrediction.predictedHomeScore}
-                                             </div>
+                                         <div className="flex items-center justify-center gap-2 text-sm font-black text-emerald-400 bg-emerald-900/20 py-3 rounded-xl border border-emerald-500/30 text-center shadow-sm">
+                                           <span>הניחוש שלך:</span>
+                                           <div dir="ltr" className="flex items-center gap-1.5">
+                                             <span>{m.userPrediction.predictedAwayScore}</span>
+                                             <span className="text-emerald-600/60">-</span>
+                                             <span>{m.userPrediction.predictedHomeScore}</span>
+                                           </div>
+                                         </div>
                                              {locked ? (
                                                <button onClick={() => handleOpenSpyForMatch(m)} className="w-full text-xs font-bold text-slate-300 bg-slate-800 hover:bg-slate-700 py-3 rounded-xl border border-slate-600 text-center shadow-sm flex justify-center items-center gap-2 transition-all">
                                                   <span className="text-base">👁️</span> הצג ניחושי חברים (ריגול)
@@ -1965,17 +1970,19 @@ const renderedMagazineContent = useMemo(() => {
                                               <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none mb-0.5">הניחוש שלך</span>
                                            )}
                                            <div className={`text-xs md:text-sm font-black px-4 py-1.5 rounded-xl border shadow-inner transition-colors flex justify-center items-center gap-1.5 ${predictionBoxStyle}`} dir="ltr">
-                                             <span>{m.userPrediction.predictedHomeScore}</span>
-                                             <span className="text-slate-500">-</span>
+                                             {/* הוחלף הסדר! חוץ בשמאל (ראשון), בית בימין (אחרון) */}
                                              <span>{m.userPrediction.predictedAwayScore}</span>
+                                             <span className="text-slate-500">-</span>
+                                             <span>{m.userPrediction.predictedHomeScore}</span>
                                            </div>
                                            {m.isFinished && (
                                              <div className="text-[10px] font-bold text-emerald-400 bg-emerald-950/50 px-2 py-0.5 rounded border border-emerald-500/20 mt-0.5 whitespace-nowrap flex items-center justify-center gap-1.5">
                                                <span>אמת:</span>
                                                <span dir="ltr" className="flex items-center gap-1">
-                                                 <span>{m.realHomeScore}</span>
-                                                 <span className="text-emerald-600">-</span>
+                                                 {/* הוחלף הסדר גם כאן */}
                                                  <span>{m.realAwayScore}</span>
+                                                 <span className="text-emerald-600">-</span>
+                                                 <span>{m.realHomeScore}</span>
                                                </span>
                                              </div>
                                            )}
@@ -1983,9 +1990,10 @@ const renderedMagazineContent = useMemo(() => {
                                       ) : m.isFinished ? (
                                          <div className="flex flex-col items-center gap-1">
                                            <div className="text-emerald-400 font-black tracking-widest text-lg bg-emerald-900/20 px-3 py-0.5 rounded-lg border border-emerald-500/20 flex items-center justify-center gap-1.5" dir="ltr">
-                                             <span>{m.realHomeScore}</span>
-                                             <span className="text-emerald-600">-</span>
+                                             {/* הוחלף הסדר גם כאן */}
                                              <span>{m.realAwayScore}</span>
+                                             <span className="text-emerald-600">-</span>
+                                             <span>{m.realHomeScore}</span>
                                            </div>
                                            <span className="text-[9px] text-slate-500 font-bold mt-1">לא הוזן ניחוש</span>
                                          </div>
