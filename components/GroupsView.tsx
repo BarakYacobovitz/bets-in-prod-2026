@@ -484,7 +484,34 @@ useEffect(() => {
   })();
   // --- סוף לוגיקת חישוב טבלת הבית ---
   const currentProgress = getGroupProgress(activeGroup);
+// --- פונקציה חדשה: חישוב ניקוד מעפילות פרטני לנבחרת בתוך הטבלה ---
+  const getTeamQualifierFeedback = (teamName: string) => {
+    const userGrp = qualifiers[activeGroup];
+    const realGrp = realQualifiers[activeGroup];
 
+    // אם אין עדיין תוצאות אמת לבית הזה - מחזירים ריק
+    if (!realGrp || (!realGrp.first && !realGrp.second)) return null;
+
+    const isUserFirst = userGrp?.first === teamName;
+    const isUserSecond = userGrp?.second === teamName;
+    const isRealFirst = realGrp?.first === teamName;
+    const isRealSecond = realGrp?.second === teamName;
+
+    // בול פגיעה (הימור מדויק על המיקום)
+    if ((isUserFirst && isRealFirst) || (isUserSecond && isRealSecond)) {
+      return { pts: 15, type: 'exact' };
+    }
+    // פגיעה חלקית (הנבחרת עלתה, אבל במקום השני/הראשון ולא כמו שהמשתמש ניחש)
+    if ((isUserFirst && isRealSecond) || (isUserSecond && isRealFirst)) {
+      return { pts: 7, type: 'partial' };
+    }
+    // הנבחרת העפילה, אבל המשתמש לא בחר בה
+    if (isRealFirst || isRealSecond) {
+      return { pts: 0, type: 'miss' };
+    }
+
+    return null; // הנבחרת לא העפילה
+  };
   return (
     <div className="w-full animate-fade-in-up pb-8">
       
@@ -561,6 +588,14 @@ useEffect(() => {
   <div className="flex flex-col">
     {groupTableData.map((team: any, index: number) => {
       const isTopTwo = index < 2; // צובע את שתי העולות
+      const qualFeedback = getTeamQualifierFeedback(team.name);
+      
+      // --- זיהוי הניחוש של המשתמש ---
+      const userFirst = qualifiers[activeGroup]?.first;
+      const userSecond = qualifiers[activeGroup]?.second;
+      const isMyFirst = userFirst === team.name;
+      const isMySecond = userSecond === team.name;
+
       return (
         <div key={team.name} className={`grid grid-cols-[20px_1fr_55px_30px] gap-2 items-center py-1.5 border-b border-slate-800/50 last:border-0 px-1 rounded-md transition-colors ${isTopTwo ? 'bg-emerald-900/10' : ''}`}>
           
@@ -568,13 +603,41 @@ useEffect(() => {
             {index + 1}
           </div>
           
-          <div className="text-right flex items-center gap-1.5">
+          <div className="text-right flex items-center gap-1.5 overflow-hidden">
             {getFlagUrl(team.name) && (
-              <img src={getFlagUrl(team.name)!} className="w-4 h-3 rounded-sm object-cover shadow-sm opacity-90" alt="flag" />
+              <img src={getFlagUrl(team.name)!} className="w-4 h-3 rounded-sm object-cover shadow-sm opacity-90 shrink-0" alt="flag" />
             )}
             <span className={`text-xs sm:text-sm font-bold truncate ${isTopTwo ? 'text-white' : 'text-slate-300'}`}>
               {team.name}
             </span>
+
+            {/* --- החיווי החדש: הניחוש של המשתמש מוצמד לנבחרת --- */}
+            {isMyFirst && (
+               <span className="mr-1 shrink-0 text-[9px] font-black bg-amber-500/10 text-amber-400 px-1.5 py-0.5 rounded border border-amber-500/30" title="ניחשת שתעלה מהמקום הראשון">
+                 🥇 1
+               </span>
+            )}
+            {isMySecond && (
+               <span className="mr-1 shrink-0 text-[9px] font-black bg-slate-300/10 text-slate-300 px-1.5 py-0.5 rounded border border-slate-400/30" title="ניחשת שתעלה מהמקום השני">
+                 🥈 2
+               </span>
+            )}
+            
+            {/* --- חיווי הניקוד הסופי (במידה וכבר הוזנו תוצאות אמת ע"י האדמין) --- */}
+            {qualFeedback && qualFeedback.pts > 0 && (
+              <span className={`mr-1 shrink-0 text-[9px] font-black px-1.5 py-0.5 rounded border ${
+                qualFeedback.type === 'exact' 
+                  ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30 shadow-[0_0_8px_rgba(16,185,129,0.2)]' 
+                  : 'bg-purple-500/20 text-purple-400 border-purple-500/30'
+              }`}>
+                +{qualFeedback.pts} נק'
+              </span>
+            )}
+            {qualFeedback && qualFeedback.type === 'miss' && (
+               <span className="mr-1 shrink-0 text-[8px] bg-slate-800 text-slate-500 px-1.5 py-0.5 rounded border border-slate-700">
+                 עלתה
+               </span>
+            )}
           </div>
           
           <div className="text-center text-[11px] font-medium text-slate-400 tracking-wider" dir="ltr">

@@ -27,7 +27,10 @@ export default function AdminStatsTab({ matches, bonusQuestions, groupsList, isC
   const chartRef = useRef<HTMLDivElement>(null);
   const [scorersData, setScorersData] = useState<any[] | null>(null);
   const [isFetchingScorers, setIsFetchingScorers] = useState(false);
-
+// סטייטים למפענח ה-AI
+  const [rawStatsText, setRawStatsText] = useState("");
+  const [parsedStatsPreview, setParsedStatsPreview] = useState<any>(null);
+  const [isParsingStats, setIsParsingStats] = useState(false);
   const formatAuditTime = (ts: any) => {
     if (!ts) return "";
     try {
@@ -71,6 +74,88 @@ export default function AdminStatsTab({ matches, bonusQuestions, groupsList, isC
       toast.error("שגיאת תקשורת. ה-API כנראה לא זמין.", { id: toastId });
     } finally {
       setIsFetchingScorers(false);
+    }
+  };
+  const handleParseRawText = async () => {
+    if (!rawStatsText.trim()) return toast.error("אין טקסט לפענוח");
+    setIsParsingStats(true);
+    const toastId = toast.loading("🤖 ה-AI מפענח את האירועים...");
+    
+    try {
+      const systemInstructions = `You are a strict data extraction parser. 
+Extract goal scorers and yellow cards from the raw text provided. 
+CRITICAL RULES:
+1. Return ONLY valid JSON. No markdown, no intro text.
+2. 'scorers' and 'yellowCards' MUST ALWAYS be arrays []. Even if there are no scorers or cards, return an empty array []. NEVER return null, undefined, or a string.
+3. Guess the "matchName" (e.g. "Japan vs Tunisia") from the context.
+4. For each event, provide "playerName", "team", and "minute" (numbers only for minute).
+Structure:
+{
+  "matchName": "Team A vs Team B",
+  "scorers": [ { "playerName": "Name", "team": "Team", "minute": "45" } ],
+  "yellowCards": []
+}`;
+
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: rawStatsText, context: { systemInstructions } })
+      });
+      
+      const data = await res.json();
+      
+      let jsonString = data.reply.trim();
+      
+      // ניקוי Markdown בטוח ללא Regex
+      if (jsonString.startsWith("```json")) {
+        jsonString = jsonString.substring(7);
+      } else if (jsonString.startsWith("```")) {
+        jsonString = jsonString.substring(3);
+      }
+      
+      if (jsonString.endsWith("```")) {
+        jsonString = jsonString.substring(0, jsonString.length - 3);
+      }
+      
+      jsonString = jsonString.trim();
+
+      const parsedData = JSON.parse(jsonString);
+      
+      setParsedStatsPreview(parsedData);
+      toast.success("הפענוח הושלם בהצלחה!", { id: toastId });
+      
+    } catch (e: any) {
+      console.error("Parsing error:", e);
+      toast.error("שגיאה: ה-AI לא הצליח לקרוא את הטקסט או שהפורמט שבור.", { id: toastId });
+    } finally {
+      setIsParsingStats(false);
+    }
+  };
+
+  const handleSaveParsedStats = async () => {
+    if (!parsedStatsPreview) return;
+    const toastId = toast.loading("שומר למסד הנתונים... 💾");
+    try {
+      // שומרים תחת קולקשן מרכזי של סטטיסטיקות הטורניר
+      await updateDoc(doc(db, "system_data", "tournament_stats"), {
+        [parsedStatsPreview.matchName]: parsedStatsPreview
+      });
+      toast.success("הנתונים נשמרו!", { id: toastId });
+      setRawStatsText("");
+      setParsedStatsPreview(null);
+    } catch (e: any) {
+      // אם המסמך לא קיים עדיין, ניצור אותו
+      if (e.code === 'not-found') {
+         const { setDoc } = await import("firebase/firestore");
+         await setDoc(doc(db, "system_data", "tournament_stats"), {
+            [parsedStatsPreview.matchName]: parsedStatsPreview
+         });
+         toast.success("הנתונים נשמרו (נוצר מסמך חדש)!", { id: toastId });
+         setRawStatsText("");
+         setParsedStatsPreview(null);
+      } else {
+         toast.error("שגיאה בשמירה", { id: toastId });
+      }
     }
   };
 
@@ -427,6 +512,84 @@ export default function AdminStatsTab({ matches, bonusQuestions, groupsList, isC
          >
            {isCalculating ? "⏳ מעבד נתונים..." : "🚀 פרסם Wrapped לכולם"}
          </button>
+       </div>
+       {/* 🤖 מפענח AI להזנת סטטיסטיקות ידנית */}
+       <div className="bg-gradient-to-r from-slate-900 to-blue-950/40 p-6 rounded-3xl border border-blue-500/30 shadow-xl flex flex-col gap-4 mt-8">
+         <div>
+           <h3 className="text-xl font-black text-blue-400 mb-2 flex items-center gap-2"><span>🧠</span> מפענח נתונים אוטומטי (AI)</h3>
+           <p className="text-slate-400 text-sm max-w-xl">
+             העתק את אזור הסטטיסטיקה של המשחק (מגוגל או מאתרי ספורט) והדבק כאן. המערכת תחלץ כובשים וכרטיסים צהובים באופן אוטומטי ותכין אותם לשמירה עבור שאלות הבונוס.
+           </p>
+         </div>
+
+         <div className="flex flex-col lg:flex-row gap-6">
+           {/* אזור ההדבקה */}
+           <div className="flex-1 flex flex-col gap-3">
+             <textarea
+               value={rawStatsText}
+               onChange={(e) => setRawStatsText(e.target.value)}
+               placeholder="הדבק כאן טקסט מבולגן..."
+               className="w-full h-40 bg-slate-950 border border-slate-700 rounded-xl p-4 text-slate-300 text-sm font-mono focus:border-blue-500 outline-none resize-none"
+             />
+             <button 
+               onClick={handleParseRawText} 
+               disabled={isParsingStats || !rawStatsText.trim()}
+               className="w-full bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-black py-3 rounded-xl shadow-md transition-transform active:scale-95 flex justify-center items-center gap-2"
+             >
+               {isParsingStats ? "מפענח..." : "חלץ נתונים עכשיו ⚡"}
+             </button>
+           </div>
+
+           {/* אזור התצוגה המקדימה (Preview) */}
+           <div className="flex-1 bg-slate-950/50 rounded-xl border border-blue-500/20 p-4 shadow-inner relative min-h-[160px]">
+             {!parsedStatsPreview ? (
+               <div className="flex h-full items-center justify-center text-slate-600 text-sm font-bold">הנתונים יופיעו כאן לאישור...</div>
+             ) : (
+               <div className="space-y-4 animate-fade-in">
+                 <div className="text-center font-black text-lg text-white bg-slate-900 py-2 rounded-lg border border-slate-700">
+                   {parsedStatsPreview.matchName}
+                 </div>
+                 
+                 <div className="grid grid-cols-2 gap-4">
+                   <div className="bg-slate-900/80 p-3 rounded-lg border border-emerald-500/20">
+                     <div className="text-emerald-400 font-bold mb-2 border-b border-slate-700 pb-1 text-sm">⚽ כובשים:</div>
+                     {Array.isArray(parsedStatsPreview.scorers) && parsedStatsPreview.scorers.length > 0 ? (
+                       parsedStatsPreview.scorers.map((s: any, i: number) => (
+                         <div key={i} className="text-xs text-slate-300 mb-1 flex justify-between">
+                           <span>{s.playerName} <span className="opacity-50">({s.team})</span></span>
+                           <span className="text-emerald-500">{s.minute}'</span>
+                         </div>
+                       ))
+                     ) : (
+                       <div className="text-xs text-slate-500 text-center py-2">אין נתוני כובשים</div>
+                     )}
+                   </div>
+                   
+                   <div className="bg-slate-900/80 p-3 rounded-lg border border-amber-500/20">
+                     <div className="text-amber-400 font-bold mb-2 border-b border-slate-700 pb-1 text-sm">🟨 צהובים:</div>
+                     {Array.isArray(parsedStatsPreview.yellowCards) && parsedStatsPreview.yellowCards.length > 0 ? (
+                       parsedStatsPreview.yellowCards.map((c: any, i: number) => (
+                         <div key={i} className="text-xs text-slate-300 mb-1 flex justify-between">
+                           <span>{c.playerName} <span className="opacity-50">({c.team})</span></span>
+                           <span className="text-amber-500">{c.minute}'</span>
+                         </div>
+                       ))
+                     ) : (
+                       <div className="text-xs text-slate-500 text-center py-2">אין נתוני כרטיסים</div>
+                     )}
+                   </div>
+                 </div>
+
+                 <button 
+                   onClick={handleSaveParsedStats}
+                   className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-black py-2.5 rounded-lg shadow-md transition-transform active:scale-95"
+                 >
+                   אישור ושמירה ל-Firebase ✔️
+                 </button>
+               </div>
+             )}
+           </div>
+         </div>
        </div>
 {/* מודול חיבור ל-API חיצוני - כובשים */}
        <div className="bg-gradient-to-r from-emerald-900/40 to-teal-900/30 p-6 rounded-3xl border border-emerald-500/30 shadow-xl flex flex-col gap-4">
