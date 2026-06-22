@@ -1137,20 +1137,12 @@ const renderedMagazineContent = useMemo(() => {
            <img src="tunnel.png" alt="Bets in Prod Tunnel" className="absolute inset-0 w-full h-full object-cover z-0 opacity-40 transition-all duration-1000 pointer-events-none" />
             <div className="absolute inset-0 z-0 bg-gradient-to-l from-slate-950/90 via-slate-900/60 to-slate-950/90 pointer-events-none"></div>
             
-            <div className="relative z-10 text-right mb-6 flex justify-between items-start gap-2">
-               <div>
-                 <h1 className="text-3xl md:text-4xl font-black text-white flex items-center justify-center md:justify-start gap-2 mb-2" dir="rtl">
-                    <span>אהלן, {safeUserName}!</span>
-                    <span className="origin-bottom-right">👋</span>
-                 </h1>
-                 <p className="text-slate-300 text-sm font-medium drop-shadow-lg">ברוך הבא לחדר ההלבשה. הנה המצב שלך כרגע:</p>
-               </div>
-               
-               {/* 👈 רמז ההחלקה למובייל (יופיע רק במסכים קטנים) */}
-               <div className="lg:hidden flex flex-col items-center justify-center bg-blue-900/20 border border-blue-500/30 px-3 py-1.5 rounded-2xl shadow-sm animate-pulse shrink-0 mt-1">
-                 <span className="text-xl leading-none mb-0.5">👈</span>
-                 <span className="text-[9px] font-black text-blue-300 uppercase tracking-widest">החלק</span>
-               </div>
+            <div className="relative z-10 text-right mb-6">
+               <h1 className="text-3xl md:text-4xl font-black text-white flex items-center justify-center md:justify-start gap-2 mb-2" dir="rtl">
+                  <span>אהלן, {safeUserName}!</span>
+                  <span className="origin-bottom-right">👋</span>
+               </h1>
+               <p className="text-slate-300 text-sm font-medium drop-shadow-lg">ברוך הבא לחדר ההלבשה. הנה המצב שלך כרגע:</p>
             </div>
             {tournamentState >= 4 && (
        <button 
@@ -1955,48 +1947,67 @@ const renderedMagazineContent = useMemo(() => {
                                 };
 
                                 return (
-                                  <div key={m.id} onClick={onMatchClick} className={`flex items-center justify-between p-3.5 rounded-2xl border cursor-pointer transition-all shadow-sm group hover:-translate-y-0.5 ${hasPrediction ? "bg-slate-900/90 border-slate-700/80 hover:border-blue-500/50 hover:bg-slate-800" : "bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 border-amber-500/40 hover:border-amber-400"}`}>
+                                  <div key={m.id} onClick={onMatchClick} className={`flex flex-col p-3 rounded-2xl border cursor-pointer transition-all shadow-sm group hover:-translate-y-0.5 ${hasPrediction ? "bg-slate-900/90 border-slate-700/80 hover:border-blue-500/50 hover:bg-slate-800" : "bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 border-amber-500/40 hover:border-amber-400"}`}>
                                     
-                                    {/* קבוצת בית */}
-                                    <div className="flex items-center gap-2 flex-1 justify-start">
-                                      {getFlagUrl(m.homeTeam) ? <img src={getFlagUrl(m.homeTeam)!} className="w-6 h-4 object-cover rounded-sm shadow-sm" alt="flag" /> : "🏳️"}
-                                      <span className="text-sm font-bold text-slate-200 truncate">{m.homeTeam}</span>
-                                    </div>
-                                    
-                                    {/* אמצע - תוצאה וניחוש המשולבים */}
-                                    <div className="flex flex-col items-center flex-1 shrink-0 px-2 relative z-10">
-                                      {hasPrediction ? (
-                                        <div className="flex flex-col items-center gap-1">
-                                           {m.isFinished && (
-                                              <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none mb-0.5">הניחוש שלך</span>
-                                           )}
-                                           <div className={`text-xs md:text-sm font-black px-4 py-1.5 rounded-xl border shadow-inner transition-colors ${predictionBoxStyle}`}>
-                                             {m.userPrediction.predictedHomeScore} - {m.userPrediction.predictedAwayScore}
+                                    {/* --- קומה עליונה: פרטי המשחק והניחוש --- */}
+                                    <div className="flex items-center justify-between w-full">
+                                      {/* קבוצת בית */}
+                                      <div className="flex items-center gap-2 flex-1 justify-start">
+                                        {getFlagUrl(m.homeTeam) ? <img src={getFlagUrl(m.homeTeam)!} className="w-6 h-4 object-cover rounded-sm shadow-sm" alt="flag" /> : "🏳️"}
+                                        <span className="text-sm font-bold text-slate-200 truncate">{m.homeTeam}</span>
+                                      </div>
+                                      
+                                      {/* אמצע - תוצאה וניחוש המשולבים */}
+                                      <div className="flex flex-col items-center flex-1 shrink-0 px-2 relative z-10">
+                                        {hasPrediction ? (
+                                          <div className="flex flex-col items-center gap-1">
+                                             {m.isFinished && (
+                                                <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none mb-0.5">הניחוש שלך</span>
+                                             )}
+                                             <div className={`text-xs md:text-sm font-black px-4 py-1.5 rounded-xl border shadow-inner transition-colors ${predictionBoxStyle}`}>
+                                               {m.userPrediction.predictedHomeScore} - {m.userPrediction.predictedAwayScore}
+                                             </div>
+                                             {m.isFinished && (
+                                               <span className="text-[10px] font-bold text-emerald-400 bg-emerald-950/50 px-2 py-0.5 rounded border border-emerald-500/20 mt-0.5 whitespace-nowrap">
+                                                 אמת: {m.realHomeScore}-{m.realAwayScore}
+                                               </span>
+                                             )}
+                                          </div>
+                                        ) : m.isFinished ? (
+                                           <div className="flex flex-col items-center gap-1">
+                                             <div className="text-emerald-400 font-black tracking-widest text-lg bg-emerald-900/20 px-3 py-0.5 rounded-lg border border-emerald-500/20">{m.realHomeScore} - {m.realAwayScore}</div>
+                                             <span className="text-[9px] text-slate-500 font-bold mt-1">לא הוזן ניחוש</span>
                                            </div>
-                                           {m.isFinished && (
-                                             <span className="text-[10px] font-bold text-emerald-400 bg-emerald-950/50 px-2 py-0.5 rounded border border-emerald-500/20 mt-0.5 whitespace-nowrap">
-                                               אמת: {m.realHomeScore}-{m.realAwayScore}
-                                             </span>
-                                           )}
-                                        </div>
-                                      ) : m.isFinished ? (
-                                         <div className="flex flex-col items-center gap-1">
-                                           <div className="text-emerald-400 font-black tracking-widest text-lg bg-emerald-900/20 px-3 py-0.5 rounded-lg border border-emerald-500/20">{m.realHomeScore} - {m.realAwayScore}</div>
-                                           <span className="text-[9px] text-slate-500 font-bold mt-1">לא הוזן ניחוש</span>
-                                         </div>
-                                      ) : locked ? (
-                                         <div className="bg-rose-950/50 text-rose-400 border border-rose-500/30 text-[10px] font-black px-3 py-1.5 rounded-lg shadow-sm whitespace-nowrap">לא הוזן ❌</div>
-                                      ) : (
-                                         <div className="bg-amber-500 text-slate-900 text-[10px] font-black px-3 py-1.5 rounded-lg shadow-sm animate-pulse whitespace-nowrap">הזן ניחוש!</div>
-                                      )}
-                                      {!m.isFinished && <span className="text-[10px] text-slate-500 mt-1.5 font-bold">{locked ? "🔒 ננעל (לחץ לריגול)" : m.time}</span>}
+                                        ) : locked ? (
+                                           <div className="bg-rose-950/50 text-rose-400 border border-rose-500/30 text-[10px] font-black px-3 py-1.5 rounded-lg shadow-sm whitespace-nowrap">לא הוזן ❌</div>
+                                        ) : (
+                                           <div className="bg-amber-500 text-slate-900 text-[10px] font-black px-3 py-1.5 rounded-lg shadow-sm animate-pulse whitespace-nowrap">הזן ניחוש!</div>
+                                        )}
+                                        {!m.isFinished && <span className="text-[10px] text-slate-500 mt-1.5 font-bold">{locked ? "🔒 ננעל (לחץ לריגול)" : m.time}</span>}
+                                      </div>
+
+                                      {/* קבוצת חוץ */}
+                                      <div className="flex items-center gap-2 flex-1 justify-end text-left">
+                                        <span className="text-sm font-bold text-slate-200 truncate">{m.awayTeam}</span>
+                                        {getFlagUrl(m.awayTeam) ? <img src={getFlagUrl(m.awayTeam)!} className="w-6 h-4 object-cover rounded-sm shadow-sm" alt="flag" /> : "🏳️"}
+                                      </div>
                                     </div>
 
-                                    {/* קבוצת חוץ */}
-                                    <div className="flex items-center gap-2 flex-1 justify-end text-left">
-                                      <span className="text-sm font-bold text-slate-200 truncate">{m.awayTeam}</span>
-                                      {getFlagUrl(m.awayTeam) ? <img src={getFlagUrl(m.awayTeam)!} className="w-6 h-4 object-cover rounded-sm shadow-sm" alt="flag" /> : "🏳️"}
-                                    </div>
+                                    {/* --- קומה תחתונה: מיני מד-כוחות (מופיע רק כשיש אחוזי קהל והמשחק טרם הסתיים) --- */}
+                                    {m.crowdStats && m.crowdStats.total > 0 && !m.isFinished && (
+                                       <div className="w-full mt-2.5 pt-2 border-t border-slate-800/80 flex flex-col gap-1.5 opacity-70 group-hover:opacity-100 transition-opacity">
+                                          <div className="flex justify-between text-[9px] font-bold px-1">
+                                             <span className="text-blue-400">{Math.round((m.crowdStats.homeWins / m.crowdStats.total) * 100)}%</span>
+                                             <span className="text-slate-500">{Math.round((m.crowdStats.draws / m.crowdStats.total) * 100)}% תיקו</span>
+                                             <span className="text-emerald-400">{Math.round((m.crowdStats.awayWins / m.crowdStats.total) * 100)}%</span>
+                                          </div>
+                                          <div className="flex w-full h-1 bg-slate-950 rounded-full overflow-hidden shadow-inner">
+                                             <div className="bg-blue-500" style={{width: `${(m.crowdStats.homeWins / m.crowdStats.total) * 100}%`}}></div>
+                                             <div className="bg-slate-500 border-x border-slate-900/50" style={{width: `${(m.crowdStats.draws / m.crowdStats.total) * 100}%`}}></div>
+                                             <div className="bg-emerald-500" style={{width: `${(m.crowdStats.awayWins / m.crowdStats.total) * 100}%`}}></div>
+                                          </div>
+                                       </div>
+                                    )}
 
                                   </div>
                                 );
