@@ -1887,7 +1887,7 @@ const renderedMagazineContent = useMemo(() => {
                                        {hasPrediction ? (
                                           <div className="flex flex-col gap-3">
                                              <div className="text-sm font-black text-emerald-400 bg-emerald-900/20 py-3 rounded-xl border border-emerald-500/30 text-center shadow-sm">
-                                               הניחוש שלך: {m.userPrediction.predictedHomeScore} - {m.userPrediction.predictedAwayScore}
+                                               הניחוש שלך:  {m.userPrediction.predictedAwayScore} - {m.userPrediction.predictedHomeScore}
                                              </div>
                                              {locked ? (
                                                <button onClick={() => handleOpenSpyForMatch(m)} className="w-full text-xs font-bold text-slate-300 bg-slate-800 hover:bg-slate-700 py-3 rounded-xl border border-slate-600 text-center shadow-sm flex justify-center items-center gap-2 transition-all">
