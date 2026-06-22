@@ -1136,7 +1136,11 @@ const renderedMagazineContent = useMemo(() => {
         <div className="w-[calc(100vw-32px)] lg:w-auto shrink-0 snap-center rounded-3xl p-6 shadow-2xl relative overflow-hidden bg-slate-900 border border-slate-700 flex flex-col min-h-full min-w-0">        
            <img src="tunnel.png" alt="Bets in Prod Tunnel" className="absolute inset-0 w-full h-full object-cover z-0 opacity-40 transition-all duration-1000 pointer-events-none" />
             <div className="absolute inset-0 z-0 bg-gradient-to-l from-slate-950/90 via-slate-900/60 to-slate-950/90 pointer-events-none"></div>
-            
+            {/* 👈 רמז ההחלקה למובייל צף! (יופיע רק במסכים קטנים ויהבהב) */}
+            <div className="lg:hidden absolute top-1/2 left-0 -translate-y-1/2 bg-slate-800/95 border border-l-0 border-blue-500/50 rounded-r-xl py-4 px-1.5 shadow-[2px_0_15px_rgba(59,130,246,0.3)] z-50 flex flex-col items-center gap-1 animate-pulse pointer-events-none">
+              <span className="text-sm leading-none -ml-1 text-cyan-400">👈</span>
+              <span className="text-[9px] font-black uppercase tracking-widest text-cyan-400" style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}>החלק שמאלה</span>
+            </div>
             <div className="relative z-10 text-right mb-6">
                <h1 className="text-3xl md:text-4xl font-black text-white flex items-center justify-center md:justify-start gap-2 mb-2" dir="rtl">
                   <span>אהלן, {safeUserName}!</span>
@@ -1956,59 +1960,56 @@ const renderedMagazineContent = useMemo(() => {
                                     
                                     {/* --- קומה עליונה: פרטי המשחק והניחוש --- */}
                                     <div className="flex items-center justify-between w-full">
-                                      {/* קבוצת בית */}
-                                      <div className="flex items-center gap-2 flex-1 justify-start">
-                                        {getFlagUrl(m.homeTeam) ? <img src={getFlagUrl(m.homeTeam)!} className="w-6 h-4 object-cover rounded-sm shadow-sm" alt="flag" /> : "🏳️"}
-                                        <span className="text-sm font-bold text-slate-200 truncate">{m.homeTeam}</span>
+                                      {/* קבוצת בית - עם w-0 שמאפשר חיתוך טקסט חכם */}
+                                      <div className="flex items-center gap-1.5 flex-1 w-0 justify-start">
+                                        {getFlagUrl(m.homeTeam) ? <img src={getFlagUrl(m.homeTeam)!} className="w-5 h-3.5 sm:w-6 sm:h-4 object-cover rounded-sm shadow-sm shrink-0" alt="flag" /> : "🏳️"}
+                                        <span className="text-xs sm:text-sm font-bold text-slate-200 truncate">{m.homeTeam}</span>
                                       </div>
                                       
-                                      {/* אמצע - תוצאה וניחוש המשולבים */}
-                                    <div className="flex flex-col items-center flex-1 shrink-0 px-2 relative z-10">
-                                      {hasPrediction ? (
-                                        <div className="flex flex-col items-center gap-1">
-                                           {m.isFinished && (
-                                              <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none mb-0.5">הניחוש שלך</span>
-                                           )}
-                                           <div className={`text-xs md:text-sm font-black px-4 py-1.5 rounded-xl border shadow-inner transition-colors flex justify-center items-center gap-1.5 ${predictionBoxStyle}`} dir="ltr">
-                                             {/* הוחלף הסדר! חוץ בשמאל (ראשון), בית בימין (אחרון) */}
-                                             <span>{m.userPrediction.predictedAwayScore}</span>
-                                             <span className="text-slate-500">-</span>
-                                             <span>{m.userPrediction.predictedHomeScore}</span>
-                                           </div>
-                                           {m.isFinished && (
-                                             <div className="text-[10px] font-bold text-emerald-400 bg-emerald-950/50 px-2 py-0.5 rounded border border-emerald-500/20 mt-0.5 whitespace-nowrap flex items-center justify-center gap-1.5">
-                                               <span>אמת:</span>
-                                               <span dir="ltr" className="flex items-center gap-1">
-                                                 {/* הוחלף הסדר גם כאן */}
-                                                 <span>{m.realAwayScore}</span>
-                                                 <span className="text-emerald-600">-</span>
-                                                 <span>{m.realHomeScore}</span>
-                                               </span>
+                                      {/* אמצע - תוצאה וניחוש - עם רוחב מינימלי קבוע כדי שלא יימעך */}
+                                      <div className="flex flex-col items-center shrink-0 min-w-[90px] sm:min-w-[110px] px-1 relative z-10">
+                                        {hasPrediction ? (
+                                          <div className="flex flex-col items-center gap-1 w-full">
+                                             {m.isFinished && (
+                                                <span className="text-[8px] sm:text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none mb-0.5">הניחוש שלך</span>
+                                             )}
+                                             <div className={`text-xs md:text-sm font-black w-full py-1.5 rounded-xl border shadow-inner transition-colors flex justify-center items-center gap-1.5 ${predictionBoxStyle}`} dir="ltr">
+                                               <span>{m.userPrediction.predictedAwayScore}</span>
+                                               <span className="text-slate-500">-</span>
+                                               <span>{m.userPrediction.predictedHomeScore}</span>
                                              </div>
-                                           )}
-                                        </div>
-                                      ) : m.isFinished ? (
-                                         <div className="flex flex-col items-center gap-1">
-                                           <div className="text-emerald-400 font-black tracking-widest text-lg bg-emerald-900/20 px-3 py-0.5 rounded-lg border border-emerald-500/20 flex items-center justify-center gap-1.5" dir="ltr">
-                                             {/* הוחלף הסדר גם כאן */}
-                                             <span>{m.realAwayScore}</span>
-                                             <span className="text-emerald-600">-</span>
-                                             <span>{m.realHomeScore}</span>
+                                             {m.isFinished && (
+                                               <div className="text-[9px] sm:text-[10px] font-bold text-emerald-400 bg-emerald-950/50 px-2 py-0.5 rounded border border-emerald-500/20 mt-0.5 flex items-center justify-center gap-1 w-full">
+                                                 <span>אמת:</span>
+                                                 <span dir="ltr" className="flex items-center gap-1">
+                                                   <span>{m.realAwayScore}</span>
+                                                   <span className="text-emerald-600">-</span>
+                                                   <span>{m.realHomeScore}</span>
+                                                 </span>
+                                               </div>
+                                             )}
+                                          </div>
+                                        ) : m.isFinished ? (
+                                           <div className="flex flex-col items-center gap-1 w-full">
+                                             <div className="text-emerald-400 font-black tracking-widest text-base sm:text-lg bg-emerald-900/20 w-full py-0.5 rounded-lg border border-emerald-500/20 flex items-center justify-center gap-1.5" dir="ltr">
+                                               <span>{m.realAwayScore}</span>
+                                               <span className="text-emerald-600">-</span>
+                                               <span>{m.realHomeScore}</span>
+                                             </div>
+                                             <span className="text-[8px] sm:text-[9px] text-slate-500 font-bold mt-1">לא הוזן</span>
                                            </div>
-                                           <span className="text-[9px] text-slate-500 font-bold mt-1">לא הוזן ניחוש</span>
-                                         </div>
-                                      ) : locked ? (
-                                         <div className="bg-rose-950/50 text-rose-400 border border-rose-500/30 text-[10px] font-black px-3 py-1.5 rounded-lg shadow-sm whitespace-nowrap">לא הוזן ❌</div>
-                                      ) : (
-                                         <div className="bg-amber-500 text-slate-900 text-[10px] font-black px-3 py-1.5 rounded-lg shadow-sm animate-pulse whitespace-nowrap">הזן ניחוש!</div>
-                                      )}
-                                      {!m.isFinished && <span className="text-[10px] text-slate-500 mt-1.5 font-bold">{locked ? "🔒 ננעל (לחץ לריגול)" : m.time}</span>}
-                                    </div>
+                                        ) : locked ? (
+                                           <div className="bg-rose-950/50 text-rose-400 border border-rose-500/30 text-[9px] sm:text-[10px] font-black w-full py-1.5 rounded-lg shadow-sm flex items-center justify-center">לא הוזן ❌</div>
+                                        ) : (
+                                           <div className="bg-amber-500 text-slate-900 text-[9px] sm:text-[10px] font-black w-full py-1.5 rounded-lg shadow-sm animate-pulse flex items-center justify-center">הזן ניחוש!</div>
+                                        )}
+                                        {!m.isFinished && <span className="text-[8px] sm:text-[10px] text-slate-500 mt-1.5 font-bold truncate max-w-full">{locked ? "🔒 ננעל" : m.time}</span>}
+                                      </div>
 
-                                      {/* קבוצת חוץ */}
-                                      <div className="flex items-center gap-2 flex-1 justify-end text-left">
-                                        <span className="text-sm font-bold text-slate-200 truncate">{m.awayTeam}</span>
-                                        {getFlagUrl(m.awayTeam) ? <img src={getFlagUrl(m.awayTeam)!} className="w-6 h-4 object-cover rounded-sm shadow-sm" alt="flag" /> : "🏳️"}
+                                      {/* קבוצת חוץ - עם w-0 */}
+                                      <div className="flex items-center gap-1.5 flex-1 w-0 justify-end text-left">
+                                        <span className="text-xs sm:text-sm font-bold text-slate-200 truncate">{m.awayTeam}</span>
+                                        {getFlagUrl(m.awayTeam) ? <img src={getFlagUrl(m.awayTeam)!} className="w-5 h-3.5 sm:w-6 sm:h-4 object-cover rounded-sm shadow-sm shrink-0" alt="flag" /> : "🏳️"}
                                       </div>
                                     </div>
 
