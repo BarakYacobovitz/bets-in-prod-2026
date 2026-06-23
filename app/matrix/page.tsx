@@ -457,23 +457,28 @@ export default function MatrixPage() {
            }
 
            const bData = bonusPredictions[u.id];
-           if (isExposed && bData && bData[q.id] !== undefined) {
+           if (isExposed) {
                const truth = realBonusFull.answers?.[q.id] || [];
                const leaders = realBonusFull.leading?.[q.id] || [];
                const tArr = Array.isArray(truth) ? truth : [truth];
                
-               const isHit = tArr.some((t:any) => String(t).trim().toLowerCase() === String(bData[q.id]).trim().toLowerCase());
-               const isMiss = realBonusFull.blacklist?.[q.id]?.some((t:any) => String(t).trim().toLowerCase() === String(bData[q.id]).trim().toLowerCase()) || (realBonusFull.locked?.[q.id] && !isHit);
+               // שליפה בטוחה של הניחוש (מונע הזיות של שדות ריקים)
+               const rawGuess = bData ? bData[q.id] : undefined;
+               const finalGuess = (rawGuess && String(rawGuess).trim() !== "") ? String(rawGuess) : "לא הוזן ניחוש";
 
-               let finalStatus = "ממתין / במשחק";
+               const isHit = tArr.some((t:any) => String(t).trim().toLowerCase() === finalGuess.trim().toLowerCase());
+               const isMiss = realBonusFull.blacklist?.[q.id]?.some((t:any) => String(t).trim().toLowerCase() === finalGuess.trim().toLowerCase()) || (realBonusFull.locked?.[q.id] && !isHit);
+
+               let finalStatus = "ממתין / פתוח";
                if (isHit) finalStatus = "✅ פגיעה נכונה!";
                else if (isMiss) finalStatus = "❌ נפילה (נפסל)";
-               else if (leaders.length > 0) finalStatus = `👑 מוביל זמני: ${leaders.join(", ")}`;
+               else if (leaders.length > 0) finalStatus = `👑 מוביל זמני: ${Array.isArray(leaders) ? leaders.join(", ") : leaders}`;
 
+               // הזרקת המשתנים בשמות המדויקים שהפרומפט מחפש!!!
                userStats.bonuses.push({
                    question: q.label || q.questionText,
-                   user_guess: (bData[q.id] && String(bData[q.id]).trim() !== "") ? String(bData[q.id]) : "לא הוזן ניחוש",
-                   reality_status: finalStatus
+                   user_guess: finalGuess, 
+                   reality_status: finalStatus 
                });
            }
         });
