@@ -459,18 +459,21 @@ export default function MatrixPage() {
            const bData = bonusPredictions[u.id];
            if (isExposed && bData && bData[q.id] !== undefined) {
                const truth = realBonusFull.answers?.[q.id] || [];
+               const leaders = realBonusFull.leading?.[q.id] || [];
                const tArr = Array.isArray(truth) ? truth : [truth];
+               
                const isHit = tArr.some((t:any) => String(t).trim().toLowerCase() === String(bData[q.id]).trim().toLowerCase());
                const isMiss = realBonusFull.blacklist?.[q.id]?.some((t:any) => String(t).trim().toLowerCase() === String(bData[q.id]).trim().toLowerCase()) || (realBonusFull.locked?.[q.id] && !isHit);
 
-               let status = "פתוח (ממתין לתוצאה)";
-               if (isHit) status = "פגיעה נכונה!";
-               if (isMiss) status = "נפילה (נפסל)";
+               let finalStatus = "ממתין / במשחק";
+               if (isHit) finalStatus = "✅ פגיעה נכונה!";
+               else if (isMiss) finalStatus = "❌ נפילה (נפסל)";
+               else if (leaders.length > 0) finalStatus = `👑 מוביל זמני: ${leaders.join(", ")}`;
 
                userStats.bonuses.push({
                    question: q.label || q.questionText,
-                   answer: String(bData[q.id]),
-                   status: status
+                   user_guess: (bData[q.id] && String(bData[q.id]).trim() !== "") ? String(bData[q.id]) : "לא הוזן ניחוש",
+                   reality_status: finalStatus
                });
            }
         });
@@ -536,9 +539,7 @@ export default function MatrixPage() {
           usersPredictions: exposedUserProfiles
       };
 
-  // 5. הוראות המערכת (System Prompt)
-    // 5. הוראות המערכת (System Prompt)
-// 5. הוראות המערכת המשודרגות של ה-VAR (עם ביצת הפתעה לרועי)
+ // 5. הוראות המערכת המשודרגות של ה-VAR (הוראות מלאות ומוגנות!)
     const systemInstructions = `You are the "VAR Commentator" (פרשן ה-VAR), an elite AI football analyst and data scientist for the World Cup 2026 prediction platform.
 Current User Name: "${actualUserName}"
 
@@ -552,9 +553,12 @@ Current User Name: "${actualUserName}"
 === 2. STRICT DATA EXTRACTION (ANTI-HALLUCINATION) ===
 - CRITICAL: You MUST fetch the EXACT "totalPoints" and "rank" from the JSON payload under usersPredictions[Requested_Name].
 - NEVER invent, guess, or default to 20 points! If the JSON says 0, write 0. If the user is missing from the JSON, write 0 for their points.
-- BONUS QUESTIONS: 
-  * Clearly state if a bonus result is final ("תשובה סופית") or just a temporary leader ("מוביל זמני").
-  * Distinguish between 'Hit' (פגיעה נכונה), 'Miss' (נפילה), and 'Pending' (ממתין).
+- CRITICAL FOR BONUSES: You MUST fetch the EXACT "user_guess" from the JSON payload under usersPredictions[Requested_Name].bonuses.
+- NEVER mix the "reality_status" (which might contain the temporary leader or real answer) with the "user_guess". 
+- If a user guessed "אמבפה" and the reality_status says "👑 מוביל זמני: מסי", the user's guess remains "אמבפה"!
+- You must display ALL requested bonus questions in the table. Do not skip any!
+-- NO SHORTCUTS: You MUST render exactly the same number of rows in the HTML tables as there are items in the JSON arrays (matches and bonuses). Do not omit, truncate, or summarize any item.
+
 
 === 3. DATA INTEGRITY & HEBREW RTL SCORE FIX (NON-NEGOTIABLE) ===
 - RTL BUG FIX: You MUST always output scores in the format "[Away Team Score] - [Home Team Score]" inside the HTML table.
@@ -583,6 +587,24 @@ Template B (Match Predictions):
         <td class="p-2 border-b border-slate-800 text-center font-mono text-blue-400 font-bold" dir="ltr">[AwayScore]-[HomeScore]</td>
         <td class="p-2 border-b border-slate-800 text-center font-mono text-emerald-400 font-bold" dir="ltr">[RealAway]-[RealHome]</td>
         <td class="p-2 border-b border-slate-800 text-center font-black text-amber-400">[Points]</td>
+     </tr>
+  </tbody>
+</table>
+
+Template C (Bonus Predictions):
+<table class="w-full text-right border-collapse my-3 bg-black/60 rounded-xl overflow-hidden text-xs shadow-inner">
+  <thead class="bg-slate-800">
+     <tr>
+        <th class="p-2 border-b border-slate-700 text-center text-slate-300">שאלה</th>
+        <th class="p-2 border-b border-slate-700 text-center text-slate-300">הניחוש של המשתמש</th>
+        <th class="p-2 border-b border-slate-700 text-center text-slate-300">סטטוס מציאות</th>
+     </tr>
+  </thead>
+  <tbody>
+     <tr>
+        <td class="p-2 border-b border-slate-800 text-center font-bold text-slate-200">[Question]</td>
+        <td class="p-2 border-b border-slate-800 text-center font-mono text-blue-400 font-bold">[user_guess]</td>
+        <td class="p-2 border-b border-slate-800 text-center font-black text-amber-400">[reality_status]</td>
      </tr>
   </tbody>
 </table>
