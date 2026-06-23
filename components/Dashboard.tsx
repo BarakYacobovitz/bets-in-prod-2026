@@ -1560,8 +1560,8 @@ const renderedMagazineContent = useMemo(() => {
            קרא את המהדורה המלאה 👈
         </button>
       </div>
-{/* אולפן המובייל - עכשיו כחלק מהעמודה */}
-      <div className="xl:hidden w-full max-w-sm mx-auto bg-slate-950/40 rounded-3xl border border-slate-700/50 shadow-inner flex flex-col items-center pt-6 pb-2 overflow-hidden shrink-0">        
+      {/* אולפן המובייל (הקומיקס) - חזר להיות בלוק עצמאי וגלוי! */}
+      <div className="xl:hidden w-full max-w-sm mx-auto bg-slate-950/40 rounded-3xl border border-slate-700/50 shadow-inner flex flex-col items-center pt-6 pb-2 overflow-hidden shrink-0 mb-4 mt-2">        
         <div className="absolute top-0 right-0 w-full h-1 bg-gradient-to-r from-rose-400 via-amber-400 to-emerald-400"></div>
         
         <div className="mb-2 relative z-30 px-4 py-1.5 bg-slate-900/80 rounded-full border border-slate-700 text-white font-black text-[10px] flex items-center gap-2 shadow-md">
@@ -1625,7 +1625,6 @@ const renderedMagazineContent = useMemo(() => {
         </div>
       </div>
 
-      </div>
       {tournamentState > 0 ? (
       <div className="bg-slate-900 rounded-3xl border border-slate-700 shadow-xl flex flex-col lg:h-[600px] overflow-hidden relative z-10">
          <div className="flex lg:hidden bg-slate-950 border-b border-slate-700 shrink-0">
