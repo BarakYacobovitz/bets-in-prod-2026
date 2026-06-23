@@ -1708,7 +1708,7 @@ const renderedMagazineContent = useMemo(() => {
                  <div className="flex items-center justify-between w-full lg:w-auto gap-2 sm:gap-3">
                    <h2 className="text-lg sm:text-xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-cyan-400 flex items-center gap-1.5 sm:gap-2"><span>📅</span> צפוי היום</h2>
                    
-                   {/* כפתור ה-Toggle בין רשימה לקרוסלה (עכשיו גלוי תמיד!) */}
+                   {/* כפתור ה-Toggle גלוי תמיד! */}
                    {(activeBannerMode === "MATCHES" || activeBannerMode === "BONUS") && (
                      <div className="flex bg-slate-950 rounded-lg p-0.5 border border-slate-700 shadow-inner shrink-0">
                         <button onClick={() => setTodayViewMode("LIST")} className={`px-2 py-1 rounded text-[10px] font-bold transition-all flex items-center gap-1 ${todayViewMode === "LIST" ? "bg-slate-800 text-white shadow-sm" : "text-slate-500 hover:text-slate-300"}`}><span>📄</span> רשימה</button>
