@@ -8,7 +8,7 @@ import toast from "react-hot-toast";
 
 
 export default function GroupsView({ matches, groups, userId, tournamentState }: any) {
-  const groupNames = Object.keys(groups).sort();
+  const groupNames = Object.keys(groups).filter(g => g && g !== "undefined" && g !== "null" && g.trim() !== "").sort();
   
   // פונקציה חכמה שבודקת אם המשתמש נשלח לבית ספציפי מהדשבורד
   // 1. פונקציית אתחול חכמה לבית - יודעת לחלץ את הבית גם מתוך מזהה משחק!
@@ -27,7 +27,7 @@ export default function GroupsView({ matches, groups, userId, tournamentState }:
         }
       }
 
-      if (targetGroup && groupNames.includes(targetGroup)) return targetGroup;
+      if (targetGroup && targetGroup !== "undefined" && targetGroup !== "null" && groupNames.includes(targetGroup)) return targetGroup;
     }
     return groupNames[0] || "A";
   };
@@ -140,7 +140,7 @@ useEffect(() => {
   // מנגנון הניווט והגלילה החכם שמגיע מהדשבורד!
   useEffect(() => {
     const targetGroup = sessionStorage.getItem("targetGroup");
-    if (targetGroup) {
+    if (targetGroup && targetGroup !== "undefined" && targetGroup !== "null" && targetGroup.trim() !== "" && groupNames.includes(targetGroup)) {
        setActiveGroup(targetGroup);
     }
     
