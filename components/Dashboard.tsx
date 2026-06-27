@@ -33,14 +33,12 @@ const AnimatedNumber = ({ value, prefix = "" }: { value: number, prefix?: string
     }
     
     let start: number | null = null;
-    const duration = 2000; // זמן האנימציה - 2 שניות (אפשר לשנות)
+    const duration = 2000;
     let animationFrameId: number;
 
     const step = (timestamp: number) => {
       if (!start) start = timestamp;
       const progress = Math.min((timestamp - start) / duration, 1);
-      
-      // נוסחת Ease-Out (מתחיל מהר, מאט בסוף)
       const easeOut = progress === 1 ? 1 : 1 - Math.pow(2, -10 * progress);
       
       setCurrent(Math.floor(easeOut * finalValue));
@@ -54,10 +52,10 @@ const AnimatedNumber = ({ value, prefix = "" }: { value: number, prefix?: string
     
     animationFrameId = window.requestAnimationFrame(step);
     
-    return () => window.cancelAnimationFrame(animationFrameId); // ניקוי זיכרון חשוב!
+    return () => window.cancelAnimationFrame(animationFrameId);
   }, [value]);
 
-  return <>{prefix}{current.toLocaleString()}</>; // הוספנו toLocaleString כדי שיהיו פסיקים באלפים!
+  return <>{prefix}{current.toLocaleString()}</>;
 };
 
 const isMatchInCurrentActivePhase = (m: any, state: number) => {
@@ -143,35 +141,31 @@ export default function Dashboard({ userId, userName, setActiveTab, setPredictio
     canadian: '"Sorry eh, הניחוש שלי מושלם..." 🍁',
     mexican: '"Ay caramba! איזה בול!" 🌮'
   });
+
   useEffect(() => {
-    // 1. האזנה בזמן אמת (עובד מיידית באנדרואיד ומחשב)
     const unsubSys = onSnapshot(doc(db, "settings", "system"), (docSnap) => {
       if (docSnap.exists()) {
         setTournamentState(Number(docSnap.data().tournamentState) || 0);
       }
     });
 
-    // פונקציית גיבוי שמושכת את הנתון בכוח, עוקפת את צינור ה-WebSocket
     const forceFetchState = async () => {
        try {
          const snap = await getDoc(doc(db, "settings", "system"));
          if (snap.exists()) {
            setTournamentState((prevState: number) => {
               const serverState = Number(snap.data().tournamentState) || 0;
-              // אם תפסנו שהמסך לא מעודכן מול השרת - אנחנו מעדכנים בכוח!
               return serverState !== prevState ? serverState : prevState;
            });
          }
        } catch (e) { console.error("Shadow fetch failed", e); }
     };
 
-    // 2. טיפול ביציאה ממצב שינה / חזרה מאפליקציה אחרת באייפון
     const handleWakeUp = () => {
       if (document.visibilityState === 'visible') forceFetchState();
     };
     document.addEventListener('visibilitychange', handleWakeUp);
 
-    // 3. גיבוי צללים: בדיקה אקטיבית כל 10 שניות (מחסל את בעיית הניתוק השקט של אפל)
     const fallbackInterval = setInterval(forceFetchState, 10000);
 
     return () => {
@@ -180,6 +174,7 @@ export default function Dashboard({ userId, userName, setActiveTab, setPredictio
       clearInterval(fallbackInterval);
     };
   }, []);
+  
   const isBannerInit = useRef(false);
 
   useEffect(() => {
@@ -299,7 +294,6 @@ export default function Dashboard({ userId, userName, setActiveTab, setPredictio
         setMyLeagues(leagues);
     });
 
-
     const unsubscribeDash = onSnapshot(doc(db, "settings", "dashboard"), (dashSnap) => {
       const data = dashSnap.data();
       if (dashSnap.exists()) {
@@ -307,7 +301,6 @@ export default function Dashboard({ userId, userName, setActiveTab, setPredictio
         if (data.dailyMediaUrl !== undefined) setDailyMediaUrl(data.dailyMediaUrl);
         if (data.dailySubtext !== undefined) setDailySubtext(data.dailySubtext);
         if (data.studioQuotes) {
-           // מנגנון הגנה: אם המשפט ריק באדמין, נשתמש בברירת המחדל
            setStudioQuotes({
              trump: data.studioQuotes.trump || '"FAKE NEWS! אני מנצח את כולם!" 🤬',
              canadian: data.studioQuotes.canadian || '"Sorry eh, הניחוש שלי מושלם..." 🍁',
@@ -315,8 +308,8 @@ export default function Dashboard({ userId, userName, setActiveTab, setPredictio
            });
         }
       }
-      
     });
+    
     const unsubscribePrizes = onSnapshot(doc(db, "settings", "prizes"), (snap) => {
       if (snap.exists()) setPrizes(snap.data());
     });
@@ -344,28 +337,19 @@ export default function Dashboard({ userId, userName, setActiveTab, setPredictio
         <span className="font-bold text-slate-800">בטוח שאתה רוצה לבטל את היריבות?</span>
         <div className="flex gap-2">
           <button onClick={() => {
-            // 1. משמידים את שאלת האישור מיד
             toast.dismiss(t.id);
-            
-            // 2. מנתקים מגע עם השהיה קלה של 100ms
             setTimeout(async () => {
               try {
                 await updateDoc(doc(db, "users", userId), { nemesisId: null });
                 setNemesisInput("");
-                
-                // 3. מציגים הצלחה וכופים השמדה כדי שלא ייתקע באייפון
                 const successId = toast.success("היריבות בוטלה. שלום חברות!");
                 setTimeout(() => toast.dismiss(successId), 2500);
-                
               } catch (e) { 
-                // כופים השמדה גם על שגיאות
                 const errId = toast.error("שגיאה בביטול יריב."); 
                 setTimeout(() => toast.dismiss(errId), 3000);
               }
-            }, 100); // 👈 הקסם של אפל
-            
+            }, 100);
           }} className="bg-rose-500 hover:bg-rose-600 text-white px-3 py-1.5 rounded-lg text-sm font-bold transition-colors">כן, בטל</button>
-          
           <button onClick={() => toast.dismiss(t.id)} className="bg-slate-200 hover:bg-slate-300 text-slate-800 px-3 py-1.5 rounded-lg text-sm font-bold transition-colors">לא, התחרטתי</button>
         </div>
       </div>
@@ -425,7 +409,6 @@ export default function Dashboard({ userId, userName, setActiveTab, setPredictio
         const userThirdData = ptSnap.exists() ? ptSnap.data().teams || [] : [];
 
         const now = new Date();
-        // מזיזים את "היום הנוכחי" 12 שעות אחורה. כך "היום" מוגדר מ-12:00 עד 11:59 ביום שלמחרת
         const shiftedNow = new Date(now.getTime() - 12 * 60 * 60 * 1000); 
         
         const targets: any[] = [];
@@ -446,11 +429,9 @@ export default function Dashboard({ userId, userName, setActiveTab, setPredictio
                  const [day, month, year] = dParts;
                  const [hour, minute] = tParts;
                  
-                 // יוצרים אובייקט תאריך למשחק, ומזיזים גם אותו 12 שעות אחורה לשם ההשוואה
                  const matchDateObj = new Date(Number(year), Number(month) - 1, Number(day), Number(hour), Number(minute));
                  const shiftedMatchDate = new Date(matchDateObj.getTime() - 12 * 60 * 60 * 1000);
 
-                 // משווים תאריכים לפי הזמן ה"מוזז"
                  if (
                     shiftedNow.getDate() === shiftedMatchDate.getDate() &&
                     shiftedNow.getMonth() === shiftedMatchDate.getMonth() &&
@@ -526,7 +507,7 @@ export default function Dashboard({ userId, userName, setActiveTab, setPredictio
           return false;
         };
 
-          bonusQuestions.forEach((q: any) => {
+        bonusQuestions.forEach((q: any) => {
            if (!isQuestionLockedLocal(q)) {
               const ans = userBonusAnswers[q.id];
               if (!ans || String(ans).trim() === "") {
@@ -589,12 +570,10 @@ export default function Dashboard({ userId, userName, setActiveTab, setPredictio
                       });
                       }
                }
-                else if (q.answerType === "MATCH") {
-                // מפרקים את התשובה (למשל: "ספרד - גרמניה") לשתי קבוצות
+               else if (q.answerType === "MATCH") {
                 const parts = ansStr.split("-").map(s => s.trim());
                 if (parts.length === 2) {
                     const [teamA, teamB] = parts;
-                    // בודקים האם המשחק הזה בדיוק מופיע ברשימת המשחקים של היום
                     const isMatchToday = tMatches.some(m => 
                       (m.homeTeam === teamA && m.awayTeam === teamB) || 
                       (m.homeTeam === teamB && m.awayTeam === teamA)
@@ -646,7 +625,7 @@ export default function Dashboard({ userId, userName, setActiveTab, setPredictio
                     id: `gm_${match.id}`, 
                     matchId: match.id, 
                     matchday: match.matchday, 
-                    group: match.group, // ◄◄ הוסף את השורה הזו כדי שהפיד יכיר את הבית של המשחק
+                    group: match.group,
                     icon: exact ? '🎯' : '✅', 
                     title: `${match.homeTeam} נגד ${match.awayTeam}`, 
                     desc: exact ? `פגיעה בול! (${pH}-${pA})` : `כיוון נכון`, 
@@ -693,15 +672,15 @@ export default function Dashboard({ userId, userName, setActiveTab, setPredictio
         if(Object.keys(realBonusAnswers).length > 0) {
             bonusQuestions.forEach((q:any) => {
                const truth = realBonusAnswers[q.id]; const uAns = userBonusAnswers[q.id];
-          if(truth && uAns) {
-               const tArr = Array.isArray(truth) ? truth : [truth];
-              const normalize = (s: any) => String(s || "").trim().replace(/\s+/g, " ").toLowerCase();
-             if(tArr.some((t:any) => normalize(t) === normalize(uAns))) {
-                 feed.push({ id: `b_${q.id}`, qId: q.id, icon: '🎁', title: q.label, desc: `שאלת בונוס (${uAns})`, points: Number(q.points)||0, ts: Infinity });
-              }
-          }
-        });
-      }
+               if(truth && uAns) {
+                   const tArr = Array.isArray(truth) ? truth : [truth];
+                   const normalize = (s: any) => String(s || "").trim().replace(/\s+/g, " ").toLowerCase();
+                   if(tArr.some((t:any) => normalize(t) === normalize(uAns))) {
+                       feed.push({ id: `b_${q.id}`, qId: q.id, icon: '🎁', title: q.label, desc: `שאלת בונוס (${uAns})`, points: Number(q.points)||0, ts: Infinity });
+                   }
+               }
+            });
+        }
 
         feed.sort((a,b) => b.ts - a.ts);
         setPointsFeed(feed);
@@ -825,14 +804,16 @@ export default function Dashboard({ userId, userName, setActiveTab, setPredictio
     if (points >= 15) return <span className="inline-flex items-center gap-1 whitespace-nowrap shrink-0 bg-emerald-900/40 text-emerald-400 border border-emerald-500/50 px-2 py-1 rounded text-[10px] font-black shadow-[0_0_10px_rgba(16,185,129,0.2)]">🎯 +{points} נק'</span>;
     return <span className="inline-flex items-center gap-1 whitespace-nowrap shrink-0 bg-blue-900/40 text-blue-400 border border-blue-500/40 px-2 py-1 rounded text-[10px] font-black shadow-sm">+{points} נק'</span>;
   };
-const renderedMagazineContent = useMemo(() => {
+
+  const renderedMagazineContent = useMemo(() => {
     return (
       <div 
-              className="w-full !p-0 !m-0 [&_*]:!m-0 [&_*]:!p-0 [&_p]:text-lg [&_h1]:text-3xl [&_h2]:text-2xl [&_h3]:text-xl"
-              dangerouslySetInnerHTML={{ __html: dailyMessage || "המהדורה מתעדכנת..." }} 
+         className="w-full !p-0 !m-0 [&_*]:!m-0 [&_*]:!p-0 [&_p]:text-lg [&_h1]:text-3xl [&_h2]:text-2xl [&_h3]:text-xl"
+         dangerouslySetInnerHTML={{ __html: dailyMessage || "המהדורה מתעדכנת..." }} 
       />
     );
   }, [dailyMessage]);
+
   if (isLoading) return <div className="flex justify-center items-center h-64"><div className="animate-spin text-5xl text-blue-500">⚽</div></div>;
 
   if (tournamentState >= 13 && showPodiumState && allUsersList.length > 0) {
@@ -967,9 +948,7 @@ const renderedMagazineContent = useMemo(() => {
   };
 
   return (
-    
     <div className="w-full space-y-8 animate-fade-in-up pb-8 relative">
-      
       <style dangerouslySetInnerHTML={{__html: `
         @keyframes eyeBlink {
           0%, 90%, 100% { transform: scaleY(1); }
@@ -983,19 +962,18 @@ const renderedMagazineContent = useMemo(() => {
           animation: eyeBlink 4s infinite;
           transform-origin: center;
         }
-          @keyframes scan {
+        @keyframes scan {
           0% { transform: translateY(0); opacity: 1; }
           100% { transform: translateY(150px); opacity: 0; }
         }
         .animate-scan {
           animation: scan 2.5s infinite linear;
         }
-          @keyframes float {
+        @keyframes float {
           0%, 100% { transform: translateY(0); }
           50% { transform: translateY(-20px); }
         }
         .animate-float { animation: float 6s ease-in-out infinite; }
-
         @keyframes rageShake {
           0% { transform: translate(1px, 1px) rotate(0deg); }
           10% { transform: translate(-1px, -2px) rotate(-1deg); }
@@ -1018,10 +996,8 @@ const renderedMagazineContent = useMemo(() => {
         .animate-carousel-3 { animation: fade3 15s infinite ease-in-out; }
       `}} />
 
-        {/* אולפן שולחני - מופיע ממסכי XL ומעלה (1280px+) */}
-        <div className="hidden xl:block fixed bottom-0 left-4 z-[60] w-[320px] pointer-events-none origin-bottom-left">
-
-         {/* המסך טלוויזיה */}
+      {/* אולפן שולחני - מופיע ממסכי XL ומעלה (1280px+) */}
+      <div className="hidden xl:block fixed bottom-0 left-4 z-[60] w-[320px] pointer-events-none origin-bottom-left">
          <div className="absolute bottom-[80%] left-1/2 -translate-x-1/2 w-[85%] bg-slate-950 border-[4px] border-slate-800 rounded-3xl shadow-[0_25px_50px_rgba(0,0,0,0.8),0_0_30px_rgba(59,130,246,0.2)] pointer-events-auto overflow-hidden flex flex-col z-0 transition-transform duration-500 hover:scale-[1.02]">
             <div className="bg-slate-900 border-b border-slate-800 px-4 py-2 flex justify-between items-center z-10 relative shadow-md">
                <div className="flex items-center gap-2">
@@ -1044,9 +1020,7 @@ const renderedMagazineContent = useMemo(() => {
             </div>
          </div>
 
-         {/* הדמויות והבועות - הוגדלו והותאמו ללחיצה וריחוף */}
          <div className="absolute bottom-[38%] left-0 w-full flex justify-center items-end gap-2 z-20 px-4 pointer-events-auto">
-          
             {/* Trump */}
             <div className="relative group cursor-pointer pb-2 z-30 shrink-0 pointer-events-auto" tabIndex={0}>
                <div className="absolute bottom-full mb-4 -right-4 opacity-0 group-hover:opacity-100 group-focus:opacity-100 group-active:opacity-100 transition-all duration-300 z-[100] pointer-events-none origin-bottom-right scale-90 group-hover:scale-100 group-focus:scale-100 w-max max-w-[220px]">
@@ -1056,7 +1030,6 @@ const renderedMagazineContent = useMemo(() => {
                   </div>
                </div>
                <div className="relative transition-all duration-300 group-hover:-translate-y-4 group-focus:-translate-y-4 group-hover:rotate-6 group-focus:rotate-6 group-hover:scale-110 group-focus:scale-110">
-                 {/* הנה ההילה האדומה שחזרה! */}
                  <div className="absolute inset-0 bg-red-600 rounded-full blur-2xl opacity-0 group-hover:opacity-80 group-focus:opacity-80 transition-opacity duration-300 scale-125 z-0"></div>
                  <img src="/donaldIcon-removebg.png" alt="Trump" className="w-24 relative z-10 object-contain transition-all duration-300 group-hover:animate-rage group-focus:animate-rage filter group-hover:drop-shadow-[0_0_20px_rgba(225,29,72,1)] group-focus:drop-shadow-[0_0_20px_rgba(225,29,72,1)]" />
                </div>
@@ -1084,7 +1057,6 @@ const renderedMagazineContent = useMemo(() => {
                <img src="/maxicanIcon-removebg.png" alt="Mexican" className="w-24 object-contain drop-shadow-xl -scale-x-100 transition-all duration-300 group-hover:-translate-y-4 group-focus:-translate-y-4 group-hover:-rotate-6 group-focus:-rotate-6 group-hover:scale-110 group-focus:scale-110 origin-bottom" />
             </div>
          </div>
-         {/* שולחן האולפן */}
          <img src="/panel-removebg.png" alt="Studio Desk" className="relative z-30 w-full object-contain drop-shadow-[0_-8px_20px_rgba(0,0,0,0.8)] pointer-events-none" />
       </div>
 
@@ -1132,15 +1104,21 @@ const renderedMagazineContent = useMemo(() => {
          </div>
       )}
 
-    <div className="flex lg:grid lg:grid-cols-2 items-stretch overflow-x-auto snap-x snap-mandatory gap-4 md:gap-8 pb-4 md:pb-0 custom-scrollbar -mx-4 px-4 md:mx-0 md:px-0 shrink-0 w-full"> 
-        <div className="w-[calc(100vw-32px)] lg:w-auto shrink-0 snap-center rounded-3xl p-6 shadow-2xl relative overflow-hidden bg-slate-900 border border-slate-700 flex flex-col min-h-full min-w-0">        
-           <img src="tunnel.png" alt="Bets in Prod Tunnel" className="absolute inset-0 w-full h-full object-cover z-0 opacity-40 transition-all duration-1000 pointer-events-none" />
+      {/* ========================================================================= */}
+      {/* 👈 קרוסלה אופקית (החלקה שמאלה) המכילה את קוביית "אהלן ברק" ואת קוביית המגזין */}
+      {/* ========================================================================= */}
+      <div className="flex lg:grid lg:grid-cols-2 items-stretch overflow-x-auto snap-x snap-mandatory gap-4 md:gap-8 pb-4 md:pb-0 custom-scrollbar -mx-4 px-4 md:mx-0 md:px-0 shrink-0 w-full"> 
+         
+         {/* 1. קוביית הפתיחה והסטטיסטיקות ("אהלן ברק") */}
+         <div className="w-[calc(100vw-32px)] lg:w-auto shrink-0 snap-center rounded-3xl p-6 shadow-2xl relative overflow-hidden bg-slate-900 border border-slate-700 flex flex-col min-h-full min-w-0">        
+            <img src="tunnel.png" alt="Bets in Prod Tunnel" className="absolute inset-0 w-full h-full object-cover z-0 opacity-40 transition-all duration-1000 pointer-events-none" />
             <div className="absolute inset-0 z-0 bg-gradient-to-l from-slate-950/90 via-slate-900/60 to-slate-950/90 pointer-events-none"></div>
-            {/* 👈 רמז ההחלקה למובייל צף! (יופיע רק במסכים קטנים ויהבהב) */}
+            
             <div className="lg:hidden absolute top-1/2 left-0 -translate-y-1/2 bg-slate-800/95 border border-l-0 border-blue-500/50 rounded-r-xl py-4 px-1.5 shadow-[2px_0_15px_rgba(59,130,246,0.3)] z-50 flex flex-col items-center gap-1 animate-pulse pointer-events-none">
               <span className="text-sm leading-none -ml-1 text-cyan-400">👈</span>
               <span className="text-[9px] font-black uppercase tracking-widest text-cyan-400" style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}>החלק שמאלה</span>
             </div>
+
             <div className="relative z-10 text-right mb-6">
                <h1 className="text-3xl md:text-4xl font-black text-white flex items-center justify-center md:justify-start gap-2 mb-2" dir="rtl">
                   <span>אהלן, {safeUserName}!</span>
@@ -1148,39 +1126,31 @@ const renderedMagazineContent = useMemo(() => {
                </h1>
                <p className="text-slate-300 text-sm font-medium drop-shadow-lg">ברוך הבא לחדר ההלבשה. הנה המצב שלך כרגע:</p>
             </div>
-            {tournamentState >= 4 && (
-       <button 
-    onClick={() => setShowWrappedModal(true)}
-    className="relative z-10 w-full mb-6 bg-gradient-to-r from-purple-600 via-pink-600 to-rose-600 p-1 rounded-2xl group cursor-pointer hover:scale-[1.02] transition-transform shadow-lg"
-  >
-    <div className="bg-slate-950/80 backdrop-blur-sm rounded-xl px-4 py-3 flex items-center justify-between">
-      <div className="flex items-center gap-3">
-        <span className="text-3xl animate-bounce">🎬</span>
-        <div className="text-right">
-          <div className="font-black text-white">הסיכום האישי שלך זמין!</div>
-          <div className="text-xs text-pink-300 font-bold">איך היית בשלב הבתים? כנס לגלות 👉</div>
-        </div>
-      </div>
-    </div>
-  </button>
-)}
 
-{tournamentState === 0 ? (
-               /* --- מצ  ב 0: כרטיס טיסה VIP ממוקד --- */
+            {tournamentState >= 4 && (
+               <button 
+                 onClick={() => setShowWrappedModal(true)}
+                 className="relative z-10 w-full mb-6 bg-gradient-to-r from-purple-600 via-pink-600 to-rose-600 p-1 rounded-2xl group cursor-pointer hover:scale-[1.02] transition-transform shadow-lg"
+               >
+                 <div className="bg-slate-950/80 backdrop-blur-sm rounded-xl px-4 py-3 flex items-center justify-between">
+                   <div className="flex items-center gap-3">
+                     <span className="text-3xl animate-bounce">🎬</span>
+                     <div className="text-right">
+                       <div className="font-black text-white">הסיכום האישי שלך זמין!</div>
+                       <div className="text-xs text-pink-300 font-bold">איך היית בשלב הבתים? כנס לגלות 👉</div>
+                     </div>
+                   </div>
+                 </div>
+               </button>
+            )}
+
+            {tournamentState === 0 ? (
                <div id="betting-pass-ticket" className="relative z-10 w-full mb-8 group">
                   <div className={`bg-gradient-to-br ${userStats.hasPaid ? 'from-emerald-900/40 via-slate-900 to-emerald-900/20 border-emerald-500/40' : 'from-slate-900 via-blue-950 to-slate-900 border-blue-500/30'} rounded-3xl border shadow-2xl overflow-hidden relative transition-all duration-500`}>
-                     
-                     {/* אפקט גזירה/כרטיס משומש במידה ושילם */}
-                     {userStats.hasPaid && (
-                        <div className="absolute -top-10 -right-10 w-40 h-40 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none"></div>
-                     )}
-
-                     {/* פס עליון */}
+                     {userStats.hasPaid && <div className="absolute -top-10 -right-10 w-40 h-40 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none"></div>}
                      <div className={`absolute top-0 left-0 w-full h-2 ${userStats.hasPaid ? 'bg-emerald-500' : 'bg-blue-500'}`}></div>
                      
                      <div className="p-8 md:p-10 relative">
-                        
-                        {/* חותמת שולם (מוצגת רק אם hasPaid === true) */}
                         {userStats.hasPaid && (
                            <div className="absolute top-12 left-8 md:left-12 transform -rotate-12 z-20 pointer-events-none animate-fade-in">
                               <div className="border-4 border-emerald-500/60 text-emerald-500/60 font-black text-2xl md:text-4xl px-4 py-2 rounded-xl uppercase tracking-tighter shadow-lg">
@@ -1190,99 +1160,69 @@ const renderedMagazineContent = useMemo(() => {
                         )}
 
                         <div className="flex justify-between items-center mb-6 md:mb-10 border-b border-slate-700/50 pb-6 md:pb-8 border-dashed gap-3 md:gap-4">
-   <div className="text-right flex-1">
-      <h2 className="text-3xl sm:text-4xl md:text-6xl font-black text-white tracking-tighter mb-1 md:mb-2 leading-none uppercase">
-         Betting Pass
-      </h2>
-      <div className="flex flex-wrap items-center gap-1.5 md:gap-3 text-blue-400 font-bold text-sm md:text-xl mt-1">
-         <span className="line-through opacity-50 decoration-rose-500 decoration-2">EXCEL</span>
-         <span className="text-xs md:text-base">✈️</span>
-         <span className="text-emerald-400 animate-pulse uppercase">World Cup 2026</span>
-      </div>
-   </div>
-   <div className="shrink-0">
-      <img 
-        src="/worldcup26.png" 
-        alt="World Cup 2026 Logo" 
-        className="w-16 sm:w-20 md:w-28 object-contain opacity-90 drop-shadow-[0_0_15px_rgba(255,255,255,0.15)]" 
-      />
-   </div>
-</div>
+                           <div className="text-right flex-1">
+                              <h2 className="text-3xl sm:text-4xl md:text-6xl font-black text-white tracking-tighter mb-1 md:mb-2 leading-none uppercase">
+                                 Betting Pass
+                              </h2>
+                              <div className="flex flex-wrap items-center gap-1.5 md:gap-3 text-blue-400 font-bold text-sm md:text-xl mt-1">
+                                 <span className="line-through opacity-50 decoration-rose-500 decoration-2">EXCEL</span>
+                                 <span className="text-xs md:text-base">✈️</span>
+                                 <span className="text-emerald-400 animate-pulse uppercase">World Cup 2026</span>
+                              </div>
+                           </div>
+                           <div className="shrink-0">
+                              <img src="/worldcup26.png" alt="World Cup 2026 Logo" className="w-16 sm:w-20 md:w-28 object-contain opacity-90 drop-shadow-[0_0_15px_rgba(255,255,255,0.15)]" />
+                           </div>
+                        </div>
                         
-                        {/* שינוי ל-grid-cols-2 קבוע וצמצום ה-gap במובייל לסימטריה מקסימלית */}
-<div className="grid grid-cols-2 gap-4 md:gap-8 mb-8 md:mb-10">
-   <div className="flex flex-col justify-center">
-      <div className="text-[10px] md:text-xs text-slate-500 uppercase font-black tracking-widest mb-1 md:mb-2">Passenger Name</div>
-      <div className="text-xl sm:text-2xl md:text-3xl font-black text-white leading-tight truncate">{safeUserName}</div>
-   </div>
-   <div className="flex flex-col justify-center md:items-end">
-      <div className="text-[10px] md:text-xs text-slate-500 uppercase font-black tracking-widest mb-1 md:mb-2 md:text-left w-full">Registration Status</div>
-      {userStats.hasPaid ? (
-         <div className="text-lg sm:text-xl md:text-2xl font-black text-emerald-400 flex md:justify-end items-center gap-2 leading-tight">
-            מאושר לטיסה ✅
-         </div>
-      ) : (
-         <div className="flex flex-col md:items-end gap-2">
-            <div className="text-lg sm:text-xl md:text-2xl font-black text-rose-500 leading-tight">ממתין להסדר ⚠️</div>
-            <div className="flex gap-2 w-full md:w-auto">
-               <a 
-                 href={`https://wa.me/972525583098?text=${encodeURIComponent('היי ברק, אני רוצה להסדיר תשלום עבור Bets in PROD ולהבטיח את מקומי בטיסה! ✈️')}`}
-                 target="_blank" rel="noopener noreferrer"
-                 className="bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] md:text-xs font-black px-3 py-2 rounded-xl transition-all flex items-center justify-center gap-1 shadow-lg active:scale-95 flex-1"
-               >
-                 💬 וואטסאפ - להוסיף שם ואימייל
-               </a>
-               <a 
-                 href="https://links.payboxapp.com/gJBV4D6wl3b" 
-                 target="_blank" rel="noopener noreferrer"
-                 className="bg-blue-600 hover:bg-blue-500 text-white text-[10px] md:text-xs font-black px-3 py-2 rounded-xl transition-all flex items-center justify-center gap-1 shadow-lg active:scale-95 flex-1"
-               >
-                 💰 PayBox
-               </a>
-            </div>
-         </div>
-      )}
-   </div>
-</div>
+                        <div className="grid grid-cols-2 gap-4 md:gap-8 mb-8 md:mb-10">
+                           <div className="flex flex-col justify-center">
+                              <div className="text-[10px] md:text-xs text-slate-500 uppercase font-black tracking-widest mb-1 md:mb-2">Passenger Name</div>
+                              <div className="text-xl sm:text-2xl md:text-3xl font-black text-white leading-tight truncate">{safeUserName}</div>
+                           </div>
+                           <div className="flex flex-col justify-center md:items-end">
+                              <div className="text-[10px] md:text-xs text-slate-500 uppercase font-black tracking-widest mb-1 md:mb-2 md:text-left w-full">Registration Status</div>
+                              {userStats.hasPaid ? (
+                                 <div className="text-lg sm:text-xl md:text-2xl font-black text-emerald-400 flex md:justify-end items-center gap-2 leading-tight">
+                                    מאושר לטיסה ✅
+                                 </div>
+                              ) : (
+                                 <div className="flex flex-col md:items-end gap-2">
+                                    <div className="text-lg sm:text-xl md:text-2xl font-black text-rose-500 leading-tight">ממתין להסדר ⚠️</div>
+                                    <div className="flex gap-2 w-full md:w-auto">
+                                       <a href={`https://wa.me/972525583098?text=${encodeURIComponent('היי ברק, אני רוצה להסדיר תשלום עבור Bets in PROD ולהבטיח את מקומי בטיסה! ✈️')}`} target="_blank" rel="noopener noreferrer" className="bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] md:text-xs font-black px-3 py-2 rounded-xl transition-all flex items-center justify-center gap-1 shadow-lg active:scale-95 flex-1">💬 וואטסאפ</a>
+                                       <a href="https://links.payboxapp.com/gJBV4D6wl3b" target="_blank" rel="noopener noreferrer" className="bg-blue-600 hover:bg-blue-500 text-white text-[10px] md:text-xs font-black px-3 py-2 rounded-xl transition-all flex items-center justify-center gap-1 shadow-lg active:scale-95 flex-1">💰 PayBox</a>
+                                    </div>
+                                 </div>
+                              )}
+                           </div>
+                        </div>
 
-                        {/* שורת המשימה התחתונה */}
                         <div className="bg-slate-950/80 rounded-2xl p-6 border border-slate-800 text-center relative overflow-hidden group-hover:border-blue-500/50 transition-colors">
-                           <div className="absolute inset-0 bg-blue-500/5 opacity-0 group-hover:opacity-100 transition-opacity"></div>
                            <p className="text-lg md:text-xl text-slate-200 font-bold relative z-10 leading-relaxed">
                               כל שנותר זה להגיע ל-<span className="text-blue-400 font-black text-2xl">100%</span> במד למעלה <br className="hidden md:block" /> באמצעות מילוי הניחושים. המראה בקרוב!
                            </p>
                         </div>
 
-                        {/* ברקוד מעוצב רחב */}
                         <div className="mt-10 flex justify-center items-center gap-1.5 opacity-30 grayscale">
                            {[...Array(30)].map((_, i) => (
                               <div key={i} className={`bg-white h-12 ${i % 4 === 0 ? 'w-2' : i % 7 === 0 ? 'w-3' : 'w-0.5'}`}></div>
                            ))}
                         </div>
                      </div>
-
-                     {/* אפקט "חור" בכרטיס (Ticket Punch) אם שולם */}
-                     {userStats.hasPaid && (
-                        <div className="absolute top-1/2 -right-6 w-12 h-12 bg-slate-950 rounded-full border border-emerald-500/30 z-30"></div>
-                     )}
+                     {userStats.hasPaid && <div className="absolute top-1/2 -right-6 w-12 h-12 bg-slate-950 rounded-full border border-emerald-500/30 z-30"></div>}
                   </div>
                </div>
             ) : (
-               /* --- מצב 1 ומעלה: קוביות הדירוג המקוריות (העיצוב שאהבת) --- */
                <>
                   <div className={`grid gap-3 relative z-10 w-full mb-6 ${tournamentState >= 4 ? 'grid-cols-2' : 'grid-cols-1'}`}>
-                    <div 
-                        onClick={() => {
-                           sessionStorage.setItem("targetBoard", "GENERAL");
-                           setActiveTab("LEADERBOARD");
-                        }}
+                     <div 
+                        onClick={() => { sessionStorage.setItem("targetBoard", "GENERAL"); setActiveTab("LEADERBOARD"); }}
                         className="bg-gradient-to-br from-amber-500/20 to-amber-900/40 backdrop-blur-md p-3 rounded-2xl border border-amber-500/50 text-center shadow-[0_0_20px_rgba(245,158,11,0.15)] cursor-pointer hover:border-amber-400 hover:scale-[1.02] transition-all group relative flex flex-col justify-between"
                      >
                         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-24 h-24 bg-amber-400/20 rounded-full blur-2xl pointer-events-none z-0"></div>
-
                         {ptsDiff > 0 && <div className="absolute -top-3 left-1/2 -translate-x-1/2 text-[10px] font-black text-white bg-gradient-to-r from-blue-600 to-blue-400 px-2 py-0.5 rounded-lg border border-blue-300 shadow-lg transform rotate-3 animate-pulse whitespace-nowrap z-20">+{ptsDiff} היום!</div>}
-                        
-                        <div className="text-amber-200/70 text-[10px] font-black uppercase mb-3 relative z-10 transition-colors">דירוג כללי</div>
+                        <div className="text-amber-200/70 text-[10px] font-black uppercase mb-3 relative z-10">דירוג כללי</div>
                         
                         <div className="flex justify-around items-center mb-3 px-4 relative z-10">
                            <div className="flex flex-col items-center">
@@ -1305,14 +1245,10 @@ const renderedMagazineContent = useMemo(() => {
                      
                      {tournamentState >= 4 && (
                         <div 
-                           onClick={() => {
-                              sessionStorage.setItem("targetBoard", "KNOCKOUT");
-                              setActiveTab("LEADERBOARD");
-                           }}
+                           onClick={() => { sessionStorage.setItem("targetBoard", "KNOCKOUT"); setActiveTab("LEADERBOARD"); }}
                            className="bg-emerald-900/20 backdrop-blur-md p-3 rounded-2xl border border-emerald-500/30 text-center shadow-xl cursor-pointer hover:bg-emerald-900/40 hover:border-emerald-400 hover:scale-[1.02] transition-all group relative flex flex-col justify-between"
                         >
-                           <div className="text-emerald-500 text-[10px] font-black uppercase mb-3 group-hover:text-emerald-300 transition-colors">דירוג נוקאאוט</div>
-                           
+                           <div className="text-emerald-500 text-[10px] font-black uppercase mb-3 group-hover:text-emerald-300">דירוג נוקאאוט</div>
                            <div className="flex justify-around items-center mb-3 px-4">
                               <div className="flex flex-col items-center">
                                  <span className="text-2xl md:text-3xl font-black text-emerald-400 drop-shadow-[0_0_15px_rgba(16,185,129,0.8)] leading-none">{userStats.koPoints}</span>
@@ -1324,7 +1260,6 @@ const renderedMagazineContent = useMemo(() => {
                                  <span className="text-[9px] text-emerald-400/70 font-bold mt-1.5">מיקום</span>
                               </div>
                            </div>
-
                            <div className="mt-auto flex justify-center items-center min-h-[22px]">
                               {koRankDiff > 0 && <span className="text-[9px] font-bold text-emerald-400 bg-emerald-950/80 px-2 py-0.5 rounded border border-emerald-500/30">▲ עלית {koRankDiff}</span>}
                               {koRankDiff < 0 && <span className="text-[9px] font-bold text-rose-400 bg-rose-950/80 px-2 py-0.5 rounded border border-rose-500/30">▼ ירדת {Math.abs(koRankDiff)}</span>}
@@ -1336,14 +1271,11 @@ const renderedMagazineContent = useMemo(() => {
 
                   <div className={`grid gap-3 relative z-10 w-full mb-8 ${tournamentState >= 4 ? 'grid-cols-2' : 'grid-cols-1'}`}>
                      <div 
-                        onClick={() => {
-                           sessionStorage.setItem("targetBoard", "GENERAL");
-                           setActiveTab("LEADERBOARD");
-                        }}
+                        onClick={() => { sessionStorage.setItem("targetBoard", "GENERAL"); setActiveTab("LEADERBOARD"); }}
                         className="bg-gradient-to-br from-amber-500/20 to-amber-900/40 p-4 rounded-2xl border border-amber-500/50 shadow-[0_0_20px_rgba(245,158,11,0.15)] relative overflow-hidden flex flex-col items-center justify-center text-center gap-1 cursor-pointer hover:scale-[1.02] hover:border-amber-400 transition-all"
                      >
                         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-24 h-24 bg-amber-400/20 rounded-full blur-2xl pointer-events-none"></div>
-                        <div className="text-3xl md:text-4xl drop-shadow-[0_0_15px_rgba(251,191,36,0.8)] relative z-10 mb-1 animate-pulse">⚽</div>
+                        <div className="text-3xl md:text-4xl drop-shadow-[0_0_15px_rgba(251,191,36,0.8)] relative z-10 mb-1">⚽</div>
                         <span className="text-[10px] text-amber-200/70 font-black uppercase tracking-widest relative z-10 leading-tight">כדור הזהב <br/>(מקום 1)</span>
                         <span className="text-base md:text-lg font-black text-amber-400 relative z-10 w-full px-2 mt-1 leading-none">
                            <span className="block truncate">{currentLeader}</span>
@@ -1353,14 +1285,11 @@ const renderedMagazineContent = useMemo(() => {
 
                      {tournamentState >= 4 && (
                        <div 
-                          onClick={() => {
-                             sessionStorage.setItem("targetBoard", "KNOCKOUT");
-                             setActiveTab("LEADERBOARD");
-                          }}
+                          onClick={() => { sessionStorage.setItem("targetBoard", "KNOCKOUT"); setActiveTab("LEADERBOARD"); }}
                           className="bg-gradient-to-br from-emerald-500/20 to-emerald-900/40 p-4 rounded-2xl border border-emerald-500/50 shadow-[0_0_20px_rgba(16,185,129,0.15)] relative overflow-hidden flex flex-col items-center justify-center text-center gap-1 cursor-pointer hover:scale-[1.02] hover:border-emerald-400 transition-all"
                        >
                           <div className="absolute top-0 left-1/2 -translate-x-1/2 w-24 h-24 bg-emerald-400/20 rounded-full blur-2xl pointer-events-none"></div>
-                          <div className="text-3xl md:text-4xl drop-shadow-[0_0_15px_rgba(16,185,129,0.8)] relative z-10 mb-1 animate-pulse">👟</div>
+                          <div className="text-3xl md:text-4xl drop-shadow-[0_0_15px_rgba(16,185,129,0.8)] relative z-10 mb-1">👟</div>
                           <span className="text-[10px] text-emerald-200/70 font-black uppercase tracking-widest relative z-10 leading-tight">נעל הזהב <br/>(נוקאאוט)</span>
                           <span className="text-base md:text-lg font-black text-emerald-400 relative z-10 w-full px-2 mt-1 leading-none">
                              <span className="block truncate">{currentKoLeader}</span>
@@ -1371,49 +1300,43 @@ const renderedMagazineContent = useMemo(() => {
                   </div>
                </>
             )}
-            {/* מפריד אזור מודיעין */}
-            {tournamentState > 0 && (
-               <div className="relative z-10 w-full flex items-center gap-3 mt-4 mb-6 opacity-90">
-                  <div className="flex-1 h-px bg-gradient-to-r from-transparent to-slate-600"></div>
-                  <span className="text-xs md:text-sm font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                     <span>👁️</span> כלים ומודיעין
-                  </span>
-                  <div className="flex-1 h-px bg-gradient-to-l from-transparent to-slate-600"></div>
-               </div>
-            )}
+
+            <div className="relative z-10 w-full flex items-center gap-3 mt-4 mb-6 opacity-90">
+               <div className="flex-1 h-px bg-gradient-to-r from-transparent to-slate-600"></div>
+               <span className="text-xs md:text-sm font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                  <span>👁️</span> כלים ומודיעין
+               </span>
+               <div className="flex-1 h-px bg-gradient-to-l from-transparent to-slate-600"></div>
+            </div>
           
-           
-            {/* כפתור גילוי נאות - ממלא את החור בצורה חכמה ומוסיף ערך */}
-            {tournamentState > 0 && (
-               <div className="relative z-10 w-full mb-6 flex-1 flex flex-col justify-center min-h-[80px]">
-                  <Link href="/matrix" className="bg-gradient-to-r from-blue-900/20 to-slate-900/80 border border-blue-500/30 hover:border-blue-400 p-4 rounded-2xl flex items-center justify-between group transition-all shadow-lg active:scale-95 backdrop-blur-sm relative overflow-hidden">
-                     {/* אפקט רקע עדין */}
-                     <div className="absolute top-0 right-0 w-1.5 h-full bg-blue-500"></div>
-                     <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0IiBoZWlnaHQ9IjQiPgo8cmVjdCB3aWR0aD0iNCIgaGVpZ2h0PSI0IiBmaWxsPSIjZmZmIiBmaWxsLW9wYWNpdHk9IjAuMSIvPgo8L3N2Zz4=')] opacity-10"></div>
-                     
-                     <div className="flex items-center gap-4 relative z-10">
-                        <div className="w-12 h-12 bg-slate-950 rounded-xl flex items-center justify-center border border-slate-700 shadow-inner group-hover:scale-110 transition-transform shrink-0">
-                           <span className="text-2xl drop-shadow-md animate-pulse">👁️</span>
-                        </div>
-                        <div className="text-right">
-                           <div className="font-black text-white text-sm md:text-base">טבלת הגילוי הנאות</div>
-                           <div className="text-[10px] md:text-xs text-blue-300 font-medium mt-0.5">מי ניחש מה? כנס לראות הכל</div>
-                        </div>
+            <div className="relative z-10 w-full mb-6 flex-1 flex flex-col justify-center min-h-[80px]">
+               <Link href="/matrix" className="bg-gradient-to-r from-blue-900/20 to-slate-900/80 border border-blue-500/30 hover:border-blue-400 p-4 rounded-2xl flex items-center justify-between group transition-all shadow-lg active:scale-95 backdrop-blur-sm relative overflow-hidden">
+                  <div className="absolute top-0 right-0 w-1.5 h-full bg-blue-500"></div>
+                  <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0IiBoZWlnaHQ9IjQiPgo8cmVjdCB3aWR0aD0iNCIgaGVpZ2h0PSI0IiBmaWxsPSIjZmZmIiBmaWxsLW9wYWNpdHk9IjAuMSIvPgo8L3N2Zz4=')] opacity-10"></div>
+                  
+                  <div className="flex items-center gap-4 relative z-10">
+                     <div className="w-12 h-12 bg-slate-950 rounded-xl flex items-center justify-center border border-slate-700 shadow-inner group-hover:scale-110 transition-transform shrink-0">
+                        <span className="text-2xl drop-shadow-md animate-pulse">👁️</span>
                      </div>
-                     <div className="w-8 h-8 rounded-full bg-blue-600/20 flex items-center justify-center text-blue-400 group-hover:bg-blue-600 group-hover:text-white transition-colors shrink-0 relative z-10">
-                        <span className="text-sm transform rotate-180">➜</span>
+                     <div className="text-right">
+                        <div className="font-black text-white text-sm md:text-base">טבלת הגילוי הנאות</div>
+                        <div className="text-[10px] md:text-xs text-blue-300 font-medium mt-0.5">מי ניחש מה? כנס לראות הכל</div>
                      </div>
-                  </Link>
-               </div>
-            )}
-            {/* מפריד אזור חברתי */}
-               <div className="w-full flex items-center gap-3 mb-6 opacity-90 mt-2">
-                  <div className="flex-1 h-px bg-gradient-to-r from-transparent to-slate-600"></div>
-                  <span className="text-xs md:text-sm font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                     <span>🏟️</span> הזירה החברתית
-                  </span>
-                  <div className="flex-1 h-px bg-gradient-to-l from-transparent to-slate-600"></div>
-               </div>
+                  </div>
+                  <div className="w-8 h-8 rounded-full bg-blue-600/20 flex items-center justify-center text-blue-400 group-hover:bg-blue-600 group-hover:text-white transition-colors shrink-0 relative z-10">
+                     <span className="text-sm transform rotate-180">➜</span>
+                  </div>
+               </Link>
+            </div>
+
+            <div className="w-full flex items-center gap-3 mb-6 opacity-90 mt-2">
+               <div className="flex-1 h-px bg-gradient-to-r from-transparent to-slate-600"></div>
+               <span className="text-xs md:text-sm font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                  <span>🏟️</span> הזירה החברתית
+               </span>
+               <div className="flex-1 h-px bg-gradient-to-l from-transparent to-slate-600"></div>
+            </div>
+
             <div className="relative z-10 w-full mb-6">
                <div className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-2.5 px-1 flex items-center gap-1.5">
                   <span>🏟️</span> הליגות שלי
@@ -1421,11 +1344,7 @@ const renderedMagazineContent = useMemo(() => {
                <div className="flex gap-2.5 overflow-x-auto custom-scrollbar pb-2 snap-x snap-mandatory">
                  {userLeaguesData.length === 0 ? (
                     <div 
-                       onClick={() => {
-                          sessionStorage.setItem("targetBoard", "LEAGUES");
-                          sessionStorage.removeItem("targetLeagueId");
-                          setActiveTab("LEADERBOARD");
-                       }} 
+                       onClick={() => { sessionStorage.setItem("targetBoard", "LEAGUES"); sessionStorage.removeItem("targetLeagueId"); setActiveTab("LEADERBOARD"); }} 
                        className="min-w-[140px] flex-1 bg-indigo-500/10 p-3 rounded-xl border border-indigo-500/30 backdrop-blur-sm text-center shrink-0 snap-center flex flex-col justify-center cursor-pointer hover:bg-indigo-500/20 transition-all border-dashed group"
                     >
                        <div className="text-xl mb-1 group-hover:scale-110 transition-transform">➕</div>
@@ -1436,11 +1355,7 @@ const renderedMagazineContent = useMemo(() => {
                      {userLeaguesData.map(league => (
                         <div 
                            key={league.id} 
-                           onClick={() => {
-                             sessionStorage.setItem("targetBoard", "LEAGUES");
-                             sessionStorage.setItem("targetLeagueId", league.id);
-                             setActiveTab("LEADERBOARD");
-                           }}
+                           onClick={() => { sessionStorage.setItem("targetBoard", "LEAGUES"); sessionStorage.setItem("targetLeagueId", league.id); setActiveTab("LEADERBOARD"); }}
                            className="min-w-[120px] flex-1 bg-slate-800/60 p-2.5 rounded-xl border border-slate-700/80 backdrop-blur-sm text-center shrink-0 snap-center flex flex-col justify-center transition-all hover:bg-slate-700 hover:border-blue-500/50 cursor-pointer shadow-sm group"
                         >
                            <div className="text-[11px] text-slate-300 font-black mb-1.5 truncate px-1 group-hover:text-white transition-colors" title={league.name}>{league.name}</div>
@@ -1448,11 +1363,7 @@ const renderedMagazineContent = useMemo(() => {
                         </div>
                      ))}
                      <div 
-                        onClick={() => {
-                           sessionStorage.setItem("targetBoard", "LEAGUES");
-                           sessionStorage.removeItem("targetLeagueId");
-                           setActiveTab("LEADERBOARD");
-                        }} 
+                        onClick={() => { sessionStorage.setItem("targetBoard", "LEAGUES"); sessionStorage.removeItem("targetLeagueId"); setActiveTab("LEADERBOARD"); }} 
                         className="min-w-[70px] bg-slate-800/30 p-2 rounded-xl border border-slate-700 backdrop-blur-sm text-center shrink-0 snap-center flex flex-col justify-center cursor-pointer hover:bg-slate-700/80 transition-all border-dashed group"
                      >
                         <div className="text-lg mb-0.5 group-hover:scale-110 transition-transform opacity-70">⚙️</div>
@@ -1518,7 +1429,7 @@ const renderedMagazineContent = useMemo(() => {
                  </div>
                )}
             </div>
-            {/* מפריד נתונים יבשים */}
+
             <div className="relative z-10 w-full flex items-center gap-3 mt-8 mb-4 opacity-80">
                <div className="flex-1 h-px bg-gradient-to-r from-transparent to-slate-700"></div>
                <span className="text-[10px] md:text-xs font-black text-slate-500 uppercase tracking-widest flex items-center gap-1.5">
@@ -1526,8 +1437,6 @@ const renderedMagazineContent = useMemo(() => {
                </span>
                <div className="flex-1 h-px bg-gradient-to-l from-transparent to-slate-700"></div>
             </div>
-
-            <div className="flex justify-between items-center gap-2 relative z-10 text-center mb-2"></div>
 
             <div className="flex justify-between items-center gap-2 pt-2 border-t border-slate-700/50 relative z-10 text-center">
               <div className="flex-1"><div className="text-[10px] text-slate-400 uppercase tracking-widest font-bold">קופת פרסים</div><div className="text-sm font-black text-emerald-400"><AnimatedNumber value={totalPrizesPool} prefix="₪" /></div></div>
@@ -1538,92 +1447,97 @@ const renderedMagazineContent = useMemo(() => {
             </div>  
          </div>
 
-{/* הנה בלוק המגזין החדש והנקי: */}
-      <div 
-        onClick={() => setShowMagazineModal(true)}
-        className="w-[calc(100vw-32px)] lg:w-auto shrink-0 snap-center min-h-full min-w-0 bg-slate-900 rounded-3xl p-6 shadow-xl border border-slate-700 cursor-pointer hover:border-blue-500/50 transition-all flex flex-col overflow-hidden"
-      >
-        {dailyMediaUrl && (
-          <div className="w-full mb-4 overflow-hidden rounded-2xl border border-slate-800">
-            {dailyMediaUrl.match(/\.(jpeg|jpg|gif|png|webp)$/i) != null ? (
-              <img src={dailyMediaUrl} alt="Magazine" className="w-full h-auto object-cover" />
-            ) : (
-              <video src={dailyMediaUrl} autoPlay loop muted playsInline className="w-full h-auto object-cover" />
-            )}
-          </div>
-        )}
-        <div 
-          className="w-full overflow-hidden [&_img]:w-full [&_img]:h-auto [&_img]:rounded-2xl [&_h1]:text-2xl [&_h2]:text-xl [&_p]:text-sm [&_p]:text-slate-300"
-          dangerouslySetInnerHTML={{ __html: dailySubtext || "אין עדכונים מיוחדים הבוקר." }} 
-        />
-        <button className="mt-4 bg-slate-800 hover:bg-slate-700 text-white font-bold py-3 w-full rounded-xl border border-slate-600 transition-colors text-sm shadow-md">
-           קרא את המהדורה המלאה 👈
-        </button>
-      </div>
-      {/* אולפן המובייל (הקומיקס) - חזר להיות בלוק עצמאי וגלוי! */}
-      <div className="xl:hidden w-full max-w-sm mx-auto bg-slate-950/40 rounded-3xl border border-slate-700/50 shadow-inner flex flex-col items-center pt-6 pb-2 overflow-hidden shrink-0 mb-4 mt-2">        
-        <div className="absolute top-0 right-0 w-full h-1 bg-gradient-to-r from-rose-400 via-amber-400 to-emerald-400"></div>
-        
-        <div className="mb-2 relative z-30 px-4 py-1.5 bg-slate-900/80 rounded-full border border-slate-700 text-white font-black text-[10px] flex items-center gap-2 shadow-md">
-          <span className="animate-pulse">🎙️</span> חברי הפאנל בלייב
-        </div>
-
-        <div className="relative w-full mt-32 sm:mt-40">
-          <div className="absolute bottom-[75%] left-1/2 -translate-x-1/2 w-[85%] bg-slate-950 border-[3px] border-slate-800 rounded-2xl shadow-[0_15px_30px_rgba(0,0,0,0.7)] pointer-events-auto overflow-hidden flex flex-col z-0">
-             <div className="bg-slate-900 border-b border-slate-800 px-3 py-1 flex justify-between items-center z-10 relative">
-                <div className="flex items-center gap-1.5">
-                   <div className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse"></div>
-                   <span className="text-rose-500 font-black text-[8px] tracking-widest uppercase">LIVE</span>
-                </div>
-                <div className="flex gap-1">
-                   <div className="w-1 h-1 rounded-full bg-slate-700"></div>
-                   <div className="w-1 h-1 rounded-full bg-slate-700"></div>
-                </div>
+         {/* 2. קוביית המגזין שמכילה בתוכה את אולפן המובייל המוקטן והמעודכן - יושבת בתוך הקרוסלה האופקית! */}
+         <div 
+           onClick={() => setShowMagazineModal(true)}
+           className="w-[calc(100vw-32px)] lg:w-auto shrink-0 snap-center min-h-full min-w-0 bg-slate-900 rounded-3xl p-6 shadow-xl border border-slate-700 cursor-pointer hover:border-blue-500/50 transition-all flex flex-col overflow-hidden relative"
+         >
+           {dailyMediaUrl && (
+             <div className="w-full mb-4 overflow-hidden rounded-2xl border border-slate-800 shrink-0">
+               {dailyMediaUrl.match(/\.(jpeg|jpg|gif|png|webp)$/i) != null ? (
+                 <img src={dailyMediaUrl} alt="Magazine" className="w-full h-auto object-cover" />
+               ) : (
+                 <video src={dailyMediaUrl} autoPlay loop muted playsInline className="w-full h-auto object-cover" />
+               )}
              </div>
-             <div className="relative aspect-video bg-black overflow-hidden">
-                 <img src="/usa-bg.jpg" className="absolute inset-0 w-full h-full object-cover animate-carousel-1" alt="USA" />
-                 <img src="/canada-bg.jpg" className="absolute inset-0 w-full h-full object-cover animate-carousel-2 opacity-0" alt="Canada" />
-                 <img src="/mexico-bg.jpg" className="absolute inset-0 w-full h-full object-cover animate-carousel-3 opacity-0" alt="Mexico" />
-                 <div className="absolute inset-0 bg-gradient-to-tr from-white/10 via-transparent to-transparent pointer-events-none z-10"></div>
+           )}
+           <div 
+             className="w-full overflow-hidden [&_img]:w-full [&_img]:h-auto [&_img]:rounded-2xl [&_h1]:text-2xl [&_h2]:text-xl [&_p]:text-sm [&_p]:text-slate-300"
+             dangerouslySetInnerHTML={{ __html: dailySubtext || "אין עדכונים מיוחדים הבוקר." }} 
+           />
+           <button className="mt-4 mb-4 bg-slate-800 hover:bg-slate-700 text-white font-bold py-3 w-full rounded-xl border border-slate-600 transition-colors text-sm shadow-md z-10 relative shrink-0">
+              קרא את המהדורה המלאה 👈
+           </button>
+
+           {/* --- אולפן המובייל (מוטמע בתוך המגזין ונצמד יפה לתחתית הדף) --- */}
+           <div 
+             className="xl:hidden w-full max-w-[260px] mx-auto mt-auto bg-slate-950/80 rounded-2xl border border-slate-700/50 shadow-inner flex flex-col items-center pt-3 pb-0 overflow-hidden shrink-0 relative z-0"
+             onClick={(e) => e.stopPropagation()}
+           >        
+             <div className="absolute top-0 right-0 w-full h-1 bg-gradient-to-r from-rose-400 via-amber-400 to-emerald-400"></div>
+             
+             <div className="mb-1 relative z-30 px-3 py-1 bg-slate-900/80 rounded-full border border-slate-700 text-white font-black text-[9px] flex items-center gap-1.5 shadow-md">
+               <span className="animate-pulse">🎙️</span> פאנל המומחים
              </div>
-          </div>
 
-          <div className="absolute bottom-[44%] left-0 w-full flex justify-center items-end gap-2 px-4 z-10 pointer-events-auto">
-            
-            {/* Trump */}
-            <div className="relative group w-[28%] flex flex-col items-center -translate-y-[15%]" tabIndex={0}>
-              <div className="speech-bubble absolute bottom-full mb-8 right-0 opacity-0 group-hover:opacity-100 group-focus:opacity-100 group-active:opacity-100 transition-all duration-300 z-50 pointer-events-none scale-90 group-hover:scale-100 group-active:scale-100 bg-rose-700 text-white font-bold text-[11px] sm:text-sm border-2 border-white px-3 py-2 rounded-xl shadow-[0_0_15px_rgba(225,29,72,0.8)] origin-bottom-right tracking-wide w-max max-w-[160px] whitespace-normal break-words text-center">
-                 {studioQuotes.trump}
-                 <div className="absolute -bottom-2 right-6 w-0 h-0 border-l-[8px] border-l-transparent border-r-[8px] border-r-transparent border-t-[8px] border-t-white"></div>
-              </div>
-              <div className="relative w-full transition-all duration-300 group-hover:-translate-y-2 group-active:-translate-y-2 group-focus:-translate-y-2 group-hover:rotate-6 group-active:rotate-6 group-hover:scale-110 group-active:scale-110">
-                 <div className="absolute inset-0 bg-red-600 rounded-full blur-xl opacity-0 group-hover:opacity-80 group-active:opacity-80 group-focus:opacity-80 transition-opacity duration-300 scale-125"></div>
-                 <img src="/donaldIcon-removebg.png" alt="Trump" className="relative z-10 w-full object-contain drop-shadow-xl transition-all group-hover:animate-rage group-active:animate-rage group-focus:animate-rage" />
-              </div>
-            </div>
-
-            {/* Canadian */}
-            <div className="relative group w-[28%] flex flex-col items-center -translate-y-[10%]" tabIndex={0}>
-               <div className="speech-bubble absolute bottom-full mb-6 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 group-active:opacity-100 group-focus:opacity-100 transition-all z-50 pointer-events-none scale-90 group-hover:scale-100 bg-slate-900 text-blue-50 font-bold text-[11px] sm:text-sm border-2 border-blue-500/80 px-3 py-2 rounded-xl shadow-[0_5px_15px_rgba(59,130,246,0.3)] tracking-wide w-max max-w-[160px] whitespace-normal break-words text-center">
-                 {studioQuotes.canadian}
-                 <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-0 h-0 border-l-[8px] border-l-transparent border-r-[8px] border-r-transparent border-t-[8px] border-t-blue-500/80"></div>
+             <div className="relative w-full mt-20">
+               <div className="absolute bottom-[80%] left-1/2 -translate-x-1/2 w-[88%] bg-slate-950 border-[2px] border-slate-800 rounded-xl shadow-[0_10px_20px_rgba(0,0,0,0.5)] pointer-events-auto overflow-hidden flex flex-col z-0">
+                  <div className="bg-slate-900 border-b border-slate-800 px-2 py-1 flex justify-between items-center z-10 relative">
+                     <div className="flex items-center gap-1">
+                        <div className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse"></div>
+                        <span className="text-rose-500 font-black text-[7px] tracking-widest uppercase">LIVE</span>
+                     </div>
+                     <div className="flex gap-1">
+                        <div className="w-1 h-1 rounded-full bg-slate-700"></div>
+                        <div className="w-1 h-1 rounded-full bg-slate-700"></div>
+                     </div>
+                  </div>
+                  <div className="relative aspect-video bg-black overflow-hidden">
+                      <img src="/usa-bg.jpg" className="absolute inset-0 w-full h-full object-cover animate-carousel-1 transform-gpu will-change-opacity" alt="USA" />
+                      <img src="/canada-bg.jpg" className="absolute inset-0 w-full h-full object-cover animate-carousel-2 opacity-0 transform-gpu will-change-opacity" alt="Canada" />
+                      <img src="/mexico-bg.jpg" className="absolute inset-0 w-full h-full object-cover animate-carousel-3 opacity-0 transform-gpu will-change-opacity" alt="Mexico" />
+                      <div className="absolute inset-0 bg-gradient-to-tr from-white/10 via-transparent to-transparent pointer-events-none z-10"></div>
+                  </div>
                </div>
-               <img src="/candianIcon-removebg.png" className="relative z-10 w-full object-contain group-hover:-translate-y-2 group-active:-translate-y-2 group-focus:-translate-y-2 transition-transform drop-shadow-xl" />
-            </div>
 
-            {/* Mexican */}
-            <div className="relative group w-[28%] flex flex-col items-center -translate-y-[12%]" tabIndex={0}>
-               <div className="speech-bubble absolute bottom-full mb-6 left-0 opacity-0 group-hover:opacity-100 group-active:opacity-100 group-focus:opacity-100 transition-all z-50 pointer-events-none scale-90 group-hover:scale-100 group-active:scale-100 bg-slate-900 text-emerald-50 font-bold text-[11px] sm:text-sm border-2 border-emerald-500/80 px-3 py-2 rounded-xl shadow-[0_5px_15px_rgba(16,185,129,0.3)] origin-bottom-left tracking-wide w-max max-w-[160px] whitespace-normal break-words text-center">
-                 {studioQuotes.mexican}
-                 <div className="absolute -bottom-2 left-6 w-0 h-0 border-l-[8px] border-l-transparent border-r-[8px] border-r-transparent border-t-[8px] border-t-emerald-500/80"></div>
+               <div className="absolute bottom-[40%] left-0 w-full flex justify-center items-end gap-1 px-2 z-10 pointer-events-auto">
+                 {/* Trump */}
+                 <div className="relative group w-[30%] flex flex-col items-center -translate-y-[10%]" tabIndex={0}>
+                   <div className="speech-bubble absolute bottom-full mb-6 right-0 opacity-0 group-hover:opacity-100 group-active:opacity-100 transition-all z-50 pointer-events-none scale-90 group-hover:scale-100 group-active:scale-100 bg-rose-700 text-white font-bold text-[9px] border-2 border-white px-2 py-1.5 rounded-lg shadow-lg origin-bottom-right w-max max-w-[120px] whitespace-normal text-center">
+                      {studioQuotes.trump}
+                      <div className="absolute -bottom-1.5 right-4 w-0 h-0 border-l-[5px] border-l-transparent border-r-[5px] border-r-transparent border-t-[5px] border-t-white"></div>
+                   </div>
+                   <div className="relative w-full transition-all group-hover:-translate-y-1 group-active:-translate-y-1 group-hover:scale-110 group-active:scale-110">
+                      <img src="/donaldIcon-removebg.png" alt="Trump" className="relative z-10 w-full object-contain drop-shadow-md" />
+                   </div>
+                 </div>
+
+                 {/* Canadian */}
+                 <div className="relative group w-[30%] flex flex-col items-center -translate-y-[5%]" tabIndex={0}>
+                    <div className="speech-bubble absolute bottom-full mb-4 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 group-active:opacity-100 transition-all z-50 pointer-events-none scale-90 group-hover:scale-100 bg-slate-900 text-blue-50 font-bold text-[9px] border-2 border-blue-500/80 px-2 py-1.5 rounded-lg shadow-lg w-max max-w-[120px] whitespace-normal text-center">
+                      {studioQuotes.canadian}
+                      <div className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-0 h-0 border-l-[5px] border-l-transparent border-r-[5px] border-r-transparent border-t-[5px] border-t-blue-500/80"></div>
+                    </div>
+                    <img src="/candianIcon-removebg.png" className="relative z-10 w-full object-contain transition-transform drop-shadow-md" />
+                 </div>
+
+                 {/* Mexican */}
+                 <div className="relative group w-[30%] flex flex-col items-center -translate-y-[8%]" tabIndex={0}>
+                    <div className="speech-bubble absolute bottom-full mb-4 left-0 opacity-0 group-hover:opacity-100 group-active:opacity-100 transition-all z-50 pointer-events-none scale-90 group-hover:scale-100 group-active:scale-100 bg-slate-900 text-emerald-50 font-bold text-[9px] border-2 border-emerald-500/80 px-2 py-1.5 rounded-lg shadow-lg origin-bottom-left w-max max-w-[120px] whitespace-normal text-center">
+                      {studioQuotes.mexican}
+                      <div className="absolute -bottom-1.5 left-4 w-0 h-0 border-l-[5px] border-l-transparent border-r-[5px] border-r-transparent border-t-[5px] border-t-emerald-500/80"></div>
+                    </div>
+                    <img src="/maxicanIcon-removebg.png" className="relative z-10 w-full object-contain -scale-x-100 transition-transform origin-bottom drop-shadow-md" />
+                 </div>
                </div>
-               <img src="/maxicanIcon-removebg.png" className="relative z-10 w-full object-contain -scale-x-100 group-hover:-translate-y-2 group-active:-translate-y-2 group-focus:-translate-y-2 group-hover:-rotate-6 group-active:-rotate-6 transition-transform origin-bottom drop-shadow-xl" />
-            </div>
-          </div>
 
-          <img src="/panel-removebg.png" className="relative z-20 w-[110%] max-w-[110%] -ml-[5%] pointer-events-none" />
-        </div>
-      </div>
+               <img src="/panel-removebg.png" className="relative z-20 w-[110%] max-w-[110%] -ml-[5%] pointer-events-none" />
+             </div>
+           </div>
+         </div>
+
+      </div> 
+      {/* <====== כאן מסתיימת הקרוסלה האופקית ======> */}
 
       {tournamentState > 0 ? (
       <div className="bg-slate-900 rounded-3xl border border-slate-700 shadow-xl flex flex-col lg:h-[600px] overflow-hidden relative z-10">
@@ -1657,9 +1571,9 @@ const renderedMagazineContent = useMemo(() => {
                         sessionStorage.setItem("targetMatchday", item.matchday || "1");
                         sessionStorage.setItem("scrollToMatch", item.matchId);
                         if (item.group) {
-                            sessionStorage.setItem("targetGroup", item.group); // ◄◄ מעדכן את הבית הנכון
+                            sessionStorage.setItem("targetGroup", item.group);
                         }
-                        sessionStorage.setItem("groupsViewMode", "MATCHES"); // ◄◄ מוודא שמציג משחקים ולא מעפילות
+                        sessionStorage.setItem("groupsViewMode", "MATCHES");
                         setActiveTab("PREDICTIONS"); 
                         if(setPredictionTab) setPredictionTab("MATCHES");
                       }
@@ -1668,15 +1582,12 @@ const renderedMagazineContent = useMemo(() => {
                          setActiveTab("PREDICTIONS"); if(setPredictionTab) setPredictionTab("KNOCKOUT");
                       }
                       else if (item.id.startsWith("q1") || item.id.startsWith("q2")) { 
-                      // חותך את האות של הבית מה-ID (למשל מ-"q1_A" או "q1s_B")
                         const groupLetter = item.id.split("_")[1]; 
-   
                         sessionStorage.setItem("groupsViewMode", "QUALIFIERS");
                         sessionStorage.setItem("targetGroup", groupLetter);
-   
-                         setActiveTab("PREDICTIONS"); 
-                         if(setPredictionTab) setPredictionTab("MATCHES"); 
-                          window.scrollTo({top:0, behavior:'smooth'});
+                        setActiveTab("PREDICTIONS"); 
+                        if(setPredictionTab) setPredictionTab("MATCHES"); 
+                        window.scrollTo({top:0, behavior:'smooth'});
                       }
                       else if (item.id.startsWith("t3_")) { 
                           setActiveTab("PREDICTIONS"); 
@@ -1706,8 +1617,6 @@ const renderedMagazineContent = useMemo(() => {
                <div className="hidden lg:flex bg-slate-900/80 px-6 h-20 border-b border-slate-700 justify-between items-center z-10 shadow-sm shrink-0">
                  <div className="flex items-center justify-between w-full lg:w-auto gap-2 sm:gap-3">
                    <h2 className="text-lg sm:text-xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-cyan-400 flex items-center gap-1.5 sm:gap-2"><span>📅</span> צפוי היום</h2>
-                   
-                   {/* כפתור ה-Toggle גלוי תמיד! */}
                    {(activeBannerMode === "MATCHES" || activeBannerMode === "BONUS") && (
                      <div className="flex bg-slate-950 rounded-lg p-0.5 border border-slate-700 shadow-inner shrink-0">
                         <button onClick={() => setTodayViewMode("LIST")} className={`px-2 py-1 rounded text-[10px] font-bold transition-all flex items-center gap-1 ${todayViewMode === "LIST" ? "bg-slate-800 text-white shadow-sm" : "text-slate-500 hover:text-slate-300"}`}><span>📄</span> רשימה</button>
@@ -1820,10 +1729,10 @@ const renderedMagazineContent = useMemo(() => {
                                 
                                 return (
                                   <div className={`w-full relative mt-3 md:mt-4 bg-slate-900 p-6 md:p-8 rounded-3xl border transition-all shadow-xl flex flex-col shrink-0 ${hasPrediction ? "border-blue-500/30" : "border-amber-500/50 shadow-[0_0_20px_rgba(245,158,11,0.15)]"}`}>
-                                        {Number(m.matchday) === 3 && m.stage !== "KNOCKOUT" && (
-                                      <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 bg-gradient-to-r from-rose-600 to-red-500 text-white text-[11px] md:text-xs font-black px-5 py-1.5 rounded-full shadow-lg border border-rose-400/50 whitespace-nowrap flex items-center gap-1.5 z-10">                                 <span className="animate-pulse">🔥</span> מחזור הכרעה
-                                     </div>
-                                   )}
+                                     {Number(m.matchday) === 3 && m.stage !== "KNOCKOUT" && (
+                                       <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 bg-gradient-to-r from-rose-600 to-red-500 text-white text-[11px] md:text-xs font-black px-5 py-1.5 rounded-full shadow-lg border border-rose-400/50 whitespace-nowrap flex items-center gap-1.5 z-10">                                 <span className="animate-pulse">🔥</span> מחזור הכרעה
+                                       </div>
+                                     )}
                                      
                                      <div className="text-blue-400 text-xs font-bold mb-6 flex justify-between items-center">
                                        <span className={`px-3 py-1 rounded-lg border ${m.isFinished ? 'bg-emerald-900/30 border-emerald-500/30 text-emerald-400' : locked ? 'bg-rose-900/30 border-rose-500/30 text-rose-400' : 'bg-slate-950 border-slate-800 text-blue-400'}`}>
@@ -1833,7 +1742,6 @@ const renderedMagazineContent = useMemo(() => {
                                      </div>
                                      
                                      <div className="flex flex-col mb-6 bg-slate-950 p-4 rounded-2xl border border-slate-800 shadow-inner">
-                                       {/* אזור הנבחרות והאחוזים */}
                                        <div className="flex justify-between items-start text-white font-bold text-lg w-full">
                                          <span className="flex-1 flex flex-col items-center gap-2 text-center" title={m.homeTeam}>
                                             {getFlagUrl(m.homeTeam) ? <img src={getFlagUrl(m.homeTeam)!} className="w-8 h-5 object-cover rounded shadow-sm" alt="flag" /> : "🏳️"} 
@@ -1846,13 +1754,13 @@ const renderedMagazineContent = useMemo(() => {
                                          </span>
                                          
                                          <span className="flex flex-col items-center justify-center mx-2 gap-1.5 mt-2">
-                                       {m.isFinished ? (
-                                         <div className="flex items-center gap-3 bg-slate-900 px-4 py-2 rounded-xl border border-slate-700 shadow-inner" dir="ltr">
-                                            <span>{m.realAwayScore}</span>
-                                            <span className="text-slate-600 font-black">-</span>
-                                            <span>{m.realHomeScore}</span>
-                                         </div>
-                                       ) : (
+                                           {m.isFinished ? (
+                                             <div className="flex items-center gap-3 bg-slate-900 px-4 py-2 rounded-xl border border-slate-700 shadow-inner" dir="ltr">
+                                                <span>{m.realAwayScore}</span>
+                                                <span className="text-slate-600 font-black">-</span>
+                                                <span>{m.realHomeScore}</span>
+                                             </div>
+                                           ) : (
                                              <>
                                                 <span className="text-slate-600 text-sm font-black">VS</span>
                                                 {m.crowdStats && m.crowdStats.total > 0 && (
@@ -1875,10 +1783,9 @@ const renderedMagazineContent = useMemo(() => {
                                          </span>
                                        </div>
 
-                                       {/* מד כוחות */}
                                        {m.crowdStats && m.crowdStats.total > 0 && !m.isFinished && (
                                          <div className="w-full mt-6 px-2">
-                                            <div className="flex w-full h-2.5 bg-slate-900 rounded-full overflow-hidden border border-slate-800 shadow-inner relative">
+                                            <div className="flex w-full h-2.5 bg-slate-950 rounded-full overflow-hidden border border-slate-800 shadow-inner relative">
                                                <div className="bg-blue-500 transition-all duration-1000 shadow-[0_0_10px_rgba(59,130,246,0.8)]" style={{width: `${Math.round((m.crowdStats.homeWins / m.crowdStats.total) * 100)}%`}}></div>
                                                <div className="bg-slate-500 transition-all duration-1000 border-x border-slate-900/50" style={{width: `${Math.round((m.crowdStats.draws / m.crowdStats.total) * 100)}%`}}></div>
                                                <div className="bg-emerald-500 transition-all duration-1000 shadow-[0_0_10px_rgba(16,185,129,0.8)]" style={{width: `${Math.round((m.crowdStats.awayWins / m.crowdStats.total) * 100)}%`}}></div>
@@ -1889,14 +1796,14 @@ const renderedMagazineContent = useMemo(() => {
                                      <div className="mt-auto border-t border-slate-700/50 pt-5">
                                        {hasPrediction ? (
                                           <div className="flex flex-col gap-3">
-                                         <div className="flex items-center justify-center gap-2 text-sm font-black text-emerald-400 bg-emerald-900/20 py-3 rounded-xl border border-emerald-500/30 text-center shadow-sm">
-                                           <span>הניחוש שלך:</span>
-                                           <div dir="ltr" className="flex items-center gap-1.5">
-                                             <span>{m.userPrediction.predictedAwayScore}</span>
-                                             <span className="text-emerald-600/60">-</span>
-                                             <span>{m.userPrediction.predictedHomeScore}</span>
-                                           </div>
-                                         </div>
+                                             <div className="flex items-center justify-center gap-2 text-sm font-black text-emerald-400 bg-emerald-900/20 py-3 rounded-xl border border-emerald-500/30 text-center shadow-sm" >
+                                               <span>הניחוש שלך:</span>
+                                               <div dir="ltr" className="flex items-center gap-1.5">
+                                                 <span>{m.userPrediction.predictedAwayScore}</span>
+                                                 <span className="text-emerald-600/60">-</span>
+                                                 <span>{m.userPrediction.predictedHomeScore}</span>
+                                               </div>
+                                             </div>
                                              {locked ? (
                                                <button onClick={() => handleOpenSpyForMatch(m)} className="w-full text-xs font-bold text-slate-300 bg-slate-800 hover:bg-slate-700 py-3 rounded-xl border border-slate-600 text-center shadow-sm flex justify-center items-center gap-2 transition-all">
                                                   <span className="text-base">👁️</span> הצג ניחושי חברים (ריגול)
@@ -1912,7 +1819,6 @@ const renderedMagazineContent = useMemo(() => {
                                             הזן ניחוש למשחק זה! ⚠️
                                           </button>
                                        )}
-
                                      </div>
                                   </div>
                                 );
@@ -1924,22 +1830,21 @@ const renderedMagazineContent = useMemo(() => {
                                 const hasPrediction = m.userPrediction && m.userPrediction.predictedHomeScore !== "" && m.userPrediction.predictedAwayScore !== "";
                                 const locked = checkIsMatchLocked(m, tournamentState);
 
-                                // --- חישוב עיצוב הקובייה של הניחוש (צבעים לפי פגיעה) ---
-                                let predictionBoxStyle = "bg-blue-900/20 text-blue-400 border-blue-500/30 group-hover:border-blue-400 group-hover:bg-blue-900/40";
+                                let predictionBoxStyle = "bg-blue-900/20 text-blue-400 border-blue-500/30 group-hover:border-blue-400 group-hover:bg-blue-909/40";
                                 if (m.isFinished && hasPrediction) {
                                    const pH = Number(m.userPrediction.predictedHomeScore);
                                    const pA = Number(m.userPrediction.predictedAwayScore);
                                    const rH = Number(m.realHomeScore);
                                    const rA = Number(m.realAwayScore);
                                    if (pH === rH && pA === rA) {
-                                       predictionBoxStyle = "bg-emerald-900/40 text-emerald-400 border-emerald-500/50 shadow-[0_0_10px_rgba(16,185,129,0.2)]"; // בול
+                                       predictionBoxStyle = "bg-emerald-900/40 text-emerald-400 border-emerald-500/50 shadow-[0_0_10px_rgba(16,185,129,0.2)]";
                                    } else if (Math.sign(pH - pA) === Math.sign(rH - rA)) {
-                                       predictionBoxStyle = "bg-amber-900/40 text-amber-400 border-amber-500/50"; // כיוון
+                                       predictionBoxStyle = "bg-amber-900/40 text-amber-400 border-amber-500/50";
                                    } else {
-                                       predictionBoxStyle = "bg-rose-900/20 text-rose-400 border-rose-500/30 opacity-80"; // נפילה
+                                       predictionBoxStyle = "bg-rose-900/20 text-rose-400 border-rose-500/30 opacity-80";
                                    }
                                 } else if (locked && hasPrediction && !m.isFinished) {
-                                   predictionBoxStyle = "bg-slate-950 text-slate-400 border-slate-700 group-hover:bg-slate-900"; // נעול טרם התחיל
+                                   predictionBoxStyle = "bg-slate-950 text-slate-400 border-slate-700 group-hover:bg-slate-900";
                                 }
 
                                 const onMatchClick = () => {
@@ -1956,16 +1861,12 @@ const renderedMagazineContent = useMemo(() => {
 
                                 return (
                                   <div key={m.id} onClick={onMatchClick} className={`flex flex-col p-3 rounded-2xl border cursor-pointer transition-all shadow-sm group hover:-translate-y-0.5 ${hasPrediction ? "bg-slate-900/90 border-slate-700/80 hover:border-blue-500/50 hover:bg-slate-800" : "bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 border-amber-500/40 hover:border-amber-400"}`}>
-                                    
-                                    {/* --- קומה עליונה: פרטי המשחק והניחוש --- */}
                                     <div className="flex items-center justify-between w-full">
-                                      {/* קבוצת בית - עם w-0 שמאפשר חיתוך טקסט חכם */}
                                       <div className="flex items-center gap-1.5 flex-1 w-0 justify-start">
                                         {getFlagUrl(m.homeTeam) ? <img src={getFlagUrl(m.homeTeam)!} className="w-5 h-3.5 sm:w-6 sm:h-4 object-cover rounded-sm shadow-sm shrink-0" alt="flag" /> : "🏳️"}
                                         <span className="text-xs sm:text-sm font-bold text-slate-200 truncate">{m.homeTeam}</span>
                                       </div>
                                       
-                                      {/* אמצע - תוצאה וניחוש - עם רוחב מינימלי קבוע כדי שלא יימעך */}
                                       <div className="flex flex-col items-center shrink-0 min-w-[90px] sm:min-w-[110px] px-1 relative z-10">
                                         {hasPrediction ? (
                                           <div className="flex flex-col items-center gap-1 w-full">
@@ -2005,14 +1906,12 @@ const renderedMagazineContent = useMemo(() => {
                                         {!m.isFinished && <span className="text-[8px] sm:text-[10px] text-slate-500 mt-1.5 font-bold truncate max-w-full">{locked ? "🔒 ננעל" : m.time}</span>}
                                       </div>
 
-                                      {/* קבוצת חוץ - עם w-0 */}
                                       <div className="flex items-center gap-1.5 flex-1 w-0 justify-end text-left">
                                         <span className="text-xs sm:text-sm font-bold text-slate-200 truncate">{m.awayTeam}</span>
                                         {getFlagUrl(m.awayTeam) ? <img src={getFlagUrl(m.awayTeam)!} className="w-5 h-3.5 sm:w-6 sm:h-4 object-cover rounded-sm shadow-sm shrink-0" alt="flag" /> : "🏳️"}
                                       </div>
                                     </div>
 
-                                    {/* --- קומה תחתונה: מיני מד-כוחות (מופיע רק כשיש אחוזי קהל והמשחק טרם הסתיים) --- */}
                                     {m.crowdStats && m.crowdStats.total > 0 && !m.isFinished && (
                                        <div className="w-full mt-2.5 pt-2 border-t border-slate-800/80 flex flex-col gap-1.5 opacity-70 group-hover:opacity-100 transition-opacity">
                                           <div className="flex justify-between text-[9px] font-bold px-1">
@@ -2027,14 +1926,13 @@ const renderedMagazineContent = useMemo(() => {
                                           </div>
                                        </div>
                                     )}
-
                                   </div>
                                 );
                              })}
                            </div>
                          )}
                       </div>
-                      )
+                    )
                   ) : (
                     todayTargets.length > 0 && (
                       <div className="w-full max-w-md mx-auto flex flex-col items-center animate-fade-in-up">
@@ -2049,71 +1947,71 @@ const renderedMagazineContent = useMemo(() => {
                             return (
                               <div className="w-full bg-slate-900 p-6 md:p-8 rounded-3xl border border-rose-500/30 shadow-xl flex flex-col text-center shrink-0">
                                  {target.type === "PLAYER" ? (
-                              <div className="flex items-center gap-4 bg-slate-800/90 p-4 md:p-5 rounded-2xl border border-blue-500/30 shadow-lg relative overflow-hidden transition-all hover:border-blue-500/50">
-                              <div className="absolute top-0 right-0 w-24 h-full bg-blue-500/10 skew-x-12"></div>
-                              <div className="relative z-10 shrink-0">
-                                    {getFlagUrl(target.team) ? (
-                              <div className="relative">
-                              <img src={getFlagUrl(target.team)!} className="w-14 h-14 object-cover rounded-full border-2 border-slate-600 shadow-md" alt="flag" />
-                              <span className="absolute -bottom-2 -right-2 bg-slate-900 border border-slate-700 rounded-full w-6 h-6 flex items-center justify-center text-xs">🏃‍♂️</span>
-                             </div>
-                         ) : (
-                              <span className="text-4xl drop-shadow-md">🏃‍♂️</span>
-                              )}
-                             </div>
-                             <div className="relative z-10 text-right">
-                                     <h4 className="text-white font-bold text-base md:text-lg leading-tight mb-1">
-                                     דע לך ש<span className="text-blue-400">{target.name}</span> עולה למגרש!
-                                    </h4>
-                                    <p className="text-slate-300 text-xs md:text-sm leading-relaxed">
-                                        משחק היום עם נבחרת <strong className="text-white">{target.team}</strong>. <br/>
-                                        הזדמנות לניקוד בשאלת: <span className="text-amber-400 font-bold">"{target.questionLabel}"</span>.
-                                    </p>
-                                 </div>
-                                 </div>
+                                   <div className="flex items-center gap-4 bg-slate-800/90 p-4 md:p-5 rounded-2xl border border-blue-500/30 shadow-lg relative overflow-hidden transition-all hover:border-blue-500/50">
+                                     <div className="absolute top-0 right-0 w-24 h-full bg-blue-500/10 skew-x-12"></div>
+                                     <div className="relative z-10 shrink-0">
+                                       {getFlagUrl(target.team) ? (
+                                         <div className="relative">
+                                           <img src={getFlagUrl(target.team)!} className="w-14 h-14 object-cover rounded-full border-2 border-slate-600 shadow-md" alt="flag" />
+                                           <span className="absolute -bottom-2 -right-2 bg-slate-900 border border-slate-700 rounded-full w-6 h-6 flex items-center justify-center text-xs">🏃‍♂️</span>
+                                         </div>
+                                       ) : (
+                                         <span className="text-4xl drop-shadow-md">🏃‍♂️</span>
+                                       )}
+                                     </div>
+                                     <div className="relative z-10 text-right">
+                                        <h4 className="text-white font-bold text-base md:text-lg leading-tight mb-1">
+                                          דע לך ש<span className="text-blue-400">{target.name}</span> עולה למגרש!
+                                        </h4>
+                                        <p className="text-slate-300 text-xs md:text-sm leading-relaxed">
+                                            משחק היום עם נבחרת <strong className="text-white">{target.team}</strong>. <br/>
+                                            הזדמנות לניקוד בשאלת: <span className="text-amber-400 font-bold">"{target.questionLabel}"</span>.
+                                        </p>
+                                     </div>
+                                   </div>
                                  ) : target.type === "CONTEXTUAL_ALERT" ? (
                                    <div className="flex items-center gap-4 bg-slate-800/90 p-5 rounded-2xl border border-amber-500/30 relative overflow-hidden transition-all shadow-lg text-right">
-                                   <div className="absolute top-0 right-0 w-2 h-full bg-amber-500"></div>
-                                   <div className="relative z-10 shrink-0">
-                                   <div className="relative">
-                                   {getFlagUrl(target.team) ? (
-                                   <img src={getFlagUrl(target.team)!} className="w-14 h-14 object-cover rounded-full border-2 border-slate-600 shadow-md" alt="flag" />
-                                 ) : (
-                                   <span className="text-4xl drop-shadow-md">🏃‍♂️</span>
-                                  )}
-                                    <span className="absolute -bottom-2 -right-2 bg-slate-900 border border-slate-700 rounded-full w-7 h-7 flex items-center justify-center text-xs">⭐</span>
-                                  </div>
-                               </div>
-                              <div className="relative z-10 text-right">
-                                 <h4 className="text-white font-bold text-base md:text-lg leading-tight mb-1">
-                                      הזדמנות לנקודות עבור <span className="text-amber-400">{target.context}</span>!
-                                 </h4>
-                                 <p className="text-slate-300 text-xs md:text-sm leading-relaxed">
-                                     היום עולה למגרש <strong className="text-white">{target.name}</strong> שמייצג את {target.context} שסימנת בשאלה: <br/>
-                                 <span className="text-slate-400 italic mt-1 inline-block">"{target.questionLabel}"</span>
-                                </p>
-                               </div>
-                             </div>
-                          ) : target.type === "SPECIFIC_MATCH" ? (
-                            <div className="flex items-center gap-4 bg-slate-800/90 p-5 rounded-2xl border border-rose-500/30 relative overflow-hidden transition-all shadow-lg text-right">
-                            <div className="absolute top-0 right-0 w-2 h-full bg-rose-500"></div>
-                            <div className="relative z-10 shrink-0">
-                                <div className="relative">
-                                  <span className="text-4xl drop-shadow-md">⚔️</span>
-                                  <span className="absolute -bottom-2 -right-2 bg-slate-900 border border-slate-700 rounded-full w-7 h-7 flex items-center justify-center text-xs">⚽</span>
-                                </div>
-                            </div>
-                            <div className="relative z-10 text-right">
-                                <h4 className="text-white font-bold text-base md:text-lg leading-tight mb-1">
-                                  דע לך שהיום יש את המשחק בין <span className="text-rose-400">{target.teamA}</span> ל-<span className="text-rose-400">{target.teamB}</span>!
-                                </h4>
-                                <p className="text-slate-300 text-xs md:text-sm leading-relaxed">
-                                  אם יהיו בו הרבה שערים תוכל להרוויח בענק בשאלה: <br/>
-                                  <span className="text-slate-400 italic mt-1 inline-block">"{target.questionLabel}"</span>
-                                </p>
-                            </div>
-                          </div>   
-                          ) : target.isSurvival ? (
+                                     <div className="absolute top-0 right-0 w-2 h-full bg-amber-500"></div>
+                                     <div className="relative z-10 shrink-0">
+                                       <div className="relative">
+                                         {getFlagUrl(target.team) ? (
+                                           <img src={getFlagUrl(target.team)!} className="w-14 h-14 object-cover rounded-full border-2 border-slate-600 shadow-md" alt="flag" />
+                                         ) : (
+                                           <span className="text-4xl drop-shadow-md">🏃‍♂️</span>
+                                         )}
+                                         <span className="absolute -bottom-2 -right-2 bg-slate-900 border border-slate-700 rounded-full w-7 h-7 flex items-center justify-center text-xs">⭐</span>
+                                       </div>
+                                     </div>
+                                     <div className="relative z-10 text-right">
+                                        <h4 className="text-white font-bold text-base md:text-lg leading-tight mb-1">
+                                             הזדמנות לנקודות עבור <span className="text-amber-400">{target.context}</span>!
+                                        </h4>
+                                        <p className="text-slate-300 text-xs md:text-sm leading-relaxed">
+                                            היום עולה למגרש <strong className="text-white">{target.name}</strong> שמייצג את {target.context} שסימנת בשאלה: <br/>
+                                            <span className="text-slate-400 italic mt-1 inline-block">"{target.questionLabel}"</span>
+                                        </p>
+                                     </div>
+                                   </div>
+                                 ) : target.type === "SPECIFIC_MATCH" ? (
+                                   <div className="flex items-center gap-4 bg-slate-800/90 p-5 rounded-2xl border border-rose-500/30 relative overflow-hidden transition-all shadow-lg text-right">
+                                     <div className="absolute top-0 right-0 w-2 h-full bg-rose-500"></div>
+                                     <div className="relative z-10 shrink-0">
+                                       <div className="relative">
+                                         <span className="text-4xl drop-shadow-md">⚔️</span>
+                                         <span className="absolute -bottom-2 -right-2 bg-slate-900 border border-slate-700 rounded-full w-7 h-7 flex items-center justify-center text-xs">⚽</span>
+                                       </div>
+                                     </div>
+                                     <div className="relative z-10 text-right">
+                                        <h4 className="text-white font-bold text-base md:text-lg leading-tight mb-1">
+                                          דע לך שהיום יש את המשחק בין <span className="text-rose-400">{target.teamA}</span> ל-<span className="text-rose-400">{target.teamB}</span>!
+                                        </h4>
+                                        <p className="text-slate-300 text-xs md:text-sm leading-relaxed">
+                                          אם יהיו בו הרבה שערים תוכל להרוויח בענק בשאלה: <br/>
+                                          <span className="text-slate-400 italic mt-1 inline-block">"{target.questionLabel}"</span>
+                                        </p>
+                                     </div>
+                                   </div>   
+                                 ) : target.isSurvival ? (
                                     <>
                                       <div className="text-5xl mb-4 drop-shadow-md">🛡️</div>
                                       <h3 className="text-xl md:text-2xl font-bold text-emerald-400 mb-3">משחק הישרדות!</h3>
@@ -2164,7 +2062,6 @@ const renderedMagazineContent = useMemo(() => {
          </div>
       )}
 
-
       {showMagazineModal && (
         <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/85 p-4 backdrop-blur-md animate-fade-in-up" dir="rtl">
           <div className="bg-slate-900 border border-slate-700 p-6 md:p-8 rounded-3xl w-full max-w-3xl max-h-[90vh] flex flex-col shadow-2xl relative overflow-hidden">
@@ -2173,7 +2070,6 @@ const renderedMagazineContent = useMemo(() => {
               <button onClick={() => setShowMagazineModal(false)} className="w-10 h-10 flex items-center justify-center rounded-full bg-slate-800 hover:bg-rose-500/20 text-slate-400 transition-colors border border-slate-700">✕</button>
             </div>
             <div className="overflow-y-auto custom-scrollbar flex-1 pr-4 pb-4">
-               {/* אזור התמונה */}
                {dailyMediaUrl && (
                   <div className="w-full rounded-2xl overflow-hidden mb-6 border border-slate-800 shadow-lg">
                      {dailyMediaUrl.match(/\.(jpeg|jpg|gif|png|webp)$/i) != null ? (
@@ -2184,7 +2080,6 @@ const renderedMagazineContent = useMemo(() => {
                   </div>
                )}
               
-               {/* המהדורה המלאה! */}
                <div 
                   className="w-full h-full text-slate-200 text-lg leading-relaxed [&_h1]:text-3xl [&_h1]:font-black [&_h1]:text-emerald-400 [&_mark]:bg-emerald-500/20 [&_mark]:text-emerald-300 [&_blockquote]:border-r-4 [&_blockquote]:bg-slate-800/50 [&_blockquote]:p-4" 
                   dangerouslySetInnerHTML={{ __html: dailyMessage || "" }} 
@@ -2196,8 +2091,7 @@ const renderedMagazineContent = useMemo(() => {
 
       {showRealStandingsModal && (
         <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/90 p-2 md:p-4 backdrop-blur-md animate-fade-in-up" dir="rtl">
-          <div className="bg-slate-900 border border-slate-700 p-2 md:p-6 rounded-3xl w-full max-w-5xl h-[90vh] flex flex-col shadow-2xl relative overflow-hidden md:resize">
-            
+          <div className="bg-slate-900 border border-slate-700 p-2 md:p-6 rounded-3xl w-full max-w-5xl h-[90vh] flex flex-col shadow-2xl relative overflow-hidden">
             <div className="flex justify-between items-center mb-4 px-2 pt-2 md:px-0 md:pt-0 border-b border-slate-800 pb-4 shrink-0">
               <div>
                 <h3 className="text-xl md:text-2xl font-black text-white flex items-center gap-2">
@@ -2217,17 +2111,14 @@ const renderedMagazineContent = useMemo(() => {
                  scrolling="yes"
                  className="w-full flex-1"
                ></iframe>
-
             </div>
-            
           </div>
         </div>
       )}
 
       {spyModalMatch && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-md animate-fade-in-up" dir="rtl">
-          <div className="bg-gradient-to-b from-slate-800 to-slate-900 border border-slate-700 p-5 md:p-6 rounded-3xl w-full max-w-md md:max-w-[600px] md:min-w-[400px] min-h-[500px] h-[85vh] md:h-[650px] md:max-h-[90vh] flex flex-col shadow-2xl relative overflow-hidden md:resize">
-            
+          <div className="bg-gradient-to-b from-slate-800 to-slate-900 border border-slate-700 p-5 md:p-6 rounded-3xl w-full max-w-md md:max-w-[600px] md:min-w-[400px] min-h-[500px] h-[85vh] md:h-[650px] md:max-h-[90vh] flex flex-col shadow-2xl relative overflow-hidden">
             <div className="flex justify-between items-center mb-4 pb-4 border-b border-slate-700/50 shrink-0">
                 <h3 className="text-xl font-black text-white flex items-center gap-2"><span>🕵️‍♂️</span> חדר בקרה</h3>
                 <button onClick={() => setSpyModalMatch(null)} className="w-8 h-8 flex items-center justify-center rounded-full bg-slate-800 hover:bg-rose-500/20 hover:text-rose-400 text-slate-400 transition-colors font-black border border-slate-700 hover:border-rose-500/30">✕</button>
@@ -2285,7 +2176,7 @@ const renderedMagazineContent = useMemo(() => {
                   <button onClick={() => setSpyFilter("EXACT")} className={`py-2 px-2 rounded-xl text-[11px] sm:text-xs font-bold transition-colors border flex justify-center items-center gap-1.5 ${spyFilter === "EXACT" ? "bg-emerald-900/40 text-emerald-400 border-emerald-500/50 shadow-[0_0_10px_rgba(16,185,129,0.15)]" : "bg-slate-900 text-slate-400 border-slate-800 hover:bg-slate-800"}`}>
                     🎯 בול ({spyStats.exact})
                   </button>
-                  <button onClick={() => setSpyFilter("DIRECTION")} className={`py-2 px-2 rounded-xl text-[11px] sm:text-xs font-bold transition-colors border flex justify-center items-center gap-1.5 ${spyFilter === "DIRECTION" ? "bg-amber-900/40 text-amber-400 border-amber-500/50 shadow-[0_0_10px_rgba(245,158,11,0.1)]" : "bg-slate-900 text-slate-400 border-slate-800 hover:bg-slate-800"}`}>
+                  <button onClick={() => setSpyFilter("DIRECTION")} className={`py-2 px-2 rounded-xl text-[11px] sm:text-xs font-bold transition-colors border flex justify-center items-center gap-1.5 ${spyFilter === "DIRECTION" ? "bg-amber-900/40 text-amber-400 border-amber-500/50 shadow-[0_0_10px_rgba(245,158,11,0.2)]" : "bg-slate-900 text-slate-400 border-slate-800 hover:bg-slate-800"}`}>
                     ✅ כיוון ({spyStats.direction})
                   </button>
                   <button onClick={() => setSpyFilter("MISS")} className={`py-2 px-2 rounded-xl text-[11px] sm:text-xs font-bold transition-colors border flex justify-center items-center gap-1.5 ${spyFilter === "MISS" ? "bg-rose-900/40 text-rose-400 border-rose-500/50 shadow-[0_0_10px_rgba(225,29,72,0.1)]" : "bg-slate-900 text-slate-400 border-slate-800 hover:bg-slate-800"}`}>
@@ -2299,7 +2190,6 @@ const renderedMagazineContent = useMemo(() => {
               {isLoadingSpy ? (<div className="flex justify-center py-8 text-blue-400 animate-pulse font-black tracking-wide">טוען נתונים מהשטח... ⏳</div>) : filteredSpyData.length === 0 ? (<div className="text-center text-slate-500 py-8 font-bold">לא נמצאו ניחושים שמתאימים לחיפוש.</div>) : (
                 <div className="space-y-2">
                   {filteredSpyData.map((data, idx) => {
-                    
                     let cardStyle = "px-3 py-2.5 rounded-xl border transition-all ";
                     if (spyModalMatch.isFinished) {
                       const pH = Number(data.predictedHomeScore); const pA = Number(data.predictedAwayScore);
@@ -2362,7 +2252,7 @@ const renderedMagazineContent = useMemo(() => {
           </div>
         </div>
       )}
-{/* --- מודל סטטיסטיקת קהל --- */}
+
       {matchStatsModal && (
         <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm animate-fade-in-up" dir="rtl">
           <div className="bg-slate-900 border border-slate-700 p-6 rounded-3xl w-full max-w-sm shadow-2xl relative">
@@ -2424,6 +2314,7 @@ const renderedMagazineContent = useMemo(() => {
           </div>
         </div>
       )}
+
       {showWrappedModal && (
         <WrappedModal 
           onClose={() => setShowWrappedModal(false)}
@@ -2433,6 +2324,6 @@ const renderedMagazineContent = useMemo(() => {
           nemesisData={nemesisData}
         />
       )}
-    </div> // סגירת ה-div הראשי
-  ); // סגירת ה-return
-} // סגירת ה-Dashboard
+    </div>
+  );
+}

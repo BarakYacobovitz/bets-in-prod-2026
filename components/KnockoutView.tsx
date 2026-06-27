@@ -8,6 +8,29 @@ import { getFlagUrl } from "../app/utils/flags";
 import toast from "react-hot-toast";
 import { TransformWrapper, TransformComponent, useControls } from "react-zoom-pan-pinch";
 
+const FIFA_BRACKET_ORDER: Record<string, string[]> = {
+  "32 הגדולות": [
+    // צד שמאל של העץ
+    "match_74", "match_77", "match_73", "match_75", "match_83", "match_84", "match_81", "match_82",
+    // צד ימין של העץ
+    "match_76", "match_78", "match_79", "match_80", "match_86", "match_88", "match_85", "match_87"
+  ],
+  "שמינית גמר": [
+    "match_89", "match_90", "match_93", "match_94", // שמאל
+    "match_91", "match_92", "match_95", "match_96"  // ימין
+  ],
+  "רבע גמר": [
+    "match_97", "match_98", // שמאל
+    "match_99", "match_100" // ימין
+  ],
+  "חצי גמר": [
+    "match_101", // שמאל
+    "match_102"  // ימין
+  ],
+  "גמר": ["match_104"],
+  "מקום שלישי": ["match_103"]
+};
+
 // קומפוננטת עזר חכמה לכפתורי הזום
 const ZoomControls = () => {
   const { zoomIn, zoomOut, resetTransform } = useControls();
@@ -30,6 +53,12 @@ export default function KnockoutView({ matches, userId, tournamentState }: { mat
   const roundMatches = matches.filter(m => {
      if (activeRound === "גמר") return m.roundName === "גמר" || m.roundName === "מקום שלישי";
      return m.roundName === activeRound;
+  }).sort((a, b) => {
+      // מיון לפי המפה של פיפ"א
+      const orderArray = FIFA_BRACKET_ORDER[a.roundName] || [];
+      const indexA = orderArray.indexOf(a.id);
+      const indexB = orderArray.indexOf(b.id);
+      return (indexA === -1 ? 999 : indexA) - (indexB === -1 ? 999 : indexB);
   });
 
   useEffect(() => {
@@ -116,10 +145,11 @@ export default function KnockoutView({ matches, userId, tournamentState }: { mat
   let previousRoundMatches: any[] = [];
 
   rounds.forEach(round => {
+      const orderArray = FIFA_BRACKET_ORDER[round] || [];
       const realMatches = matches.filter(m => m.roundName === round).sort((a,b) => {
-          const numA = parseInt(a.id.replace(/\D/g, '') || "0");
-          const numB = parseInt(b.id.replace(/\D/g, '') || "0");
-          return numA - numB;
+          const indexA = orderArray.indexOf(a.id);
+          const indexB = orderArray.indexOf(b.id);
+          return (indexA === -1 ? 999 : indexA) - (indexB === -1 ? 999 : indexB);
       });
       
       const count = expectedCounts[round] || 0;
