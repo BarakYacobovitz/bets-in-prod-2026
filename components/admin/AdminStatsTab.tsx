@@ -223,8 +223,7 @@ Structure:
 
         const timeStr = formatAuditTime(pred.updatedAt);
         const mId = pred.matchId;
-        if (!matchStatsMap[mId]) matchStatsMap[mId] = { total: 0, homeWins: [], awayWins: [], draws: [], exactScores: {} };
-        matchStatsMap[mId].total++;
+        if (!matchStatsMap[mId]) matchStatsMap[mId] = { total: 0, homeWins: [], awayWins: [], draws: [], exactScores: {}, qualifiers: {} };           matchStatsMap[mId].total++;
         
         const h = Number(pred.predictedHomeScore); const a = Number(pred.predictedAwayScore);
         const userObj = { name: userName, home: h, away: a, time: timeStr }; 
@@ -237,6 +236,13 @@ Structure:
         if (!matchStatsMap[mId].exactScores[exact]) matchStatsMap[mId].exactScores[exact] = { count: 0, users: [] };
         matchStatsMap[mId].exactScores[exact].count++;
         matchStatsMap[mId].exactScores[exact].users.push({ name: userName, time: timeStr }); 
+        // --- התוספת החדשה: איסוף התפלגות מעפילות בנוקאאוט ---
+        if (pred.qualifier && String(pred.qualifier).trim() !== "") {
+           const qual = String(pred.qualifier).trim();
+           if (!matchStatsMap[mId].qualifiers[qual]) matchStatsMap[mId].qualifiers[qual] = { count: 0, users: [] };
+           matchStatsMap[mId].qualifiers[qual].count++;
+           matchStatsMap[mId].qualifiers[qual].users.push({ name: userName, time: timeStr });
+        }
       });
 
       const bSnap = await getDocs(collection(db, "predictions_bonus"));
@@ -723,9 +729,24 @@ Structure:
                      const stats = statsData.matches[selectedStatMatch];
                      return (
                        <div className="bg-slate-900/50 p-4 rounded-2xl border border-slate-700/50 shadow-inner mb-6">
+                         <div className="text-[10px] text-slate-500 mb-3 uppercase tracking-widest font-bold">ניחושי תוצאה (90 דקות):</div>
                          {renderProgressBar(match?.homeTeam || "קבוצת בית", stats.homeWins.length, stats.total, "bg-blue-500", () => { if(stats.homeWins.length>0) setStatSpyModal({ title: `הימרו על ${match?.homeTeam}`, list: stats.homeWins, type: "MATCH_DIRECTION" })})}
                          {renderProgressBar("תיקו", stats.draws.length, stats.total, "bg-slate-400", () => { if(stats.draws.length>0) setStatSpyModal({ title: `הימרו על תיקו`, list: stats.draws, type: "MATCH_DIRECTION" })})}
                          {renderProgressBar(match?.awayTeam || "קבוצת חוץ", stats.awayWins.length, stats.total, "bg-emerald-500", () => { if(stats.awayWins.length>0) setStatSpyModal({ title: `הימרו על ${match?.awayTeam}`, list: stats.awayWins, type: "MATCH_DIRECTION" })})}
+                         
+                         {/* אזור העולות - יופיע רק אם זה משחק נוקאאוט ויש נתונים */}
+                         {match?.stage === "KNOCKOUT" && stats.qualifiers && Object.keys(stats.qualifiers).length > 0 && (
+                            <div className="mt-6 border-t border-slate-700/80 pt-5">
+                               <h4 className="text-sm font-black text-purple-400 mb-4 flex items-center gap-2"><span>🏆</span> מי תעפיל לשלב הבא? (כולל הארכה/פנדלים):</h4>
+                               <div className="space-y-1">
+                                 {Object.entries(stats.qualifiers)
+                                    .sort(([,a]:any, [,b]:any) => b.count - a.count)
+                                    .map(([team, data]: any) => (
+                                       renderProgressBar(team, data.count, stats.total, team === match.homeTeam ? "bg-indigo-500" : "bg-teal-500", () => setStatSpyModal({ title: `הימרו ש${team} תעפיל`, list: data.users, type: "NAMES_ONLY" }))
+                                 ))}
+                               </div>
+                            </div>
+                         )}
                        </div>
                      )
                   })()}
