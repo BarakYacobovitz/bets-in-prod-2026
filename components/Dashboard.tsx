@@ -508,16 +508,22 @@ export default function Dashboard({ userId, userName, setActiveTab, setPredictio
         };
 
         bonusQuestions.forEach((q: any) => {
-           if (!isQuestionLockedLocal(q)) {
-              const ans = userBonusAnswers[q.id];
-              if (!ans || String(ans).trim() === "") {
-                 currentMissingList.push({
-                    type: 'BONUS',
-                    id: q.id,
-                    title: `שאלת בונוס: ${q.label}`,
-                    tab: 'BONUS'
-                 });
-              }
+           // 1. האם השאלה ננעלה (הזמן נגמר או שהטורניר עבר את השלב)?
+           if (isQuestionLockedLocal(q)) return;
+
+           // 2. האם השאלה מתאימה לשלב הנוכחי של הטורניר? (חסימת שאלות עתידיות)
+           // שאלות נוק-אאוט יהפכו למשימות חסרות אך ורק משלב 4 (32 הגדולות) ומעלה.
+           if (q.phase === "KNOCKOUT" && tournamentState < 4) return;
+
+           // 3. האם חסרה תשובה של המשתמש?
+           const ans = userBonusAnswers[q.id];
+           if (!ans || String(ans).trim() === "") {
+              currentMissingList.push({
+                 type: 'BONUS',
+                 id: q.id,
+                 title: `שאלת בונוס: ${q.label}`,
+                 tab: 'BONUS'
+              });
            }
         });
         
