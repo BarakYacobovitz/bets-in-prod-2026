@@ -517,13 +517,12 @@ function AdminMatchRow({ match, allMatches, isSaving, justSaved, onSave, onClear
     }
   };
 
-  const handleSaveTime = async () => { 
+  const handleSaveTime = async (e?: any) => { 
+    if (e && e.preventDefault) e.preventDefault();
     try {
-      // אנחנו קוראים לפונקציה של האבא (page.tsx) שכבר יש בה את תיקון ה-String וההודעות הירוקות
       if (onUpdateDate) {
          await onUpdateDate(String(match.id), timeInput);
       } else {
-         // גיבוי למקרה חירום בלבד, עטוף ב-String
          const { updateDoc, doc } = await import("firebase/firestore");
          await updateDoc(doc(db, "matches", String(match.id)), { matchDate: timeInput });
       }
@@ -533,7 +532,8 @@ function AdminMatchRow({ match, allMatches, isSaving, justSaved, onSave, onClear
     }
   };
 
-  const handleSaveMatchday = async () => { 
+  const handleSaveMatchday = async (e?: any) => { 
+    if (e && e.preventDefault) e.preventDefault();
     try {
       if (onUpdateMatchday) {
          await onUpdateMatchday(String(match.id), matchdayInput);
@@ -555,6 +555,17 @@ function AdminMatchRow({ match, allMatches, isSaving, justSaved, onSave, onClear
       } else {
         await updateDoc(doc(db, "matches", match.id), editData);
       }
+
+      // 🚀 התיקון: מעכשיו הכפתור הכחול שומר גם את השעה והמחזור אם שינית אותם!
+      if (timeInput !== match.matchDate) {
+         if (onUpdateDate) await onUpdateDate(String(match.id), timeInput);
+         setIsEditingTime(false);
+      }
+      if (matchdayInput !== match.matchday) {
+         if (onUpdateMatchday) await onUpdateMatchday(String(match.id), matchdayInput);
+         setIsEditingMatchday(false);
+      }
+
       toast.success("פרטי המשחק עודכנו בהצלחה! ✨");
       setIsEditingDetails(false);
     } catch (e) {
@@ -573,13 +584,13 @@ function AdminMatchRow({ match, allMatches, isSaving, justSaved, onSave, onClear
         <span className="text-[10px] sm:text-xs font-black bg-blue-900/30 text-blue-400 px-2 sm:px-2.5 py-1 rounded-lg border border-blue-500/20 whitespace-nowrap">
             ID: {match?.id ? String(match.id).substring(0, 4) : "---"}...
         </span>         
- <button onClick={() => setIsEditingDetails(!isEditingDetails)} className={`transition-all ${isEditingDetails ? 'rotate-90 text-blue-400' : 'text-slate-500 hover:text-white'}`} title="ערוך פרטי נבחרות ושידור">✏️</button>
+        <button onClick={() => setIsEditingDetails(!isEditingDetails)} className={`transition-all ${isEditingDetails ? 'rotate-90 text-blue-400' : 'text-slate-500 hover:text-white'}`} title="ערוך פרטי נבחרות ושידור">✏️</button>
         </div>
         <div className="flex gap-2">
           {isEditingMatchday ? (
             <div className="flex items-center gap-1 bg-slate-950 rounded-lg p-1 border border-slate-700">
-               <input type="text" value={matchdayInput} onChange={e => setMatchdayInput(e.target.value)} className="w-12 sm:w-16 bg-transparent text-white text-center text-xs outline-none" />
-               <button onClick={handleSaveMatchday} className="text-emerald-400 text-xs px-2 hover:bg-slate-800 rounded">✓</button>
+               <input type="text" value={matchdayInput} onChange={e => setMatchdayInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleSaveMatchday(e)} className="w-12 sm:w-16 bg-transparent text-white text-center text-xs outline-none" />
+               <button onClick={handleSaveMatchday} className="bg-emerald-600/20 text-emerald-400 font-bold text-xs px-2 hover:bg-emerald-600 hover:text-white transition-colors rounded">✓ שמור</button>
             </div>
           ) : (
             <button onClick={() => setIsEditingMatchday(true)} className="text-[10px] sm:text-xs font-black bg-slate-800 text-slate-300 hover:bg-slate-700 px-2 sm:px-2.5 py-1 rounded-lg border border-slate-700 transition-colors">
@@ -587,7 +598,10 @@ function AdminMatchRow({ match, allMatches, isSaving, justSaved, onSave, onClear
             </button>
           )}
           {isEditingTime ? (
-            <div className="flex items-center gap-1 bg-slate-950 rounded-lg p-1 border border-slate-700"><input type="text" value={timeInput} onChange={e => setTimeInput(e.target.value)} className="w-24 sm:w-32 bg-transparent text-white text-center text-xs outline-none" dir="ltr" /><button onClick={handleSaveTime} className="text-emerald-400 text-xs px-2 hover:bg-slate-800 rounded">✓</button></div>
+            <div className="flex items-center gap-1 bg-slate-950 rounded-lg p-1 border border-slate-700">
+               <input type="text" value={timeInput} onChange={e => setTimeInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleSaveTime(e)} className="w-24 sm:w-32 bg-transparent text-white text-center text-xs outline-none" dir="ltr" />
+               <button onClick={handleSaveTime} className="bg-emerald-600/20 text-emerald-400 font-bold text-xs px-2 hover:bg-emerald-600 hover:text-white transition-colors rounded">✓ שמור</button>
+            </div>
           ) : (
             <button onClick={() => setIsEditingTime(true)} className="text-[10px] sm:text-xs font-black bg-slate-800 text-slate-300 hover:bg-slate-700 px-2 sm:px-2.5 py-1 rounded-lg border border-slate-700 transition-colors">{match.matchDate}</button>
           )}
