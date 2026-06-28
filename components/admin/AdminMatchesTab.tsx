@@ -517,8 +517,27 @@ function AdminMatchRow({ match, allMatches, isSaving, justSaved, onSave, onClear
     }
   };
 
-  const handleSaveTime = () => { onUpdateDate(match.id, timeInput); setIsEditingTime(false); };
-  const handleSaveMatchday = () => { onUpdateMatchday(match.id, matchdayInput); setIsEditingMatchday(false); };
+  const handleSaveTime = async () => { 
+    try {
+      await updateDoc(doc(db, "matches", match.id), { matchDate: timeInput });
+      if (onUpdateDate) onUpdateDate(match.id, timeInput); // מעדכן גם את הסטייט המקומי אם אפשר
+      setIsEditingTime(false);
+      toast.success("המועד נשמר בהצלחה במסד הנתונים! 🕒");
+    } catch (e) {
+      toast.error("שגיאה בעדכון השעה");
+    }
+  };
+
+  const handleSaveMatchday = async () => { 
+    try {
+      await updateDoc(doc(db, "matches", match.id), { matchday: matchdayInput });
+      if (onUpdateMatchday) onUpdateMatchday(match.id, matchdayInput);
+      setIsEditingMatchday(false);
+      toast.success("השלב נשמר בהצלחה במסד הנתונים! 🏷️");
+    } catch (e) {
+      toast.error("שגיאה בעדכון השלב");
+    }
+  };
 
   const onSaveDetails = async () => {
     setIsSavingDetails(true);

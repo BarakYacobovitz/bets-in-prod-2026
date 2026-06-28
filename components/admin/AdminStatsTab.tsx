@@ -38,7 +38,48 @@ export default function AdminStatsTab({ matches, bonusQuestions, groupsList, isC
       return date.toLocaleString('he-IL', {day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit'});
     } catch { return ""; }
   };
+  // --- הסטייטים החדשים לדוח הקבוצתי ---
+  const [leagueSummaryUsers, setLeagueSummaryUsers] = useState<any[]>([]);
+  const [showLeagueSummaryModal, setShowLeagueSummaryModal] = useState(false);
+  const summaryRef = useRef<HTMLDivElement>(null);
 
+  // פונקציה ששולפת את הנתונים המוכנים של כולם ופותחת את הטבלה
+  const handleOpenLeagueSummary = async () => {
+    const toastId = toast.loading("מכין את דוח הפדיחות של הליגה... 😈");
+    try {
+      const uSnap = await getDocs(collection(db, "users"));
+      const users = uSnap.docs
+        .map(d => ({ id: d.id, ...d.data() }))
+        .filter(u => u.wrappedData) // מביא רק את מי שכבר חושב לו Wrapped
+        .sort((a, b) => (Number(b.totalPoints) || 0) - (Number(a.totalPoints) || 0));
+      
+      setLeagueSummaryUsers(users);
+      setShowLeagueSummaryModal(true);
+      toast.success("הדוח מוכן!", { id: toastId });
+    } catch (e) {
+      toast.error("שגיאה במשיכת נתונים", { id: toastId });
+    }
+  };
+
+  // פונקציה שמצלמת את הטבלה ומורידה אותה כתמונה
+  const handleExportLeagueSummary = async () => {
+    if (!summaryRef.current) return;
+    const toastId = toast.loading("מצלם את לוח התוצאות... 📸");
+    try {
+      const dataUrl = await toPng(summaryRef.current, { 
+        quality: 1, 
+        pixelRatio: 2, 
+        backgroundColor: "#0f172a" 
+      });
+      const link = document.createElement("a");
+      link.download = `BetsInProd_League_Summary.png`;
+      link.href = dataUrl;
+      link.click();
+      toast.success("התמונה ירדה! זרוק אותה בוואטסאפ ותתחיל את החגיגה 🎉", { id: toastId });
+    } catch (error) {
+      toast.error("שגיאה ביצירת התמונה", { id: toastId });
+    }
+  };
   const handleDownloadGraphImage = async () => {
     if (!chartRef.current) return;
     const toastId = toast.loading("מייצר תמונה... 📷");
@@ -512,6 +553,13 @@ Structure:
          >
            {isCalculating ? "⏳ מעבד נתונים..." : "🚀 פרסם Wrapped לכולם"}
          </button>
+         {/* הכפתור החדש שמפעיל את דוח הליגה */}
+           <button 
+             onClick={handleOpenLeagueSummary} 
+             className="w-full bg-slate-800 border border-pink-500/50 hover:bg-slate-700 text-pink-300 font-black py-3 px-6 rounded-xl shadow-lg transition-transform active:scale-95 whitespace-nowrap"
+           >
+             📊 2. צור דוח קבוצתי לתמונה
+           </button>
        </div>
        {/* 🤖 מפענח AI להזנת סטטיסטיקות ידנית */}
        <div className="bg-gradient-to-r from-slate-900 to-blue-950/40 p-6 rounded-3xl border border-blue-500/30 shadow-xl flex flex-col gap-4 mt-8">
@@ -841,6 +889,80 @@ Structure:
             </div>
          </div>
        )}
+       {showLeagueSummaryModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 p-4 backdrop-blur-sm overflow-y-auto" dir="rtl">
+          <div className="flex flex-col items-center max-h-screen py-10">
+            <button onClick={() => setShowLeagueSummaryModal(false)} className="mb-4 bg-slate-800 text-white px-4 py-2 rounded-full font-bold">✕ סגור תצוגה מקדימה</button>
+
+            {/* ה-DIV המצולם */}
+            <div className="overflow-x-auto custom-scrollbar w-full max-w-[95vw]">
+               <div ref={summaryRef} className="bg-slate-900 border-2 border-blue-500/50 p-6 md:p-10 rounded-3xl min-w-[800px] shadow-2xl relative overflow-hidden shrink-0">
+                  <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/20 rounded-full blur-3xl pointer-events-none"></div>
+                  <div className="absolute bottom-0 left-0 w-32 h-32 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none"></div>
+                  
+                  {/* כותרת התמונה */}
+                  <div className="text-center mb-8 relative z-10">
+                     <h2 className="text-4xl font-black text-white drop-shadow-md mb-2">סיכום שלב הבתים 🏆</h2>
+                     <h3 className="text-xl font-bold text-blue-400">האמת כולה על השולחן - מי הפציץ ומי עשה פדיחות?</h3>
+                  </div>
+
+                  {/* טבלת הליגה */}
+                  <div className="w-full bg-slate-950 rounded-2xl border border-slate-700 shadow-inner relative z-10">
+                     <table className="w-full text-right text-sm">
+                        <thead className="bg-slate-800 border-b-2 border-slate-700 text-slate-300">
+                           <tr>
+                              <th className="p-4 font-black">מקום</th>
+                              <th className="p-4 font-black">חבר פאנל</th>
+                              <th className="p-4 font-black text-blue-400">סה"כ נק'</th>
+                              <th className="p-4 font-black text-emerald-400">בולים 🎯</th>
+                              <th className="p-4 font-black text-teal-400">מעפילות 🌍</th>
+                              <th className="p-4 font-black text-purple-400">בונוסים 🎁</th>
+                              <th className="p-4 font-black text-amber-400">הברקת הטורניר 💡</th>
+                           </tr>
+                        </thead>
+                        <tbody>
+                           {leagueSummaryUsers.map((u, i) => (
+                              <tr key={u.id} className={`border-b border-slate-800/60 font-bold transition-colors ${i === 0 ? 'bg-amber-500/10' : i === leagueSummaryUsers.length - 1 ? 'bg-rose-500/10 opacity-70' : 'hover:bg-slate-800/40'}`}>
+                                 <td className="p-4 text-slate-400">{i + 1}</td>
+                                 <td className="p-4 text-white text-base">
+                                    {u.name?.split(" ")[0]} {i === 0 && "👑"} {i === leagueSummaryUsers.length - 1 && "🤦‍♂️"}
+                                 </td>
+                                 <td className="p-4 text-blue-400 text-lg">{u.totalPoints || 0}</td>
+                                 <td className="p-4 text-emerald-400">{u.wrappedData?.exactHits || 0}</td>
+                                 <td className="p-4 text-teal-400">{(u.wrappedData?.qualPoints || 0) + (u.wrappedData?.thirdPlacePoints || 0)}</td>
+                                 <td className="p-4 text-purple-400">{u.wrappedData?.bonusPoints || 0}</td>
+                                 <td className="p-4 text-amber-400 text-[11px] max-w-[150px] leading-tight">
+                                    {u.wrappedData?.rarestHit ? (
+                                       <span className="block truncate" title={u.wrappedData.rarestHit.matchTitle}>
+                                          {u.wrappedData.rarestHit.matchTitle} <br/><span className="text-slate-300">({u.wrappedData.rarestHit.score})</span>
+                                       </span>
+                                    ) : (
+                                       <span className="text-slate-600">-</span>
+                                    )}
+                                 </td>
+                              </tr>
+                           ))}
+                        </tbody>
+                     </table>
+                  </div>
+                  
+                  <div className="mt-8 text-center opacity-40">
+                     <span className="font-black text-white text-lg tracking-widest italic">BETS IN PROD</span>
+                  </div>
+               </div>
+            </div>
+
+            <button 
+              onClick={handleExportLeagueSummary} 
+              className="mt-6 bg-emerald-600 hover:bg-emerald-500 px-8 py-4 rounded-xl text-white font-black shadow-[0_0_20px_rgba(16,185,129,0.4)] text-lg flex items-center gap-2 transition-transform active:scale-95"
+            >
+              <span>📸</span> לחץ כאן כדי לצלם את הדוח לתמונה!
+            </button>
+          </div>
+        </div>
+      )}
+       
     </div>
   );
+  
 }
