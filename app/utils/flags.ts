@@ -36,6 +36,7 @@ const flagMap: Record<string, string> = {
   "אקוודור": "https://flagcdn.com/w40/ec.png",
   "יפן": "https://flagcdn.com/w40/jp.png",
   "שבדיה": "https://flagcdn.com/w40/se.png",
+   "שוודיה": "https://flagcdn.com/w40/se.png",
   "תוניסיה": "https://flagcdn.com/w40/tn.png",
   "בלגיה": "https://flagcdn.com/w40/be.png",
   "מצרים": "https://flagcdn.com/w40/eg.png",
