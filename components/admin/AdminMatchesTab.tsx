@@ -517,7 +517,7 @@ function AdminMatchRow({ match, allMatches, isSaving, justSaved, onSave, onClear
     }
   };
 
- const handleSaveTime = async () => { 
+  const handleSaveTime = async () => { 
     try {
       // אנחנו קוראים לפונקציה של האבא (page.tsx) שכבר יש בה את תיקון ה-String וההודעות הירוקות
       if (onUpdateDate) {
