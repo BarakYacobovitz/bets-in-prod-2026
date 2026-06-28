@@ -33,6 +33,7 @@ export default function AdminBonusTab() {
   const [filterPhase, setFilterPhase] = useState<string>("ALL");
   const [filterType, setFilterType] = useState<string>("ALL");
   const [filterKoRound, setFilterKoRound] = useState<string>("ALL");
+  const [allMatches, setAllMatches] = useState<any[]>([]);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -72,6 +73,12 @@ export default function AdminBonusTab() {
       if (loadedQuestions.length > 0 && !selectedId) {
         handleSelectQuestion(loadedQuestions[0].id, loadedQuestions, rSnap.exists() ? rSnap.data() : null);
       }
+      // נוסיף את השליפה הזו:
+      const mSnap = await getDocs(collection(db, "matches"));
+      const matchesArr: any[] = [];
+      mSnap.forEach(d => matchesArr.push({ id: d.id, ...d.data() }));
+      setAllMatches(matchesArr);
+
     } catch (e) {
       console.error(e);
       toast.error("שגיאה בטעינת נתוני הבונוס");
@@ -208,6 +215,27 @@ export default function AdminBonusTab() {
       currentTeams.push(team);
     }
     setFormData({ ...formData, specificTeams: currentTeams.join(", ") });
+  };
+  const handleAutoSelectTeams = (roundName: string) => {
+    const roundTeams = new Set<string>();
+    
+    allMatches.forEach(m => {
+       if (m.stage === "KNOCKOUT" && m.roundName === roundName) {
+          // נוודא שלא מושכים שמות זמניים כמו "מנצחת שמינית גמר 1"
+          if (m.homeTeam && !m.homeTeam.includes("מקום") && !m.homeTeam.includes("מנצחת")) roundTeams.add(m.homeTeam);
+          if (m.awayTeam && !m.awayTeam.includes("מקום") && !m.awayTeam.includes("מנצחת")) roundTeams.add(m.awayTeam);
+       }
+    });
+    
+    if (roundTeams.size === 0) {
+       toast.error(`לא נמצאו נבחרות ממשיות ב-${roundName} בלוח המשחקים.`);
+       return;
+    }
+
+    // הופכים את ה-Set למחרוזת ושומרים במקום שבו נשמרים הבלונים
+    const newTeamsString = Array.from(roundTeams).sort().join(", ");
+    setFormData({ ...formData, specificTeams: newTeamsString });
+    toast.success(`סומנו ${roundTeams.size} נבחרות שמשחקות ב-${roundName}! 🤖`);
   };
 
   const toggleQuickAction = (field: 'answer' | 'leading' | 'blacklist', guess: string) => {
@@ -492,7 +520,29 @@ export default function AdminBonusTab() {
 
                      {currentAnswerType === "TEAM" && (
                         <div className="pt-4 border-t border-emerald-900/50 mt-4 animate-fade-in-up space-y-4">
-                          
+                          <div className="bg-blue-950/20 p-3 rounded-xl border border-blue-500/20">
+                             <label className="block text-blue-400 text-xs font-bold mb-2">
+                                🤖 מילוי אוטומטי מלוח המשחקים:
+                                <br/><span className="font-normal text-[10px] text-slate-400">לחיצה תסמן אוטומטית את הנבחרות שמשחקות בסיבוב הזה (תדרוס בחירה קיימת).</span>
+                             </label>
+                             <div className="flex flex-wrap gap-2">
+                                {KO_ROUNDS.map(round => (
+                                   <button 
+                                      key={round}
+                                      onClick={() => handleAutoSelectTeams(round)}
+                                      className="bg-blue-900/30 hover:bg-blue-600 text-blue-300 hover:text-white border border-blue-500/30 px-2.5 py-1.5 rounded-lg text-[10px] font-bold transition-all shadow-sm active:scale-95"
+                                   >
+                                      מלוט מ-{round}
+                                   </button>
+                                ))}
+                                <button 
+                                   onClick={() => setFormData({ ...formData, specificTeams: "" })}
+                                   className="bg-rose-900/30 hover:bg-rose-600 text-rose-300 hover:text-white border border-rose-500/30 px-2.5 py-1.5 rounded-lg text-[10px] font-bold transition-all shadow-sm active:scale-95 mr-auto"
+                                >
+                                   נקה בחירה
+                                </button>
+                             </div>
+                          </div>
                           <div className="flex gap-2">
                              <button onClick={() => setFormData({...formData, hasNoneOption: !formData.hasNoneOption})} className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all border ${formData.hasNoneOption ? 'bg-emerald-600 text-white border-emerald-500' : 'bg-slate-950 text-slate-400 border-slate-700 hover:border-emerald-500/50'}`}>
                                 🛡️ בלון "אף נבחרת"

@@ -1508,34 +1508,36 @@ export default function Dashboard({ userId, userName, setActiveTab, setPredictio
 
                <div className="absolute bottom-[40%] left-0 w-full flex justify-center items-end gap-1 px-2 z-10 pointer-events-auto">
                  {/* Trump */}
-                 <div className="relative group w-[30%] flex flex-col items-center -translate-y-[10%] cursor-pointer" tabIndex={0}>
-                   <div className="speech-bubble absolute bottom-full mb-6 right-0 opacity-0 group-hover:opacity-100 group-active:opacity-100 group-focus:opacity-100 transition-all z-50 pointer-events-none scale-90 group-hover:scale-100 group-active:scale-100 group-focus:scale-100 bg-rose-700 text-white font-bold text-[9px] border-2 border-white px-2 py-1.5 rounded-lg shadow-lg origin-bottom-right w-max max-w-[120px] whitespace-normal text-center">
+                 <div className="relative group w-[30%] flex flex-col items-center -translate-y-[10%]" tabIndex={0}>
+                   <div className="speech-bubble absolute bottom-full mb-6 right-0 opacity-0 group-hover:opacity-100 group-active:opacity-100 transition-all z-50 pointer-events-none scale-90 group-hover:scale-100 group-active:scale-100 bg-rose-700 text-white font-bold text-[9px] border-2 border-white px-2 py-1.5 rounded-lg shadow-lg origin-bottom-right w-max max-w-[120px] whitespace-normal text-center">
                       {studioQuotes.trump}
                       <div className="absolute -bottom-1.5 right-4 w-0 h-0 border-l-[5px] border-l-transparent border-r-[5px] border-r-transparent border-t-[5px] border-t-white"></div>
                    </div>
-                   <div className="relative w-full transition-all group-hover:-translate-y-1 group-active:-translate-y-1 group-focus:-translate-y-1 group-hover:scale-110 group-active:scale-110 group-focus:scale-110">
+                   <div className="relative w-full transition-all group-hover:-translate-y-1 group-active:-translate-y-1 group-hover:scale-110 group-active:scale-110">
                       <img src="/donaldIcon-removebg.png" alt="Trump" className="relative z-10 w-full object-contain drop-shadow-md" />
                    </div>
                  </div>
 
                  {/* Canadian */}
-                 <div className="relative group w-[30%] flex flex-col items-center -translate-y-[5%] cursor-pointer" tabIndex={0}>
-                    <div className="speech-bubble absolute bottom-full mb-4 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 group-active:opacity-100 group-focus:opacity-100 transition-all z-50 pointer-events-none scale-90 group-hover:scale-100 group-active:scale-100 group-focus:scale-100 bg-slate-900 text-blue-50 font-bold text-[9px] border-2 border-blue-500/80 px-2 py-1.5 rounded-lg shadow-lg w-max max-w-[120px] whitespace-normal text-center">
+                 <div className="relative group w-[30%] flex flex-col items-center -translate-y-[5%]" tabIndex={0}>
+                    <div className="speech-bubble absolute bottom-full mb-4 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 group-active:opacity-100 transition-all z-50 pointer-events-none scale-90 group-hover:scale-100 bg-slate-900 text-blue-50 font-bold text-[9px] border-2 border-blue-500/80 px-2 py-1.5 rounded-lg shadow-lg w-max max-w-[120px] whitespace-normal text-center">
                       {studioQuotes.canadian}
                       <div className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-0 h-0 border-l-[5px] border-l-transparent border-r-[5px] border-r-transparent border-t-[5px] border-t-blue-500/80"></div>
                     </div>
-                    <img src="/candianIcon-removebg.png" className="relative z-10 w-full object-contain transition-transform group-hover:-translate-y-1 group-active:-translate-y-1 group-focus:-translate-y-1 group-hover:scale-110 group-active:scale-110 group-focus:scale-110 drop-shadow-md" />
+                    <img src="/candianIcon-removebg.png" className="relative z-10 w-full object-contain transition-transform drop-shadow-md" />
                  </div>
 
                  {/* Mexican */}
-                 <div className="relative group w-[30%] flex flex-col items-center -translate-y-[8%] cursor-pointer" tabIndex={0}>
-                    <div className="speech-bubble absolute bottom-full mb-4 left-0 opacity-0 group-hover:opacity-100 group-active:opacity-100 group-focus:opacity-100 transition-all z-50 pointer-events-none scale-90 group-hover:scale-100 group-active:scale-100 group-focus:scale-100 bg-slate-900 text-emerald-50 font-bold text-[9px] border-2 border-emerald-500/80 px-2 py-1.5 rounded-lg shadow-lg origin-bottom-left w-max max-w-[120px] whitespace-normal text-center">
+                 <div className="relative group w-[30%] flex flex-col items-center -translate-y-[8%]" tabIndex={0}>
+                    <div className="speech-bubble absolute bottom-full mb-4 left-0 opacity-0 group-hover:opacity-100 group-active:opacity-100 transition-all z-50 pointer-events-none scale-90 group-hover:scale-100 group-active:scale-100 bg-slate-900 text-emerald-50 font-bold text-[9px] border-2 border-emerald-500/80 px-2 py-1.5 rounded-lg shadow-lg origin-bottom-left w-max max-w-[120px] whitespace-normal text-center">
                       {studioQuotes.mexican}
                       <div className="absolute -bottom-1.5 left-4 w-0 h-0 border-l-[5px] border-l-transparent border-r-[5px] border-r-transparent border-t-[5px] border-t-emerald-500/80"></div>
                     </div>
-                    <img src="/maxicanIcon-removebg.png" className="relative z-10 w-full object-contain -scale-x-100 transition-transform origin-bottom group-hover:-translate-y-1 group-active:-translate-y-1 group-focus:-translate-y-1 group-hover:scale-110 group-active:scale-110 group-focus:scale-110 drop-shadow-md" />
+                    <img src="/maxicanIcon-removebg.png" className="relative z-10 w-full object-contain -scale-x-100 transition-transform origin-bottom drop-shadow-md" />
                  </div>
-                  <img src="/panel-removebg.png" className="relative z-20 w-[110%] max-w-[110%] -ml-[5%] pointer-events-none" />
+               </div>
+
+               <img src="/panel-removebg.png" className="relative z-20 w-[110%] max-w-[110%] -ml-[5%] pointer-events-none" />
              </div>
            </div>
          </div>
