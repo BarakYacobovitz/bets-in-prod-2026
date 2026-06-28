@@ -27,6 +27,8 @@ export default function AdminStatsTab({ matches, bonusQuestions, groupsList, isC
   const chartRef = useRef<HTMLDivElement>(null);
   const [scorersData, setScorersData] = useState<any[] | null>(null);
   const [isFetchingScorers, setIsFetchingScorers] = useState(false);
+  const [hideFinishedMatches, setHideFinishedMatches] = useState(true);
+  const [hideGroupsBonuses, setHideGroupsBonuses] = useState(true);
 // סטייטים למפענח ה-AI
   const [rawStatsText, setRawStatsText] = useState("");
   const [parsedStatsPreview, setParsedStatsPreview] = useState<any>(null);
@@ -303,8 +305,14 @@ Structure:
       });
 
       setStatsData({ matches: matchStatsMap, bonuses: bonusStatsMap, qualifiers: qualStatsMap, thirdPlace: { teams: thirdStatsMap, totalUsers: totalThirdPlaceUsers } });
-      if (matches.length > 0) setSelectedStatMatch(matches[0].id);
-      if (bonusQuestions.length > 0) setSelectedStatBonus(bonusQuestions[0].id);
+      if (matches.length > 0) {
+         const active = matches.filter(m => !m.isFinished);
+         setSelectedStatMatch(active.length > 0 ? active[0].id : matches[0].id);
+      }
+      if (bonusQuestions.length > 0) {
+         const active = bonusQuestions.filter(q => q.phase === "KNOCKOUT");
+         setSelectedStatBonus(active.length > 0 ? active[0].id : bonusQuestions[0].id);
+      }
       
       toast.success("סריקת הנתונים הסתיימה!");
 
@@ -541,6 +549,12 @@ Structure:
   const isNumericBonus = numericChartData.length > 0;
   
   const dynamicChartHeight = Math.max(400, numericChartData.length * 45);
+  // --- סינון דינמי לרשימות הראדאר ---
+  const visibleMatches = hideFinishedMatches ? matches.filter(m => !m.isFinished) : matches;
+  const displayMatches = visibleMatches.length > 0 ? visibleMatches : matches;
+
+  const visibleBonuses = hideGroupsBonuses ? bonusQuestions.filter(q => q.phase === "KNOCKOUT") : bonusQuestions;
+  const displayBonuses = visibleBonuses.length > 0 ? visibleBonuses : bonusQuestions;
 
   return (
     <div className="space-y-8 relative">
@@ -718,9 +732,15 @@ Structure:
          <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
            
            <div className="bg-slate-800 p-6 md:p-8 rounded-3xl border border-slate-700 shadow-xl">
-              <h3 className="text-xl md:text-2xl font-black text-white mb-6 border-b border-slate-700 pb-3">⚽ התפלגות ניחושי משחק</h3>
+              <div className="flex justify-between items-center mb-6 border-b border-slate-700 pb-3">
+                 <h3 className="text-xl md:text-2xl font-black text-white">⚽ התפלגות ניחושי משחק</h3>
+                 <label className="flex items-center gap-2 cursor-pointer text-sm text-slate-400 hover:text-white transition-colors font-bold">
+                    <input type="checkbox" checked={hideFinishedMatches} onChange={e => setHideFinishedMatches(e.target.checked)} className="accent-blue-500 w-4 h-4" />
+                    הסתר משחקים שהסתיימו
+                 </label>
+              </div>
               <select value={selectedStatMatch} onChange={(e) => setSelectedStatMatch(e.target.value)} className="w-full bg-slate-900 text-blue-300 font-bold p-3.5 rounded-xl border border-slate-600 mb-6 outline-none shadow-inner cursor-pointer">
-                {matches.map(m => (<option key={m.id} value={m.id}>{m.homeTeam} נגד {m.awayTeam}</option>))}
+                {displayMatches.map(m => (<option key={m.id} value={m.id}>{m.homeTeam} נגד {m.awayTeam}</option>))}
               </select>
               {statsData.matches[selectedStatMatch] ? (
                 <>
@@ -766,7 +786,13 @@ Structure:
 
            <div className="bg-slate-800 p-6 md:p-8 rounded-3xl border border-slate-700 shadow-xl">
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 mb-6 border-b border-slate-700 pb-3">
-                <h3 className="text-xl md:text-2xl font-black text-amber-400">⭐ שאלות בונוס</h3>
+                <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+                  <h3 className="text-xl md:text-2xl font-black text-amber-400">⭐ שאלות בונוס</h3>
+                  <label className="flex items-center gap-2 cursor-pointer text-sm text-slate-400 hover:text-white transition-colors font-bold sm:border-r border-slate-600 sm:pr-4">
+                    <input type="checkbox" checked={hideGroupsBonuses} onChange={e => setHideGroupsBonuses(e.target.checked)} className="accent-amber-500 w-4 h-4" />
+                    הצג רק בונוסים - נוקאאוט
+                  </label>
+                </div>
                 
                 {isNumericBonus && (
                   <div className="flex gap-2 bg-slate-900 p-1 rounded-xl border border-slate-700 self-end sm:self-auto items-center">
@@ -797,7 +823,7 @@ Structure:
               </div>
 
               <select value={selectedStatBonus} onChange={(e) => setSelectedStatBonus(e.target.value)} className="w-full bg-slate-900 text-amber-300 font-bold p-3.5 rounded-xl border border-slate-600 mb-6 outline-none shadow-inner cursor-pointer">
-                {bonusQuestions.map(q => (<option key={q.id} value={q.id}>{q.label}</option>))}
+                {displayBonuses.map(q => (<option key={q.id} value={q.id}>{q.label}</option>))}
               </select>
 
               {statsData.bonuses[selectedStatBonus] ? (
