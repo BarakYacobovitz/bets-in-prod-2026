@@ -517,12 +517,17 @@ function AdminMatchRow({ match, allMatches, isSaving, justSaved, onSave, onClear
     }
   };
 
-  const handleSaveTime = async () => { 
+ const handleSaveTime = async () => { 
     try {
-      await updateDoc(doc(db, "matches", match.id), { matchDate: timeInput });
-      if (onUpdateDate) onUpdateDate(match.id, timeInput); // מעדכן גם את הסטייט המקומי אם אפשר
+      // אנחנו קוראים לפונקציה של האבא (page.tsx) שכבר יש בה את תיקון ה-String וההודעות הירוקות
+      if (onUpdateDate) {
+         await onUpdateDate(String(match.id), timeInput);
+      } else {
+         // גיבוי למקרה חירום בלבד, עטוף ב-String
+         const { updateDoc, doc } = await import("firebase/firestore");
+         await updateDoc(doc(db, "matches", String(match.id)), { matchDate: timeInput });
+      }
       setIsEditingTime(false);
-      toast.success("המועד נשמר בהצלחה במסד הנתונים! 🕒");
     } catch (e) {
       toast.error("שגיאה בעדכון השעה");
     }
@@ -530,10 +535,13 @@ function AdminMatchRow({ match, allMatches, isSaving, justSaved, onSave, onClear
 
   const handleSaveMatchday = async () => { 
     try {
-      await updateDoc(doc(db, "matches", match.id), { matchday: matchdayInput });
-      if (onUpdateMatchday) onUpdateMatchday(match.id, matchdayInput);
+      if (onUpdateMatchday) {
+         await onUpdateMatchday(String(match.id), matchdayInput);
+      } else {
+         const { updateDoc, doc } = await import("firebase/firestore");
+         await updateDoc(doc(db, "matches", String(match.id)), { matchday: matchdayInput });
+      }
       setIsEditingMatchday(false);
-      toast.success("השלב נשמר בהצלחה במסד הנתונים! 🏷️");
     } catch (e) {
       toast.error("שגיאה בעדכון השלב");
     }
