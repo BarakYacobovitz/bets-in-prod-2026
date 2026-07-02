@@ -53,6 +53,17 @@ const getDefaultMatchdayFilter = (state: number) => {
   if (state >= 12) return "גמר";
   return "ALL";
 };
+// פונקציה שמתרגמת את סטטוס הטורניר לערך הסינון הדיפולטיבי של טבלת הבונוסים
+const getDefaultBonusFilter = (state: number) => {
+  if (state <= 0) return "TOURNAMENT";
+  if (state >= 1 && state <= 3) return "GROUPS";
+  if (state === 4 || state === 5) return "32 הגדולות";
+  if (state === 6 || state === 7) return "שמינית גמר";
+  if (state === 8 || state === 9) return "רבע גמר";
+  if (state === 10 || state === 11) return "חצי גמר";
+  if (state >= 12) return "גמר";
+  return "ALL";
+};
 
 export default function MatrixPage() {
   const [users, setUsers] = useState<any[]>([]);
@@ -124,10 +135,11 @@ export default function MatrixPage() {
         ]);
 
         if (sysDoc.exists()) {
-           const sysState = sysDoc.data().tournamentState || 0;
-           setTournamentState(sysState);
-           // ברגע שגילינו מה הסטטוס, אנחנו מגדירים את הדיפולט של החיפוש!
-           setFilterMatchday(getDefaultMatchdayFilter(sysState)); 
+          const sysState = sysDoc.data().tournamentState || 0;
+          setTournamentState(sysState);
+          // ברגע שגילינו מה הסטטוס, אנחנו מגדירים את הדיפולט של החיפוש למשחקים ולבונוסים יחד!
+          setFilterMatchday(getDefaultMatchdayFilter(sysState)); 
+          setFilterBonusPhase(getDefaultBonusFilter(sysState)); // <-- השורה החדשה שמסדרת את זה!
         }
 
         const uList: any[] = [];
@@ -256,21 +268,48 @@ export default function MatrixPage() {
 
   // סינון הבונוסים - עודכן לתפוס "ALL" לפי מסד הנתונים
   const filteredBonusQuestions = useMemo(() => {
-    return bonusQuestions.filter(q => {
-      if (filterBonusPhase === "ALL") return true;
-      if (filterBonusPhase === "TOURNAMENT") return q.phase === "TOURNAMENT" || (!q.phase && !q.isSurprise);
-      if (filterBonusPhase === "GROUPS") return q.phase === "GROUPS";
-      if (filterBonusPhase === "KNOCKOUT_GENERAL") {
-          // הבדיקה המורחבת: מוודאת "ALL" בדיוק כפי שנשמר ב-DB
-          return q.phase === "KNOCKOUT" && (!q.knockoutRound || q.knockoutRound === "" || q.knockoutRound === "ALL" || q.knockoutRound.includes("כללי"));
-      }
-      if (["32 הגדולות", "שמינית גמר", "רבע גמר", "חצי גמר", "גמר","מקום 3"].includes(filterBonusPhase)) {
-          return q.phase === "KNOCKOUT" && q.knockoutRound === filterBonusPhase;
-      }
-      if (filterBonusPhase === "SURPRISE") return q.isSurprise;
-      return true;
-    });
-  }, [bonusQuestions, filterBonusPhase]);
+  return bonusQuestions.filter(q => {
+    if (filterBonusPhase === "ALL") return true;
+    
+    // אם המשתמש בחר במפורש לראות רק את שאלות שלב הבתים
+    if (filterBonusPhase === "GROUPS") return q.phase === "GROUPS";
+    
+    // אם המשתמש בחר במפורש לראות רק את שאלות ה"הפתעה"
+    if (filterBonusPhase === "SURPRISE") return q.isSurprise;
+    
+    // אם המשתמש בחר במפורש לראות *רק* את הנוקאאוט הכללי (בלי שלב ספציפי)
+    if (filterBonusPhase === "KNOCKOUT_GENERAL") {
+        return q.phase === "KNOCKOUT" && (!q.knockoutRound || q.knockoutRound === "" || q.knockoutRound === "ALL" || q.knockoutRound.includes("כללי"));
+    }
+    
+    // אם המשתמש בחר במפורש לראות *רק* את שאלות כל הטורניר (בלי נוקאאוט)
+    if (filterBonusPhase === "TOURNAMENT") {
+        return q.phase === "TOURNAMENT" || (!q.phase && !q.isSurprise);
+    }
+    
+    // 🔥 חוק המשחק החדש לשלבי הנוקאאוט הספציפיים (32 הגדולות, שמינית, רבע, חצי, גמר, מקום 3)
+    if (["32 הגדולות", "שמינית גמר", "רבע גמר", "חצי גמר", "גמר", "מקום 3"].includes(filterBonusPhase)) {
+        
+        // 1. תנאי א': תציג שאלות של כל הטורניר
+        if (q.phase === "TOURNAMENT" || (!q.phase && !q.isSurprise)) return true;
+        
+        // 2. תנאי ב' ו-ג': תנאים ייעודיים בתוך עולם הנוקאאוט
+        if (q.phase === "KNOCKOUT") {
+           // האם השאלה היא לכלל הנוקאאוט (ALL / כללי / ריק)
+           const isGeneralKnockout = !q.knockoutRound || q.knockoutRound === "" || q.knockoutRound === "ALL" || q.knockoutRound.includes("כללי");
+           
+           // האם השאלה שייכת בדיוק לשלב הנוכחי (למשל "רבע גמר")
+           const isSpecificRound = q.knockoutRound === filterBonusPhase;
+           
+           return isGeneralKnockout || isSpecificRound;
+        }
+        
+        return false;
+    }
+    
+    return true;
+  });
+}, [bonusQuestions, filterBonusPhase]);
 
   const handleExportCSV = () => {
     let csvContent = "\uFEFF";
