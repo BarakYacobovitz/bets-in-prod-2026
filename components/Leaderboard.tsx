@@ -1093,8 +1093,14 @@ export default function Leaderboard() {
                        
                       <td className="p-3 md:p-4">
                          <div className="font-bold text-white text-sm md:text-base block">
-                             <span className="truncate max-w-[150px] sm:max-w-[200px] block">{u.name || "שחקן לא ידוע"}</span>
-                         </div>
+                            {/* הגדלנו את המקסימום במובייל ל-180px והוספנו title שמציג את השם המלא */}
+                            <span 
+                              className="truncate max-w-[180px] sm:max-w-[250px] block cursor-help" 
+                              title={u.name || "שחקן לא ידוע"}
+                            >
+                              {u.name || "שחקן לא ידוע"}
+                            </span>
+                        </div>
                         <div className="flex items-center gap-2 mt-1">
                         {isMe && <span className="bg-blue-600 text-white text-[9px] px-1.5 py-0.5 rounded uppercase tracking-wider shrink-0 shadow-sm">אתה</span>}
                         {isNemesis && <span className="bg-rose-600/20 border border-rose-500/50 text-rose-400 text-[9px] px-1.5 py-0.5 rounded tracking-wider shrink-0 flex items-center gap-1 shadow-sm" title="היריב המושבע שלך!"><span>🎯</span> יריב</span>}
@@ -1168,7 +1174,7 @@ export default function Leaderboard() {
                 </div>
                 <div className="flex flex-col">
                    <div className="font-bold text-white text-base md:text-lg flex items-center gap-2">
-                     <span>{me.name?.split(" ")[0]}</span>
+                     <span title={me.name}>{me.name?.split(" ")[0]}</span>
                      <span className="bg-blue-600 text-white text-[9px] md:text-[10px] px-1.5 py-0.5 rounded uppercase tracking-wider">אתה</span>
                    </div>
                    

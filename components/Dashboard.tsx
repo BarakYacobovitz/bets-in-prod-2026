@@ -601,6 +601,12 @@ export default function Dashboard({ userId, userName, setActiveTab, setPredictio
            }
         }
         
+        // מיון משחקי היום מהמוקדם ביותר למאוחר ביותר (כולל משחקי לילה ולפנות בוקר)
+        tMatches.sort((a: any, b: any) => {
+          const scoreA = parseDate(a.matchDate);
+          const scoreB = parseDate(b.matchDate);
+          return scoreA - scoreB;
+        });
         setTodayMatches(tMatches);
         setTodayTargets(targets);
         
@@ -1123,9 +1129,9 @@ export default function Dashboard({ userId, userName, setActiveTab, setPredictio
             <img src="tunnel.png" alt="Bets in Prod Tunnel" className="absolute inset-0 w-full h-full object-cover z-0 opacity-40 transition-all duration-1000 pointer-events-none" />
             <div className="absolute inset-0 z-0 bg-gradient-to-l from-slate-950/90 via-slate-900/60 to-slate-950/90 pointer-events-none"></div>
             
-            <div className="lg:hidden absolute top-1/2 left-0 -translate-y-1/2 bg-slate-800/95 border border-l-0 border-blue-500/50 rounded-r-xl py-4 px-1.5 shadow-[2px_0_15px_rgba(59,130,246,0.3)] z-50 flex flex-col items-center gap-1 animate-pulse pointer-events-none">
-              <span className="text-sm leading-none -ml-1 text-cyan-400">👈</span>
-              <span className="text-[9px] font-black uppercase tracking-widest text-cyan-400" style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}>החלק שמאלה</span>
+            <div className="lg:hidden absolute top-[30%] left-2 bg-slate-950/90 border border-slate-700/80 rounded-2xl p-2.5 shadow-[0_4px_20px_rgba(0,0,0,0.6)] border-l-cyan-500/80 border-l-2 z-50 flex flex-col items-center gap-2 animate-bounce pointer-events-none backdrop-blur-md">
+              <span className="text-xl leading-none text-cyan-400 font-black">👈</span>
+              <span className="text-[10px] font-black uppercase tracking-widest text-cyan-400 [writing-mode:vertical-lr] rotate-180">החלק שמאלה</span>
             </div>
 
             <div className="relative z-10 text-right mb-6">
