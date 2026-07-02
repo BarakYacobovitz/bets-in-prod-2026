@@ -664,15 +664,15 @@ export default function Dashboard({ userId, userName, setActiveTab, setPredictio
         for(const [g, preds] of Object.entries<any>(userQualsData)) {
             const rG = realQuals[g];
             if(rG) {
-               if(preds.first === rG.first && preds.first) feed.push({ id: `q1_${g}`, icon: '🥇', title: `${preds.first} עולה מבית ${g}`, desc: `פגיעה מדויקת - מקום 1`, points: 15, ts: Infinity });
-               else if(preds.first === rG.second && preds.first) feed.push({ id: `q1s_${g}`, icon: '🥈', title: `${preds.first} עולה מבית ${g}`, desc: `עלתה בפועל מהמקום ה-2`, points: 7, ts: Infinity });
-               if(preds.second === rG.second && preds.second) feed.push({ id: `q2_${g}`, icon: '🥇', title: `${preds.second} עולה מבית ${g}`, desc: `פגיעה מדויקת - מקום 2`, points: 15, ts: Infinity });
-               else if(preds.second === rG.first && preds.second) feed.push({ id: `q2s_${g}`, icon: '🥈', title: `${preds.second} עולה מבית ${g}`, desc: `עלתה בפועל מהמקום ה-1`, points: 7, ts: Infinity });
+               if(preds.first === rG.first && preds.first) feed.push({ id: `q1_${g}`, icon: '🥇', title: `${preds.first} עולה מבית ${g}`, desc: `פגיעה מדויקת - מקום 1`, points: 15, ts: 1 });
+               else if(preds.first === rG.second && preds.first) feed.push({ id: `q1s_${g}`, icon: '🥈', title: `${preds.first} עולה מבית ${g}`, desc: `עלתה בפועל מהמקום ה-2`, points: 7, ts: 1 });
+               if(preds.second === rG.second && preds.second) feed.push({ id: `q2_${g}`, icon: '🥇', title: `${preds.second} עולה מבית ${g}`, desc: `פגיעה מדויקת - מקום 2`, points: 15, ts: 1 });
+               else if(preds.second === rG.first && preds.second) feed.push({ id: `q2s_${g}`, icon: '🥈', title: `${preds.second} עולה מבית ${g}`, desc: `עלתה בפועל מהמקום ה-1`, points: 7, ts: 1 });
             }
         }
 
         userThirdData.forEach((t:string, i:number) => {
-            if(t && realThird.includes(t)) feed.push({ id: `t3_${i}`, icon: '🥉', title: `${t}`, desc: `צדקת! העפילה לשמינית ממקום 3`, points: 10, ts: Infinity });
+            if(t && realThird.includes(t)) feed.push({ id: `t3_${i}`, icon: '🥉', title: `${t}`, desc: `צדקת! העפילה לשמינית ממקום 3`, points: 10, ts: 2 });
         });
 
         if(Object.keys(realBonusAnswers).length > 0) {
@@ -682,7 +682,7 @@ export default function Dashboard({ userId, userName, setActiveTab, setPredictio
                    const tArr = Array.isArray(truth) ? truth : [truth];
                    const normalize = (s: any) => String(s || "").trim().replace(/\s+/g, " ").toLowerCase();
                    if(tArr.some((t:any) => normalize(t) === normalize(uAns))) {
-                       feed.push({ id: `b_${q.id}`, qId: q.id, icon: '🎁', title: q.label, desc: `שאלת בונוס (${uAns})`, points: Number(q.points)||0, ts: Infinity });
+                       feed.push({ id: `b_${q.id}`, qId: q.id, icon: '🎁', title: q.label, desc: `שאלת בונוס (${uAns})`, points: Number(q.points)||0, ts: 3 });
                    }
                }
             });
@@ -758,6 +758,9 @@ export default function Dashboard({ userId, userName, setActiveTab, setPredictio
   const avgPoints = allUsersList.length > 0 ? Math.round(allUsersList.reduce((sum, u) => sum + (Number(u.totalPoints) || 0), 0) / allUsersList.length) : 0;
   
   const getRecentFeedItems = () => {
+    if (tournamentState >= 4) {
+    return pointsFeed.slice(0, 6);
+  }
     const ptsDiff = userStats.points - userStats.prevPoints;
     if (ptsDiff <= 0) return [];
     const recent = [];
@@ -1909,8 +1912,17 @@ export default function Dashboard({ userId, userName, setActiveTab, setPredictio
                                         ) : (
                                            <div className="bg-amber-500 text-slate-900 text-[9px] sm:text-[10px] font-black w-full py-1.5 rounded-lg shadow-sm animate-pulse flex items-center justify-center">הזן ניחוש!</div>
                                         )}
-                                        {!m.isFinished && <span className="text-[8px] sm:text-[10px] text-slate-500 mt-1.5 font-bold truncate max-w-full">{locked ? "🔒 ננעל" : m.time}</span>}
-                                      </div>
+                                          {!m.isFinished && (
+                                            <div className="flex flex-col items-center mt-1">
+                                              <span className="text-[10px] sm:text-[11px] font-black text-cyan-400 bg-cyan-950/50 px-2.5 py-0.5 rounded border border-cyan-800/40 shadow-sm flex items-center gap-1">
+                                                🕒 {m.time}
+                                              </span>
+                                              <span className="text-[8px] text-slate-500 mt-1 font-semibold">
+                                                {m.matchDate ? m.matchDate.split(" ")[0] : ""}
+                                              </span>
+                                              {locked && <span className="text-[8px] font-bold text-rose-400 mt-0.5">🔒 ננעל</span>}
+                                            </div>
+                                          )}                                      </div>
 
                                       <div className="flex items-center gap-1.5 flex-1 w-0 justify-end text-left">
                                         <span className="text-xs sm:text-sm font-bold text-slate-200 truncate">{m.awayTeam}</span>
