@@ -26,7 +26,39 @@ const checkIsMatchLocked = (m: any, state: number) => {
     return false;
   }
 };
+// פונקציית עזר לבדיקה האם שאלת בונוס מסוימת צריכה להיות גלויה לכולם כרגע
+const checkIsBonusExposed = (q: any, state: number, nowMs: number) => {
+  const phase = q.phase || "TOURNAMENT";
+  
+  // אם זו שאלת הפתעה - תלוי אך ורק בזמן הסגירה שלה
+  if (q.isSurprise) {
+     if (!q.closeTime) return false;
+     const parts = q.closeTime.split("T");
+     const [year, month, day] = (parts[0] || "").split("-").map(Number);
+     const [hour, minute] = (parts[1] || "00:00").split(":").map(Number);
+     const closeTimeMs = new Date(year, month - 1, day, hour, minute).getTime();
+     return nowMs > closeTimeMs;
+  }
 
+  // שאלות טורניר ובתים נחשפות ברגע שמתחיל הטורניר (סטטוס 1 ומעלה)
+  if (phase === "TOURNAMENT" || phase === "GROUPS") {
+    return state >= 1;
+  }
+
+  // שאלות נוקאאוט - חשיפה דינמית לפי השלב הספציפי של השאלה
+  if (phase === "KNOCKOUT") {
+    const kr = q.knockoutRound || "ALL";
+    if (kr === "ALL" || kr === "" || kr.includes("כללי") || kr === "32 הגדולות") {
+      return state >= 5; // נחשף מסגירת 32 הגדולות
+    }
+    if (kr === "שמינית גמר") return state >= 7; // נחשף רק מסגירת שמינית!
+    if (kr === "רבע גמר")   return state >= 9; // נחשף רק מסגירת רבע!
+    if (kr === "חצי גמר")   return state >= 11;
+    if (kr === "גמר" || kr === "מקום 3" || kr === "מקום שלישי") return state >= 13;
+  }
+
+  return false;
+};
 // פונקציית קריאת זמנים בדיוק לפי השעון המקומי
 const parseDateTimeLocal = (dtStr: string) => {
   if (!dtStr) return 0;
@@ -380,7 +412,7 @@ export default function MatrixPage() {
              if (bData && bData[q.id] !== undefined) answerText = String(bData[q.id]);
 
              const phase = q.phase || "TOURNAMENT";
-             let isExposed = (phase === "KNOCKOUT") ? (tournamentState >= 5) : (tournamentState >= 1);
+             let isExposed = checkIsBonusExposed(q, tournamentState, nowMs);
 
              if (q.isSurprise) {
                 const closeMs = parseDateTimeLocal(q.closeTime);
@@ -423,7 +455,7 @@ export default function MatrixPage() {
       const liveTournamentStats: any = {};
       filteredBonusQuestions.forEach(q => {
          const phase = q.phase || "TOURNAMENT";
-         let isExposed = (phase === "KNOCKOUT") ? (tournamentState >= 5) : (tournamentState >= 1);
+         let isExposed = checkIsBonusExposed(q, tournamentState, nowMs);
          if (q.isSurprise) {
             const closeMs = parseDateTimeLocal(q.closeTime);
             isExposed = nowMs > closeMs;
@@ -1151,7 +1183,7 @@ ${JSON.stringify(varContextPayload)}`;
                         }
 
                         const phase = q.phase || "TOURNAMENT";
-                        let isExposed = (phase === "KNOCKOUT") ? (tournamentState >= 5) : (tournamentState >= 1);
+                        let isExposed = checkIsBonusExposed(q, tournamentState, nowMs);
 
                         if (q.isSurprise) {
                            const closeTimeMs = parseDateTimeLocal(q.closeTime);
