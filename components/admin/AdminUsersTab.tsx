@@ -4,6 +4,10 @@ import { pdf , PDFDownloadLink } from '@react-pdf/renderer';
 import { TicketPDF } from '../TicketPDF'; // עדכן את הנתיב בהתאם למיקום שבו שמרת את הקובץ
 import { useState, useEffect } from 'react';
 import { DailyMatrixPDF } from '../DailyMatrixPDF'; //
+// 🔥 הוספת רכיבי ה-Firestore הנחוצים לכלי החדש
+import { collection, query, where, getDocs, doc, updateDoc } from "firebase/firestore";
+import { db } from "../../app/firebase"; 
+import toast from "react-hot-toast";
 
 interface AdminUsersTabProps {
   usersList: any[];
@@ -27,11 +31,10 @@ interface AdminUsersTabProps {
     targetStage?: string | number
   ) => Promise<{ 
     matches: any[]; 
-    qualifiers: any[]; 
-    thirdPlace: string[]; 
-    bonuses: any[]; 
+    qualifiers: any; 
+    thirdPlace: any[]; 
+    bonus: any; 
   }>;
-  fetchDailyMatrixForPDF: (targetDate: string) => Promise<{ matches: any[], rows: any[] }>;
 }
 
 export default function AdminUsersTab({
@@ -51,427 +54,319 @@ export default function AdminUsersTab({
   handleSmartSimulation,
   handleRefreshData,
   handleExportUserBackup,
-  fetchUserPredictionsForPDF,
-  fetchDailyMatrixForPDF
+  fetchUserPredictionsForPDF
 }: AdminUsersTabProps) {
-  // מונע שגיאת Hydration ב-Next.js עם ספריות PDF
-  const [isMounted, setIsMounted] = useState(false);
-  useEffect(() => {
-    setIsMounted(true);
-  }, []);
 
-  // נתונים פיקטיביים לבדיקת העיצוב
-  const mockMatches = [
-    { home: "ספרד", away: "גרמניה", homeScore: 2, awayScore: 1, dateTime: "2026-06-12T22:00:00Z" },
-    { home: "אנגליה", away: "צרפת", homeScore: 3, awayScore: 1, dateTime: "2026-06-11T16:00:00Z" }, // תאריך מוקדם יותר, אמור לקפוץ למעלה
-    { home: "ארגנטינה", away: "ברזיל", homeScore: 0, awayScore: 0, dateTime: "2026-06-13T19:00:00Z" }
-  ];
-  
-  const mockQualifiers = [
-    { group: "A", first: "ארגנטינה", second: "הולנד" },
-    { group: "B", first: "ספרד", second: "אנגליה" },
-    { group: "C", first: "צרפת", second: "פורטוגל" },
-    { group: "D", first: "ברזיל", second: "גרמניה" }
-  ];
-  const mockThirdPlace = ["קרואטיה (מקום 3)", "אורוגוואי (מקום 3)"];
-  const mockBonuses = [
-    { question: "מלך השערים:", answer: "קיליאן אמבפה" },
-    { question: "הנבחרת המאכזבת:", answer: "איטליה" },
-    { question: "אלופת העולם:", answer: "ארגנטינה" }
-  ];
-    
-  const sendWhatsAppReminder = (userObj: any) => {
-    const firstName = (userObj.name || "").split(" ")[0];
-    const mb = userObj.missingBreakdown || {};
-    
-    const missingList = [];
-    if (mb.md1 > 0) missingList.push(`${mb.md1} משחקים במחזור 1`);
-    if (mb.md2 > 0) missingList.push(`${mb.md2} משחקים במחזור 2`);
-    if (mb.md3 > 0) missingList.push(`${mb.md3} משחקים במחזור 3`);
-    if (mb.ko > 0) missingList.push(`${mb.ko} משחקי נוקאאוט`);
-    if (mb.quals > 0) missingList.push(`עולות מ-${mb.quals} בתים`);
-    if (mb.third > 0) missingList.push(`מעפילות מקום 3`);
-    if (mb.bonus > 0) missingList.push(`${mb.bonus} שאלות בונוס`);
+  const [editingUserId, setEditingUserId] = useState<string | null>(null);
+  const [editName, setEditingName] = useState("");
+  const [editPhone, setEditingPhone] = useState("");
 
-    const missingText = missingList.length > 0 ? `\nספציפית חסר לך כרגע:\n- ${missingList.join('\n- ')}\n` : "";
+  // 🔥 1. הגדרת ה-States של כלי איתור ואיחוד ניחושים בעייתיים
+  const [searchQualifier, setSearchQualifier] = useState("");
+  const [replaceQualifier, setReplaceQualifier] = useState("");
+  const [foundPredictions, setFoundPredictions] = useState<any[]>([]);
+  const [isSearchingKnockout, setIsSearchingKnockout] = useState(false);
+  const [isUpdatingKnockout, setIsUpdatingKnockout] = useState(false);
 
-    const message = `אהלן ${firstName}, כאן הנהלת Bets in PROD ⚽\nראיתי שעוד לא סיימת למלא את הניחושים לשלב הנוכחי... הזמן רץ והדד-ליין מתקרב! \n${missingText}\nכנס עכשיו למגרש לפני שיינעל: ${window.location.origin}`;
-    const encodedMsg = encodeURIComponent(message);
-    
-    // לוגיקה חדשה: אם יש מספר טלפון, נתקן קידומת (0 -> 972) ונשלח ישירות
-    if (userObj.phone && userObj.phone.trim() !== "") {
-      let cleanPhone = userObj.phone.replace(/[\s-]/g, ''); // הסרת רווחים ומקפים
-      if (cleanPhone.startsWith('0')) {
-        cleanPhone = '972' + cleanPhone.substring(1);
-      }
-      window.open(`https://wa.me/${cleanPhone}?text=${encodedMsg}`, "_blank");
-    } else {
-      // חלון וואטסאפ רגיל לבחירת איש קשר
-      window.open(`https://wa.me/?text=${encodedMsg}`, "_blank");
+  // 🔥 2. פונקציית חיפוש הניחושים הבעייתיים בקולקציית הנוקאאוט
+  // פונקציית חיפוש גמישה וחכמה (Client-side Filter) ללא תלות בהתאמה מדויקת
+  const handleSearchBadQualifiers = async () => {
+    if (!searchQualifier.trim()) {
+      return toast.error("יש להזין ערך לחיפוש!");
     }
+    
+    setIsSearchingKnockout(true);
+    setFoundPredictions([]);
+    
+    try {
+      // שולפים את הרשומות לצורך סינון גמיש בזכרון (מונע בעיות של רווחים שגויים ב-DB)
+      const snap = await getDocs(collection(db, "predictions_knockout"));
+      
+      const usersMap: Record<string, string> = {};
+      usersList.forEach(u => { usersMap[u.id] = u.name || "שחקן לא ידוע"; });
+      
+      const results: any[] = [];
+      const searchVal = searchQualifier.trim().toLowerCase();
+
+      snap.forEach(docSnap => {
+        const data = docSnap.data();
+        const qualifierVal = String(data.qualifier || "").trim().toLowerCase();
+        
+        // בדיקה גמישה: האם הניחוש של המשתמש מכיל את מה שחיפשת (למשל מכיל "49" או "מנצחת")
+        if (qualifierVal.includes(searchVal)) {
+          results.push({
+            docId: docSnap.id, 
+            userId: data.userId,
+            userName: usersMap[data.userId] || "משתמש לא ידוע",
+            matchId: data.matchId,
+            currentValue: data.qualifier
+          });
+        }
+      });
+      
+      setFoundPredictions(results);
+      
+      if (results.length === 0) {
+        toast.success("לא נמצאו ניחושים תואמים לערך החיפוש. ✨");
+      } else {
+        toast.success(`נמצאו ${results.length} ניחושים שמתאימים לחיפוש! 🔥`);
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error("שגיאה בביצוע החיפוש ב-DB");
+    } finally {
+      setIsSearchingKnockout(false);
+    }
+  };
+
+  // 🔥 3. פונקציית העדכון המרוכזת להחלפת הערכים הבעייתיים
+  const handleBulkUpdateQualifiers = async () => {
+    if (foundPredictions.length === 0) return;
+    if (!replaceQualifier.trim()) {
+      return toast.error("יש להזין ערך חדש להחלפה!");
+    }
+    
+    setIsUpdatingKnockout(true);
+    try {
+      let successCount = 0;
+      
+      for (const pred of foundPredictions) {
+        const docRef = doc(db, "predictions_knockout", pred.docId);
+        await updateDoc(docRef, {
+          qualifier: replaceQualifier.trim()
+        });
+        successCount++;
+      }
+      
+      toast.success(`העדכון הסתיים! עודכנו בהצלחה ${successCount} ניחושים. 🎉`);
+      setFoundPredictions([]); 
+      setReplaceQualifier("");
+      setSearchQualifier("");
+    } catch (error) {
+      console.error(error);
+      toast.error("שגיאה במהלך העדכון המרוכז ב-DB");
+    } finally {
+      setIsUpdatingKnockout(false);
+    }
+  };
+
+  const handleStartEdit = (user: any) => {
+    setEditingUserId(user.id);
+    setEditingName(user.name || "");
+    setEditingPhone(user.phone || "");
+  };
+
+  const handleSaveEdit = (userId: string) => {
+    handleUpdateUserDetails(userId, { name: editName, phone: editPhone });
+    setEditingUserId(null);
+  };
+
+  const handleCancelEdit = () => {
+    setEditingUserId(null);
   };
 
   const handleGenerateUserTicket = async (user: any) => {
-    try {
-      
-      // חלון קופץ משודרג עם כל השלבים
-      const targetStageRaw = prompt("איזה שלב להדפיס?\n(אפשרויות: 1 / 2 / 3 / 32 הגדולות / שמינית גמר / רבע גמר / חצי גמר / גמר / ALL)", "1");      
-      if (!targetStageRaw) return; // בוטל
-      const targetStage = targetStageRaw.trim(); // מנקה רווחים מיותרים
+     try {
+       toast.loading("מכין את הטופס, שנייה אחת...");
+       const data = await fetchUserPredictionsForPDF(user.id, "ALL");
+       
+       const docProps = {
+          userName: user.name || "ללא שם",
+          totalPoints: user.totalPoints || 0,
+          rank: user.displayRank || "-",
+          matches: data.matches,
+          qualifiers: data.qualifiers,
+          thirdPlace: data.thirdPlace,
+          bonus: data.bonus
+       };
 
-      console.log(`מייצר טופס עבור ${user.name} - סיבוב ${targetStage}...`);
-
-      const predictions = await fetchUserPredictionsForPDF(user.id, targetStage);
-
-      const stageNameDisplay = (targetStage.toUpperCase() === "ALL") 
-        ? "טופס רשמי - כל הטורניר" 
-        : `טופס רשמי - ${targetStage}`;
-
-      const blob = await pdf(
-        <TicketPDF 
-          userName={user.name || "ללא שם"} 
-          stageName={stageNameDisplay} 
-          matches={predictions?.matches || []}
-          qualifiers={predictions?.qualifiers || []}
-          thirdPlace={predictions?.thirdPlace || []}
-          bonuses={predictions?.bonuses || []}
-        />
-      ).toBlob();
-
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      const safeName = (user.name || "User").replace(/\s+/g, '_');
-      link.download = `Ticket_MD${targetStage}_${safeName}.pdf`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-
-    } catch (error) {
-      console.error("שגיאה בהפקת ה-PDF:", error);
-      alert("הייתה בעיה ביצירת הטופס. בדוק את הקונסול.");
-    }
-  };
-  const handleGenerateDailyMatrix = async () => {
-    try {
-      const today = new Date();
-      const todayStr = `${String(today.getDate()).padStart(2, '0')}/${String(today.getMonth() + 1).padStart(2, '0')}/${today.getFullYear()}`;
-      
-      const targetDateRaw = prompt("לאיזה תאריך להפיק את טבלת הניחושים?\n(הכנס תאריך בפורמט DD/MM/YYYY או DD/MM)", todayStr);
-      if (!targetDateRaw) return;
-      const targetDate = targetDateRaw.trim();
-
-      console.log(`מייצר מטריצה יומית ל-${targetDate}...`);
-
-      const matrixData = await fetchDailyMatrixForPDF(targetDate);
-
-      if (!matrixData || matrixData.matches.length === 0) {
-        alert("לא נמצאו משחקים לתאריך זה במסד הנתונים.");
-        return;
-      }
-
-      const blob = await pdf(
-        <DailyMatrixPDF 
-          dateStr={targetDate} 
-          matches={matrixData.matches}
-          rows={matrixData.rows}
-        />
-      ).toBlob();
-
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `Daily_Matrix_${targetDate.replace(/\//g, '-')}.pdf`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-    } catch (error) {
-      console.error("שגיאה בהפקת המטריצה:", error);
-      alert("הייתה בעיה ביצירת המטריצה. בדוק את הקונסול.");
-    }
-  };
-  // פונקציה חדשה לייצוא טבלת המשתמשים לאקסל (CSV)
-  const handleExportUsersCSV = () => {
-    let csvContent = "\uFEFF"; // BOM לתמיכה בעברית באקסל
-    csvContent += "שם,אימייל,טלפון,התקדמות (%),שילם,נקודות כללי,נקודות נוקאאוט\n";
-
-    usersList.forEach(u => {
-      const name = `"${u.name || ""}"`;
-      const email = `"${u.email || ""}"`;
-      const phone = `"${u.phone || ""}"`;
-      const progress = u.completionRate || 0;
-      const hasPaid = u.hasPaid ? "כן" : "לא";
-      const totalPts = u.totalPoints || 0;
-      const koPts = u.knockoutPoints || 0;
-
-      csvContent += `${name},${email},${phone},${progress},${hasPaid},${totalPts},${koPts}\n`;
-    });
-
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.setAttribute("href", url);
-    link.setAttribute("download", `users_table_${new Date().toISOString().split('T')[0]}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+       const blob = await pdf(<TicketPDF {...docProps} />).toBlob();
+       const url = URL.createObjectURL(blob);
+       const link = document.createElement('a');
+       link.href = url;
+       link.download = `BetsInProd_Ticket_${user.name || user.id}.pdf`;
+       document.body.appendChild(link);
+       link.click();
+       document.body.removeChild(link);
+       URL.revokeObjectURL(url);
+       toast.dismiss();
+       toast.success("הטופס הורד בהצלחה! 📄");
+     } catch (e) {
+        console.error(e);
+        toast.dismiss();
+        toast.error("שגיאה בהפקת ה-PDF");
+     }
   };
 
   return (
-    <div className="space-y-8 max-w-5xl mx-auto animate-fade-in-up">
+    <div className="space-y-6">
       
-      <div className="bg-gradient-to-br from-indigo-900/40 to-slate-800 p-8 rounded-3xl border border-indigo-500/30 shadow-xl">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4 border-b border-slate-700 pb-4">
-          <div>
-            <h2 className="text-2xl font-black text-indigo-400 flex items-center gap-2">
-              <span>🔮</span> מחולל Wall of Fame / Shame
-            </h2>
-            <p className="text-slate-400 text-sm mt-1">
-              המערכת מנתחת את ניחושי הקהל ומחלצת דרמות לטור היומי.
-            </p>
-          </div>
-          <button
-            onClick={handleCreateAutoInsights}
-            className="bg-indigo-600 hover:bg-indigo-500 text-white px-6 py-3 rounded-xl font-bold transition-all shadow-md active:scale-95 flex items-center gap-2"
-          >
-            {autoInsights.length > 0 ? "🔄 רענן תובנות" : "🔍 חלץ תובנות עכשיו"}
-          </button>
-          <button
-              onClick={handleGenerateDailyMatrix}
-              disabled={isCalculating}
-              className="bg-purple-600 hover:bg-purple-500 text-white font-bold py-3 px-4 rounded-xl transition-all shadow-md flex items-center justify-center gap-2 active:scale-95 flex-1 xl:flex-none text-sm whitespace-nowrap"
-            >
-              <span>📅</span> מטריצה יומית
-            </button>
+      {/* כרטיס תובנות ואקשן מהיר */}
+      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div className="text-right">
+          <h3 className="text-lg font-black text-white">תובנות קהל ואוטומציה 🤖</h3>
+          <p className="text-xs text-slate-400 mt-1">מערכת ה-Insights סורקת את ה-DB ומייצרת פנינים לקבוצת הוואטסאפ.</p>
         </div>
-
-        {autoInsights.length > 0 ? (
-          <div className="flex flex-col gap-3">
-            {autoInsights.map((insight, idx) => (
-              <div key={idx} className="bg-slate-900/80 border border-slate-700 p-4 rounded-2xl flex justify-between items-center gap-4 group hover:border-indigo-500/50 hover:bg-slate-800 transition-colors shadow-sm">
-                <span className="text-slate-200 text-sm font-medium leading-relaxed">{insight}</span>
-                <button
-                  onClick={() => addInsightToMessage(insight)}
-                  className="bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600 hover:text-white border border-emerald-500/30 px-4 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap opacity-0 group-hover:opacity-100 flex items-center gap-1"
-                >
-                  <span>➕</span> הוסף לטור
-                </button>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="text-slate-500 text-sm bg-slate-900/50 p-6 rounded-2xl border border-dashed border-slate-700 text-center">
-            אין תובנות זמינות. הרץ סריקה כדי למצוא ניחושים מעניינים.
-          </div>
-        )}
+        <div className="flex flex-wrap gap-2 w-full md:w-auto">
+          <button 
+            onClick={handleCreateAutoInsights}
+            className="flex-1 md:flex-none bg-blue-600 hover:bg-blue-500 text-white text-xs font-black py-2.5 px-4 rounded-xl transition-all shadow-md active:scale-95"
+          >
+             ✨ גנרט תובנות
+          </button>
+          <button 
+            onClick={handleRefreshData}
+            className="flex-1 md:flex-none bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold py-2.5 px-4 rounded-xl transition-all"
+          >
+             🔄 רפרש נתונים
+          </button>
+        </div>
       </div>
 
-      <div className="bg-slate-800 p-8 rounded-3xl border border-blue-500/30 shadow-xl">
-        <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center mb-6 gap-4 border-b border-slate-700 pb-6">
-          <div>
-            <h2 className="text-2xl font-black text-white flex items-center gap-2">
-              <span>👥</span> ניהול שחקנים ומד התקדמות
-            </h2>
-            <p className="text-slate-400 text-sm mt-1">עקוב אחרי קצב הניחושים, הוסף מספרי טלפון וייצא דוחות.</p>
-          </div>
-          <div className="flex flex-wrap gap-3 w-full xl:w-auto">
-            <button
-              onClick={handleExportUsersCSV}
-              disabled={isCalculating}
-              className="bg-teal-600 hover:bg-teal-500 text-white font-bold py-3 px-4 rounded-xl transition-all shadow-md flex items-center justify-center gap-2 active:scale-95 flex-1 xl:flex-none text-sm whitespace-nowrap"
-            >
-              <span>📊</span> ייצוא טבלה
-            </button>
-            <button
-              onClick={() => handleExportPredictions("ALL", "All")}
-              disabled={isCalculating}
-              className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 px-4 rounded-xl transition-all shadow-md flex items-center justify-center gap-2 active:scale-95 flex-1 xl:flex-none text-sm whitespace-nowrap"
-            >
-              <span>⬇️</span> יומן ניחושים
-            </button>
-            <button
-              onClick={handleRefreshData}
-              disabled={isCalculating}
-              className="bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 px-4 rounded-xl transition-all shadow-md flex items-center justify-center gap-2 active:scale-95 flex-1 xl:flex-none text-sm whitespace-nowrap"
-            >
-              <span>🔄</span> סנכרן נתונים
-            </button>
-            
-          </div>
-        </div>
+      {autoInsights.length > 0 && (
+         <div className="bg-slate-900/50 border border-slate-800/80 rounded-2xl p-4 space-y-2 text-right">
+            <div className="text-xs font-black text-blue-400 tracking-wider uppercase mb-2">תובנות חמות מהשטח 🔥</div>
+            <div className="max-h-40 overflow-y-auto custom-scrollbar space-y-2 pl-2">
+               {autoInsights.map((text, idx) => (
+                  <div key={idx} className="bg-slate-950 p-2.5 rounded-xl border border-slate-800 flex justify-between items-center text-xs gap-3">
+                     <p className="text-slate-200 font-medium leading-relaxed flex-1">{text}</p>
+                     <button 
+                        onClick={() => addInsightToMessage(text)}
+                        className="bg-blue-600/10 hover:bg-blue-600 text-blue-400 hover:text-white border border-blue-500/20 px-2.5 py-1.5 rounded-lg text-[11px] font-bold transition-all shrink-0"
+                     >
+                        ➕ הוסף להודעה
+                     </button>
+                  </div>
+               ))}
+            </div>
+         </div>
+      )}
 
-        <div className="bg-purple-900/10 p-5 rounded-2xl border border-purple-500/30 mb-8 flex flex-col xl:flex-row items-start xl:items-center justify-between gap-6 shadow-inner">
-          <div>
-            <h3 className="text-purple-400 font-black flex items-center gap-2 mb-1 text-lg"><span>🤖</span> מעבדת סימולציות</h3>
-            <p className="text-slate-400 text-sm">הזרק משתמשים פיקטיביים לבדיקת עומסים ולוגיקה.</p>
-          </div>
-          <div className="flex flex-col sm:flex-row gap-3 w-full">
-            <select
-              value={simStage}
-              onChange={(e) => setSimStage(e.target.value)}
-              className="bg-slate-950 text-white p-3 rounded-xl border border-purple-500/50 outline-none font-bold text-sm flex-1 xl:flex-none"
-            >
-              <option value="BOTS_ONLY">🤖 בוטים בלבד (ללא אמת)</option>
-              <option value="MD1">סמלץ מחזור 1 (אמת)</option>
-              <option value="MD2">סמלץ מחזור 2</option>
-              <option value="MD3">סמלץ מחזור 3 + עולות</option>
-              <option value="R32">סמלץ 32 הגדולות</option>
-              <option value="R16">סמלץ שמינית גמר</option>
-              <option value="QF">סמלץ רבע גמר</option>
-              <option value="SF">סמלץ חצי גמר</option>
-              <option value="FINAL">סמלץ גמר הטורניר</option>
-              <option value="ALL">סמלץ טורניר שלם</option>
-            </select>
-            <button
-              onClick={() => (simStage === "BOTS_ONLY" ? handleSpawnBotsOnly() : handleSmartSimulation())}
-              disabled={isCalculating}
-              className="py-3 px-8 bg-purple-600 hover:bg-purple-500 text-white font-black rounded-xl transition-all shadow-lg text-sm active:scale-95 whitespace-nowrap"
-            >
-              {isCalculating ? "מריץ... ⏳" : "🧪 הפעל"}
-            </button>
-          </div>
-        </div>
+      {/* סימולטור שלבים מהיר לאדמין */}
+      <div className="bg-slate-900/40 border border-slate-800 rounded-2xl p-4 flex flex-col md:flex-row items-center justify-between gap-4">
+         <div className="text-right w-full md:w-auto">
+            <div className="text-sm font-black text-slate-300">🎮 סימולטור שלבים (Sandbox)</div>
+            <p className="text-[11px] text-slate-500 mt-0.5">מאפשר להריץ בוטים או סימולציות חכמות על משחקים קרובים.</p>
+         </div>
+         <div className="flex gap-2 w-full md:w-auto justify-end">
+            <button onClick={handleSpawnBotsOnly} className="text-xs font-bold text-slate-400 bg-slate-800 hover:bg-slate-700 px-3 py-2 rounded-xl transition-all">🤖 זרוק בוטים</button>
+            <button onClick={handleSmartSimulation} className="text-xs font-black text-amber-400 bg-amber-950/30 border border-amber-500/20 hover:bg-amber-900/40 px-4 py-2 rounded-xl transition-all shadow-sm">🧠 סימולציה חכמה</button>
+         </div>
+      </div>
 
-        <div className="w-full overflow-x-auto bg-slate-950 rounded-2xl border border-slate-700 shadow-inner custom-scrollbar">
-          <table className="w-full text-right text-slate-300 min-w-[800px]">
-            <thead className="text-xs uppercase tracking-widest bg-slate-900/80 text-slate-500 border-b border-slate-800">
-              <tr>
-                <th className="p-4 font-black">פרטי משתמש</th>
-                <th className="p-4 text-center font-black">התקדמות</th>
-                <th className="p-4 text-center font-black">תשלום</th>
-                <th className="p-4 text-center font-black">פעולות</th>
+      {/* טבלת המשתמשים המרכזית */}
+      <div className="bg-slate-900 border border-slate-800 rounded-3xl overflow-hidden shadow-xl">
+        <div className="p-5 border-b border-slate-800 bg-slate-900/50 flex justify-between items-center">
+          <h3 className="text-base font-black text-white text-right">רשימת מנויים ומשתתפים ({usersList.length})</h3>
+          <span className="text-[10px] bg-slate-950 text-slate-500 px-2.5 py-1 rounded-md border border-slate-800 font-bold uppercase tracking-wider">Database Live</span>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-right text-sm">
+            <thead>
+              <tr className="bg-slate-950 text-slate-400 border-b border-slate-800 text-xs font-bold">
+                <th className="p-4 w-12 text-center">#</th>
+                <th className="p-4">שם משתתף</th>
+                <th className="p-4">טלפון</th>
+                <th className="p-4 text-center w-24">סטטוס תשלום</th>
+                <th className="p-4 text-center w-24">ניקוד כללי</th>
+                <th className="p-4 text-center w-40">פעולות ניהול</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="divide-y divide-slate-800/60">
               {usersList.length === 0 ? (
-                <tr><td colSpan={4} className="p-12 text-center text-slate-500 font-bold">אין משתמשים רשומים.</td></tr>
+                <tr>
+                  <td colSpan={6} className="text-center p-12 text-slate-500 font-bold animate-pulse">אין משתמשים רשומים במערכת... 🤷‍♂️</td>
+                </tr>
               ) : (
-                usersList.map((u, idx) => {
-                  const progress = u.completionRate || 0;
+                usersList.map((u, index) => {
+                  const isEditing = editingUserId === u.id;
                   return (
-                    <tr key={u.id} className="border-b border-slate-800/50 hover:bg-slate-800/50 transition-colors">
-                      <td className="p-4 min-w-[280px]">
-                        <div className="flex items-start gap-2">
-                          <span className="text-slate-600 text-xs w-4 mt-2">{idx + 1}.</span>
-                          <div className="flex flex-col flex-1 gap-2">
-                            <input
-                              type="text"
-                              value={u.name || ""}
-                              onChange={(e) =>
-                                setUsersList(
-                                  usersList.map((user) =>
-                                    user.id === u.id ? { ...user, name: e.target.value } : user
-                                  )
-                                )
-                              }
-                              placeholder="שם המשתמש"
-                              className="bg-slate-900 border border-slate-700 text-white px-2 py-1.5 rounded-lg focus:border-blue-500 outline-none text-sm w-full"
-                            />
-                            <div className="flex items-center gap-2">
-                                <span className="text-[10px] text-slate-500 truncate w-1/2" title={u.email}>{u.email}</span>
-                                <input
-                                  type="text"
-                                  value={u.phone || ""}
-                                  onChange={(e) =>
-                                    setUsersList(
-                                      usersList.map((user) =>
-                                        user.id === u.id ? { ...user, phone: e.target.value } : user
-                                      )
-                                    )
-                                  }
-                                  placeholder="טלפון (לדוגמה 054...)"
-                                  className="bg-slate-900 border border-slate-700 text-emerald-300 px-2 py-1 rounded-lg focus:border-emerald-500 outline-none text-[11px] w-1/2 font-sans text-left"
-                                  dir="ltr"
-                                />
-                            </div>
+                    <tr key={u.id} className="hover:bg-slate-800/30 transition-colors">
+                      <td className="p-4 text-center text-slate-600 font-mono font-bold">{index + 1}</td>
+                      <td className="p-4 font-bold text-slate-200">
+                        {isEditing ? (
+                          <input
+                            type="text"
+                            value={editName}
+                            onChange={(e) => setEditingName(e.target.value)}
+                            className="bg-slate-950 border border-slate-700 rounded px-2 py-1 text-white text-xs outline-none w-full"
+                          />
+                        ) : (
+                          <div className="flex flex-col">
+                             <span>{u.name || "ללא שם"}</span>
+                             <span className="text-[10px] text-slate-500 font-mono mt-0.5 font-normal">{u.id}</span>
                           </div>
-                          <button
-                            onClick={() => handleUpdateUserDetails(u.id, { name: u.name, phone: u.phone })}
-                            className="bg-slate-800 hover:bg-blue-600 text-white p-2 rounded-lg border border-slate-700 transition-all shrink-0 self-stretch flex items-center justify-center shadow-sm"
-                            title="שמור שם וטלפון"
-                          >
-                            💾
-                          </button>
-                        </div>
+                        )}
                       </td>
-
-                      <td className="p-4 w-56 align-top pt-6">
-                        <div className="flex flex-col gap-1.5">
-                          <div className="flex justify-between items-center px-1">
-                            <span className={`text-[10px] font-black ${progress === 100 ? "text-emerald-400" : "text-amber-400"}`}>
-                              {progress}%
-                            </span>
-                            {progress < 100 && (
-                              <span className="text-[9px] bg-rose-500/10 text-rose-400 px-1 rounded border border-rose-500/20 animate-pulse">חסר</span>
-                            )}
-                          </div>
-                          <div className="w-full bg-slate-900 rounded-full h-2 border border-slate-700 overflow-hidden shadow-inner">
-                            <div
-                              className={`h-full transition-all duration-1000 ${
-                                progress === 100 ? "bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.4)]" :
-                                progress > 50 ? "bg-amber-500" : "bg-rose-500"
-                              }`}
-                              style={{ width: `${progress}%` }}
-                            ></div>
-                          </div>
-                          
-                          {progress < 100 && u.missingBreakdown && (
-                             <div className="flex flex-wrap gap-1 mt-1 justify-end">
-                               {u.missingBreakdown.md1 > 0 && <span className="text-[8px] bg-slate-800 text-slate-300 border border-slate-600 px-1 rounded">מחזור 1: {u.missingBreakdown.md1}</span>}
-                               {u.missingBreakdown.md2 > 0 && <span className="text-[8px] bg-slate-800 text-slate-300 border border-slate-600 px-1 rounded">מחזור 2: {u.missingBreakdown.md2}</span>}
-                               {u.missingBreakdown.md3 > 0 && <span className="text-[8px] bg-slate-800 text-slate-300 border border-slate-600 px-1 rounded">מחזור 3: {u.missingBreakdown.md3}</span>}
-                               {u.missingBreakdown.ko > 0 && <span className="text-[8px] bg-purple-900/50 text-purple-300 border border-purple-500/30 px-1 rounded">נוקאאוט: {u.missingBreakdown.ko}</span>}
-                               {u.missingBreakdown.quals > 0 && <span className="text-[8px] bg-teal-900/50 text-teal-300 border border-teal-500/30 px-1 rounded">עולות</span>}
-                               {u.missingBreakdown.third > 0 && <span className="text-[8px] bg-rose-900/50 text-rose-300 border border-rose-500/30 px-1 rounded">מקום 3</span>}
-                               {u.missingBreakdown.bonus > 0 && <span className="text-[8px] bg-amber-900/50 text-amber-300 border border-amber-500/30 px-1 rounded">בונוס: {u.missingBreakdown.bonus}</span>}
-                             </div>
-                          )}
-                        </div>
+                      <td className="p-4 text-slate-300 font-medium">
+                        {isEditing ? (
+                          <input
+                            type="text"
+                            value={editPhone}
+                            onChange={(e) => setEditingPhone(e.target.value)}
+                            className="bg-slate-950 border border-slate-700 rounded px-2 py-1 text-white text-xs outline-none w-full"
+                          />
+                        ) : (
+                          u.phone || "-"
+                        )}
                       </td>
-
-                      <td className="p-4 text-center align-middle">
+                      <td className="p-4 text-center">
                         <button
-                          onClick={() => handleTogglePayment(u.id, u.hasPaid)}
-                          className={`px-4 py-1.5 rounded-lg font-bold text-xs w-24 transition-all border ${
+                          onClick={() => handleTogglePayment(u.id, u.hasPaid || false)}
+                          className={`px-3 py-1.5 rounded-full text-xs font-black transition-all ${
                             u.hasPaid
-                              ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20"
-                              : "bg-rose-500/10 text-rose-400 border-rose-500/30 hover:bg-rose-500/20"
+                              ? "bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20"
+                              : "bg-rose-500/10 border border-rose-500/30 text-rose-400 hover:bg-rose-500/20 animate-pulse"
                           }`}
                         >
-                          {u.hasPaid ? "✅ שולם" : "❌ חוב"}
+                          {u.hasPaid ? "💰 שולם" : "⚠️ ממתין"}
                         </button>
                       </td>
-
-                      <td className="p-4 align-middle">
-                        <div className="flex justify-center gap-2">
-                          {progress < 100 && (
-                            <button
-                              onClick={() => sendWhatsAppReminder(u)}
-                              className="bg-emerald-600/20 hover:bg-emerald-600 text-emerald-400 hover:text-white border border-emerald-500/30 w-9 h-9 rounded-lg transition-all flex items-center justify-center group relative"
-                            >
-                              <span className="text-lg">💬</span>
-                              <div className="absolute bottom-full mb-2 right-0 bg-slate-900 text-white text-[10px] px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap border border-slate-700 z-10 pointer-events-none">
-                                {u.phone ? "שלח תזכורת WhatsApp (ישיר)" : "שלח תזכורת חביבה"}
-                              </div>
-                            </button>
+                      <td className="p-4 text-center text-amber-400 font-black font-mono text-base">
+                        {u.totalPoints || 0}
+                      </td>
+                      <td className="p-4">
+                        <div className="flex items-center justify-center gap-2">
+                          {isEditing ? (
+                            <>
+                              <button
+                                onClick={() => handleSaveEdit(u.id)}
+                                className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold px-2.5 py-1.5 rounded transition-all"
+                              >
+                                שמור
+                              </button>
+                              <button
+                                onClick={handleCancelEdit}
+                                className="bg-slate-700 hover:bg-slate-600 text-slate-200 text-xs font-bold px-2.5 py-1.5 rounded transition-all"
+                              >
+                                ביטול
+                              </button>
+                            </>
+                          ) : (
+                            <>
+                              <button
+                                onClick={() => handleStartEdit(u)}
+                                className="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 w-9 h-9 rounded-lg transition-all flex items-center justify-center text-xs"
+                                title="ערוך פרטי שחקן"
+                              >
+                                ✏️
+                              </button>
+                              <button
+                                onClick={() => handleExportPredictions(u.id, u.name || "משתמש")}
+                                className="bg-blue-500/10 hover:bg-blue-500 text-blue-400 hover:text-white border border-blue-500/30 w-9 h-9 rounded-lg transition-all flex items-center justify-center text-xs"
+                                title="ייצא ניחושים מלאים"
+                              >
+                                📤
+                              </button>
+                              <button
+                                onClick={() => handleExportUserBackup(u.id, u.name || "משתמש")}
+                                className="bg-purple-500/10 hover:bg-purple-500 text-purple-400 hover:text-white border border-purple-500/30 w-9 h-9 rounded-lg transition-all flex items-center justify-center text-xs"
+                                title="ייצא גיבוי JSON גולמי"
+                              >
+                                💾
+                              </button>
+                            </>
                           )}
-                          <button
-                            onClick={() => handleExportPredictions(u.id, u.name || "ללא שם")}
-                            className="bg-blue-500/10 hover:bg-blue-500 text-blue-400 hover:text-white border border-blue-500/30 w-9 h-9 rounded-lg transition-all flex items-center justify-center"
-                            title="הורד ניחושים"
-                          >
-                            ⬇️
-                          </button>
-                          <button
-                            onClick={() => handleExportUserBackup(u.id, u.name || "ללא שם")}
-                            className="bg-teal-500/10 hover:bg-teal-500 text-teal-400 hover:text-white border border-teal-500/30 w-9 h-9 rounded-lg transition-all flex items-center justify-center group relative"
-                            title="גבה משתמש לקובץ גיבוי (JSON)"
-                          >
-                            <span className="text-lg">💾</span>
-                            <div className="absolute bottom-full mb-2 right-0 bg-slate-900 text-white text-[10px] px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap border border-slate-700 z-10 pointer-events-none">
-                                הורד קובץ שחזור
-                              </div>
-                          </button>                          
                           <button
                             onClick={() => handleDeleteUser(u.id, u.name || "ללא שם")}
                             className="bg-rose-500/10 hover:bg-rose-500 text-rose-400 hover:text-white border border-rose-500/30 w-9 h-9 rounded-lg transition-all flex items-center justify-center"
@@ -480,16 +375,15 @@ export default function AdminUsersTab({
                             🗑️
                           </button>
                           <button
-                              onClick={() => handleGenerateUserTicket(u)}
-                              className="bg-orange-500/10 hover:bg-orange-500 text-orange-400 hover:text-white border border-orange-500/30 w-9 h-9 rounded-lg transition-all flex items-center justify-center group relative"
-                              title="הפק טופס רשמי (PDF)"
-                            >
-                              <span className="text-lg">📄</span>
-                              <div className="absolute bottom-full mb-2 right-0 bg-slate-900 text-white text-[10px] px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap border border-slate-700 z-10 pointer-events-none">
-                                הורד טופס PDF
-                              </div>
-                            </button>
-
+                            onClick={() => handleGenerateUserTicket(u)}
+                            className="bg-orange-500/10 hover:bg-orange-500 text-orange-400 hover:text-white border border-orange-500/30 w-9 h-9 rounded-lg transition-all flex items-center justify-center group relative"
+                            title="הפק טופס רשמי (PDF)"
+                          >
+                            <span className="text-lg">📄</span>
+                            <div className="absolute bottom-full mb-2 right-0 bg-slate-900 text-white text-[10px] px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap border border-slate-700 z-10 pointer-events-none">
+                              הורד טופס PDF
+                            </div>
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -500,6 +394,89 @@ export default function AdminUsersTab({
           </table>
         </div>
       </div>
+
+      {/* ========================================================================= */}
+      {/* 🔥 4. ממשק המשתמש (UI) של כלי איתור ואיחוד ניחושים בעייתיים בנוקאאוט */}
+      {/* ========================================================================= */}
+      <div className="mt-12 bg-slate-900 rounded-3xl p-6 border border-slate-700 shadow-2xl text-right animate-fade-in-up" dir="rtl">
+        <div className="border-b border-slate-800 pb-4 mb-6 flex items-center gap-3">
+          <span className="text-2xl">🕵️‍♂️</span>
+          <div>
+            <h3 className="text-xl font-black text-transparent bg-clip-text bg-gradient-to-r from-amber-400 to-orange-400">כלי איתור ואיחוד ניחושים בעייתיים (נוקאאוט)</h3>
+            <p className="text-slate-400 text-xs mt-0.5">סריקה ועדכון ישיר של שדה העולה (qualifier) עבור משתתפים שהזינו ערכים זמניים/שגויים.</p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end mb-6">
+          <div className="flex flex-col gap-2">
+            <label className="text-xs font-bold text-slate-400 pr-1">1. ערך שגוי לחיפוש (לדוגמה: "מנצחת משחק 49"):</label>
+            <input 
+              type="text"
+              placeholder="הזן את הערך המדויק שנשמר..."
+              value={searchQualifier}
+              onChange={(e) => setSearchQualifier(e.target.value)}
+              className="w-full bg-slate-950 text-white placeholder-slate-600 rounded-xl py-3 px-4 border border-slate-800 focus:border-amber-500 outline-none text-sm font-medium shadow-inner transition-all"
+            />
+          </div>
+
+          <button 
+            onClick={handleSearchBadQualifiers}
+            disabled={isSearchingKnockout || !searchQualifier}
+            className="bg-amber-500 hover:bg-amber-400 disabled:opacity-40 text-slate-950 font-black py-3 px-6 rounded-xl text-sm transition-all shadow-md active:scale-95 h-[46px]"
+          >
+            {isSearchingKnockout ? "סורק DB... ⏳" : "🔎 מצא ניחושים בעייתיים"}
+          </button>
+        </div>
+
+        {/* הצגת רשימת התוצאות שנמצאו ב-DB במידה ויש כאלו */}
+        {foundPredictions.length > 0 && (
+          <div className="mt-6 bg-slate-950/50 rounded-2xl border border-slate-800/80 p-4 animate-fade-in">
+            <h4 className="text-sm font-black text-slate-300 mb-3 flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
+              נמצאו {foundPredictions.length} רשומות שדורשות תיקון:
+            </h4>
+            
+            <div className="max-h-48 overflow-y-auto custom-scrollbar space-y-2 mb-6 pl-2">
+              {foundPredictions.map((pred, i) => (
+                <div key={i} className="bg-slate-900 border border-slate-800 p-2.5 rounded-xl flex justify-between items-center text-xs">
+                  <div className="flex items-center gap-2">
+                    <span className="text-slate-500 font-mono">[{i+1}]</span>
+                    <span className="font-bold text-slate-200">{pred.userName}</span>
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <span className="text-slate-500 bg-slate-950 px-2 py-1 rounded border border-slate-800">מזהה משחק: {pred.matchId}</span>
+                    <span className="text-rose-400 font-bold bg-rose-950/20 px-2 py-1 rounded border border-rose-900/30">ערך נוכחי: "{pred.currentValue}"</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* חלק ב' - הזנת התוצאה הלוגית החדשה וביצוע עדכון מרוכז */}
+            <div className="border-t border-slate-800 pt-5 grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
+              <div className="flex flex-col gap-2">
+                <label className="text-xs font-bold text-emerald-400 pr-1">2. לאיזה ערך תקין תרצה לשנות את התוצאה עבורם?</label>
+                <input 
+                  type="text"
+                  placeholder="הזן את שם הנבחרת האמיתית (לדוגמה: ארגנטינה)..."
+                  value={replaceQualifier}
+                  onChange={(e) => setReplaceQualifier(e.target.value)}
+                  className="w-full bg-slate-950 text-white placeholder-slate-600 rounded-xl py-3 px-4 border border-emerald-900/30 focus:border-emerald-500 outline-none text-sm font-medium shadow-inner transition-all"
+                />
+              </div>
+
+              <button 
+                onClick={handleBulkUpdateQualifiers}
+                disabled={isUpdatingKnockout || !replaceQualifier}
+                className="bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white font-black py-3 px-8 rounded-xl text-sm transition-all shadow-lg shadow-emerald-900/20 active:scale-95 h-[46px]"
+              >
+                {isUpdatingKnockout ? "מעדכן רשומות ב-DB... ⏳" : "💾 בצע החלפה מרוכזת ושמור"}
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+      {/* ========================================================================= */}
+
     </div>
   );
 }
