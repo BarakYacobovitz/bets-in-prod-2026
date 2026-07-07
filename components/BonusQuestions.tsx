@@ -81,7 +81,9 @@ export default function BonusQuestions({ userId, tournamentState: propTournament
   const [bonusCategory, setBonusCategory] = useState<string>("TOURNAMENT");
   const [knockoutRound, setKnockoutRound] = useState<string>("ALL");
   const [weightTab, setWeightTab] = useState<string>("REGULAR");
-  
+  const [boostMatchPred, setBoostMatchPred] = useState<any>(null);
+
+
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
   const [isLoading, setIsLoading] = useState(true);
   const [isRandomizing, setIsRandomizing] = useState(false);
@@ -123,7 +125,30 @@ export default function BonusQuestions({ userId, tournamentState: propTournament
     const interval = setInterval(() => setNowMs(Date.now()), 1000);
     return () => clearInterval(interval);
   }, []);
+  useEffect(() => {
+  // bq_1783463384597 - שים כאן את ה-ID האמיתי של שאלת הבוסט
+  const chosenBoostMatch = answers["bq_1783463384597"]; 
+  if (!chosenBoostMatch || !userId || allMatches.length === 0) {
+    setBoostMatchPred(null);
+    return;
+  }
 
+  // מוצאים את המשחק האמיתי כדי לקבל את ה-ID שלו
+  const targetMatch = allMatches.find(m => `${m.homeTeam} - ${m.awayTeam}` === chosenBoostMatch && m.roundName === "רבע גמר");
+  if (!targetMatch) return;
+
+  // פונים ישירות למסמך הניחוש הספציפי בנוקאאוט
+  const docRef = doc(db, "predictions_knockout", `${userId}_${targetMatch.id}`);
+  const unsubscribe = onSnapshot(docRef, (docSnap) => {
+    if (docSnap.exists()) {
+      setBoostMatchPred(docSnap.data());
+    } else {
+      setBoostMatchPred(null);
+    }
+  });
+
+  return () => unsubscribe();
+}, [answers, userId, allMatches]);
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -512,7 +537,35 @@ export default function BonusQuestions({ userId, tournamentState: propTournament
     const hasTruth = realBonusAnswers[q.id] && (Array.isArray(realBonusAnswers[q.id]) ? realBonusAnswers[q.id].length > 0 : String(realBonusAnswers[q.id]).trim() !== "");
     const hasLeading = realBonusData.leading?.[q.id] && (Array.isArray(realBonusData.leading[q.id]) ? realBonusData.leading[q.id].length > 0 : String(realBonusData.leading[q.id]).trim() !== "");
     
-    const myPoints = checkAnswerPoints(q, answers[q.id]);
+    // 1. חישוב נקודות רגיל כברירת מחדל
+let myPoints = checkAnswerPoints(q, answers[q.id]);
+
+if (q.id === "bq_1783463384597") { // <--- ה-ID האמיתי של שאלת הבוסט
+  const chosenMatchStr = answers[q.id];
+  
+  if (chosenMatchStr) {
+    const targetMatch = allMatches.find(m => `${m.homeTeam} - ${m.awayTeam}` === chosenMatchStr && m.roundName === "רבע גמר");
+    
+    if (targetMatch && targetMatch.isFinished && boostMatchPred) {
+       let pts = 0;
+       const rH = Number(targetMatch.realHomeScore);
+       const rA = Number(targetMatch.realAwayScore);
+       const pH = Number(boostMatchPred.predictedHomeScore); // 🔥 משתמשים בסטייט החדש והבטוח
+       const pA = Number(boostMatchPred.predictedAwayScore);
+       
+       if (!isNaN(pH) && !isNaN(pA) && !isNaN(rH) && !isNaN(rA)) {
+         if (Math.sign(pH - pA) === Math.sign(rH - rA)) {
+           pts += 5;
+           if (pH === rH && pA === rA) pts += 10;
+         }
+       }
+       if (boostMatchPred.qualifier === targetMatch.realQualifier && boostMatchPred.qualifier !== "") {
+         pts += 15; // ניקוד עולה ברבע גמר
+       }
+       myPoints = pts;
+    }
+  }
+}
     
     const openMs = q.openTime ? parseDateTimeLocal(q.openTime) : 0;
     const isWaitingToOpen = q.isSurprise && nowMs < openMs;
@@ -581,10 +634,11 @@ export default function BonusQuestions({ userId, tournamentState: propTournament
                  {q.isSurprise && !isWaitingToOpen && <span className="bg-purple-600 w-6 h-6 rounded-full flex items-center justify-center text-[10px] shadow-md" title="שאלת הפתעה!">🎁</span>}
                  {q.isDouble && !q.isSurprise && <span className="bg-rose-600 w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black shadow-md text-white" title="ניקוד כפול!">X2</span>}
               </div>
-              {hasTruth && myPoints !== null && !isWaitingToOpen && (
-                 <span className={`px-2 py-0.5 rounded text-[10px] font-black shadow-sm border ${myPoints > 0 ? "bg-emerald-900/40 text-emerald-400 border-emerald-500/50" : "bg-rose-950/50 text-rose-400 border-rose-500/40"}`}>
-                   {myPoints > 0 ? `🎯 +${myPoints} נק'` : "0 נק'"}
-                 </span>
+              {/* בדיקה דינמית אם להציג את הניקוד: או שיש תשובה באדמין, או שזו שאלת ה-Boost והמשחק נגמר */}
+              {((hasTruth) || (q.id === "bq_1783463384597" && allMatches.find(m => `${m.homeTeam} - ${m.awayTeam}` === answers[q.id] && m.roundName === "רבע גמר")?.isFinished)) && myPoints !== null && !isWaitingToOpen && (
+                <span className={`px-2 py-0.5 rounded text-[10px] font-black shadow-sm border ${myPoints > 0 ? "bg-emerald-900/40 text-emerald-400 border-emerald-500/50" : "bg-rose-950/50 text-rose-400 border-rose-500/40"}`}>
+                  {myPoints > 0 ? `🎯 +${myPoints} נק'` : "0 נק'"}
+                </span>
               )}
             </div>
          </div>

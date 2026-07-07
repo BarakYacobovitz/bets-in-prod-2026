@@ -15,7 +15,6 @@ import AdminNotificationTab from "@/components/admin/AdminNotificationTab";
 import AdminPrizesTab from "@/components/admin/AdminPrizesTab";
 import AdminStatsTab from "@/components/admin/AdminStatsTab";
 
-
 const ADMIN_EMAIL = "bawak.y10@gmail.com"; 
 
 export default function AdminPanel() {
@@ -31,7 +30,7 @@ export default function AdminPanel() {
   const [savingId, setSavingId] = useState<string | null>(null);
   const [isCalculating, setIsCalculating] = useState(false);
   const [autoInsights, setAutoInsights] = useState<string[]>([]);
-  const [statsData, setStatsData] = useState<any>(null); // השורה שחסרה!
+  const [statsData, setStatsData] = useState<any>(null); 
   
   const [realQualifiers, setRealQualifiers] = useState<any>({});
   const [realThirdPlace, setRealThirdPlace] = useState<string[]>(Array(8).fill(""));
@@ -89,7 +88,6 @@ export default function AdminPanel() {
     }
   };
 
-// 1. פונקציית בדיקה - האם השאלה היא "חובה" לשלב שבו אנחנו נמצאים?
   const isQuestionMandatoryNow = (q: any, state: number) => {
     const s = Number(state) || 0;
     
@@ -107,7 +105,6 @@ export default function AdminPanel() {
     }
 
     if (q.phase === "KNOCKOUT") {
-      // התיקון: תמיכה בשאלות נוקאאוט כלליות ("ALL") שיופיעו כחובה רק בסטייט 4
       if (!q.knockoutRound || q.knockoutRound === "ALL") {
           return s === 4;
       }
@@ -122,8 +119,6 @@ export default function AdminPanel() {
     return false;
   };
 
-  // מנוע חישוב התקדמות משודרג ומחמיר!
-  // מנוע חישוב אחוזי התקדמות למשתמש - עכשיו עם פירוט חוסרים מלא!
   const calculateAllUsersProgress = async (users: any[], currentMatches: any[], questions: any[], currentTournState: number) => {
     const predictionsMatches = await getDocs(collection(db, "predictions_matches"));
     const predictionsKnockout = await getDocs(collection(db, "predictions_knockout"));
@@ -136,7 +131,6 @@ export default function AdminPanel() {
       let completed = 0;
       const missing = { md1: 0, md2: 0, md3: 0, ko: 0, bonus: 0, quals: 0, third: 0 };
 
-      // 1. משחקים - סופרים רק את השלב הפעיל כרגע!
       const activeMatches = currentMatches.filter(m => isMatchInCurrentActivePhase(m, currentTournState));
       total += activeMatches.length;
       
@@ -161,7 +155,6 @@ export default function AdminPanel() {
         }
       });
 
-      // 2. בונוסים - כאן השינוי הקריטי! סופרים רק מה ש"חובה כרגע"
       const mandatoryBonuses = questions.filter(q => isQuestionMandatoryNow(q, currentTournState));
       total += mandatoryBonuses.length;
       const userBonus = predictionsBonus.docs.find(d => d.id === u.id)?.data()?.answers || {};
@@ -174,7 +167,6 @@ export default function AdminPanel() {
         }
       });
 
-      // 3. עולות מבתים ומקום 3 - חובה רק לפני הטורניר (State 0)
       if (currentTournState === 0) {
         const groups = Array.from(new Set(currentMatches.filter(m => m.stage !== "KNOCKOUT").map(m => m.group))).filter(Boolean);
         total += groups.length + 1;
@@ -341,13 +333,9 @@ const handleUpdateUserDetails = async (userId: string, details: { name?: string,
   };
   const handleUpdateMatchDetails = async (matchId: string, details: any) => {
   try {
-    // 1. עוטפים את ה-ID ב-String כדי למנוע קריסה בפיירבייס
     const matchRef = doc(db, "matches", String(matchId));
     await updateDoc(matchRef, details);
-    
-    // 2. עוטפים ב-String גם בבדיקת השוויון למניעת באג ב-State
     setMatches(prev => prev.map(m => String(m.id) === String(matchId) ? { ...m, ...details } : m));
-    
     return true;
   } catch (error) {
     console.error("Error updating details:", error);
@@ -357,11 +345,8 @@ const handleUpdateUserDetails = async (userId: string, details: { name?: string,
 
   const handleUpdateMatchDate = async (matchId: string, newDate: string) => {
     try {
-      // 1. עוטפים את ה-ID ב-String כדי שפיירבייס לא יקרוס
       const matchRef = doc(db, "matches", String(matchId));
       await updateDoc(matchRef, { matchDate: newDate });
-      
-      // 2. משתמשים ב-prev כדי למנוע דריסת נתונים (Race Condition)
       setMatches(prev => prev.map(m => String(m.id) === String(matchId) ? { ...m, matchDate: newDate } : m));
       toast.success("תאריך ושעת המשחק עודכנו בהצלחה! 📅");
     } catch (error) {
@@ -372,10 +357,8 @@ const handleUpdateUserDetails = async (userId: string, details: { name?: string,
 
   const handleUpdateMatchday = async (matchId: string, newMatchday: number) => {
     try {
-      // אותו תיקון בדיוק חל גם על עדכון מספרי המחזורים
       const matchRef = doc(db, "matches", String(matchId));
       await updateDoc(matchRef, { matchday: newMatchday });
-      
       setMatches(prev => prev.map(m => String(m.id) === String(matchId) ? { ...m, matchday: newMatchday } : m));
       toast.success("מחזור המשחק עודכן בהצלחה! 🔄");
     } catch (error) {
@@ -563,7 +546,6 @@ const handleUpdateUserDetails = async (userId: string, details: { name?: string,
   const handleSaveMatch = async (matchId: string, homeScore: number, awayScore: number, qualifier: string) => {
   setSavingId(matchId);
   try {
-    // 1. עדכון במסד הנתונים עם השדות של "תוצאת האמת"
     await updateDoc(doc(db, "matches", matchId), {
       realHomeScore: homeScore,
       realAwayScore: awayScore,
@@ -571,7 +553,6 @@ const handleUpdateUserDetails = async (userId: string, details: { name?: string,
       isFinished: true
     });
 
-    // 2. עדכון הסטייט הלוקאלי כדי שהמסך יתעדכן מיידית בלי צורך ברענון הדפדפן!
     setMatches(prevMatches => prevMatches.map(m => 
       m.id === matchId ? {
         ...m,
@@ -613,13 +594,11 @@ const handleCalculateCrowdStats = async (match: any) => {
           else if (pAway > pHome) awayWins++;
           else draws++;
 
-          // שומרים הפוך (חוץ ואז בית) כדי שיוצג נכון ב-LTR/RTL
           const scoreStr = `${pAway}-${pHome}`;
           exactScores[scoreStr] = (exactScores[scoreStr] || 0) + 1;
         }
       });
 
-      // שומרים כאובייקט כדי שפיירבייס לא יקרוס על "Nested Arrays"
       const topScores = Object.entries(exactScores)
         .sort((a, b) => b[1] - a[1])
         .slice(0, 3)
@@ -627,10 +606,8 @@ const handleCalculateCrowdStats = async (match: any) => {
 
       const crowdStats = { total, homeWins, awayWins, draws, topScores };
 
-      // עדכון ה-DB
       await updateDoc(doc(db, "matches", String(match.id)), { crowdStats });
       
-      // עדכון הטבלה המקומית באדמין כדי שלא נצטרך לרענן
       setMatches(prevMatches => prevMatches.map(m => m.id === match.id ? { ...m, crowdStats } : m));
       
       toast.success("חכמת הקהל נשמרה למשחק בהצלחה!", { id: `stats_${match.id}` });
@@ -711,7 +688,6 @@ const handleCalculateCrowdStats = async (match: any) => {
       const systemSnap = await getDoc(doc(db, "settings", "system"));
       const lastSnapshotDate = systemSnap.exists() ? systemSnap.data().lastSnapshotDate : "";
       
-      // מזיזים את השעון 12 שעות אחורה ומשתמשים בתאריך מקומי כדי להסתנכרן בדיוק עם הדשבורד ב-12 בצהריים!
       const shiftedDate = new Date(Date.now() - 12 * 60 * 60 * 1000);
       const todayString = `${shiftedDate.getFullYear()}-${shiftedDate.getMonth() + 1}-${shiftedDate.getDate()}`;
       
@@ -746,7 +722,6 @@ const handleCalculateCrowdStats = async (match: any) => {
 
       const qualifierPointsMap: any = { "32 הגדולות": 5, "שמינית גמר": 10, "רבע גמר": 15, "חצי גמר": 20, "גמר": 25, "מקום שלישי": 10 };
 
-      // שימוש ב-Batch לחיתוך זמני הריצה מ-15 שניות לשבריר שניה
       let batch = writeBatch(db);
       let opCount = 0;
 
@@ -757,6 +732,12 @@ const handleCalculateCrowdStats = async (match: any) => {
           let groupPoints = 0;
           let thirdPlacePoints = 0;
           let bonusPoints = 0;
+          
+          // 🔥 מונים חדשים לטבלה המורחבת (EXTENDED)
+          let exactHits = 0;
+          let dirHits = 0;
+          let koQualifiers = 0;
+          
           const uid = currentUser.id;
 
           const userGroupMatches = allUserMatches.filter(m => m.userId === uid);
@@ -772,6 +753,9 @@ const handleCalculateCrowdStats = async (match: any) => {
                   if (predH === realH && predA === realA) {
                      basePoints += 10; 
                      matchesPoints += 10;
+                     exactHits++; // נספר כפגיעת בול (15 נקודות יחד)
+                  } else {
+                     dirHits++; // נספר כפגיעת כיוון (5 נקודות)
                   }
                 }
               }
@@ -810,11 +794,19 @@ const handleCalculateCrowdStats = async (match: any) => {
               if (!isNaN(predH) && !isNaN(predA) && !isNaN(realH) && !isNaN(realA)) {
                 if (Math.sign(predH - predA) === Math.sign(realH - realA)) { 
                   knockoutPoints += 5; 
-                  if (predH === realH && predA === realA) knockoutPoints += 10; 
+                  if (predH === realH && predA === realA) {
+                      knockoutPoints += 10; 
+                      exactHits++; // בול נוקאאוט
+                  } else {
+                      dirHits++; // כיוון נוקאאוט
+                  }
                 }
               }
               const pointsForQualifying = qualifierPointsMap[koMatch.roundName] || 0;
-              if (koMatch.qualifier === realMatch.realQualifier && koMatch.qualifier !== "") knockoutPoints += pointsForQualifying;
+              if (koMatch.qualifier === realMatch.realQualifier && koMatch.qualifier !== "") {
+                  knockoutPoints += pointsForQualifying;
+                  koQualifiers++; // ספירת פגיעה נכונה במעפילה!
+              }
             }
           });
 
@@ -822,6 +814,48 @@ const handleCalculateCrowdStats = async (match: any) => {
           if (userBonusData) {
             const userBonus = userBonusData.answers;
             currentBonusQuestions.forEach((q: any) => {
+              if (q.id === "bq_1783456211289") { // <--- כאן תשים את ה-ID האמיתי שנוצר לך
+                  const chosenMatchStr = userBonus[q.id]; // למשל: "ברזיל - גרמניה"
+                  
+                  if (chosenMatchStr && chosenMatchStr.trim() !== "") {
+                    // מוצאים את המשחק האמיתי מרשימת המשחקים כדי לבדוק אם הוא נגמר
+                    const targetMatch = realMatches.find(m => `${m.homeTeam} - ${m.awayTeam}` === chosenMatchStr && m.roundName === "רבע גמר");
+                    
+                    if (targetMatch && targetMatch.isFinished) {
+                      // מוצאים את הניחוש שהמשתמש הנוכחי נתן למשחק הזה בנוקאאוט
+                      const userPred = allUserKnockouts.find(p => p.userId === uid && p.matchId === targetMatch.id);
+                      
+                      if (userPred) {
+                        let matchPointsEarned = 0;
+                        const predH = Number(userPred.predictedHomeScore);
+                        const predA = Number(userPred.predictedAwayScore);
+                        const realH = Number(targetMatch.realHomeScore);
+                        const realA = Number(targetMatch.realAwayScore);
+                        
+                        // חישוב ניקוד תוצאה (בול או כיוון) לפי חוקי הנוקאאוט שלך
+                        if (!isNaN(predH) && !isNaN(predA) && !isNaN(realH) && !isNaN(realA)) {
+                          if (Math.sign(predH - predA) === Math.sign(realH - realA)) { 
+                            matchPointsEarned += 5; // כיוון
+                            if (predH === realH && predA === realA) {
+                              matchPointsEarned += 10; // בול
+                            }
+                          }
+                        }
+                        
+                        // חישוב ניקוד עולה לשלב הבא (ברבע הגמר = 15 נק')
+                        if (userPred.qualifier === targetMatch.realQualifier && userPred.qualifier !== "") {
+                          matchPointsEarned += 15; 
+                        }
+                        
+                        // 🚀 כאן אנחנו מכפילים! מוסיפים את הנקודות פעם נוספת לקופת המשתמש
+                        bonusPoints += matchPointsEarned;
+                        knockoutPoints += matchPointsEarned;
+                      }
+                    }
+                  }
+                  
+                  return; // מדלגים על הלוגיקה הרגילה של הבונוסים עבור השאלה הזו
+                }
               const truth = realBonusAns[q.id]; 
               const userAnswer = userBonus[q.id];
               if (truth !== undefined && truth !== null && userAnswer !== undefined && userAnswer !== null && userAnswer !== "") {
@@ -857,6 +891,7 @@ const handleCalculateCrowdStats = async (match: any) => {
 
           const finalTotal = basePoints + knockoutPoints;
           
+          // 🔥 שמירת המונים החדשים אל תוך המסד
           batch.update(doc(db, "users", uid), { 
               totalPoints: finalTotal, 
               knockoutPoints: knockoutPoints,
@@ -865,7 +900,10 @@ const handleCalculateCrowdStats = async (match: any) => {
                   groups: groupPoints,
                   thirdPlace: thirdPlacePoints,
                   bonuses: bonusPoints,
-                  knockout: knockoutPoints
+                  knockout: knockoutPoints,
+                  exactHits: exactHits,
+                  dirHits: dirHits,
+                  koQualifiers: koQualifiers
               }
           });
 
@@ -1244,7 +1282,6 @@ const handleExportBackup = async () => {
         snap.forEach(d => { backupData[collName][d.id] = d.data(); });
       }
 
-      // שימוש ב-Blob מונע קריסות זיכרון בקבצים גדולים (תחליף בטוח ל-encodeURIComponent)
       const dataStr = JSON.stringify(backupData, null, 2);
       const blob = new Blob([dataStr], { type: "application/json" });
       const url = URL.createObjectURL(blob);
@@ -1273,7 +1310,6 @@ const handleExportBackup = async () => {
       try {
         const backup = JSON.parse(event.target?.result as string);
         
-        // --- 1. איתור משתמשים שעלולים להימחק (שמרתי על הלוגיקה החכמה שלך) ---
         const currentUsersSnap = await getDocs(collection(db, "users"));
         const currentUsersIds = currentUsersSnap.docs.map(d => d.id);
         const backupUsersIds = backup.users ? Object.keys(backup.users) : [];
@@ -1294,19 +1330,17 @@ const handleExportBackup = async () => {
         setIsCalculating(true);
         toast.loading("מוחק נתונים ישנים ומשחזר מקובץ (נא לא לסגור את הדף)... ⏳", { duration: 15000, id: "import" });
         
-        // --- שימוש ב-Batch של Firebase לביצועים מהירים ומניעת קריסות ---
         let batch = writeBatch(db);
         let operationCount = 0;
 
         const commitBatchIfNeeded = async () => {
            if (operationCount >= 400) {
               await batch.commit();
-              batch = writeBatch(db); // פתיחת באצ' חדש
+              batch = writeBatch(db); 
               operationCount = 0;
            }
         };
 
-        // --- 2. מחיקה מהירה של הקולקשנים כדי למנוע "שאריות" ---
         const collectionsToRestore = Object.keys(backup);
         for (const collName of collectionsToRestore) {
            const snap = await getDocs(collection(db, collName));
@@ -1317,7 +1351,6 @@ const handleExportBackup = async () => {
            }
         }
 
-        // --- 3. הזרקה מהירה של הנתונים מהגיבוי למסד ---
         for (const [collName, docs] of Object.entries(backup)) {
           for (const [docId, data] of Object.entries(docs as any)) {
             batch.set(doc(db, collName, docId), data);
@@ -1326,7 +1359,6 @@ const handleExportBackup = async () => {
           }
         }
         
-        // Commit אחרון למה שנשאר בזיכרון של הבאצ'
         if (operationCount > 0) {
            await batch.commit();
         }
@@ -1339,7 +1371,7 @@ const handleExportBackup = async () => {
       } 
       finally { 
         setIsCalculating(false); 
-        if (e.target) e.target.value = ""; // איפוס הקובץ
+        if (e.target) e.target.value = ""; 
       }
     };
     reader.readAsText(file);
@@ -1367,7 +1399,6 @@ const handleExportBackup = async () => {
         return { id: u.id, rank: currentKoRank };
       });
 
-      // שימוש ב-Batch לעדכון מהיר של כולם במכה
       let batch = writeBatch(db);
       let opCount = 0;
 
@@ -1667,8 +1698,7 @@ const handleExportBackup = async () => {
       setIsCalculating(false);
     }
   };
-  // פונקציה חדשה ששולפת נתונים נקיים עבור קומפוננטת ה-PDF
-    // פונקציית שליפה חכמה ל-PDF
+  
   const fetchUserPredictionsForPDF = async (userId: string, targetStage: string | number = "ALL") => {
     try {
       const matchesSnap = await getDocs(collection(db, "matches"));
@@ -1682,13 +1712,11 @@ const handleExportBackup = async () => {
       const ptSnap = await getDoc(doc(db, "predictions_third_place", userId));
       const pbSnap = await getDoc(doc(db, "predictions_bonus", userId));
 
-      // זיהוי איזה סוג שלב ביקשנו כדי לדעת מה לסנן
       const safeTarget = String(targetStage).trim();
       const isTargetGroupPhase = ["1", "2", "3"].includes(safeTarget);
       const isTargetKnockoutPhase = ["32 הגדולות", "שמינית גמר", "רבע גמר", "חצי גמר", "גמר"].includes(safeTarget);
       const isAll = safeTarget.toUpperCase() === "ALL";
 
-      // --- עיבוד משחקים ---
       const pmData = pmSnap.docs.map(d => d.data()).filter(p => p.userId === userId);
       const pkData = pkSnap.docs.map(d => d.data()).filter(p => p.userId === userId);
       const allUserMatches = [...pmData, ...pkData];
@@ -1700,7 +1728,6 @@ const handleExportBackup = async () => {
           const isKnockout = m.stage === "KNOCKOUT";
           const roundLabel = isKnockout ? (m.roundName || "נוקאאוט") : `מחזור ${m.matchday || 1}`;
 
-          // מנגנון סינון משחקים לפי השלב המבוקש
           if (!isAll) {
              if (!isKnockout && String(m.matchday) !== safeTarget) continue;
              if (isKnockout && String(m.roundName).trim() !== safeTarget) continue;
@@ -1738,7 +1765,6 @@ const handleExportBackup = async () => {
         }
       }
 
-      // --- עיבוד עולות (יוצג רק בשלב הבתים או ב-ALL) ---
       const formattedQualifiers = [];
       if (isAll || isTargetGroupPhase) {
         if (pqSnap.exists()) {
@@ -1754,7 +1780,6 @@ const handleExportBackup = async () => {
         formattedQualifiers.sort((a, b) => a.group.localeCompare(b.group));
       }
 
-      // --- עיבוד מקום 3 (יוצג רק בשלב הבתים או ב-ALL) ---
       let formattedThirdPlace: string[] = [];
       if (isAll || isTargetGroupPhase) {
         if (ptSnap.exists()) {
@@ -1763,7 +1788,6 @@ const handleExportBackup = async () => {
         }
       }
 
-      // --- עיבוד בונוסים חכם לפי שלב  ---
       const formattedBonuses = [];
       if (pbSnap.exists()) {
          const bData = pbSnap.data();
@@ -1778,10 +1802,8 @@ const handleExportBackup = async () => {
                   if (isAll || isGlobalBonus) {
                       includeBonus = true;
                   } else if (isTargetGroupPhase) {
-                      // שאלות ספציפיות לשלב הבתים
                       if (q.phase === "GROUPS") includeBonus = true;
                   } else if (isTargetKnockoutPhase) {
-                      // שאלות ספציפיות לנוקאאוט או לשלב מדויק
                       if (q.phase === "KNOCKOUT") includeBonus = true;
                       if (q.roundName === safeTarget || q.stage === safeTarget) includeBonus = true;
                   }
@@ -1810,13 +1832,12 @@ const handleExportBackup = async () => {
       throw error;
     }
   };
-  // פונקציה חכמה להפקת מטריצה יומית
+  
   const fetchDailyMatrixForPDF = async (targetDate: string) => {
     try {
       const matchesSnap = await getDocs(collection(db, "matches"));
       const allMatches = matchesSnap.docs.map(d => ({ id: d.id, ...d.data() }));
 
-      // סינון משחקים לפי התאריך המבוקש (תומך בחיפוש חלקי כמו "16/06")
       const dailyMatches = allMatches.filter(m => {
         if (!m.matchDate) return false;
         const dStr = String(m.matchDate);
@@ -1827,12 +1848,10 @@ const handleExportBackup = async () => {
 
       if (dailyMatches.length === 0) return { matches: [], rows: [] };
 
-      // שליפת ניחושים
       const pmSnap = await getDocs(collection(db, "predictions_matches"));
       const pkSnap = await getDocs(collection(db, "predictions_knockout"));
       const allPreds = [...pmSnap.docs.map(d=>d.data()), ...pkSnap.docs.map(d=>d.data())];
 
-      // שימוש ברשימת המשתמשים המעודכנת מהסטייט (שכבר ממוינת לפי ניקוד!)
       const sortedUsers = [...usersList].sort((a: any, b: any) => (b.totalPoints || 0) - (a.totalPoints || 0));
 
       const rows = sortedUsers.map((u: any, index: number) => {
@@ -1840,13 +1859,12 @@ const handleExportBackup = async () => {
          dailyMatches.forEach(m => {
             const pred = allPreds.find(p => p.userId === u.id && p.matchId === m.id);
             if (pred && pred.predictedHomeScore !== "" && pred.predictedAwayScore !== "") {
-               // התיקון: בניית המחרוזת הפוך (חוץ - בית) כדי שבתצוגה הבית יופיע מימין יחד עם הקבוצה!
                userPreds[m.id] = `${pred.predictedAwayScore} - ${pred.predictedHomeScore}`;
                if (m.stage === "KNOCKOUT" && pred.qualifier) {
                   userPreds[m.id] += `\n(${pred.qualifier})`;
                }
             } else {
-               userPreds[m.id] = "X"; // לא ניחש
+               userPreds[m.id] = "X"; 
             }
          });
          return {
@@ -2083,7 +2101,6 @@ const handleExportBackup = async () => {
              setStatsData={setStatsData}
              />
           )}
-          {/* --- הנה הקסם החדש שלנו --- */}
           {activeTab === "NOTIFICATIONS" && (
             <AdminNotificationTab />
           )}
@@ -2103,10 +2120,9 @@ const handleExportBackup = async () => {
              setSimStage={setSimStage}
              handleSpawnBotsOnly={handleSpawnBotsOnly}
              handleSmartSimulation={handleSmartSimulation}
-             // הוספנו פרופ לסנכרון ידני!
              handleRefreshData={fetchAdminData}
              handleExportUserBackup={handleExportUserBackup}
-             fetchUserPredictionsForPDF={fetchUserPredictionsForPDF} // <-- הוסף את השורה הזו
+             fetchUserPredictionsForPDF={fetchUserPredictionsForPDF} 
              fetchDailyMatrixForPDF={fetchDailyMatrixForPDF}
            />
         )}
