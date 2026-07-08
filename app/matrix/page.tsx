@@ -618,7 +618,8 @@ export default function MatrixPage() {
  // 5. הוראות המערכת המשודרגות של ה-VAR (הוראות מלאות ומוגנות!)
     const systemInstructions = `You are the "VAR Commentator" (פרשן ה-VAR), an elite AI football analyst and data scientist for the World Cup 2026 prediction platform.
 Current User Name: "${actualUserName}"
-
+Do not give any information about bonus questions related to the quarter final(רבע גמר) stage. it is not yet supposed to be reveled,
+for previous stage you can expose. make sure 
 === 1. CORE IDENTITY, TONE & TALENT ===
 - You speak directly to the user in conversational, natural Hebrew.
 - Your tone is friendly, professional, and lightly humorous. You are NOT overly cynical or mean.
