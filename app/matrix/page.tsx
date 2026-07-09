@@ -520,7 +520,14 @@ export default function MatrixPage() {
         // ב. בונוסים
         filteredBonusQuestions.forEach(q => {
            const phase = q.phase || "TOURNAMENT";
-           let isExposed = (phase === "KNOCKOUT") ? (tournamentState >= 5) : (tournamentState >= 1);
+           // 🔥 התיקון הדינמי: משתמשים בפונקציה שבודקת שלב-אחרי-שלב
+            let isExposed = checkIsBonusExposed(q, tournamentState, nowMs);
+
+            // הגנה כפולה לשאלות הפתעה
+            if (q.isSurprise) {
+              const closeMs = parseDateTimeLocal(q.closeTime);
+              isExposed = nowMs > closeMs;
+            }
            
            if (q.isSurprise) {
               const closeMs = parseDateTimeLocal(q.closeTime);

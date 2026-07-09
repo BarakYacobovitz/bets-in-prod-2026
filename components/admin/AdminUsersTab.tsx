@@ -267,6 +267,7 @@ export default function AdminUsersTab({
                 <th className="p-4 w-12 text-center">#</th>
                 <th className="p-4">שם משתתף</th>
                 <th className="p-4">טלפון</th>
+                <th className="p-4 text-center w-36">התקדמות מילוי</th> {/* 🔥 עמודה חדשה שהחזרנו */}
                 <th className="p-4 text-center w-24">סטטוס תשלום</th>
                 <th className="p-4 text-center w-24">ניקוד כללי</th>
                 <th className="p-4 text-center w-40">פעולות ניהול</th>
@@ -275,11 +276,22 @@ export default function AdminUsersTab({
             <tbody className="divide-y divide-slate-800/60">
               {usersList.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="text-center p-12 text-slate-500 font-bold animate-pulse">אין משתמשים רשומים במערכת... 🤷‍♂️</td>
+                  <td colSpan={7} className="text-center p-12 text-slate-500 font-bold animate-pulse">אין משתמשים רשומים במערכת... 🤷‍♂️</td>
                 </tr>
               ) : (
                 usersList.map((u, index) => {
                   const isEditing = editingUserId === u.id;
+
+                  // 🔥 לוגיקת חישוב התקדמות דינמית בהתאם לדאטה הקיים על אובייקט המשתמש
+                  // אם יש לך שדות של כמות ניחושים על ה-User (למשל u.predictionsCount), נשתמש בהם. 
+                  // אחרת, נעשה פולבק חכם לפי האם הוא מילא את הטופס הכללי
+                  const totalRequiredItems = 64; // כמות המשחקים/בונוסים המשוערת בטורניר
+                  const filledItems = u.predictionsCount !== undefined ? u.predictionsCount : (u.totalPoints > 0 ? 64 : 0);
+                  const progressPercentage = Math.min(
+                    u.progressPercentage !== undefined ? u.progressPercentage : (filledItems / totalRequiredItems) * 100, 
+                    100
+                  );
+
                   return (
                     <tr key={u.id} className="hover:bg-slate-800/30 transition-colors">
                       <td className="p-4 text-center text-slate-600 font-mono font-bold">{index + 1}</td>
@@ -310,6 +322,69 @@ export default function AdminUsersTab({
                           u.phone || "-"
                         )}
                       </td>
+
+                      {/* 🔥 החזרת מנוע החוסרים המשוכלל והטולטיפ למגרש! */}
+                      <td className="p-4 text-center vertical-middle">
+                        <div className="flex flex-col items-center justify-center w-full max-w-[140px] mx-auto gap-1">
+                          
+                          {/* 1. בר ההתקדמות הוויזואלי (מבוסס על ה-completionRate המקורי של חדר הבקרה) */}
+                          <div className="w-full bg-slate-950 border border-slate-800 rounded-full h-2.5 overflow-hidden shadow-inner relative group/bar">
+                            <div 
+                              className={`h-full transition-all duration-500 rounded-full ${
+                                u.completionRate === 100 
+                                  ? "bg-gradient-to-r from-emerald-500 to-teal-400" 
+                                  : u.completionRate > 50 
+                                  ? "bg-blue-500" 
+                                  : "bg-amber-500"
+                              }`}
+                              style={{ width: `${u.completionRate || 0}%` }}
+                            ></div>
+                          </div>
+                          
+                          {/* 2. אחוז ההשלמה הכללי */}
+                          <span className="text-[11px] text-slate-300 font-mono font-black">
+                            {u.completionRate || 0}%
+                          </span>
+
+                          {/* 3. מנוע הפירוט הדינמי - מציג בדיוק מה חסר לשחקן מתחת לבר */}
+                          {(() => {
+                            const missing = u.missingBreakdown;
+                            if (!missing) return null;
+
+                            const labels: string[] = [];
+                            if (missing.md1 > 0) labels.push(`מחזור 1 (${missing.md1})`);
+                            if (missing.md2 > 0) labels.push(`מחזור 2 (${missing.md2})`);
+                            if (missing.md3 > 0) labels.push(`מחזור 3 (${missing.md3})`);
+                            if (missing.ko > 0) labels.push(`נוקאאוט (${missing.ko})`);
+                            if (missing.bonus > 0) labels.push(`בונוסים (${missing.bonus})`);
+                            if (missing.quals > 0) labels.push(`עולות מבתים (${missing.quals})`);
+                            if (missing.third > 0) labels.push(`8 מקום שלישי`);
+
+                            if (labels.length === 0 || u.completionRate === 100) {
+                              return (
+                                <span className="text-[9px] text-emerald-400 font-bold bg-emerald-950/40 px-1.5 py-0.5 rounded border border-emerald-900/30">
+                                  🎉 הכל מלא!
+                                </span>
+                              );
+                            }
+
+                            return (
+                              <div className="flex flex-col gap-0.5 w-full text-center">
+                                <span className="text-[9px] text-rose-400 font-bold bg-rose-950/40 px-1 py-0.5 rounded border border-rose-900/20 max-w-full truncate inline-block" title={labels.join(", ")}>
+                                  ⚠️ חסר: {labels[0]} {labels.length > 1 && `+${labels.length - 1}`}
+                                </span>
+                                {labels.length > 1 && (
+                                  <span className="text-[8px] text-slate-500 font-medium">
+                                    ({labels.slice(1).join(", ")})
+                                  </span>
+                                )}
+                              </div>
+                            );
+                          })()}
+
+                        </div>
+                      </td>
+
                       <td className="p-4 text-center">
                         <button
                           onClick={() => handleTogglePayment(u.id, u.hasPaid || false)}
