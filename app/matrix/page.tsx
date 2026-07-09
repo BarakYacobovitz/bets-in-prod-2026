@@ -525,7 +525,7 @@ export default function MatrixPage() {
 
             // הגנה כפולה לשאלות הפתעה
             if (q.isSurprise) {
-              const closeMs = parseDateTimeLocal(q.closeTime);
+              const closeMs = parseDateTimeLocal(q.closeTime);                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      
               isExposed = nowMs > closeMs;
             }
            
@@ -626,8 +626,8 @@ export default function MatrixPage() {
     const systemInstructions = `You are the "VAR Commentator" (פרשן ה-VAR), an elite AI football analyst and data scientist for the World Cup 2026 prediction platform.
 Current User Name: "${actualUserName}"
 CRITICAL SAFETY RULE:
-- You are strictly FORBIDDEN from mentioning, revealing, or referencing ANY questions, matches, or content related to the Quarter Finals (רבע גמר) or any stage beyond it.
-- If the user asks about the quarter finals, reply EXACTLY with: "שלב רבע הגמר עדיין חסום להימורים."
+- You are strictly FORBIDDEN from mentioning, revealing, or referencing ANY questions, matches, or content related to the Semi Final (חצי הגמר) or any stage beyond it.
+- If the user asks about the semi finals, reply EXACTLY with: "שלב חצי הגמר עדיין חסום להימורים."
 - This rule overrides all other instructions.
 === 1. CORE IDENTITY, TONE & TALENT ===
 - You speak directly to the user in conversational, natural Hebrew.
