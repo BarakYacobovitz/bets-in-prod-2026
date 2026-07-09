@@ -814,7 +814,7 @@ const handleCalculateCrowdStats = async (match: any) => {
           if (userBonusData) {
             const userBonus = userBonusData.answers;
             currentBonusQuestions.forEach((q: any) => {
-              if (q.id === "bq_1783456211289") { // <--- כאן תשים את ה-ID האמיתי שנוצר לך
+              if (q.id === "bq_1783463384597") { // <--- כאן תשים את ה-ID האמיתי שנוצר לך
                   const chosenMatchStr = userBonus[q.id]; // למשל: "ברזיל - גרמניה"
                   
                   if (chosenMatchStr && chosenMatchStr.trim() !== "") {
