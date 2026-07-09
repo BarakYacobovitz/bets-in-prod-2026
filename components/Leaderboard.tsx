@@ -685,7 +685,7 @@ export default function Leaderboard() {
     setSpyBonusCategory("TOURNAMENT");
     setSpyBonusKnockoutRound("ALL");
     
-    let stats = { exactC: 0, exactP: 0, dirC: 0, dirP: 0, koC: 0, koP: 0, bonusC: 0, bonusP: 0, groupC: 0, groupP: 0, thirdC: 0, thirdP: 0 };
+    let stats = { exactC: 0, exactP: 0, dirC: 0, dirP: 0, koC: 0, koP: 0, bonusC: 0, bonusP: 0, groupC: 0, groupP: 0, thirdC: 0, thirdP: 0, boostPoints: 0 }; // 🔥 הוספנו את האתחול כאן
     const qMap: any = { "32 הגדולות": 5, "שמינית גמר": 10, "רבע גמר": 15, "חצי גמר": 20, "גמר": 25, "מקום שלישי": 10 };
     
     try {
@@ -742,11 +742,32 @@ export default function Leaderboard() {
       const bonusSnap = await getDoc(doc(db, "predictions_bonus", userToSpy.id));
       if (bonusSnap.exists()) {
         const userAnswers = bonusSnap.data().answers || {};
+        // מציאת הניקוד לשאלות הבונוס
         for (const [qId, ans] of Object.entries(userAnswers)) {
           const qInfo = bonusQuestionsMap[qId];
           if (qInfo && isBonusLocked(qInfo, tournamentState)) {
-             const pts = calculateBonusPoints(qId, ans as string); gatheredBonuses.push({ qId, question: qInfo, answer: ans, points: pts });
-             if (pts && pts > 0) { stats.bonusC++; stats.bonusP += pts; }
+            let pts = calculateBonusPoints(qId, ans as string);
+            
+            // 🔥 קסם ה-Boost: אם הגענו לשאלת הדאבל המיוחדת
+            if (qId === "bq_1783463384597") { // <--- שים כאן את ה-ID האמיתי של שאלת הבוסט
+              // אנחנו בודקים האם המשחק שהמשתמש בחר קיים כבר ברשימת המשחקים ששלפנו למעלה בחקירה
+              const matchedPred = gatheredMatches.find(m => `${m.matchInfo.homeTeam} - ${m.matchInfo.awayTeam}` === (ans as string) && m.matchInfo.roundName === "רבע גמר");
+              
+              if (matchedPred && matchedPred.matchInfo.isFinished) {
+                pts = matchedPred.points; // הניקוד שקיבל המשתמש על המשחק הזה הופך להיות הניקוד של הבונוס!
+                
+                // נשמור את זה בסטטיסטיקות הכלליות של החקירה תחת קטגוריה מיוחדת
+                stats.boostPoints = pts; 
+              }
+            }
+
+            gatheredBonuses.push({ qId, question: qInfo, answer: ans, points: pts });
+            
+            // מוסיפים למונים הרגילים (אם זה לא הבוסט, או אם הבוסט הניב נקודות)
+            if (pts && pts > 0 && qId !== "bq_171234567890") { 
+              stats.bonusC++; 
+              stats.bonusP += pts; 
+            }
           }
         }
       }
@@ -1400,12 +1421,28 @@ export default function Leaderboard() {
                     </div>
                     <div className="font-black text-xl text-rose-400">+{spyStats.koP}</div>
                   </div>
-                  
+                  {/* קומפוננטת כרטיס בוסט ייעודית בחקירה */}
+                  {spyBonusPredictions.some(b => b.qId === "bq_1783463384597") && (
+                    <div className="bg-gradient-to-r from-purple-900/20 to-slate-800 p-4 rounded-xl border border-purple-500/30 flex justify-between items-center shadow-sm animate-fade-in-up">
+                      <div className="flex items-center gap-3">
+                        <div className="text-2xl bg-purple-900/40 p-2 rounded-lg border border-purple-500/40">🚀</div>
+                        <div>
+                          <div className="text-purple-300 font-black flex items-center gap-1.5">שאלת BOOST רבע גמר (X2)</div>
+                          <div className="text-xs text-slate-400 mt-0.5">
+                            המשחק שנבחר: <span className="text-white font-bold">{spyBonusPredictions.find(b => b.qId === "bq_171234567890")?.answer || "לא נבחר"}</span>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="font-black text-xl text-purple-400">
+                        +{spyStats.boostPoints || 0}
+                      </div>
+                    </div>
+                  )}
                   <div className="mt-4 pt-4 border-t-2 border-slate-700 border-dashed flex justify-between items-center px-2">
                      <span className="text-slate-400 font-bold">סך הכל נקודות מוכחות:</span>
                      <span className="text-2xl font-black text-white">
-                        {spyStats.exactP + spyStats.dirP + spyStats.bonusP + spyStats.groupP + spyStats.thirdP + spyStats.koP}
-                     </span>
+                      {spyStats.exactP + spyStats.dirP + spyStats.bonusP + spyStats.groupP + spyStats.thirdP + spyStats.koP + (spyStats.boostPoints || 0)}
+                    </span>
                   </div>
                 </div>
               ) : spyTab === "MATCHES" ? (

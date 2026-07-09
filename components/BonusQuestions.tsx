@@ -600,9 +600,9 @@ if (q.id === "bq_1783463384597") { // <--- ה-ID האמיתי של שאלת הב
               {!isWaitingToOpen && (
                 <div className="flex flex-wrap gap-1.5">
                 <span className="text-xs md:text-sm font-black text-slate-400 bg-slate-950 px-3 py-1.5 rounded-lg w-fit border border-slate-800 shadow-sm flex items-center gap-1.5">
-                     קופה: <span className={`${q.isDouble ? "text-rose-400" : "text-amber-400"} text-sm md:text-base drop-shadow-sm`}>
-                     {q.isProximity ? "עד 50" : q.points} נק'
-                     </span>
+                    קופה: <span className={`${q.isDouble ? "text-rose-400" : "text-amber-400"} text-sm md:text-base drop-shadow-sm`}>
+                    {q.id === "bq_1783463384597" ? "🔥 ניקוד כפול!" : (q.isProximity ? "עד 50" : `${q.points} נק'`)}
+                    </span>
                 </span>
                 {q.isProximity && (
                 <span className="text-[10px] font-black text-orange-400 bg-orange-950/30 px-2 py-0.5 rounded w-fit border border-orange-500/50">
