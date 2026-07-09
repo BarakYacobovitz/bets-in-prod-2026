@@ -299,6 +299,15 @@ export default function BonusQuestions({ userId, tournamentState: propTournament
       });
 
       const bonusSnap = await getDocs(collection(db, "predictions_bonus"));
+      // 🔥 שואבים את ניחושי הנוקאאוט של כולם רק אם פתחו את שאלת הבוסט!
+        let allKoPreds: any[] = [];
+        if (q.id === "bq_1783463384597") {
+          const koSnap = await getDocs(collection(db, "predictions_knockout"));
+          allKoPreds = koSnap.docs.map(d => d.data());
+        }
+
+
+
       const gatheredData: any[] = [];
       
       bonusSnap.forEach(doc => {
@@ -306,6 +315,39 @@ export default function BonusQuestions({ userId, tournamentState: propTournament
         const userAns = doc.data().answers?.[q.id];
         
         if (userAns) {
+      let pts: number | null = checkAnswerPoints(q, userAns);
+
+      // 🚀 לוגיקת החישוב הדינמית לבוסט:
+      if (q.id === "bq_1783463384597" && userAns.trim() !== "") {
+        const targetMatch = allMatches.find(m => `${m.homeTeam} - ${m.awayTeam}` === userAns && m.roundName === "רבע גמר");
+        
+        if (targetMatch && targetMatch.isFinished) {
+          const uPred = allKoPreds.find(p => p.userId === uId && p.matchId === targetMatch.id);
+          if (uPred) {
+             let matchPts = 0;
+             const rH = Number(targetMatch.realHomeScore);
+             const rA = Number(targetMatch.realAwayScore);
+             const pH = Number(uPred.predictedHomeScore);
+             const pA = Number(uPred.predictedAwayScore);
+
+             if (!isNaN(pH) && !isNaN(pA) && !isNaN(rH) && !isNaN(rA)) {
+               if (Math.sign(pH - pA) === Math.sign(rH - rA)) {
+                 matchPts += 5;
+                 if (pH === rH && pA === rA) matchPts += 10;
+               }
+             }
+             if (uPred.qualifier === targetMatch.realQualifier && uPred.qualifier !== "") {
+               matchPts += 15;
+             }
+             pts = matchPts; // זה הניקוד שהמשתמש הזה הרוויח!
+          } else {
+             pts = 0; // המשחק נגמר אבל המשתמש לא מילא ניחוש נוקאאוט
+          }
+        } else {
+           pts = null; // המשחק עדיין לא הסתיים (ממתין)
+        }
+      }
+
           gatheredData.push({
             userId: uId,
             userName: usersMap[uId]?.name || "שחקן לא ידוע",
