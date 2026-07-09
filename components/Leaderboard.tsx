@@ -764,7 +764,7 @@ export default function Leaderboard() {
             gatheredBonuses.push({ qId, question: qInfo, answer: ans, points: pts });
             
             // מוסיפים למונים הרגילים (אם זה לא הבוסט, או אם הבוסט הניב נקודות)
-            if (pts && pts > 0 && qId !== "bq_171234567890") { 
+            if (pts && pts > 0 && qId !== "bq_1783463384597") { 
               stats.bonusC++; 
               stats.bonusP += pts; 
             }
@@ -1429,7 +1429,7 @@ export default function Leaderboard() {
                         <div>
                           <div className="text-purple-300 font-black flex items-center gap-1.5">שאלת BOOST רבע גמר (X2)</div>
                           <div className="text-xs text-slate-400 mt-0.5">
-                            המשחק שנבחר: <span className="text-white font-bold">{spyBonusPredictions.find(b => b.qId === "bq_171234567890")?.answer || "לא נבחר"}</span>
+                            המשחק שנבחר: <span className="text-white font-bold">{spyBonusPredictions.find(b => b.qId === "bq_1783463384597")?.answer || "לא נבחר"}</span>
                           </div>
                         </div>
                       </div>
