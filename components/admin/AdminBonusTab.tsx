@@ -4,7 +4,7 @@ import { doc, getDoc, setDoc, collection, getDocs } from "firebase/firestore";
 import { db } from "../../app/firebase";
 import toast from "react-hot-toast";
 
-const KO_ROUNDS = ["32 הגדולות", "שמינית גמר", "רבע גמר", "חצי גמר", "גמר"];
+const KO_ROUNDS = ["32 הגדולות", "שמינית גמר", "רבע גמר", "חצי גמר"];
 
 const ALL_TEAMS = [
   "מקסיקו", "דרום אפריקה", "קוריאה הדרומית", "צ'כיה", "קנדה", "בוסניה", "קטר", "שווייץ",
@@ -220,7 +220,7 @@ export default function AdminBonusTab() {
     const roundTeams = new Set<string>();
     
     allMatches.forEach(m => {
-       if (m.stage === "KNOCKOUT" && m.roundName === roundName) {
+       if (m.stage === "KNOCKOUT" && (m.roundName === roundName || (roundName === "חצי גמר" && m.roundName === "גמר"))) {
           // נוודא שלא מושכים שמות זמניים כמו "מנצחת שמינית גמר 1"
           if (m.homeTeam && !m.homeTeam.includes("מקום") && !m.homeTeam.includes("מנצחת")) roundTeams.add(m.homeTeam);
           if (m.awayTeam && !m.awayTeam.includes("מקום") && !m.awayTeam.includes("מנצחת")) roundTeams.add(m.awayTeam);
@@ -303,7 +303,13 @@ export default function AdminBonusTab() {
 
   const filteredQuestions = questions.filter(q => {
      if (filterPhase !== "ALL" && q.phase !== filterPhase) return false;
-     if (filterPhase === "KNOCKOUT" && filterKoRound !== "ALL" && q.knockoutRound !== filterKoRound) return false;
+      if (filterPhase === "KNOCKOUT" && filterKoRound !== "ALL") {
+         const qRound = q.knockoutRound;
+         const isMatch = (filterKoRound === "חצי גמר") 
+           ? (qRound === "חצי גמר" || qRound === "גמר")
+           : (qRound === filterKoRound);
+         if (!isMatch) return false;
+      }
      if (filterType === "SURPRISE" && !q.isSurprise) return false;
      if (filterType === "DOUBLE" && !q.isDouble) return false;
      if (filterType === "REGULAR" && (q.isSurprise || q.isDouble)) return false;
@@ -406,7 +412,7 @@ export default function AdminBonusTab() {
                <button onClick={() => setFilterKoRound("ALL")} className={`shrink-0 snap-center px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${filterKoRound === "ALL" ? "bg-indigo-600 text-white shadow-md" : "text-indigo-400/70 hover:bg-indigo-900/50 hover:text-indigo-300"}`}>כללי</button>
                {KO_ROUNDS.map(round => (
                  <button key={round} onClick={() => setFilterKoRound(round)} className={`shrink-0 snap-center px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${filterKoRound === round ? "bg-indigo-600 text-white shadow-md" : "text-indigo-400/70 hover:bg-indigo-900/50 hover:text-indigo-300"}`}>
-                   {round}
+                   {round === "חצי גמר" ? "חצי גמר וגמר" : round}
                  </button>
                ))}
              </div>
@@ -443,7 +449,7 @@ export default function AdminBonusTab() {
                      
                      <div className="flex flex-wrap justify-end gap-1 flex-1">
                        {q.phase === "KNOCKOUT" && q.knockoutRound && q.knockoutRound !== "ALL" && (
-                          <span className="text-[8px] bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 px-1 rounded truncate max-w-full" title={q.knockoutRound}>{q.knockoutRound}</span>
+                          <span className="text-[8px] bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 px-1 rounded truncate max-w-full" title={q.knockoutRound}>{q.knockoutRound === "חצי גמר" || q.knockoutRound === "גמר" ? "חצי גמר וגמר" : q.knockoutRound}</span>
                        )}
                        {q.isDouble && <span className="text-sm drop-shadow-md shrink-0" title="שאלת דאבל">⭐</span>}
                        {q.isSurprise && <span className="text-sm drop-shadow-md shrink-0" title="שאלת הפתעה">🎁</span>}
@@ -499,7 +505,7 @@ export default function AdminBonusTab() {
                            <label className="block text-indigo-400 text-xs font-bold mb-1.5">שיוך לסיבוב נוקאאוט ספציפי (אופציונלי)</label>
                            <select value={formData.knockoutRound || "ALL"} onChange={e => setFormData({...formData, knockoutRound: e.target.value})} className="w-full bg-indigo-950/20 border border-indigo-500/30 rounded-xl p-3 text-white outline-none focus:border-indigo-500 text-sm">
                               <option className="bg-slate-900 text-white" value="ALL">כללי (ללא שיוך לסיבוב)</option>
-                              {KO_ROUNDS.map(r => <option className="bg-slate-900 text-white" key={r} value={r}>{r}</option>)}
+                              {KO_ROUNDS.map(r => <option className="bg-slate-900 text-white" key={r} value={r}>{r === "חצי גמר" ? "חצי גמר וגמר" : r}</option>)}
                            </select>
                         </div>
                      )}
@@ -532,7 +538,7 @@ export default function AdminBonusTab() {
                                       onClick={() => handleAutoSelectTeams(round)}
                                       className="bg-blue-900/30 hover:bg-blue-600 text-blue-300 hover:text-white border border-blue-500/30 px-2.5 py-1.5 rounded-lg text-[10px] font-bold transition-all shadow-sm active:scale-95"
                                    >
-                                      מלוט מ-{round}
+                                      מלוט מ-{round === "חצי גמר" ? "חצי גמר וגמר" : round}
                                    </button>
                                 ))}
                                 <button 

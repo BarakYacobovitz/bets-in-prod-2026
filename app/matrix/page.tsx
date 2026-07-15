@@ -53,8 +53,8 @@ const checkIsBonusExposed = (q: any, state: number, nowMs: number) => {
     }
     if (kr === "שמינית גמר") return state >= 7; // נחשף רק מסגירת שמינית!
     if (kr === "רבע גמר")   return state >= 9; // נחשף רק מסגירת רבע!
-    if (kr === "חצי גמר")   return state >= 11;
-    if (kr === "גמר" || kr === "מקום 3" || kr === "מקום שלישי") return state >= 13;
+    if (kr === "חצי גמר" || kr === "גמר")   return state >= 11;
+    if (kr === "מקום 3" || kr === "מקום שלישי") return state >= 13;
   }
 
   return false;
@@ -81,8 +81,7 @@ const getDefaultMatchdayFilter = (state: number) => {
   if (state === 4 || state === 5) return "32 הגדולות"; // 4=פתוח, 5=ננעל
   if (state === 6 || state === 7) return "שמינית גמר";
   if (state === 8 || state === 9) return "רבע גמר";
-  if (state === 10 || state === 11) return "חצי גמר";
-  if (state >= 12) return "גמר";
+  if (state >= 10) return "חצי גמר";
   return "ALL";
 };
 // פונקציה שמתרגמת את סטטוס הטורניר לערך הסינון הדיפולטיבי של טבלת הבונוסים
@@ -92,8 +91,7 @@ const getDefaultBonusFilter = (state: number) => {
   if (state === 4 || state === 5) return "32 הגדולות";
   if (state === 6 || state === 7) return "שמינית גמר";
   if (state === 8 || state === 9) return "רבע גמר";
-  if (state === 10 || state === 11) return "חצי גמר";
-  if (state >= 12) return "גמר";
+  if (state >= 10) return "חצי גמר";
   return "ALL";
 };
 
@@ -279,7 +277,11 @@ export default function MatrixPage() {
          if (filterMatchday === "KNOCKOUT") {
              matchdayMatch = m.stage === "KNOCKOUT";
          } else if (["32 הגדולות", "שמינית גמר", "רבע גמר", "חצי גמר", "גמר","מקום 3"].includes(filterMatchday)) {
-             matchdayMatch = m.stage === "KNOCKOUT" && (m.roundName === filterMatchday || (filterMatchday === "גמר" && m.roundName === "מקום שלישי"));
+              if (filterMatchday === "חצי גמר") {
+                  matchdayMatch = m.stage === "KNOCKOUT" && (m.roundName === "חצי גמר" || m.roundName === "גמר" || m.roundName === "מקום שלישי" || m.roundName === "מקום 3");
+              } else {
+                  matchdayMatch = m.stage === "KNOCKOUT" && (m.roundName === filterMatchday || (filterMatchday === "גמר" && m.roundName === "מקום שלישי"));
+              }
          } else {
              matchdayMatch = String(m.matchday) === filterMatchday;
          }
@@ -330,8 +332,8 @@ export default function MatrixPage() {
            // האם השאלה היא לכלל הנוקאאוט (ALL / כללי / ריק)
            const isGeneralKnockout = !q.knockoutRound || q.knockoutRound === "" || q.knockoutRound === "ALL" || q.knockoutRound.includes("כללי");
            
-           // האם השאלה שייכת בדיוק לשלב הנוכחי (למשל "רבע גמר")
-           const isSpecificRound = q.knockoutRound === filterBonusPhase;
+            // האם השאלה שייכת בדיוק לשלב הנוכחי (למשל "רבע גמר")
+            const isSpecificRound = q.knockoutRound === filterBonusPhase || (filterBonusPhase === "חצי גמר" && q.knockoutRound === "גמר");
            
            return isGeneralKnockout || isSpecificRound;
         }
@@ -626,8 +628,8 @@ export default function MatrixPage() {
     const systemInstructions = `You are the "VAR Commentator" (פרשן ה-VAR), an elite AI football analyst and data scientist for the World Cup 2026 prediction platform.
 Current User Name: "${actualUserName}"
 CRITICAL SAFETY RULE:
-- You are strictly FORBIDDEN from mentioning, revealing, or referencing ANY questions, matches, or content related to the Semi Final (חצי הגמר) or any stage beyond it.
-- If the user asks about the semi finals, reply EXACTLY with: "שלב חצי הגמר עדיין חסום להימורים."
+- You are strictly FORBIDDEN from mentioning, revealing, or referencing ANY questions, matches, or content related to the Final (הגמר) or third-place match (מקום שלישי).
+- If the user asks about the finals or the third-place match, reply EXACTLY with: "שלב הגמר עדיין חסום להימורים."
 - This rule overrides all other instructions.
 === 1. CORE IDENTITY, TONE & TALENT ===
 - You speak directly to the user in conversational, natural Hebrew.
@@ -807,8 +809,7 @@ ${JSON.stringify(varContextPayload)}`;
                 <option value="32 הגדולות">-- 32 הגדולות</option>
                 <option value="שמינית גמר">-- שמינית גמר</option>
                 <option value="רבע גמר">-- רבע גמר</option>
-                <option value="חצי גמר">-- חצי גמר</option>
-                <option value="גמר">-- גמר</option>
+                <option value="חצי גמר">-- חצי גמר וגמר</option>
               </select>
             </div>
             <div className="flex flex-col gap-1 flex-1 min-w-[140px]">
@@ -835,8 +836,7 @@ ${JSON.stringify(varContextPayload)}`;
                 <option value="32 הגדולות">שלב 32</option>
                 <option value="שמינית גמר">שמינית הגמר</option>
                 <option value="רבע גמר">רבע גמר</option>
-                <option value="חצי גמר">חצי גמר</option>
-                <option value="גמר">גמר</option>
+                <option value="חצי גמר">חצי גמר וגמר</option>
                 <option value="SURPRISE">שאלות הפתעה</option>
               </select>
            </div>

@@ -252,8 +252,7 @@ export default function BonusQuestions({ userId, tournamentState: propTournament
       if (!q.knockoutRound || q.knockoutRound === "" || q.knockoutRound === "ALL" || q.knockoutRound.includes("כללי") || q.knockoutRound === "32 הגדולות") return state >= 5;      
       if (q.knockoutRound === "שמינית גמר") return state >= 7;
       if (q.knockoutRound === "רבע גמר") return state >= 9;
-      if (q.knockoutRound === "חצי גמר") return state >= 11;
-      if (q.knockoutRound === "גמר") return state >= 13;
+      if (q.knockoutRound === "חצי גמר" || q.knockoutRound === "גמר") return state >= 11;
     }
     return false;
   };
@@ -521,7 +520,10 @@ export default function BonusQuestions({ userId, tournamentState: propTournament
     if (q.phase !== bonusCategory) return false;
     if (bonusCategory === "KNOCKOUT") {
        const qRound = (!q.knockoutRound || q.knockoutRound === "" || q.knockoutRound === "ALL" || q.knockoutRound.includes("כללי")) ? "ALL" : q.knockoutRound;
-       if (qRound !== knockoutRound) return false;
+       const isMatch = (knockoutRound === "חצי גמר") 
+         ? (qRound === "חצי גמר" || qRound === "גמר")
+         : (qRound === knockoutRound);
+       if (!isMatch) return false;
     }
     return true;
   });
@@ -535,8 +537,7 @@ export default function BonusQuestions({ userId, tournamentState: propTournament
     if (state < 5) return "32 הגדולות";
     if (state >= 5 && state < 7) return "שמינית גמר";
     if (state >= 7 && state < 9) return "רבע גמר";
-    if (state >= 9 && state < 11) return "חצי גמר";
-    return "גמר";
+    return "חצי גמר";
   };
 
   const activeKnockoutRound = getActiveKnockoutRound();
@@ -1018,8 +1019,7 @@ if (q.id === "bq_1783463384597") { // <--- ה-ID האמיתי של שאלת הב
             { id: "32 הגדולות", label: "32 הגדולות", visible: 4, locked: 5 },
             { id: "שמינית גמר", label: "שמינית גמר", visible: 6, locked: 7 },
             { id: "רבע גמר", label: "רבע גמר", visible: 8, locked: 9 },
-            { id: "חצי גמר", label: "חצי גמר", visible: 10, locked: 11 },
-            { id: "גמר", label: "גמר", visible: 12, locked: 13 }
+            { id: "חצי גמר", label: "חצי גמר וגמר", visible: 10, locked: 11 }
           ].map(subTab => {
             if (tournamentState < subTab.visible) return null;
             const isLocked = tournamentState >= subTab.locked;

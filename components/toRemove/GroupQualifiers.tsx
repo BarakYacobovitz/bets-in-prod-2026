@@ -362,7 +362,7 @@ export default function ThirdPlaceQualifiers({ groups, userId, tournamentState =
                          <span className="w-6 h-6 flex items-center justify-center bg-white/20 rounded-full text-white text-xs">✓</span>
                       ) : !isLocked ? (
                          <span className="w-6 h-6 flex items-center justify-center bg-slate-800 rounded-full text-slate-500 text-lg group-hover:text-white transition-colors">+</span>
-                      )}
+                      ) : null}
                     </div>
                   </button>
                 );
