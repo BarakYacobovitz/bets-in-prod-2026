@@ -8,6 +8,7 @@ import Link from "next/link";
 import { getPlayerInfo, PLAYERS_DATA } from "../app/utils/players";
 import FinalePodiumModal from "./FinalePodiumModal"; 
 import WrappedModal from "./WrappedModal";
+import FeedbackModal from "./FeedbackModal";
 
 const parseDateTimeLocal = (dtStr: string) => {
   if (!dtStr) return 0;
@@ -93,6 +94,44 @@ const getPhaseName = (state: number) => {
 
 export default function Dashboard({ userId, userName, setActiveTab, setPredictionTab, tournamentState: initialTournamentState }: any) {
   const [userStats, setUserStats] = useState<any>({ points: 0, rank: 0, koPoints: 0, koRank: 0, hasPaid: false, prevPoints: 0, prevRank: 0, prevKoRank: 0, nemesisId: null });
+  
+  // Feedback survey states
+  const [feedbackOpenOverride, setFeedbackOpenOverride] = useState(false);
+  const [hasSubmittedFeedback, setHasSubmittedFeedback] = useState(false);
+  const [showFeedbackModal, setShowFeedbackModal] = useState(false);
+  const [feedbackDismissed, setFeedbackDismissed] = useState(false);
+
+  useEffect(() => {
+    const unsub = onSnapshot(doc(db, "settings", "system"), (snap) => {
+      if (snap.exists()) {
+        setFeedbackOpenOverride(!!snap.data().feedbackOpen);
+      }
+    });
+    return () => unsub();
+  }, []);
+
+  useEffect(() => {
+    if (!userId) return;
+    const unsub = onSnapshot(doc(db, "feedbacks", userId), (snap) => {
+      setHasSubmittedFeedback(snap.exists());
+    });
+    return () => unsub();
+  }, [userId]);
+
+  const isFeedbackPeriodActive = useMemo(() => {
+    if (feedbackOpenOverride) return true;
+    // Sunday, July 19, 2026, 06:00 AM local time
+    const targetTime = new Date(2026, 6, 19, 6, 0).getTime();
+    return Date.now() >= targetTime;
+  }, [feedbackOpenOverride]);
+
+  useEffect(() => {
+    if (isFeedbackPeriodActive && !hasSubmittedFeedback && !feedbackDismissed) {
+      setShowFeedbackModal(true);
+    } else {
+      setShowFeedbackModal(false);
+    }
+  }, [isFeedbackPeriodActive, hasSubmittedFeedback, feedbackDismissed]);
   const [leaderboardInfo, setLeaderboardInfo] = useState({ totalUsers: 0 });
   const [dailyMessage, setDailyMessage] = useState("");
   const [dailyMediaUrl, setDailyMediaUrl] = useState("");
@@ -831,7 +870,7 @@ export default function Dashboard({ userId, userName, setActiveTab, setPredictio
 
   if (isLoading) return <div className="flex justify-center items-center h-64"><div className="animate-spin text-5xl text-blue-500">⚽</div></div>;
 
-  if (tournamentState >= 13 && showPodiumState && allUsersList.length > 0) {
+  if (tournamentState >= 14 && showPodiumState && allUsersList.length > 0) {
     const getPrizeForRank = (rank: number, board: "GENERAL" | "KNOCKOUT", usersArr: any[]) => {
       if (!prizes) return 0;
       const winnersAtThisRank = usersArr.filter(u => board === "GENERAL" ? u.displayRank === rank : u.displayKoRank === rank);
@@ -1074,6 +1113,24 @@ export default function Dashboard({ userId, userName, setActiveTab, setPredictio
          </div>
          <img src="/panel-removebg.png" alt="Studio Desk" className="relative z-30 w-full object-contain drop-shadow-[0_-8px_20px_rgba(0,0,0,0.8)] pointer-events-none" />
       </div>
+
+      {isFeedbackPeriodActive && !hasSubmittedFeedback && feedbackDismissed && (
+         <div className="bg-gradient-to-r from-blue-600/90 to-indigo-600/90 border border-blue-500/30 p-4 rounded-3xl text-white shadow-lg flex flex-col sm:flex-row items-center justify-between gap-4 animate-fade-in-up">
+            <div className="flex items-center gap-3">
+               <span className="text-2xl">💬</span>
+               <div className="text-right">
+                  <h4 className="font-bold text-sm">נשמח לשמוע את דעתך על הטורניר!</h4>
+                  <p className="text-xs text-blue-100 mt-0.5">סקר משוב קצרצר לקראת סיום הטורניר ולקראת יורו 2028.</p>
+               </div>
+            </div>
+            <button 
+               onClick={() => setFeedbackDismissed(false)}
+               className="bg-white text-blue-600 hover:bg-blue-50 px-4 py-2 rounded-xl text-xs font-black transition-all active:scale-95 shadow-md cursor-pointer shrink-0"
+            >
+               ✍️ למילוי המשוב
+            </button>
+         </div>
+      )}
 
       {missingTasksList.length > 0 && (
          <div className={`${bannerStyle} p-6 rounded-3xl border relative overflow-hidden transition-all duration-500`}>
@@ -2342,12 +2399,20 @@ export default function Dashboard({ userId, userName, setActiveTab, setPredictio
       {showWrappedModal && (
         <WrappedModal 
           onClose={() => setShowWrappedModal(false)}
-          userName={userName || safeUserName}
+          userName={allUsersList.find(u => u.id === userId)?.name || allUsersList.find(u => u.id === userId)?.displayName || userName || "משתמש"}
           userStats={userStats}
           allUsersList={allUsersList}
           nemesisData={nemesisData}
         />
       )}
+
+      <FeedbackModal 
+        userId={userId}
+        userName={allUsersList.find(u => u.id === userId)?.name || allUsersList.find(u => u.id === userId)?.displayName || userName || "משתמש"}
+        isOpen={showFeedbackModal}
+        onClose={() => setFeedbackDismissed(true)}
+        onSubmitSuccess={() => setHasSubmittedFeedback(true)}
+      />
     </div>
   );
 }

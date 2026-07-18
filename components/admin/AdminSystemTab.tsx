@@ -10,7 +10,9 @@ export default function AdminSystemTab({
   isCalculating,
   handleSaveTournamentState,
   handleSaveDeadline,
-  handleFactoryReset
+  handleFactoryReset,
+  feedbackOpen,
+  setFeedbackOpen
 }: any) {
   
   const TIMELINE_STATES = [
@@ -27,7 +29,8 @@ export default function AdminSystemTab({
     { val: 10, label: "10. חשיפת חצי", desc: "👁️ נחשפים: משחקים ושאלות לחצי גמר." },
     { val: 11, label: "11. סגירת חצי", desc: "🔒 ננעלים: כל הניחושים לחצי גמר." },
     { val: 12, label: "12. חשיפת גמר", desc: "👁️ נחשפים: משחקים לגמר." },
-    { val: 13, label: "13. סיום טורניר", desc: "🔒 ננעלים: גמר. הטורניר הסתיים." }
+    { val: 13, label: "13. סגירת גמר", desc: "🔒 ננעלים: גמר ומקום שלישי. הניחושים נחשפים במטריקס." },
+    { val: 14, label: "14. סיום טורניר", desc: "🏆 הטורניר הסתיים רשמית!" }
   ];
 
   const STAGE_OPTIONS = [
@@ -109,6 +112,23 @@ export default function AdminSystemTab({
               <p className={`text-xs ${tournamentState === st.val ? 'text-blue-300/80' : 'text-slate-500'}`}>{st.desc}</p>
             </button>
           ))}
+        </div>
+        
+        {/* Toggle feedback survey manually */}
+        <div className="bg-slate-950 p-5 rounded-2xl border border-slate-800/80 flex justify-between items-center mb-6">
+          <div>
+            <h4 className="text-white font-bold text-sm">פתיחה ידנית של סקר שביעות הרצון 💬</h4>
+            <p className="text-slate-500 text-xs mt-1">פתיחת שאלון המשוב לכל המשתמשים באופן ידני (לצורכי בדיקה או להקדמת המועד).</p>
+          </div>
+          <label className="relative inline-flex items-center cursor-pointer">
+            <input 
+              type="checkbox" 
+              checked={feedbackOpen} 
+              onChange={(e) => setFeedbackOpen(e.target.checked)}
+              className="sr-only peer" 
+            />
+            <div className="w-11 h-6 bg-slate-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:bg-blue-400 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-slate-600 after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600/20 border border-slate-700"></div>
+          </label>
         </div>
 
         <button 

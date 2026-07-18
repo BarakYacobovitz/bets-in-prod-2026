@@ -14,6 +14,8 @@ import AdminUsersTab from "@/components/admin/AdminUsersTab";
 import AdminNotificationTab from "@/components/admin/AdminNotificationTab";
 import AdminPrizesTab from "@/components/admin/AdminPrizesTab";
 import AdminStatsTab from "@/components/admin/AdminStatsTab";
+import AdminScenariosTab from "@/components/admin/AdminScenariosTab";
+import AdminFeedbackTab from "@/components/admin/AdminFeedbackTab";
 
 const ADMIN_EMAIL = "bawak.y10@gmail.com"; 
 
@@ -21,7 +23,7 @@ export default function AdminPanel() {
   const [user, setUser] = useState<any>(null);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   
-  const [activeTab, setActiveTab] = useState<"SYSTEM" | "MAGAZINE" | "USERS" | "MATCHES" | "GENERATOR" | "QUALIFIERS" | "THIRD_PLACE" | "BONUS" | "STATS" | "BACKUP" | "PRIZES">("SYSTEM");  
+  const [activeTab, setActiveTab] = useState<"SYSTEM" | "MAGAZINE" | "USERS" | "MATCHES" | "GENERATOR" | "QUALIFIERS" | "THIRD_PLACE" | "BONUS" | "STATS" | "BACKUP" | "PRIZES" | "SCENARIOS" | "FEEDBACK">("SYSTEM");  
 
   const [adminBonusCategory, setAdminBonusCategory] = useState<string>("TOURNAMENT");
   const [adminKnockoutRound, setAdminKnockoutRound] = useState<string>("ALL");
@@ -44,6 +46,7 @@ export default function AdminPanel() {
   const [tournamentState, setTournamentState] = useState<number>(0);
   const [activeDeadline, setActiveDeadline] = useState<{ stage: string, time: string }>({ stage: "1", time: "" });
   const [usersList, setUsersList] = useState<any[]>([]);
+  const [feedbackOpen, setFeedbackOpen] = useState<boolean>(false);
 
   const [bonusQuestions, setBonusQuestions] = useState<any[]>([]); 
   const [editingId, setEditingId] = useState<string | null>(null); 
@@ -251,6 +254,7 @@ export default function AdminPanel() {
       if (settingsSnap.exists()) {
         currentTState = settingsSnap.data().tournamentState || 0;
         setTournamentState(currentTState);
+        setFeedbackOpen(!!settingsSnap.data().feedbackOpen);
       }
 
       const deadSnap = await getDoc(doc(db, "settings", "deadlines"));
@@ -313,7 +317,7 @@ const handleUpdateUserDetails = async (userId: string, details: { name?: string,
   const handleSaveTournamentState = async () => { 
     setSavingId("state"); 
     try { 
-      await setDoc(doc(db, "settings", "system"), { tournamentState }, { merge: true }); 
+      await setDoc(doc(db, "settings", "system"), { tournamentState, feedbackOpen }, { merge: true }); 
       setTimeout(() => { setSavingId(null); toast.success("מצב הטורניר עודכן בהצלחה!"); }, 500); 
     } catch (error) { 
       setSavingId(null); 
@@ -1196,7 +1200,7 @@ const handleCalculateCrowdStats = async (match: any) => {
          nextState = 12;
       } else if (simStage === "FINAL") {
          matchesToResolve = matches.filter(m => m.stage === "KNOCKOUT" && m.roundName === "גמר" || m.roundName === "מקום שלישי");
-         nextState = 13;
+         nextState = 14;
       }
 
       for (const match of matchesToResolve) {
@@ -2028,6 +2032,8 @@ const handleExportBackup = async () => {
             { id: "BONUS", icon: "🎁", label: "בונוסים" },
             { id: "USERS", icon: "👥", label: "משתמשים" },
             { id: "STATS", icon: "📊", label: "ראדאר" },
+            { id: "SCENARIOS", icon: "🔮", label: "תרחישים" },
+            { id: "FEEDBACK", icon: "💬", label: "משובים" },
             { id: "PRIZES", icon: "💰", label: "פרסים" },
             { id: "NOTIFICATIONS", icon: "📢", label: "פוש" },
             { id: "BACKUP", icon: "💾", label: "גיבוי" }
@@ -2083,6 +2089,8 @@ const handleExportBackup = async () => {
                 handleSaveTournamentState={handleSaveTournamentState}
                 handleSaveDeadline={handleSaveDeadline}
                 handleFactoryReset={handleFactoryReset}
+                feedbackOpen={feedbackOpen}
+                setFeedbackOpen={setFeedbackOpen}
              />
           )}
 
@@ -2127,6 +2135,8 @@ const handleExportBackup = async () => {
            />
         )}
         {activeTab === "PRIZES" && <AdminPrizesTab />}
+        {activeTab === "SCENARIOS" && <AdminScenariosTab />}
+        {activeTab === "FEEDBACK" && <AdminFeedbackTab />}
 
           {activeTab === "BONUS" && (
             <AdminBonusTab />

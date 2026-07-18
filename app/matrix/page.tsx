@@ -81,7 +81,8 @@ const getDefaultMatchdayFilter = (state: number) => {
   if (state === 4 || state === 5) return "32 הגדולות"; // 4=פתוח, 5=ננעל
   if (state === 6 || state === 7) return "שמינית גמר";
   if (state === 8 || state === 9) return "רבע גמר";
-  if (state >= 10) return "חצי גמר";
+  if (state === 10 || state === 11) return "חצי גמר";
+  if (state >= 12) return "גמר";
   return "ALL";
 };
 // פונקציה שמתרגמת את סטטוס הטורניר לערך הסינון הדיפולטיבי של טבלת הבונוסים
@@ -809,7 +810,8 @@ ${JSON.stringify(varContextPayload)}`;
                 <option value="32 הגדולות">-- 32 הגדולות</option>
                 <option value="שמינית גמר">-- שמינית גמר</option>
                 <option value="רבע גמר">-- רבע גמר</option>
-                <option value="חצי גמר">-- חצי גמר וגמר</option>
+                <option value="חצי גמר">-- חצי גמר</option>
+                <option value="גמר">-- הגמר הגדול ומקום שלישי</option>
               </select>
             </div>
             <div className="flex flex-col gap-1 flex-1 min-w-[140px]">

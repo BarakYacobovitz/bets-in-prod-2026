@@ -134,7 +134,7 @@ export default function Leaderboard() {
     let pool = BROADCAST_QUOTES.REGULAR;
     if (tournamentState >= 4 && tournamentState <= 5) {
       pool = BROADCAST_QUOTES.GROUP_STAGE_END;
-    } else if (tournamentState >= 13) {
+    } else if (tournamentState >= 14) {
       pool = BROADCAST_QUOTES.TOURNAMENT_END;
     }
     const randomQuote = pool[Math.floor(Math.random() * pool.length)];
@@ -461,7 +461,7 @@ export default function Leaderboard() {
     const isOtherF = (name: string) => name && name.includes("מאיה");
     const o = (name: string, m: string, f: string) => isOtherF(name) ? f : m; 
 
-    if (tournamentState >= 13) {
+    if (tournamentState >= 14) {
        if (me.displayRank === 1) {
          newTeaser = g(`שריקת הסיום! ${me.name?.split(' ')[0]}, אתה האלוף הבלתי מעורער! תכין מקום בארון לגביע (ולמזומן) 🏆💸`, `שריקת הסיום! ${me.name?.split(' ')[0]}, את האלופה הבלתי מעורערת! תכיני מקום בארון לגביע (ולמזומן) 🏆💸`);
        } else if (me.displayRank <= 3) {
