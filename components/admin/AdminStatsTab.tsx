@@ -463,9 +463,29 @@ Structure:
             if (!truth || !ans) continue;
             const qInfo = bqMap[qId];
             const truthArray = Array.isArray(truth) ? truth : [truth];
-            if (truthArray.some((t: string) => t.toString().trim() === (ans as string).toString().trim())) {
-               bonusPoints += (qInfo?.points || 0);
-               bonusHitsCount++;
+             let pointsEarned = 0;
+             let isCorrect = false;
+
+             if (qInfo?.isProximity && qInfo?.answerType === "NUMBER_PURE") {
+                const truthNum = Number(truthArray[0]);
+                const ansNum = Number(ans);
+                if (!isNaN(truthNum) && !isNaN(ansNum)) {
+                   const diff = Math.abs(truthNum - ansNum);
+                   if (diff === 0) pointsEarned = 50;
+                   else if (diff <= 5) pointsEarned = 40;
+                   else if (diff <= 10) pointsEarned = 30;
+                   else if (diff <= 15) pointsEarned = 20;
+                   else if (diff <= 20) pointsEarned = 10;
+                   isCorrect = pointsEarned > 0;
+                }
+             } else {
+                isCorrect = truthArray.some((t: string) => t.toString().trim() === (ans as string).toString().trim());
+                if (isCorrect) pointsEarned = (qInfo?.points || 0);
+             }
+
+             if (isCorrect) {
+                bonusPoints += pointsEarned;
+                bonusHitsCount++;
                
                if (qInfo?.isDouble) {
                   bonusBreakdown.double++;

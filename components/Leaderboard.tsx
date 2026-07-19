@@ -642,7 +642,21 @@ export default function Leaderboard() {
     const truth = realBonusAnswers[qId];
     if (!truth || !userAnswer) return null;
     const truthArray = Array.isArray(truth) ? truth : [truth];
-    return truthArray.some((t: string) => t.toString().trim() === userAnswer.toString().trim()) ? (bonusQuestionsMap[qId]?.points || 0) : 0;
+    const q = bonusQuestionsMap[qId];
+    if (q && q.isProximity && q.answerType === "NUMBER_PURE") {
+      const truthNum = Number(truthArray[0]);
+      const ansNum = Number(userAnswer);
+      if (!isNaN(truthNum) && !isNaN(ansNum)) {
+        const diff = Math.abs(truthNum - ansNum);
+        if (diff === 0) return 50;
+        if (diff <= 5) return 40;
+        if (diff <= 10) return 30;
+        if (diff <= 15) return 20;
+        if (diff <= 20) return 10;
+        return 0;
+      }
+    }
+    return truthArray.some((t: string) => t.toString().trim() === userAnswer.toString().trim()) ? (q?.points || 0) : 0;
   };
 
   const getGroupQualPoints = (group: string, place: 'first' | 'second', predTeam: string) => {

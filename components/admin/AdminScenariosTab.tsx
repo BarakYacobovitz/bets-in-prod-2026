@@ -788,6 +788,110 @@ export default function AdminScenariosTab() {
     toast.success(`התרחישים עבור ${targetUserDisplayName} חושבו!`);
   };
 
+  const generateScenarioStory = (uName: string, items: ScenarioItem[] | null, targetRank: number | null) => {
+    if (!items || items.length === 0) return "";
+    
+    const emojiMap: Record<number, string> = { 1: "🏆 מקום 1", 2: "🥈 מקום 2", 3: "🥉 מקום 3", 4: "🏅 מקום 4" };
+    const rankText = emojiMap[targetRank || 1] || `מקום ${targetRank}`;
+    
+    const matchItems = items.filter(x => x.outcome.type === "MATCH");
+    const bonusItems = items.filter(x => x.outcome.type === "BONUS");
+    
+    let storyParts: string[] = [];
+    
+    storyParts.push(`כדי ש-${uName} יגיע ל${rankText}, הוא צריך שילוב מושלם של תוצאות: ⚽`);
+    
+    if (matchItems.length > 0) {
+      const matchDescriptions = matchItems.map(item => {
+        const parts = item.varName.split(":");
+        const round = parts[0] ? parts[0].trim() : "";
+        const teams = parts[1] ? parts[1].trim() : "";
+        let action = item.label;
+        
+        if (action.includes("מנצחת בתוצאה אחרת")) {
+          const winner = action.split("מנצחת")[0].trim();
+          action = `ניצחון מוחץ של ${winner} בזמן חוקי (כמו 3-0)`;
+        } else if (action.includes("עולה בפנדלים")) {
+          const winner = action.split("עולה בפנדלים")[0].trim();
+          action = `דו-קרב פנדלים דרמטי שבו ${winner} תנצח בסוף`;
+        }
+        
+        return `${action} ב${round} (${teams})`;
+      });
+      storyParts.push(`במגרש הוא חייב: ${matchDescriptions.join(" וגם ש-")}.`);
+    }
+    
+    if (bonusItems.length > 0) {
+      const bonusDescriptions = bonusItems.map(item => {
+        const questionText = item.varName;
+        const label = item.label;
+        
+        if (label.startsWith("תשובה: ")) {
+          const val = label.replace("תשובה: ", "").replace(/"/g, "");
+          return `בשאלה "${questionText}" הוא זקוק לניחוש מדויק ש-${val} יזכה בתואר`;
+        } else if (label.startsWith("הכל רק לא ")) {
+          const val = label.replace("הכל רק לא ", "");
+          return `בשאלה "${questionText}" הוא יתפלל שכל שחקן/נבחרת חוץ מ-${val} ייבחרו (כדי לחסום את יריביו)`;
+        }
+        return `בשאלה "${questionText}" שיתקבל הניחוש: ${label}`;
+      });
+      storyParts.push(`בשאלות הבונוס הוא יצטרך את המזל לצידו: ${bonusDescriptions.join(", ")}.`);
+    }
+    
+    storyParts.push(`אם כל הפאזל הדרמטי הזה יתחבר בדיוק כך, ${uName} ישבור את הטבלה ויעפיל אל ${rankText}! 🔥`);
+    
+    return storyParts.join("\n\n");
+  };
+
+  const generateNightmareStory = (uName: string, items: ScenarioItem[] | null) => {
+    if (!items || items.length === 0) return "";
+    
+    const matchItems = items.filter(x => x.outcome.type === "MATCH");
+    const bonusItems = items.filter(x => x.outcome.type === "BONUS");
+    
+    let storyParts: string[] = [];
+    
+    storyParts.push(`בצד השני, תרחיש הבלהות שידרדר את ${uName} אל מחוץ לחמישייה הראשונה מורכב משרשרת אסונות ספורטיביים: 💀`);
+    
+    if (matchItems.length > 0) {
+      const matchDescriptions = matchItems.map(item => {
+        const parts = item.varName.split(":");
+        const round = parts[0] ? parts[0].trim() : "";
+        const teams = parts[1] ? parts[1].trim() : "";
+        let action = item.label;
+        
+        if (action.includes("מנצחת בתוצאה אחרת")) {
+          const winner = action.split("מנצחת")[0].trim();
+          action = `ניצחון מוחץ של ${winner} (כמו 3-0)`;
+        } else if (action.includes("עולה בפנדלים")) {
+          const winner = action.split("עולה בפנדלים")[0].trim();
+          action = `ניצחון של ${winner} בפנדלים`;
+        }
+        
+        return `${action} ב${round} (${teams})`;
+      });
+      storyParts.push(`הכל יתחיל בכך ש-${matchDescriptions.join(" וגם ש-")}.`);
+    }
+    
+    if (bonusItems.length > 0) {
+      const bonusDescriptions = bonusItems.map(item => {
+        const questionText = item.varName;
+        const label = item.label;
+        
+        if (label.startsWith("תשובה: ")) {
+          const val = label.replace("תשובה: ", "").replace(/"/g, "");
+          return `בשאלה "${questionText}" הניחוש ${val} יתממש (מה שיחלק נקודות למתחרים שלו)`;
+        }
+        return `בשאלה "${questionText}" שיתקבל: ${label}`;
+      });
+      storyParts.push(`בנוסף, בשאלות הבונוס הוא יחטוף מכה קשה: ${bonusDescriptions.join(", ")}.`);
+    }
+    
+    storyParts.push(`שילוב כזה של מכות יגרור את ${uName} מטה אל מחוץ לטופ 5. בואו נקווה בשבילו שזה לא יקרה! 🛡️`);
+    
+    return storyParts.join("\n\n");
+  };
+
   const copyWhatsAppText = (u: User) => {
     const result = userResults[u.id];
     if (!result) return;
@@ -800,10 +904,7 @@ export default function AdminScenariosTab() {
       const emojiMap: Record<number, string> = { 1: "🏆 מקום 1", 2: "🥈 מקום 2", 3: "🥉 מקום 3", 4: "🏅 מקום 4" };
       const rankText = emojiMap[dreamTargetRank || 1] || "מקום 1";
       text += `*✨ תרחיש חלומות (להגעה אל ${rankText}):*\n`;
-      dream.forEach(s => {
-        text += `• _${s.varName.split(':')[0]}_: ${s.label}\n`;
-      });
-      text += `\n`;
+      text += `${generateScenarioStory(u.displayName, dream, dreamTargetRank)}\n\n`;
     } else {
       text += `❌ *הדחה מתמטית:* לא נותר תרחיש בו תוכל לסיים בטופ 4.\n\n`;
     }
@@ -811,9 +912,7 @@ export default function AdminScenariosTab() {
     if (u.rank && u.rank <= 10) {
       if (nightmare) {
         text += `*💀 תרחיש בלהות (התרסקות אל מתחת למקום 5):*\n`;
-        nightmare.forEach(s => {
-          text += `• _${s.varName.split(':')[0]}_: ${s.label}\n`;
-        });
+        text += `${generateNightmareStory(u.displayName, nightmare)}\n\n`;
       } else {
         text += `🛡️ *חסין מהתרסקות:* מתמטית לא תרד מתחת למקום 5!`;
       }
@@ -991,6 +1090,11 @@ export default function AdminScenariosTab() {
                       
                       {result.dream ? (
                         <>
+                          <div className="bg-slate-950/60 border border-blue-500/20 rounded-2xl p-4 mb-4 text-xs leading-relaxed text-blue-200/90 whitespace-pre-line font-sans shadow-inner">
+                            {generateScenarioStory(u.displayName, result.dream, result.dreamTargetRank)}
+                          </div>
+                          
+                          <div className="text-[10px] font-black text-slate-500 mb-2">📋 פירוט התוצאות הטכני:</div>
                           <ul className="text-xs space-y-2">
                             {result.dream.map((s, idx) => (
                               <li key={idx} className="flex items-start gap-1.5">
@@ -1074,6 +1178,11 @@ export default function AdminScenariosTab() {
                         
                         {result.nightmare ? (
                           <>
+                            <div className="bg-slate-950/60 border border-rose-500/20 rounded-2xl p-4 mb-4 text-xs leading-relaxed text-rose-200/90 whitespace-pre-line font-sans shadow-inner">
+                              {generateNightmareStory(u.displayName, result.nightmare)}
+                            </div>
+                            
+                            <div className="text-[10px] font-black text-slate-500 mb-2">📋 פירוט התוצאות הטכני:</div>
                             <ul className="text-xs space-y-2">
                               {result.nightmare.map((s, idx) => (
                                 <li key={idx} className="flex items-start gap-1.5">

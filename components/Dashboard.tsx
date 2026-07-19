@@ -726,11 +726,31 @@ export default function Dashboard({ userId, userName, setActiveTab, setPredictio
         if(Object.keys(realBonusAnswers).length > 0) {
             bonusQuestions.forEach((q:any) => {
                const truth = realBonusAnswers[q.id]; const uAns = userBonusAnswers[q.id];
-               if(truth && uAns) {
+               if(truth && uAns !== undefined && uAns !== null && uAns !== "") {
                    const tArr = Array.isArray(truth) ? truth : [truth];
-                   const normalize = (s: any) => String(s || "").trim().replace(/\s+/g, " ").toLowerCase();
-                   if(tArr.some((t:any) => normalize(t) === normalize(uAns))) {
-                       feed.push({ id: `b_${q.id}`, qId: q.id, icon: '🎁', title: q.label, desc: `שאלת בונוס (${uAns})`, points: Number(q.points)||0, ts: 3 });
+                   let pointsEarned = 0;
+                   let isCorrect = false;
+
+                   if (q.isProximity && q.answerType === "NUMBER_PURE") {
+                       const truthNum = Number(tArr[0]);
+                       const ansNum = Number(uAns);
+                       if (!isNaN(truthNum) && !isNaN(ansNum)) {
+                           const diff = Math.abs(truthNum - ansNum);
+                           if (diff === 0) pointsEarned = 50;
+                           else if (diff <= 5) pointsEarned = 40;
+                           else if (diff <= 10) pointsEarned = 30;
+                           else if (diff <= 15) pointsEarned = 20;
+                           else if (diff <= 20) pointsEarned = 10;
+                           isCorrect = pointsEarned > 0;
+                       }
+                   } else {
+                       const normalize = (s: any) => String(s || "").trim().replace(/\s+/g, " ").toLowerCase();
+                       isCorrect = tArr.some((t:any) => normalize(t) === normalize(uAns));
+                       if (isCorrect) pointsEarned = Number(q.points) || 0;
+                   }
+
+                   if (isCorrect) {
+                       feed.push({ id: `b_${q.id}`, qId: q.id, icon: '🎁', title: q.label, desc: `שאלת בונוס (${uAns})`, points: pointsEarned, ts: 3 });
                    }
                }
             });
