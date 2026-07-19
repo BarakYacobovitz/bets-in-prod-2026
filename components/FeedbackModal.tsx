@@ -143,7 +143,7 @@ export default function FeedbackModal({ userId, userName, isOpen, onClose, onSub
         </div>
 
         {/* Step Contents */}
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <div className="space-y-6">
           
           {/* STEP 1 */}
           {step === 1 && (
@@ -332,6 +332,7 @@ export default function FeedbackModal({ userId, userName, isOpen, onClose, onSub
           <div className="flex justify-between items-center gap-3 pt-4 border-t border-slate-800/80">
             {step > 1 ? (
               <button
+                key="prev-btn"
                 type="button"
                 onClick={prevStep}
                 className="px-5 py-2.5 rounded-xl border border-slate-700 text-slate-300 hover:bg-slate-800 text-xs font-black transition-all active:scale-95 cursor-pointer"
@@ -340,6 +341,7 @@ export default function FeedbackModal({ userId, userName, isOpen, onClose, onSub
               </button>
             ) : (
               <button
+                key="dismiss-btn"
                 type="button"
                 onClick={onClose}
                 className="px-5 py-2.5 rounded-xl border border-slate-800 text-slate-500 hover:bg-slate-950 text-xs font-black transition-all active:scale-95 cursor-pointer"
@@ -350,6 +352,7 @@ export default function FeedbackModal({ userId, userName, isOpen, onClose, onSub
 
             {step < 3 ? (
               <button
+                key="next-btn"
                 type="button"
                 onClick={nextStep}
                 className="px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-black transition-all active:scale-95 shadow-md cursor-pointer"
@@ -358,7 +361,9 @@ export default function FeedbackModal({ userId, userName, isOpen, onClose, onSub
               </button>
             ) : (
               <button
-                type="submit"
+                key="submit-btn"
+                type="button"
+                onClick={handleSubmit}
                 disabled={isSubmitting}
                 className="px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black transition-all active:scale-95 shadow-md cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
               >
@@ -367,7 +372,7 @@ export default function FeedbackModal({ userId, userName, isOpen, onClose, onSub
             )}
           </div>
 
-        </form>
+        </div>
 
       </div>
     </div>
