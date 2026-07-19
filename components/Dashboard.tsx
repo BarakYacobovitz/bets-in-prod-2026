@@ -101,6 +101,7 @@ export default function Dashboard({ userId, userName, setActiveTab, setPredictio
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
   const [forceShowFeedbackModal, setForceShowFeedbackModal] = useState(false);
   const [feedbackDismissed, setFeedbackDismissed] = useState(false);
+  const [isFeedbackLoaded, setIsFeedbackLoaded] = useState(false);
 
   useEffect(() => {
     const unsub = onSnapshot(doc(db, "settings", "system"), (snap) => {
@@ -115,6 +116,7 @@ export default function Dashboard({ userId, userName, setActiveTab, setPredictio
     if (!userId) return;
     const unsub = onSnapshot(doc(db, "feedbacks", userId), (snap) => {
       setHasSubmittedFeedback(snap.exists());
+      setIsFeedbackLoaded(true);
     });
     return () => unsub();
   }, [userId]);
@@ -127,12 +129,12 @@ export default function Dashboard({ userId, userName, setActiveTab, setPredictio
   }, [feedbackOpenOverride]);
 
   useEffect(() => {
-    if (isFeedbackPeriodActive && !hasSubmittedFeedback && !feedbackDismissed) {
+    if (isFeedbackLoaded && isFeedbackPeriodActive && !hasSubmittedFeedback && !feedbackDismissed) {
       setShowFeedbackModal(true);
     } else {
       setShowFeedbackModal(false);
     }
-  }, [isFeedbackPeriodActive, hasSubmittedFeedback, feedbackDismissed]);
+  }, [isFeedbackLoaded, isFeedbackPeriodActive, hasSubmittedFeedback, feedbackDismissed]);
   const [leaderboardInfo, setLeaderboardInfo] = useState({ totalUsers: 0 });
   const [dailyMessage, setDailyMessage] = useState("");
   const [dailyMediaUrl, setDailyMediaUrl] = useState("");
