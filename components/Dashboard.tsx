@@ -99,6 +99,7 @@ export default function Dashboard({ userId, userName, setActiveTab, setPredictio
   const [feedbackOpenOverride, setFeedbackOpenOverride] = useState(false);
   const [hasSubmittedFeedback, setHasSubmittedFeedback] = useState(false);
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
+  const [forceShowFeedbackModal, setForceShowFeedbackModal] = useState(false);
   const [feedbackDismissed, setFeedbackDismissed] = useState(false);
 
   useEffect(() => {
@@ -1114,22 +1115,42 @@ export default function Dashboard({ userId, userName, setActiveTab, setPredictio
          <img src="/panel-removebg.png" alt="Studio Desk" className="relative z-30 w-full object-contain drop-shadow-[0_-8px_20px_rgba(0,0,0,0.8)] pointer-events-none" />
       </div>
 
-      {isFeedbackPeriodActive && !hasSubmittedFeedback && feedbackDismissed && (
-         <div className="bg-gradient-to-r from-blue-600/90 to-indigo-600/90 border border-blue-500/30 p-4 rounded-3xl text-white shadow-lg flex flex-col sm:flex-row items-center justify-between gap-4 animate-fade-in-up">
-            <div className="flex items-center gap-3">
-               <span className="text-2xl">💬</span>
-               <div className="text-right">
-                  <h4 className="font-bold text-sm">נשמח לשמוע את דעתך על הטורניר!</h4>
-                  <p className="text-xs text-blue-100 mt-0.5">סקר משוב קצרצר לקראת סיום הטורניר ולקראת יורו 2028.</p>
+      {isFeedbackPeriodActive && (
+        hasSubmittedFeedback ? (
+          <div className="bg-gradient-to-r from-teal-600/90 to-emerald-600/90 border border-teal-500/30 p-4 rounded-3xl text-white shadow-lg flex flex-col sm:flex-row items-center justify-between gap-4 animate-fade-in-up">
+             <div className="flex items-center gap-3">
+                <span className="text-2xl">💬</span>
+                <div className="text-right">
+                   <h4 className="font-bold text-sm">המשוב שלך התקבל בהצלחה!</h4>
+                   <p className="text-xs text-teal-100 mt-0.5">אם תרצה לשנות או לתקן את התשובות שלך, תוכל לעשות זאת כל עוד הסקר פעיל.</p>
+                </div>
+             </div>
+             <button 
+                onClick={() => setForceShowFeedbackModal(true)}
+                className="bg-white text-teal-600 hover:bg-teal-50 px-4 py-2 rounded-xl text-xs font-black transition-all active:scale-95 shadow-md cursor-pointer shrink-0"
+             >
+                ✍️ לעדכון המשוב
+             </button>
+          </div>
+        ) : (
+          feedbackDismissed && (
+            <div className="bg-gradient-to-r from-blue-600/90 to-indigo-600/90 border border-blue-500/30 p-4 rounded-3xl text-white shadow-lg flex flex-col sm:flex-row items-center justify-between gap-4 animate-fade-in-up">
+               <div className="flex items-center gap-3">
+                  <span className="text-2xl">💬</span>
+                  <div className="text-right">
+                     <h4 className="font-bold text-sm">נשמח לשמוע את דעתך על הטורניר!</h4>
+                     <p className="text-xs text-blue-100 mt-0.5">סקר משוב קצרצר לקראת סיום הטורניר ולקראת יורו 2028.</p>
+                  </div>
                </div>
+               <button 
+                  onClick={() => setFeedbackDismissed(false)}
+                  className="bg-white text-blue-600 hover:bg-blue-50 px-4 py-2 rounded-xl text-xs font-black transition-all active:scale-95 shadow-md cursor-pointer shrink-0"
+               >
+                  ✍️ למילוי המשוב
+               </button>
             </div>
-            <button 
-               onClick={() => setFeedbackDismissed(false)}
-               className="bg-white text-blue-600 hover:bg-blue-50 px-4 py-2 rounded-xl text-xs font-black transition-all active:scale-95 shadow-md cursor-pointer shrink-0"
-            >
-               ✍️ למילוי המשוב
-            </button>
-         </div>
+          )
+        )
       )}
 
       {missingTasksList.length > 0 && (
@@ -2409,9 +2430,15 @@ export default function Dashboard({ userId, userName, setActiveTab, setPredictio
       <FeedbackModal 
         userId={userId}
         userName={allUsersList.find(u => u.id === userId)?.name || allUsersList.find(u => u.id === userId)?.displayName || userName || "משתמש"}
-        isOpen={showFeedbackModal}
-        onClose={() => setFeedbackDismissed(true)}
-        onSubmitSuccess={() => setHasSubmittedFeedback(true)}
+        isOpen={showFeedbackModal || forceShowFeedbackModal}
+        onClose={() => {
+          setFeedbackDismissed(true);
+          setForceShowFeedbackModal(false);
+        }}
+        onSubmitSuccess={() => {
+          setHasSubmittedFeedback(true);
+          setForceShowFeedbackModal(false);
+        }}
       />
     </div>
   );

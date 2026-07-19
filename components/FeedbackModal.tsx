@@ -1,7 +1,7 @@
 // components/FeedbackModal.tsx
 "use client";
-import React, { useState } from "react";
-import { doc, setDoc } from "firebase/firestore";
+import React, { useState, useEffect } from "react";
+import { doc, setDoc, getDoc } from "firebase/firestore";
 import { db } from "../app/firebase";
 import toast from "react-hot-toast";
 
@@ -26,6 +26,41 @@ export default function FeedbackModal({ userId, userName, isOpen, onClose, onSub
   const [readWebsiteColumn, setReadWebsiteColumn] = useState("");
   const [improvements, setImprovements] = useState("");
   const [preservations, setPreservations] = useState("");
+
+  useEffect(() => {
+    if (isOpen && userId) {
+      const loadExistingFeedback = async () => {
+        try {
+          const docRef = doc(db, "feedbacks", userId);
+          const docSnap = await getDoc(docRef);
+          if (docSnap.exists()) {
+            const data = docSnap.data();
+            setRatingGeneral(data.ratingGeneral || 0);
+            setRatingUsability(data.ratingUsability || 0);
+            setWillRegister2028(data.willRegister2028 || "");
+            setUseForChampions(data.useForChampions || "");
+            setReadWhatsAppColumn(data.readWhatsAppColumn || "");
+            setReadWebsiteColumn(data.readWebsiteColumn || "");
+            setImprovements(data.improvements || "");
+            setPreservations(data.preservations || "");
+          } else {
+            // Reset to defaults if no document exists yet
+            setRatingGeneral(0);
+            setRatingUsability(0);
+            setWillRegister2028("");
+            setUseForChampions("");
+            setReadWhatsAppColumn("");
+            setReadWebsiteColumn("");
+            setImprovements("");
+            setPreservations("");
+          }
+        } catch (err) {
+          console.error("Error loading existing feedback:", err);
+        }
+      };
+      loadExistingFeedback();
+    }
+  }, [isOpen, userId]);
 
   if (!isOpen) return null;
 

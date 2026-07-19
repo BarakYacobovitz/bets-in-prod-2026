@@ -2,110 +2,111 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // Check if the user is an admin by their email address
+    // 👑 בודק האם המשתמש הוא האדמין הראשי לפי האימייל שלך
     function isAdmin() {
       return request.auth != null && request.auth.token.email == 'bawak.y10@gmail.com';
     }
     
-    // Check if the user is operating on their own document
+    // 👤 בודק האם המשתמש מנסה לערוך את המסמך השייך לו
     function isOwner(userId) {
       return request.auth != null && request.auth.uid == userId;
     }
 
-    // 👑 Admin bypass rule: Admins have full access to everything
+    // חוק-על: לאדמין (באימייל המורשה) יש גישה מלאה לקריאה וכתיבה של כל המידע
     match /{document=**} {
       allow read, write: if isAdmin();
     }
 
-    // --- Rules for users ---
+    // --- חוקים למשתמשים רגילים ---
 
-    // USERS collection:
-    // Anyone logged in can read the user profiles (e.g. for leaderboards, disclosure page)
-    // Users can create their profile only with totalPoints=0, knockoutPoints=0, hasPaid=false
-    // Users can update their profile but NOT stats/payment details
+    // ⚽ משחקים, הגדרות ותוצאות אמת: קריאה בלבד לכל משתמש מחובר
+    match /matches/{docId} { 
+      allow read: if request.auth != null; 
+    }
+    match /settings/{docId} { 
+      allow read: if request.auth != null; 
+    }
+    match /admin_results/{docId} { 
+      allow read: if request.auth != null; 
+    }
+    
+    // 👥 פרופיל משתמש
     match /users/{userId} {
       allow read: if request.auth != null;
-      allow create: if isOwner(userId) && 
-                      request.resource.data.totalPoints == 0 && 
-                      (!('knockoutPoints' in request.resource.data) || request.resource.data.knockoutPoints == 0) &&
-                      request.resource.data.hasPaid == false;
-      allow update: if isOwner(userId) && 
-                      !request.resource.data.diff(resource.data).affectedKeys().hasAny(['totalPoints', 'knockoutPoints', 'hasPaid', 'email']);
+      
+      // מאפשר יצירת פרופיל לשחקן חדש רק עם ערכי ברירת מחדל בטוחים (0 נקודות, ללא תשלום)
+      allow create: if request.auth != null && isOwner(userId)
+        && request.resource.data.totalPoints == 0
+        && request.resource.data.knockoutPoints == 0
+        && request.resource.data.hasPaid == false;
+      
+      // מאפשר למשתמש לעדכן את הפרופיל של עצמו (כמו שם, טוקן התראות וכו') 
+      // אך מונע ממנו לעדכן נקודות, תשלום, או סטטיסטיקות משחק
+      allow update: if isOwner(userId)
+        && !request.resource.data.diff(resource.data).affectedKeys()
+           .hasAny([
+             'totalPoints', 'knockoutPoints', 'hasPaid', 'breakdown', 
+             'previousTotalPoints', 'previousKnockoutPoints', 
+             'previousRankGeneral', 'previousRankKnockout'
+           ]);
     }
-
-    // MATCHES collection:
-    // Anyone logged in can read
-    // Only admin can write (covered by global match admin rule)
-    match /matches/{matchId} {
-      allow read: if request.auth != null;
-    }
-
-    // PREDICTIONS_MATCHES collection:
-    // Format is userUid_matchId
-    // Anyone logged in can read (for disclosure page / checking others' bets once locked)
-    // Users can write only their own predictions
-    match /predictions_matches/{predId} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null && 
-                      predId.startsWith(request.auth.uid + "_") && 
-                      request.resource.data.userId == request.auth.uid;
-    }
-
-    // PREDICTIONS_KNOCKOUT collection:
-    // Users can read/write their own knockout predictions
-    match /predictions_knockout/{predId} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null && 
-                      predId.startsWith(request.auth.uid + "_") && 
-                      request.resource.data.userId == request.auth.uid;
-    }
-
-    // PREDICTIONS_BONUS collection:
-    // Users can read/write their own bonus predictions
-    match /predictions_bonus/{predId} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null && 
-                      predId.startsWith(request.auth.uid + "_") && 
-                      request.resource.data.userId == request.auth.uid;
-    }
-
-    // PREDICTIONS_QUALIFIERS collection:
-    // Users can read/write their own qualifiers predictions
+    
+    // 🥇 ניחושי עולות מהבתים
     match /predictions_qualifiers/{userId} {
       allow read: if request.auth != null;
-      allow write: if request.auth != null && isOwner(userId);
+      allow create, update, delete: if request.auth != null && isOwner(userId);
     }
-
-    // PREDICTIONS_THIRD_PLACE collection:
-    // Users can read/write their own third-place predictions
+    
+    // 🥉 ניחושי עולות מקום שלישי
     match /predictions_third_place/{userId} {
       allow read: if request.auth != null;
-      allow write: if request.auth != null && isOwner(userId);
+      allow create, update, delete: if request.auth != null && isOwner(userId);
     }
-
-    // MINI_LEAGUES collection:
-    // Logged in users can read
-    // Users can create a league if they add themselves as a member and owner/creator
-    // Users can update members (joining/leaving) by only adding/removing their own UID from the 'members' array
+    
+    // 🎁 ניחושי שאלות בונוס
+    match /predictions_bonus/{userId} {
+      allow read: if request.auth != null;
+      allow create, update, delete: if request.auth != null && isOwner(userId);
+    }
+    
+    // 🏟️ ניחושי משחקים בודדים (שלב הבתים)
+    match /predictions_matches/{predId} {
+      allow read: if request.auth != null;
+      allow create, update: if request.auth != null && request.resource.data.userId == request.auth.uid;
+      allow delete: if request.auth != null && resource.data.userId == request.auth.uid;
+    }
+    
+    // 🏆 ניחושי משחקים בודדים (שלב הנוקאאוט)
+    match /predictions_knockout/{predId} {
+      allow read: if request.auth != null;
+      allow create, update: if request.auth != null && request.resource.data.userId == request.auth.uid;
+      allow delete: if request.auth != null && resource.data.userId == request.auth.uid;
+    }
+    
+    // 👥 ליגות פרטיות
     match /mini_leagues/{leagueId} {
       allow read: if request.auth != null;
-      allow create: if request.auth != null && 
-                      request.resource.data.creatorId == request.auth.uid &&
-                      request.resource.data.members.size() == 1 &&
-                      request.resource.data.members[0] == request.auth.uid;
+      
+      // יצירת ליגה מותרת לכל משתמש מחובר שמגדיר את עצמו כמנהל הליגה (adminId)
+      allow create: if request.auth != null && request.resource.data.adminId == request.auth.uid;
+      
+      // עדכון ליגה:
       allow update: if request.auth != null && (
-                      // Only allow updating members (for joining/leaving) unless you are the creator
-                      (resource.data.creatorId == request.auth.uid) || (
-                        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['members']) &&
-                        (
-                          // Joining: user added themselves
-                          (request.resource.data.members.size() == resource.data.members.size() + 1 && request.resource.data.members.hasAll(resource.data.members) && request.resource.data.members.hasAny([request.auth.uid])) ||
-                          // Leaving: user removed themselves
-                          (request.resource.data.members.size() == resource.data.members.size() - 1 && resource.data.members.hasAll(request.resource.data.members) && !request.resource.data.members.hasAny([request.auth.uid]))
-                        )
-                      )
-                    );
-      allow delete: if request.auth != null && resource.data.creatorId == request.auth.uid;
+        // א. מנהל הליגה יכול לשנות הכל (שם ליגה, PIN וכו')
+        resource.data.adminId == request.auth.uid ||
+        // ב. משתמש אחר יכול רק להצטרף/לעזוב (משנה רק את מערך ה-members ע"י הוספה/הסרה של ה-UID שלו בלבד)
+        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['members']) &&
+         (request.resource.data.members.toSet().difference(resource.data.members.toSet()).hasOnly([request.auth.uid]) ||
+          resource.data.members.toSet().difference(request.resource.data.members.toSet()).hasOnly([request.auth.uid])))
+      );
+      
+      // מחיקה מותרת רק למנהל הליגה שיצר אותה
+      allow delete: if request.auth != null && resource.data.adminId == request.auth.uid;
+    }
+
+    // 💬 סקר שביעות רצון (משובים)
+    match /feedbacks/{userId} {
+      allow read, write: if request.auth != null && isOwner(userId);
     }
   }
 }
