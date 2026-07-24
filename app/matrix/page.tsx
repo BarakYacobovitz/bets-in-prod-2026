@@ -97,6 +97,10 @@ const getDefaultBonusFilter = (state: number) => {
 };
 
 export default function MatrixPage() {
+  useEffect(() => {
+    window.location.href = "/";
+  }, []);
+  return null;
   const [users, setUsers] = useState<any[]>([]);
   const [matches, setMatches] = useState<any[]>([]);
   const [predictions, setPredictions] = useState<any>({});

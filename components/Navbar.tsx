@@ -502,37 +502,6 @@ export default function Navbar() {
     window.location.href = "/";
   };
 
-  const navigateToLeaderboard = (e: any) => {
-    e.preventDefault();
-    if (window.location.pathname === '/') {
-       const event = new CustomEvent("changeTab", { detail: "LEADERBOARD" });
-       window.dispatchEvent(event);
-    } else {
-       sessionStorage.setItem("startupTab", "LEADERBOARD");
-       window.location.href = "/";
-    }
-  };
-  const navigateToRules = (e: any) => {
-    e.preventDefault();
-    if (window.location.pathname === '/') {
-       const event = new CustomEvent("changeTab", { detail: "RULES" });
-       window.dispatchEvent(event);
-    } else {
-       sessionStorage.setItem("startupTab", "RULES");
-       window.location.href = "/";
-    }
-  };
-  const navigateToDashboard = (e: any) => {
-    e.preventDefault();
-    if (window.location.pathname === '/') {
-       const event = new CustomEvent("changeTab", { detail: "DASHBOARD" });
-       window.dispatchEvent(event);
-    } else {
-       sessionStorage.setItem("startupTab", "DASHBOARD");
-       window.location.href = "/";
-    }
-  };
-
   if (!isLoggedIn) return null;
 
   return (
@@ -546,7 +515,7 @@ export default function Navbar() {
     <nav className="bg-slate-950/80 backdrop-blur-md border-b border-slate-800 sticky top-0 z-50 text-white shadow-lg" dir="rtl">
       <div className="max-w-6xl mx-auto px-2 md:px-4 py-2 md:py-3 flex items-center justify-between">
         
-        <a href="/" onClick={navigateToDashboard} className="flex items-center gap-2 md:gap-4 group shrink-0" dir="ltr">
+        <a href="/" onClick={(e) => e.preventDefault()} className="flex items-center gap-2 md:gap-4 group shrink-0" dir="ltr">
           <div className="hidden sm:flex flex-col items-end justify-center">
              <div className="font-black text-2xl md:text-[28px] bg-gradient-to-b from-[#fef08a] via-[#fbbf24] to-[#d97706] bg-clip-text text-transparent leading-none tracking-wide">
                 Bets in PROD
@@ -561,167 +530,10 @@ export default function Navbar() {
           </div>
         </a>
 
-        {/* מרכז המסך: השעון ומד האחוזים צמודים */}
-        <div className="flex-1 flex justify-center items-center gap-3 md:gap-6 px-1 md:px-2">
-          
-          {totalRequiredTasks > 0 && (() => {
-              const progressPercent = Math.round(((totalRequiredTasks - missingMatchesToday) / totalRequiredTasks) * 100);
-              const ringColor = progressPercent === 100 ? 'text-emerald-500' : progressPercent >= 50 ? 'text-amber-500' : 'text-rose-500';
-              const textColor = progressPercent === 100 ? 'text-emerald-400' : progressPercent >= 50 ? 'text-amber-400' : 'text-rose-400';
-              const dashArray = 100.53; 
-              const dashOffset = dashArray - (progressPercent / 100) * dashArray;
-              const needsAttention = progressPercent < 50;
-
-              return (
-                 <div id="tour-progress-ring" className="flex flex-col items-center justify-center cursor-default shrink-0" title={`${totalRequiredTasks - missingMatchesToday} מתוך ${totalRequiredTasks} הושלמו`}>
-                    <div className={`relative w-10 h-10 md:w-14 md:h-14 flex items-center justify-center drop-shadow-md transition-transform ${needsAttention ? 'animate-pulse drop-shadow-[0_0_8px_rgba(225,29,72,0.6)]' : 'group-hover:scale-105'}`}>
-                       <svg className="absolute w-full h-full transform -rotate-90" viewBox="0 0 40 40">
-                          <circle cx="20" cy="20" r="16" stroke="currentColor" strokeWidth="3.5" fill="transparent" className="text-slate-800" />
-                          <circle cx="20" cy="20" r="16" stroke="currentColor" strokeWidth="3.5" fill="transparent"
-                            strokeDasharray={dashArray}
-                            strokeDashoffset={dashOffset}
-                            strokeLinecap="round"
-                            className={`${ringColor} transition-all duration-1000 ease-out`}
-                          />
-                       </svg>
-                       <span className={`text-[9px] md:text-xs font-black ${textColor}`}>
-                          {progressPercent}%
-                       </span>
-                    </div>
-                    <span className="text-[7px] md:text-[9px] text-slate-400 font-bold -mt-0.5 tracking-wider">הושלמו</span>
-                 </div>
-              );
-          })()}
-
-          {targetTime ? (
-            <div id="tour-timer" className={`flex flex-col items-center justify-center px-3 py-1.5 md:px-5 md:py-2 rounded-xl border transition-colors duration-500 shrink-0 ${isNoMoreBets ? 'bg-rose-950/40 border-rose-500/50 shadow-[0_0_10px_rgba(225,29,72,0.2)]' : 'bg-[#0f1115] border-slate-700/60 shadow-[inset_0_4px_10px_rgba(0,0,0,0.6)]'}`}>
-               <span className="text-[8px] md:text-[10px] font-bold text-slate-500 mb-1 uppercase tracking-widest">
-                 <span className="hidden md:inline">{nextNameFull}</span>
-                 <span className="inline md:hidden">{nextNameShort}</span>
-               </span>
-               
-               {isNoMoreBets ? (
-                 <span className="text-xs md:text-base font-black text-rose-500 animate-pulse tracking-widest">
-                   ננעל! 🔒
-                 </span>
-               ) : timeUnits ? (
-                 <div className="flex items-center gap-1 md:gap-1.5 text-sm md:text-xl font-mono font-black text-amber-500 drop-shadow-[0_0_5px_rgba(245,158,11,0.4)]" dir="ltr">
-                   {timeUnits.d && timeUnits.d !== "0" && (
-                     <>
-                       <span>{timeUnits.d.padStart(2, '0')}</span>
-                       <span className="opacity-40 animate-pulse">:</span>
-                     </>
-                   )}
-                   <span>{timeUnits.h}</span>
-                   <span className="opacity-40 animate-pulse">:</span>
-                   <span>{timeUnits.m}</span>
-                   <span className="opacity-40 animate-pulse">:</span>
-                   <span>{timeUnits.s}</span>
-                 </div>
-               ) : null}
-            </div>
-          ) : null}
-        </div>
+        {/* מרכז המסך */}
+        <div className="flex-1"></div>
 
         <div className="flex items-center gap-1.5 md:gap-3 shrink-0">
-             <div className="relative" ref={notifRef}>
-                <button onClick={() => setShowNotifMenu(!showNotifMenu)} className="relative p-1.5 md:p-2 bg-slate-900 rounded-full border border-slate-700 hover:bg-slate-800 transition-colors">
-                   <span className="text-sm md:text-lg">🔔</span>
-                   {totalNotifs > 0 && <span className="absolute -top-1 -right-1 w-3.5 h-3.5 md:w-4 md:h-4 bg-rose-500 rounded-full text-[8px] md:text-[9px] font-black flex items-center justify-center border border-slate-900 animate-pulse">{totalNotifs}</span>}
-                </button>
-                {showNotifMenu && (
-                   <div className="absolute top-full left-0 mt-2 w-64 bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl overflow-hidden z-50 animate-fade-in-up p-2">
-                      <div className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2 px-2 border-b border-slate-800 pb-2">התראות המערכת</div>
-                      
-                      {notifPermission === "default" && (
-                        <button 
-                          onClick={handleRequestNotificationPermission}
-                          className="w-full text-[11px] font-black text-white bg-blue-600 hover:bg-blue-500 p-2.5 rounded-xl border border-blue-400 shadow-[0_0_10px_rgba(37,99,235,0.4)] flex items-center justify-center gap-2 mb-2 transition-all active:scale-95"
-                        >
-                          <span>🔔</span> הפעל התראות במסך הבית
-                        </button>
-                      )}
-                      {/* --- סטטוס: מאושר פעיל --- */}
-                      {notifPermission === "granted" && (
-                        <div className="w-full text-[11px] font-black text-emerald-400 bg-emerald-950/30 p-2.5 rounded-xl border border-emerald-500/30 flex items-center justify-center gap-2 mb-2">
-                          <span>✅</span> התראות פועלות במכשיר זה
-                        </div>
-                      )}
-
-                      {/* --- סטטוס: נחסם על ידי המשתמש/דפדפן --- */}
-                      {notifPermission === "denied" && (
-                        <div className="w-full text-[10px] font-bold text-rose-400 bg-rose-950/30 p-2 rounded-xl border border-rose-500/30 flex items-center justify-center gap-1.5 mb-2 text-center">
-                          <span>❌</span> התראות חסומות בדפדפן. יש לשנות בהגדרות.
-                        </div>
-                      )}
-
-                      <div className="flex flex-col gap-1.5">
-                         {/* התראת עלייה בנקודות */}
-                         {ptsDiff > 0 && (
-                            <button 
-                               onClick={(e) => { setShowNotifMenu(false); navigateToLeaderboard(e); }} 
-                               className="w-full text-right text-[11px] font-bold text-emerald-400 bg-emerald-950/30 hover:bg-emerald-900/40 p-2.5 rounded-xl border border-emerald-500/20 flex items-center gap-2 transition-all active:scale-95 shadow-sm cursor-pointer"
-                            >
-                               <span className="animate-bounce text-xs">📈</span> עלית ב-{ptsDiff} נקודות היום!
-                            </button>
-                         )}
-
-                         {/* התראות פירוט חוסרים (השינוי החדש!) */}
-                         {alertDetails.map((alert, idx) => (
-                            <button 
-                               key={idx}
-                               onClick={(e) => { 
-                                 e.preventDefault();
-                                 setShowNotifMenu(false); 
-                                 if (window.location.pathname === '/') {
-                                    // 1. מעבר לטאב ניחושים הראשי
-                                    window.dispatchEvent(new CustomEvent("changeTab", { detail: alert.targetTab || "PREDICTIONS" }));
-                                    // 2. לחיצה חכמה על הטאב הפנימי הספציפי אחרי חלקיק שנייה!
-                                    if (alert.innerTabId) {
-                                       setTimeout(() => {
-                                          const btn = document.getElementById(`tab-${alert.innerTabId}`) || document.getElementById(`tab-${alert.innerTabId}-knockout`);
-                                          if (btn) btn.click();
-                                       }, 100);
-                                    }
-                                 } else {
-                                    sessionStorage.setItem("startupTab", alert.targetTab || "PREDICTIONS");
-                                    window.location.href = "/";
-                                 }
-                               }}
-                               className="w-full text-right text-[11px] font-bold text-amber-400 bg-amber-950/30 hover:bg-amber-900/40 p-2.5 rounded-xl border border-amber-500/20 flex items-center gap-2 transition-all active:scale-95 shadow-sm"
-                            >
-                               <span className="animate-pulse text-xs">⚠️</span> {alert.text}
-                            </button>
-                         ))}
-                         
-                         {/* שאלות הפתעה */}
-                         {activeSurpriseAlert > 0 && (
-                            <button 
-                               onClick={(e) => {
-                                 e.preventDefault();
-                                 setShowNotifMenu(false);
-                                 if (window.location.pathname === '/') {
-                                    window.dispatchEvent(new CustomEvent("changeTab", { detail: "PREDICTIONS" }));
-                                    setTimeout(() => {
-                                       const btn = document.getElementById('tab-bonus') || document.getElementById('tab-bonus-knockout');
-                                       if (btn) btn.click();
-                                    }, 100);
-                                 } else {
-                                    sessionStorage.setItem("startupTab", "PREDICTIONS");
-                                    window.location.href = "/";
-                                 }
-                               }}
-                               className="w-full text-right text-[11px] font-bold text-purple-400 bg-purple-950/30 hover:bg-purple-900/40 p-2.5 rounded-xl border border-purple-500/20 flex items-center gap-2 transition-all active:scale-95 shadow-sm"
-                            >
-                               <span className="animate-pulse text-xs">🎁</span> יש {activeSurpriseAlert} שאלות הפתעה פתוחות!
-                            </button>
-                         )}
-                         {totalNotifs === 0 && ptsDiff <= 0 && <div className="text-xs font-medium text-slate-500 text-center py-4">אין התראות חדשות.</div>}
-                      </div>
-                   </div>
-                )}
-             </div>
-
              <div className="flex items-center gap-2 bg-slate-900 border border-slate-700 p-1 pl-1.5 md:p-1.5 md:pl-4 rounded-full shadow-inner">
               {/* --- כפתור נגישות --- */}
                 <button 
@@ -737,16 +549,10 @@ export default function Navbar() {
                 )}
                 <div className="text-right hidden md:flex flex-col justify-center">
                   <div className="text-slate-200 font-bold text-sm truncate max-w-[100px]">{userName}</div>
-                  <div className="text-amber-400 text-xs font-black">{userPoints} נק'</div>
                 </div>
              </div>
 
              <div className="flex flex-col justify-center gap-1.5 mr-2 md:mr-3">
-                {userEmail === ADMIN_EMAIL && (
-                  <Link href="/admin" className="text-[10px] md:text-xs bg-emerald-600 text-white font-bold px-3 py-1 md:px-4 md:py-1.5 rounded-lg shadow-sm text-center hover:bg-emerald-500 transition-colors tracking-wide">
-                    אדמין
-                  </Link>
-                )}
                 <button onClick={handleLogout} className="text-[10px] md:text-xs bg-slate-800 border border-slate-700 text-rose-400 font-bold px-3 py-1 md:px-4 md:py-1.5 rounded-lg shadow-sm hover:bg-slate-700 hover:text-rose-300 transition-colors tracking-wide">
                   התנתק
                 </button>

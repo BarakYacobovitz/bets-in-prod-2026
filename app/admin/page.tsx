@@ -20,6 +20,10 @@ import AdminFeedbackTab from "@/components/admin/AdminFeedbackTab";
 const ADMIN_EMAIL = "bawak.y10@gmail.com"; 
 
 export default function AdminPanel() {
+  useEffect(() => {
+    window.location.href = "/";
+  }, []);
+  return null;
   const [user, setUser] = useState<any>(null);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   
